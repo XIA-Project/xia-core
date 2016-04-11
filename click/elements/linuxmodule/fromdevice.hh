@@ -134,8 +134,8 @@ Resets the count and drops handlers.
 
 class FromDevice : public AnyTaskDevice, public Storage { public:
 
-    FromDevice();
-    ~FromDevice();
+    FromDevice() CLICK_COLD;
+    ~FromDevice() CLICK_COLD;
 
     static void static_initialize();
     static void static_cleanup();
@@ -145,10 +145,10 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
     const char *processing() const	{ return PUSH; }
     void *cast(const char *);
 
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
     void take_state(Element *, ErrorHandler *);
 
     /* process a packet. return 0 if not wanted after all. */
@@ -157,6 +157,7 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
     bool run_task(Task *);
     void reset_counts() {
 	_runs = _empty_runs = _count = _drops = 0;
+	_highwater_length = Storage::size();
     }
 
   private:
@@ -164,6 +165,7 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
     bool _active;
     unsigned _burst;
     unsigned _drops;
+    unsigned _highwater_length;
 
     unsigned _runs;
     unsigned _empty_runs;
@@ -185,13 +187,17 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
 #endif
 
     enum { h_active, h_calls, h_reset_counts, h_length };
-    static String read_handler(Element *, void *);
-    static int write_handler(const String &, Element *, void *, ErrorHandler *);
+    static String read_handler(Element *, void *) CLICK_COLD;
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 
 };
 
 extern "C" {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
 struct sk_buff *click_fromdevice_rx_handler(struct sk_buff *skb);
+#else
+rx_handler_result_t click_fromdevice_rx_handler(struct sk_buff **pskb);
+#endif
 }
 
 #endif

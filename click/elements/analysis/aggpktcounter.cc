@@ -42,7 +42,7 @@ AggregatePacketCounter::Flow::add(uint32_t packetno, int column)
 {
     if (_counts[column].size() <= (int) packetno)
 	_counts[column].resize(packetno + 1, 0);
-    _counts[column].at_u(packetno)++;
+    _counts[column].unchecked_at(packetno)++;
 }
 
 AggregatePacketCounter::packetctr_t
@@ -63,7 +63,7 @@ AggregatePacketCounter::Flow::received(Vector<uint32_t> &v, const AggregatePacke
 	    n = _counts[port].size();
     for (int packetno = 0; packetno < n; packetno++)
 	for (int port = 0; port < apc->noutputs(); port++)
-	    if (packetno < _counts[port].size() && _counts[port].at_u(packetno)) {
+	    if (packetno < _counts[port].size() && _counts[port].unchecked_at(packetno)) {
 		v.push_back(packetno);
 		break;
 	    }
@@ -76,10 +76,10 @@ AggregatePacketCounter::Flow::undelivered(Vector<uint32_t> &undelivered, const A
     int packetno;
     int min_n = (_counts[0].size() < _counts[1].size() ? _counts[0].size() : _counts[1].size());
     for (packetno = 0; packetno < min_n; packetno++)
-	if (_counts[0].at_u(packetno) > _counts[1].at_u(packetno))
+	if (_counts[0].unchecked_at(packetno) > _counts[1].unchecked_at(packetno))
 	    undelivered.push_back(packetno);
     for (; packetno < _counts[0].size(); packetno++)
-	if (_counts[0].at_u(packetno))
+	if (_counts[0].unchecked_at(packetno))
 	    undelivered.push_back(packetno);
 }
 
@@ -309,8 +309,8 @@ AggregatePacketCounter::add_handlers()
 {
     add_write_handler("clear", write_handler, H_CLEAR);
     add_read_handler("count", read_handler, H_COUNT);
-    set_handler("received", Handler::h_read | Handler::h_read_param, thing_read_handler, 0);
-    set_handler("undelivered", Handler::h_read | Handler::h_read_param, thing_read_handler, (void*) 1);
+    set_handler("received", Handler::f_read | Handler::f_read_param, thing_read_handler, 0);
+    set_handler("undelivered", Handler::f_read | Handler::f_read_param, thing_read_handler, (void*) 1);
 }
 
 CLICK_ENDDECLS

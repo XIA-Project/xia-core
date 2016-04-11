@@ -22,12 +22,11 @@ does not route packets.
 
 class VectorTest : public Element { public:
 
-    VectorTest();
-    ~VectorTest();
+    VectorTest() CLICK_COLD;
 
     const char *class_name() const		{ return "VectorTest"; }
 
-    int initialize(ErrorHandler *);
+    int initialize(ErrorHandler *) CLICK_COLD;
 
 };
 

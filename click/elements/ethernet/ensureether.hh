@@ -24,29 +24,25 @@ specified by the arguments is prepended to the packet.
 
 =e
 
-Encapsulate packets in an Ethernet header with type
+Encapsulate packets without an Ethernet header with type
 ETHERTYPE_IP (0x0800), source address 1:1:1:1:1:1, and
 destination address 2:2:2:2:2:2:
 
-  EtherEncap(0x0800, 1:1:1:1:1:1, 2:2:2:2:2:2)
-
-=n
-
-For IP packets you probably want to use ARPQuerier instead.
+  EnsureEther(0x0800, 1:1:1:1:1:1, 2:2:2:2:2:2)
 
 =a
 
-EtherEncap */
+EtherEncap, EtherRewrite */
 
 class EnsureEther : public Element { public:
 
-  EnsureEther();
-  ~EnsureEther();
+  EnsureEther() CLICK_COLD;
+  ~EnsureEther() CLICK_COLD;
 
   const char *class_name() const	{ return "EnsureEther"; }
   const char *port_count() const	{ return PORTS_1_1; }
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   Packet *smaction(Packet *);
   void push(int, Packet *);

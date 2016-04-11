@@ -44,10 +44,6 @@ ErrorTest::ErrorTest()
 {
 }
 
-ErrorTest::~ErrorTest()
-{
-}
-
 #define CHECK(text) if (!errh.check((text))) return init_errh->error("%s:%d: test %<%s%> failed, got %<%.*s%>", __FILE__, __LINE__, (text), errh._last_text.length(), errh._last_text.data());
 
 int
@@ -58,7 +54,7 @@ ErrorTest::initialize(ErrorHandler *init_errh)
     IPAddress ipa(String("1.0.2.3"));
     EtherAddress etha;
     EtherAddressArg().parse("0:1:3:5:A:B", etha);
-    errh.error("IP %{ip_ptr} %% ETH %{ether_ptr}", &ipa, &etha);
+    errh.error("IP %p{ip_ptr} %% ETH %p{ether_ptr}", &ipa, &etha);
     CHECK("<3>IP 1.0.2.3 % ETH 00-01-03-05-0A-0B\n");
 
     {

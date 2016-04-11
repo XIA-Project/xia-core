@@ -75,10 +75,19 @@ packets to the rewritten destination address. Default is true.
 
 =back
 
-=h mappings read-only
+=h table read-only
 
-Returns a human-readable description of the TCPRewriter's current set of
-mappings.
+Returns a human-readable description of the TCPRewriter's current mapping
+table.
+
+=h lookup read
+
+Takes a flow as a space-separated
+
+    saddr sport daddr dport
+
+and attempts to find a forward mapping for that flow. If found, rewrites the
+flow and returns in the same format.  Otherwise, returns nothing.
 
 =a IPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 FTPPortMapper */
@@ -145,13 +154,13 @@ class TCPRewriter : public IPRewriterBase { public:
 
     };
 
-    TCPRewriter();
-    ~TCPRewriter();
+    TCPRewriter() CLICK_COLD;
+    ~TCPRewriter() CLICK_COLD;
 
     const char *class_name() const		{ return "TCPRewriter"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
 			      const IPFlowID &rewritten_flowid, int input);
@@ -162,7 +171,7 @@ class TCPRewriter : public IPRewriterBase { public:
 
     void push(int, Packet *);
 
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
  protected:
 
@@ -181,6 +190,7 @@ class TCPRewriter : public IPRewriterBase { public:
     }
 
     static String tcp_mappings_handler(Element *, void *);
+    static int tcp_lookup_handler(int, String &str, Element *e, const Handler *h, ErrorHandler *errh);
 
 };
 

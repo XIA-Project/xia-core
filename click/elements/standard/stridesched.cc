@@ -29,10 +29,6 @@ StrideSched::StrideSched()
 {
 }
 
-StrideSched::~StrideSched()
-{
-}
-
 int
 StrideSched::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -73,9 +69,9 @@ StrideSched::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 StrideSched::initialize(ErrorHandler *)
 {
-    if (input_is_push(0))
+    if (input_is_pull(0))
 	for (int i = 0; i < nclients(); ++i)
-	    _all[i]._signal = Notifier::upstream_empty_signal(this, i, 0);
+	    _all[i]._signal = Notifier::upstream_empty_signal(this, i);
     return 0;
 }
 

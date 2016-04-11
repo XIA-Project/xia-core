@@ -44,7 +44,7 @@
 #else
 # include <stdarg.h>
 #endif
-#if CLICK_USERLEVEL
+#if CLICK_USERLEVEL || CLICK_MINIOS
 # include <unistd.h>
 #endif
 #if CLICK_NS
@@ -161,6 +161,7 @@ Router::~Router()
 void
 Router::unuse()
 {
+    assert(_refcount);
     if (_refcount.dec_and_test())
 	delete this;
 }
@@ -278,10 +279,24 @@ Router::element(const Router *router, int eindex)
 const String &
 Router::ename(int eindex) const
 {
-    if (eindex < 0 || eindex >= nelements())
-	return String::make_empty();
-    else
+    if ((unsigned) eindex < (unsigned) nelements())
 	return _element_names[eindex];
+    else
+	return String::make_empty();
+}
+
+/** @brief  Returns element index @a eindex's name context.
+ *  @param  eindex  element index
+ *
+ *  The result is the context prefix for the element's name. This is the
+ *  string up to, and including, the last slash in the element's name.
+ *  Returns the empty string if @a eindex is out of range. */
+String
+Router::ename_context(int eindex) const
+{
+    String s = ename(eindex);
+    int slash = s.find_right('/');
+    return slash < 0 ? String() : s.substring(0, slash + 1);
 }
 
 /** @brief  Returns element index @a eindex's configuration string.
@@ -531,7 +546,7 @@ Router::check_hookup_range(ErrorHandler *errh)
 	int before = errh->nerrors();
 	for (int p = 0; p < 2; ++p)
 	    if ((*cp)[p].port >= _elements[(*cp)[p].idx]->nports(p))
-		hookup_error((*cp)[p], p, "%<%{element}%> has no %s %d", errh);
+		hookup_error((*cp)[p], p, "%<%p{element}%> has no %s %d", errh);
 	if (errh->nerrors() != before)
 	    cp = remove_connection(cp);
 	else
@@ -557,7 +572,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 		if (likely(last != _conn[ci][p]))
 		    last = _conn[ci][p];
 		else if (_elements[last.idx]->port_active(p, last.port))
-		    hookup_error(last, p, "illegal reuse of %<%{element}%> %s %d", errh, true);
+		    hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
 	    }
 	}
 
@@ -577,7 +592,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 		++cix;
 	    } else {
 		if (unlikely(conn != all))
-		    hookup_error(all, p, "%<%{element}%> %s %d unused", errh);
+		    hookup_error(all, p, "%<%p{element}%> %s %d unused", errh);
 		++all.port;
 	    }
     }
@@ -664,11 +679,11 @@ Router::processing_error(const Connection &c, bool aggie,
     const char *type1 = (processing_from == Element::VPUSH ? "push" : "pull");
     const char *type2 = (processing_from == Element::VPUSH ? "pull" : "push");
     if (!aggie)
-	errh->error("%<%{element}%> %s output %d connected to %<%{element}%> %s input %d",
+	errh->error("%<%p{element}%> %s output %d connected to %<%p{element}%> %s input %d",
 		    _elements[c[1].idx], type1, c[1].port,
 		    _elements[c[0].idx], type2, c[0].port);
     else
-	errh->error("agnostic %<%{element}%> in mixed context: %s input %d, %s output %d",
+	errh->error("agnostic %<%p{element}%> in mixed context: %s input %d, %s output %d",
 		    _elements[c[1].idx], type2, c[0].port, type1, c[1].port);
     return -1;
 }
@@ -850,9 +865,30 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
     _flow_code_override.push_back(flow_code);
 }
 
+/** @brief Traverse the router configuration from one of @a e's ports.
+ * @param e element to start search
+ * @param forward true to search down from outputs, false to search up from
+ *   inputs
+ * @param port port (or -1 to search all ports)
+ * @param visitor RouterVisitor traversal object
+ * @return 0 on success, -1 in early router configuration stages
+ *
+ * Calls @a visitor ->@link RouterVisitor::visit visit() @endlink on each
+ * reachable port starting from a port on @a e.  Follows connections and
+ * traverses inside elements from port to port by Element::flow_code().  The
+ * visitor can stop a traversal path by returning false from visit().
+ *
+ * @a visitor ->@link RouterVisitor::visit visit() is called on input
+ * ports if @a forward is true and output ports if @a forward is false.
+ *
+ * Equivalent to either visit_downstream() or visit_upstream(), depending on
+ * @a forward.
+ *
+ * @sa visit_downstream(), visit_upstream()
+ */
 int
-Router::visit_base(bool forward, Element *first_element, int first_port,
-		   RouterVisitor *visitor) const
+Router::visit(Element *first_element, bool forward, int first_port,
+	      RouterVisitor *visitor) const
 {
     if (!_have_connections || first_element->router() != this)
 	return -1;
@@ -951,7 +987,7 @@ int
 Router::downstream_elements(Element *e, int port, ElementFilter *filter, Vector<Element *> &result)
 {
     ElementFilterRouterVisitor visitor(filter, result);
-    return visit_base(true, e, port, &visitor);
+    return visit(e, true, port, &visitor);
 }
 
 /** @brief Search for elements upstream from @a e.
@@ -980,7 +1016,7 @@ int
 Router::upstream_elements(Element *e, int port, ElementFilter *filter, Vector<Element *> &result)
 {
     ElementFilterRouterVisitor visitor(filter, result);
-    return visit_base(false, e, port, &visitor);
+    return visit(e, false, port, &visitor);
 }
 
 
@@ -995,7 +1031,7 @@ class Router::RouterContextErrh : public ContextErrorHandler { public:
     String decorate(const String &str) {
 	if (!context_printed()) {
 	    StringAccum sa;
-	    sa << _message << " %<%{element}%>:";
+	    sa << _message << " %<%p{element}%>:";
 	    String str = format(sa.c_str(), _element);
 	    if (String s = _element->router()->elandmark(_element->eindex()))
 		str = combine_anno(str, make_landmark_anno(s));
@@ -1139,7 +1175,7 @@ Router::initialize(ErrorHandler *errh)
 	initialize_handlers(true, true);
 	for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
 	    int i = _element_configure_order[ord];
-	    //assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
+	    assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
 #if CLICK_DMALLOC
 	    sprintf(dmalloc_buf, "i%d  ", i);
 	    CLICK_DMALLOC_REG(dmalloc_buf);
@@ -1266,17 +1302,17 @@ Handler::combine(const Handler &x)
     // If this handler has no write version, add x's write handler, if any.
     // If this handler has no read or write version, make sure we copy both
     // of x's user_data arguments, since set-handler may have set them both.
-    if (!(_flags & h_read) && (x._flags & h_read)) {
+    if (!(_flags & f_read) && (x._flags & f_read)) {
 	_read_hook = x._read_hook;
 	_read_user_data = x._read_user_data;
-	_flags |= x._flags & (h_read | h_read_comprehensive | ~h_special_flags);
+	_flags |= x._flags & (f_read | f_read_comprehensive | ~f_special);
     }
-    if (!(_flags & h_write) && (x._flags & h_write)) {
+    if (!(_flags & f_write) && (x._flags & f_write)) {
 	_write_hook = x._write_hook;
 	_write_user_data = x._write_user_data;
-	_flags |= x._flags & (h_write | h_write_comprehensive | ~h_special_flags);
+	_flags |= x._flags & (f_write | f_write_comprehensive | ~f_special);
     }
-    if (!(_flags & (h_read | h_write))) {
+    if (!(_flags & (f_read | f_write))) {
 	_read_user_data = x._read_user_data;
 	_write_user_data = x._write_user_data;
     }
@@ -1296,13 +1332,13 @@ String
 Handler::call_read(Element* e, const String& param, ErrorHandler* errh) const
 {
     LocalErrorHandler lerrh(errh);
-    if (param && !(_flags & h_read_param))
+    if (param && !(_flags & f_read_param))
 	lerrh.error("read handler %<%s%> does not take parameters", unparse_name(e).c_str());
-    else if ((_flags & (h_read | h_read_comprehensive)) == h_read)
+    else if ((_flags & (f_read | f_read_comprehensive)) == f_read)
 	return _read_hook.r(e, _read_user_data);
-    else if (_flags & h_read) {
+    else if (_flags & f_read) {
 	String s(param);
-	if (_read_hook.h(h_read, s, e, this, &lerrh) >= 0)
+	if (_read_hook.h(f_read, s, e, this, &lerrh) >= 0)
 	    return s;
     } else
 	lerrh.error("%<%s%> not a read handler", unparse_name(e).c_str());
@@ -1314,11 +1350,11 @@ int
 Handler::call_write(const String& value, Element* e, ErrorHandler* errh) const
 {
     LocalErrorHandler lerrh(errh);
-    if ((_flags & (h_write | h_write_comprehensive)) == h_write)
+    if ((_flags & (f_write | f_write_comprehensive)) == f_write)
 	return _write_hook.w(value, e, _write_user_data, &lerrh);
-    else if (_flags & h_write) {
+    else if (_flags & f_write) {
 	String s(value);
-	return _write_hook.h(h_write, s, e, this, &lerrh);
+	return _write_hook.h(f_write, s, e, this, &lerrh);
     } else {
 	lerrh.error("%<%s%> not a write handler", unparse_name(e).c_str());
 	return -EACCES;
@@ -1686,7 +1722,7 @@ Router::add_read_handler(const Element *e, const String &hname,
     Handler to_add(hname);
     to_add._read_hook.r = callback;
     to_add._read_user_data = user_data;
-    to_add._flags = Handler::h_read | (flags & ~Handler::h_special_flags);
+    to_add._flags = Handler::f_read | (flags & ~Handler::f_special);
     store_handler(e, to_add);
 }
 
@@ -1719,7 +1755,7 @@ Router::add_write_handler(const Element *e, const String &hname,
     Handler to_add(hname);
     to_add._write_hook.w = callback;
     to_add._write_user_data = user_data;
-    to_add._flags = Handler::h_write | (flags & ~Handler::h_special_flags);
+    to_add._flags = Handler::f_write | (flags & ~Handler::f_special);
     store_handler(e, to_add);
 }
 
@@ -1734,15 +1770,15 @@ Router::add_write_handler(const Element *e, const String &hname,
  * Sets a handler named @a hname for element @a e.  If @a e is NULL or equal
  * to some root_element(), then sets a global handler.  The handler's callback
  * function is @a callback.  The resulting handler is a read handler if @a flags
- * contains Handler::h_read, and a write handler if @a flags contains
- * Handler::h_write.  If the flags contain Handler::h_read_param, then any read
+ * contains Handler::f_read, and a write handler if @a flags contains
+ * Handler::f_write.  If the flags contain Handler::f_read_param, then any read
  * handler will accept parameters.
  *
  * When the handler is triggered, Click will call @a callback(operation, data,
  * @a e, h, errh), where:
  *
  * <ul>
- * <li>"operation" is Handler::h_read or Handler::h_write;</li>
+ * <li>"operation" is Handler::f_read or Handler::f_write;</li>
  * <li>"data" is the handler data (empty for reads without parameters);</li>
  * <li>"h" is a pointer to a Handler object; and</li>
  * <li>"errh" is an ErrorHandler.</li>
@@ -1758,16 +1794,16 @@ Router::set_handler(const Element *e, const String &hname, uint32_t flags,
 		    void *read_user_data, void *write_user_data)
 {
     Handler to_add(hname);
-    if (flags & Handler::h_read) {
+    if (flags & Handler::f_read) {
 	to_add._read_hook.h = callback;
-	flags |= Handler::h_read_comprehensive;
+	flags |= Handler::f_read_comprehensive;
     } else
-	flags &= ~(Handler::h_read_comprehensive | Handler::h_read_param);
-    if (flags & Handler::h_write) {
+	flags &= ~(Handler::f_read_comprehensive | Handler::f_read_param);
+    if (flags & Handler::f_write) {
 	to_add._write_hook.h = callback;
-	flags |= Handler::h_write_comprehensive;
+	flags |= Handler::f_write_comprehensive;
     } else
-	flags &= ~Handler::h_write_comprehensive;
+	flags &= ~Handler::f_write_comprehensive;
     to_add._read_user_data = read_user_data;
     to_add._write_user_data = write_user_data;
     to_add._flags = flags;
@@ -1785,7 +1821,7 @@ Router::set_handler(const Element *e, const String &hname, uint32_t flags,
  * If @a e is NULL or equal to some root_element(), then changes a global
  * handler.  The handler's flags are changed by clearing the @a clear_flags
  * and then setting the @a set_flags, except that the special flags
- * (Handler::SPECIAL_FLAGS) are unchanged.
+ * (Handler::f_special) are unchanged.
  *
  * @sa add_read_handler(), add_write_handler(), set_handler()
  */
@@ -1795,8 +1831,8 @@ Router::set_handler_flags(const Element *e, const String &hname,
 {
     Handler to_add = fetch_handler(e, hname);
     if (to_add._use_count > 0) {	// only modify existing handlers
-	clear_flags &= ~Handler::h_special_flags;
-	set_flags &= ~Handler::h_special_flags;
+	clear_flags &= ~Handler::f_special;
+	set_flags &= ~Handler::f_special;
 	to_add._flags = (to_add._flags & ~clear_flags) | set_flags;
 	store_handler(e, to_add);
 	return 0;
@@ -2203,6 +2239,8 @@ Router::router_read_handler(Element *e, void *thunk)
 	return String::make_stable("linuxmodule", 11);
 #elif CLICK_BSDMODULE
 	return String::make_stable("bsdmodule", 9);
+#elif CLICK_MINIOS
+	return String::make_stable("clickos", 7);
 #else
 	break;
 #endif

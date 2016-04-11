@@ -56,24 +56,27 @@ IPFragmenter::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 IPFragmenter::optcopy(const click_ip *ip1, click_ip *ip2)
 {
-    int opts_len = (ip1->ip_hl << 2) - sizeof(click_ip);
-    u_char *oin = (u_char *) (ip1 + 1);
-    u_char *oout = (u_char *) (ip2 + 1);
+    const uint8_t* oin = (const uint8_t*) (ip1 + 1);
+    const uint8_t* oin_end = oin + (ip1->ip_hl << 2) - sizeof(click_ip);
+    uint8_t *oout = (uint8_t *) (ip2 + 1);
     int outpos = 0;
 
-    for (int i = 0; i < opts_len; ) {
-	int opt = oin[i], optlen;
-	if (opt == IPOPT_NOP)
-	    optlen = 1;
-	else if (opt == IPOPT_EOL || i == opts_len - 1
-		 || i + (optlen = oin[i+1]) > opts_len)
+    while (oin < oin_end)
+	if (*oin == IPOPT_NOP)  // don't copy NOP
+	    ++oin;
+	else if (*oin == IPOPT_EOL
+                 || oin + 1 == oin_end
+                 || oin[1] < 2
+		 || oin + oin[1] > oin_end)
 	    break;
-	if (opt & 0x80) {	// copy the option
-	    if (ip2)
-		memcpy(oout + outpos, oin + i, optlen);
-	    outpos += optlen;
-	}
-    }
+        else {
+            if (*oin & 0x80) {	// copy the option
+                if (ip2)
+                    memcpy(oout + outpos, oin, oin[1]);
+                outpos += oin[1];
+            }
+            oin += oin[1];
+        }
 
     for (; (outpos & 3) != 0; outpos++)
 	if (ip2)
@@ -92,7 +95,7 @@ IPFragmenter::fragment(Packet *p_in)
 
     if (((ip_in->ip_off & htons(IP_DF)) && _honor_df) || first_dlen < 8) {
 	if (_verbose || _drops < 5)
-	    click_chatter("IPFragmenter(%d) DF %{ip_ptr} %{ip_ptr} len=%d", _mtu, &ip_in->ip_src, &ip_in->ip_dst, p_in->length());
+	    click_chatter("IPFragmenter(%d) DF %p{ip_ptr} %p{ip_ptr} len=%d", _mtu, &ip_in->ip_src, &ip_in->ip_dst, p_in->length());
 	_drops++;
 	checked_output_push(1, p_in);
 	return;

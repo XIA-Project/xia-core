@@ -48,7 +48,7 @@
 # include <click/lexer.hh>
 #endif
 
-#if CLICK_USERLEVEL
+#if CLICK_USERLEVEL || CLICK_MINIOS
 # include <click/master.hh>
 # include <click/notifier.hh>
 # include <click/straccum.hh>
@@ -200,7 +200,7 @@ String
 click_compile_archive_file(const Vector<ArchiveElement> &archive,
 			   const ArchiveElement *ae,
 			   String package,
-			   const String &target, bool quiet,
+			   const String &target, int quiet,
 			   bool &tmpdir_populated, ErrorHandler *errh)
 {
     // create and populate temporary directory
@@ -228,9 +228,6 @@ click_compile_archive_file(const Vector<ArchiveElement> &archive,
 
     // write .cc file
     String filename = ae->name;
-    int rightdot = filename.find_right('.');
-    if (rightdot >= 0 && filename.substring(0, rightdot) == package)
-	filename = package + "_" + filename.substring(rightdot);
     String filepath = *tmpdir + filename;
     FILE *f = fopen(filepath.c_str(), "w");
     if (!f) {
@@ -243,8 +240,8 @@ click_compile_archive_file(const Vector<ArchiveElement> &archive,
     // prepare click-buildtool makepackage
     StringAccum compile_command;
     compile_command << *click_buildtool_prog << " makepackage "
-		    << (quiet ? "-q " : "") << "-C " << *tmpdir
-		    << " -t " << target;
+		    << (quiet > 0 ? "-q " : (quiet < 0 ? "-V " : ""))
+		    << "-C " << *tmpdir << " -t " << target;
 
     // check for compile flags
     const char *ss = ae->data.begin();
@@ -277,7 +274,7 @@ click_compile_archive_file(const Vector<ArchiveElement> &archive,
 
     // finish compile_command
     compile_command << ' ' << package << ' ' << filename << " 1>&2";
-    if (!quiet)
+    if (quiet <= 0)
 	errh->message("%s", compile_command.c_str());
     int compile_retval = system(compile_command.c_str());
     if (compile_retval == 127)
@@ -347,7 +344,7 @@ CLICK_ENDDECLS
 #endif /* CLICK_PACKAGE_LOADED || CLICK_TOOL */
 
 
-#ifdef CLICK_USERLEVEL
+#if defined(CLICK_USERLEVEL) || defined(CLICK_MINIOS)
 extern void click_export_elements();
 extern void click_unexport_elements();
 
@@ -495,10 +492,15 @@ click_read_router(String filename, bool is_expr, ErrorHandler *errh, bool initia
     if (is_expr) {
 	config_str = filename;
 	filename = "config";
+#ifdef CLICK_MINIOS
+    } else {
+        errh->error("MiniOS doesn't support loading configurations from files!");
+#else
     } else {
 	config_str = file_string(filename, errh);
 	if (!filename || filename == "-")
 	    filename = "<stdin>";
+#endif
     }
     if (errh->nerrors() > before)
 	return 0;
@@ -519,8 +521,8 @@ click_read_router(String filename, bool is_expr, ErrorHandler *errh, bool initia
     Lexer *l = click_lexer();
     RequireLexerExtra lextra(&archive);
     int cookie = l->begin_parse(config_str, filename, &lextra, errh);
-    while (l->ystatement())
-	/* do nothing */;
+    while (!l->ydone())
+	l->ystep();
     Router *router = l->create_router(master ? master : new Master(1));
     l->end_parse(cookie);
 
@@ -535,7 +537,7 @@ click_read_router(String filename, bool is_expr, ErrorHandler *errh, bool initia
 }
 
 CLICK_ENDDECLS
-#endif /* CLICK_USERLEVEL */
+#endif /* CLICK_USERLEVEL || CLICK_MINIOS */
 
 
 #if CLICK_TOOL

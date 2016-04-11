@@ -31,7 +31,7 @@
 CLICK_DECLS
 
 ARPTable::ARPTable()
-    : _entry_capacity(0), _packet_capacity(2048), _expire_timer(this)
+    : _entry_capacity(0), _packet_capacity(2048), _entry_packet_capacity(0), _capacity_slim_factor(2), _expire_timer(this)
 {
     _entry_count = _packet_count = _drops = 0;
 }
@@ -47,9 +47,13 @@ ARPTable::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
 	.read("CAPACITY", _packet_capacity)
 	.read("ENTRY_CAPACITY", _entry_capacity)
+	.read("ENTRY_PACKET_CAPACITY", _entry_packet_capacity)
+	.read("CAPACITY_SLIM_FACTOR", _capacity_slim_factor)
 	.read("TIMEOUT", timeout)
 	.complete() < 0)
 	return -1;
+    if (_capacity_slim_factor == 0)
+	return errh->error("CAPACITY_SLIM_FACTOR cannot be zero");
     set_timeout(timeout);
     if (_timeout_j) {
 	_expire_timer.initialize(this);
@@ -126,17 +130,23 @@ ARPTable::slim(click_jiffies_t now)
 	--_entry_count;
     }
 
-    // Mark entries for polling, and delete packets to make space.
-    while (_packet_capacity && _packet_count > _packet_capacity) {
-	while (ae->_head && _packet_count > _packet_capacity) {
-	    Packet *p = ae->_head;
-	    if (!(ae->_head = p->next()))
-		ae->_tail = 0;
-	    p->kill();
-	    --_packet_count;
-	    ++_drops;
+    // Delete packets to make space.
+    if (_packet_capacity && _packet_count > _packet_capacity) {
+	uint32_t slim_capacity = _packet_capacity - _packet_capacity / _capacity_slim_factor;
+        if (slim_capacity == 0) // last packet may not have been added yet
+	    slim_capacity = 1;
+	while (_packet_count > slim_capacity) {
+	    while (ae->_head && _packet_count > slim_capacity) {
+		Packet *p = ae->_head;
+		if (!(ae->_head = p->next()))
+		    ae->_tail = 0;
+		p->kill();
+		--_packet_count;
+		--ae->_entry_packet_count;
+		++_drops;
+	    }
+	    ae = ae->_age_link.next();
 	}
-	ae = ae->_age_link.next();
     }
 }
 
@@ -190,6 +200,7 @@ ARPTable::insert(IPAddress ip, const EtherAddress &eth, Packet **head)
     ae->_known = !eth.is_broadcast();
 
     ae->_live_at_j = now;
+    ae->_num_polls_since_reply = 0;
     ae->_polled_at_j = ae->_live_at_j - CLICK_HZ;
 
     if (ae->_age_link.next()) {
@@ -200,8 +211,8 @@ ARPTable::insert(IPAddress ip, const EtherAddress &eth, Packet **head)
     if (head) {
 	*head = ae->_head;
 	ae->_head = ae->_tail = 0;
-	for (Packet *p = *head; p; p = p->next())
-	    --_packet_count;
+	_packet_count -= ae->_entry_packet_count;
+	ae->_entry_packet_count = 0;
     }
 
     _table.balance();
@@ -242,6 +253,12 @@ ARPTable::append_query(IPAddress ip, Packet *p)
 	}
     }
 
+    if (_entry_packet_capacity && ae->_entry_packet_count >= _entry_packet_capacity) {
+	_drops++;
+	_lock.release_write();
+	return -ENOMEM;
+    }
+
     ++_packet_count;
     if (_packet_capacity && _packet_count > _packet_capacity)
 	slim(now);
@@ -252,10 +269,11 @@ ARPTable::append_query(IPAddress ip, Packet *p)
 	ae->_head = p;
     ae->_tail = p;
     p->set_next(0);
+    ++ae->_entry_packet_count;
 
     int r;
-    if (!click_jiffies_less(now, ae->_polled_at_j + CLICK_HZ / 10)) {
-	ae->_polled_at_j = now;
+    if (ae->allow_poll(now)) {
+	ae->mark_poll(now);
 	r = 1;
     } else
 	r = 0;

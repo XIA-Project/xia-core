@@ -95,14 +95,14 @@ element, in which case this element will share the other element's capacity.
 
 =back
 
-=h mappings read-only
+=h table read-only
 
-Returns a human-readable description of the IPAddrRewriter's current set of
-mappings.
+Returns a human-readable description of the IPAddrRewriter's current mapping
+table.
 
-=h nmappings read-only
+=h table_size read-only
 
-Returns the number of currently installed mapping pairs.
+Returns the number of mappings in the table.
 
 =h patterns read-only
 
@@ -130,13 +130,13 @@ class IPAddrRewriter : public IPRewriterBase { public:
 
     };
 
-    IPAddrRewriter();
-    ~IPAddrRewriter();
+    IPAddrRewriter() CLICK_COLD;
+    ~IPAddrRewriter() CLICK_COLD;
 
     const char *class_name() const		{ return "IPAddrRewriter"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &conf, ErrorHandler *errh);
+    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     //void take_state(Element *, ErrorHandler *);
 
     inline IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
@@ -146,7 +146,7 @@ class IPAddrRewriter : public IPRewriterBase { public:
 
     void push(int, Packet *);
 
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
   protected:
 

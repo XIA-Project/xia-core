@@ -177,7 +177,7 @@ class Bigint { public:
      * @param n number of limbs in @a a
      * @param b input value
      * @return carry */
-    static click_uint_large_t set(limb_type *a, int n, click_uint_large_t b) {
+    static click_uintmax_t set(limb_type *a, int n, click_uintmax_t b) {
 	while (n > 0) {
 	    *a++ = b;
 	    n--;
@@ -335,7 +335,7 @@ class Bigint { public:
 	// need d chars, min d s.t. 10^d >= 2^(sizeof(limb_type) * 8 * n)
 	// == min d s.t. d >= sizeof(limb_type) * 8 * n / lg 10
 	int div = (base >= 16 ? 4 : (base >= 8 ? 3 : 1));
-	String s = String::make_garbage((n * limb_bits) / div + 1);
+	String s = String::make_uninitialized((n * limb_bits) / div + 1);
 	char *q = const_cast<char *>(s.end());
 	assert(base >= 2 && base <= 36);
 	while (1) {

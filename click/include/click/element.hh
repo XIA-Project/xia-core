@@ -46,6 +46,7 @@ class Element { public:
 #endif
 
     inline void checked_output_push(int port, Packet *p) const;
+    inline Packet* checked_input_pull(int port) const;
 
     // ELEMENT CHARACTERISTICS
     virtual const char *class_name() const = 0;
@@ -200,7 +201,6 @@ class Element { public:
     void add_data_handlers(const char *name, int flags, String *data);
     void add_data_handlers(const char *name, int flags, IPAddress *data);
     void add_data_handlers(const char *name, int flags, EtherAddress *data);
-    //void add_data_handlers(const String &name, int flags, XID *data);
     void add_data_handlers(const char *name, int flags, Timestamp *data, bool is_interval = false);
 
     static String read_positional_handler(Element*, void*);
@@ -224,6 +224,8 @@ class Element { public:
 	unsigned npackets() const	{ return _packets; }
 #endif
 
+	inline void assign(bool isoutput, Element *e, int port);
+
       private:
 
 	Element* _e;
@@ -243,7 +245,7 @@ class Element { public:
 #endif
 
 	inline Port();
-	inline void assign(Element *owner, Element *e, int port, bool isoutput);
+	inline void assign(bool isoutput, Element *owner, Element *e, int port);
 
 	friend class Element;
 
@@ -529,9 +531,8 @@ Element::Port::Port()
 }
 
 inline void
-Element::Port::assign(Element *owner, Element *e, int port, bool isoutput)
+Element::Port::assign(bool isoutput, Element *e, int port)
 {
-    PORT_ASSIGN(owner);
     _e = e;
     _port = port;
     (void) isoutput;
@@ -546,6 +547,13 @@ Element::Port::assign(Element *owner, Element *e, int port, bool isoutput)
 	}
     }
 #endif
+}
+
+inline void
+Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)
+{
+    PORT_ASSIGN(owner);
+    assign(isoutput, e, port);
 }
 
 /** @brief Returns whether this port is active (a push output or a pull input).
@@ -695,6 +703,25 @@ Element::checked_output_push(int port, Packet* p) const
 	_ports[1][port].push(p);
     else
 	p->kill();
+}
+
+/** @brief Pull a packet from input @a port, or return 0 if @a port is out of
+ * range.
+ *
+ * @param port input port number
+ *
+ * If @a port is in range (>= 0 and < ninputs()), then return the result
+ * of input(@a port).pull().  Otherwise, return null.
+ *
+ * @note It is invalid to call checked_input_pull() on a push input @a port.
+ */
+inline Packet*
+Element::checked_input_pull(int port) const
+{
+    if ((unsigned) port < (unsigned) ninputs())
+	return _ports[0][port].pull();
+    else
+	return 0;
 }
 
 #undef PORT_ASSIGN

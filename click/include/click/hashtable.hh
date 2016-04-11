@@ -34,7 +34,7 @@ template <typename T> class HashTable_const_iterator;
 
   The HashTable template implements a hash table or associative array suitable
   for use in the kernel or at user level.  Its interface is similar to C++'s
-  map and unordered_map, although those types have more methods.
+  std::map and std::unordered_map, although those types have more methods.
 
   Used with two template parameters, as HashTable<K, V>, the table maps keys K
   to values V.  Used with one template parameter, as HashTable<T>, HashTable
@@ -147,6 +147,14 @@ class HashTable<T> {
 	clone_elements(x);
     }
 
+#if HAVE_CXX_RVALUE_REFERENCES
+    /** @overload */
+    HashTable(HashTable<T> &&x)
+	: _rep() {
+	x.swap(*this);
+    }
+#endif
+
     /** @brief Destroy the hash table, freeing its memory. */
     ~HashTable();
 
@@ -156,7 +164,7 @@ class HashTable<T> {
 	return _rep.size();
     }
 
-    /** @brief Return true iff size() == 0. */
+    /** @brief Test if size() == 0. */
     inline bool empty() const {
 	return _rep.empty();
     }
@@ -189,6 +197,9 @@ class HashTable<T> {
     /** @overload */
     inline const_iterator end() const;
 
+
+    /** @brief Return 1 if an element with key @a key exists, 0 otherwise. */
+    inline size_type count(key_const_reference key) const;
 
     /** @brief Return an iterator for the element with key @a key, if any.
      *
@@ -281,8 +292,16 @@ class HashTable<T> {
     }
 
 
-    /** @brief Assign this hash table's contents to a copy of @a x. */
+    /** @brief Replace this hash table's contents with a copy of @a x. */
     HashTable<T> &operator=(const HashTable<T> &x);
+
+#if HAVE_CXX_RVALUE_REFERENCES
+    /** @overload */
+    inline HashTable<T> &operator=(HashTable<T> &&x) {
+	x.swap(*this);
+	return *this;
+    }
+#endif
 
   private:
 
@@ -589,6 +608,14 @@ class HashTable {
 	: _rep(x._rep), _default_value(x._default_value) {
     }
 
+#if HAVE_CXX_RVALUE_REFERENCES
+    /** @overload */
+    HashTable(HashTable<K, V> &&x)
+	: _rep(), _default_value() {
+	x.swap(*this);
+    }
+#endif
+
     /** @brief Destroy this hash table, freeing its memory. */
     ~HashTable() {
     }
@@ -649,14 +676,19 @@ class HashTable {
     }
 
 
+    /** @brief Return 1 if an element with key @a key exists, 0 otherwise. */
+    inline size_type count(key_const_reference key) const {
+        return _rep.count(key);
+    }
+
     /** @brief Return an iterator for the element with key @a key, if any.
      *
      * Returns end() if no such element exists. */
-    inline const_iterator find(const key_type &key) const {
+    inline const_iterator find(key_const_reference key) const {
 	return _rep.find(key);
     }
     /** @overload */
-    inline iterator find(const key_type &key) {
+    inline iterator find(key_const_reference key) {
 	return _rep.find(key);
     }
 
@@ -664,7 +696,7 @@ class HashTable {
      *
      * Like find(), but additionally moves the found element to the head of
      * its bucket, possibly speeding up future lookups. */
-    inline iterator find_prefer(const key_type &key) {
+    inline iterator find_prefer(key_const_reference key) {
 	return _rep.find_prefer(key);
     }
 
@@ -673,7 +705,7 @@ class HashTable {
      *
      * If no element for @a key currently exists (find(@a key) == end()),
      * returns default_value(). */
-    const mapped_type &get(const key_type &key) const {
+    const mapped_type &get(key_const_reference key) const {
 	if (const_iterator i = find(key))
 	    return i.value();
 	else
@@ -684,14 +716,14 @@ class HashTable {
      *
      * If no element for @a key currently exists (find(@a key) == end()),
      * returns null. */
-    mapped_type *get_pointer(const key_type &key) {
+    mapped_type *get_pointer(key_const_reference key) {
 	if (iterator i = find(key))
 	    return &i.value();
 	else
 	    return 0;
     }
     /** @overload */
-    const mapped_type *get_pointer(const key_type &key) const {
+    const mapped_type *get_pointer(key_const_reference key) const {
 	if (const_iterator i = find(key))
 	    return &i.value();
 	else
@@ -706,7 +738,7 @@ class HashTable {
      * @warning The overloaded operator[] on non-const hash tables may add an
      * element to the table.  If you don't want to add an element, either
      * access operator[] through a const hash table, or use get().  */
-    const mapped_type &operator[](const key_type &key) const {
+    const mapped_type &operator[](key_const_reference key) const {
 	if (const_iterator i = find(key))
 	    return i.value();
 	else
@@ -722,9 +754,9 @@ class HashTable {
      * @note Inserting an element into a HashTable invalidates all existing
      * iterators. */
 #if CLICK_HASHMAP_UPGRADE_WARNINGS
-    inline mapped_type &operator[](const key_type &key) CLICK_DEPRECATED;
+    inline mapped_type &operator[](key_const_reference key) CLICK_DEPRECATED;
 #else
-    inline mapped_type &operator[](const key_type &key);
+    inline mapped_type &operator[](key_const_reference key);
 #endif
 
 
@@ -737,7 +769,7 @@ class HashTable {
      *
      * @note Inserting an element into a HashTable invalidates all existing
      * iterators. */
-    inline iterator find_insert(const key_type &key) {
+    inline iterator find_insert(key_const_reference key) {
 	return _rep.find_insert(value_type(key, _default_value));
     }
 
@@ -750,7 +782,8 @@ class HashTable {
      *
      * @note Inserting an element into a HashTable invalidates all existing
      * iterators. */
-    inline iterator find_insert(const key_type &key, const mapped_type &value) {
+    inline iterator find_insert(key_const_reference key,
+                                const mapped_type &value) {
 	return _rep.find_insert(value_type(key, value));
     }
 
@@ -768,14 +801,14 @@ class HashTable {
      *
      * @note Inserting an element into a HashTable invalidates all existing
      * iterators. */
-    bool set(const key_type &key, const mapped_type &value);
+    bool set(key_const_reference key, const mapped_type &value);
 
     /** @brief Set the mapping for @a key to @a value.
      *
      * This is a deprecated synonym for set().
      *
      * @deprecated Use set(). */
-    bool replace(const key_type &key, const mapped_type &value) CLICK_DEPRECATED;
+    bool replace(key_const_reference key, const mapped_type &value) CLICK_DEPRECATED;
 
     /** @brief Remove the element indicated by @a it.
      * @return A valid iterator pointing at the next element remaining, or
@@ -787,7 +820,7 @@ class HashTable {
     /** @brief Remove any element with @a key.
      *
      * Returns the number of elements removed, which is always 0 or 1. */
-    size_type erase(const key_type &key) {
+    size_type erase(key_const_reference key) {
 	return _rep.erase(key);
     }
 
@@ -801,10 +834,7 @@ class HashTable {
     /** @brief Swap the contents of this hash table and @a x. */
     void swap(HashTable<K, V> &x) {
 	_rep.swap(x._rep);
-
-	V odefault_value(_default_value);
-	_default_value = x._default_value;
-	x._default_value = odefault_value;
+	click_swap(x._default_value, _default_value);
     }
 
 
@@ -823,6 +853,14 @@ class HashTable {
 	_default_value = x._default_value;
 	return *this;
     }
+
+#if HAVE_CXX_RVALUE_REFERENCES
+    /** @overload */
+    HashTable<K, V> &operator=(HashTable<K, V> &&x) {
+	x.swap(*this);
+	return *this;
+    }
+#endif
 
   private:
 
@@ -867,6 +905,11 @@ inline typename HashTable<T>::iterator HashTable<T>::end()
     return iterator(_rep.end());
 }
 
+template <typename T>
+inline typename HashTable<T>::size_type HashTable<T>::count(key_const_reference key) const
+{
+    return _rep.contains(key);
+}
 
 template <typename T>
 inline HashTable_const_iterator<T> HashTable<T>::find(key_const_reference key) const

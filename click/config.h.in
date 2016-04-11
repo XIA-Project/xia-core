@@ -7,17 +7,21 @@
 # undef __CHAR_UNSIGNED__
 #endif
 
-/* Define to byte order of target machine. */
-#undef CLICK_BYTE_ORDER
 #define CLICK_BIG_ENDIAN	4321
 #define CLICK_LITTLE_ENDIAN	1234
 #define CLICK_NO_ENDIAN		0
+
+/* Define to byte order of target machine. */
+#undef CLICK_BYTE_ORDER
 
 /* Define to enable debugging support for Click scheduling. */
 #undef CLICK_DEBUG_SCHEDULING
 
 /* Define for Click memory allocation debugging. */
 #undef CLICK_DMALLOC
+
+/* Define to generate smaller object files. */
+#undef CLICK_OPTIMIZE_SIZE
 
 /* Version number of package */
 #undef CLICK_VERSION
@@ -73,8 +77,14 @@
 /* Define if the C++ compiler understands #pragma interface. */
 #undef HAVE_CXX_PRAGMA_INTERFACE
 
+/* Define if the C++ compiler understands rvalue references. */
+#undef HAVE_CXX_RVALUE_REFERENCES
+
 /* Define if the C++ compiler understands static_assert. */
 #undef HAVE_CXX_STATIC_ASSERT
+
+/* Define if the C++ compiler understands template alias. */
+#undef HAVE_CXX_TEMPLATE_ALIAS
 
 /* Define if the machine is indifferent to alignment. */
 #undef HAVE_INDIFFERENT_ALIGNMENT
@@ -133,12 +143,14 @@
 /* The size of a `struct timeval', as computed by sizeof. */
 #undef SIZEOF_STRUCT_TIMEVAL
 
+/* The size of a `ptrdiff_t', as computed by sizeof. */
+#undef SIZEOF_PTRDIFF_T
+
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define if you want to run multithreaded Click. */
 #undef __MTCLICK__
-#undef NUM_CLICK_CPUS
 
 /* Define inline, if necessary. C only. */
 #ifndef __cplusplus
@@ -166,6 +178,14 @@
 # define CLICK_ALIGNED(x) /* nothing */
 #endif
 
+/* Define macro for size of a cache line. */
+#define CLICK_CACHE_LINE_SIZE 64
+
+/* Define macro for the difference between 'x' and the next higher multiple
+   of CLICK_CACHE_LINE_SIZE (between 0 and CLICK_CACHE_LINE_SIZE - 1). */
+#define CLICK_CACHE_LINE_PAD_BYTES(x) \
+	((((x) + CLICK_CACHE_LINE_SIZE - 1) / CLICK_CACHE_LINE_SIZE) * CLICK_CACHE_LINE_SIZE - (x))
+
 /* Define macro for deprecated functions. */
 #if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ == 0)
 # define CLICK_DEPRECATED /* nothing */
@@ -180,6 +200,13 @@
 # define CLICK_DEPRECATED_ENUM __attribute__((deprecated))
 #endif
 
+/* Define macros for marking types as may-alias. */
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
+# define CLICK_MAY_ALIAS /* nothing */
+#else
+# define CLICK_MAY_ALIAS __attribute__((__may_alias__))
+#endif
+
 /* Define macro for marking functions noninlinable. */
 #ifdef CLICK_LINUXMODULE
 # define CLICK_NOINLINE noinline
@@ -187,6 +214,13 @@
 # define CLICK_NOINLINE __attribute__((noinline))
 #else
 # define CLICK_NOINLINE /* nothing */
+#endif
+
+/* Define macro for funtions that should be inline-able even if compiling without optimization. */
+#if __GNUC__
+# define CLICK_ALWAYS_INLINE __attribute__((always_inline))
+#else
+# define CLICK_ALWAYS_INLINE /* nothing */
 #endif
 
 /* Define macros for declaring packed structures. */
@@ -205,6 +239,13 @@
 # define CLICK_WARN_UNUSED_RESULT /* nothing */
 #else
 # define CLICK_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#endif
+
+/* Define macro for cold (rarely used) functions. */
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 3)
+# define CLICK_COLD /* nothing */
+#else
+# define CLICK_COLD __attribute__((cold))
 #endif
 
 /* Define ARCH_IS_BIG_ENDIAN based on CLICK_BYTE_ORDER. */
@@ -231,7 +272,7 @@
 #define ELEMENT_MT_SAFE(x)
 
 /* Assume CLICK_USERLEVEL unless otherwise defined. */
-#if !defined(CLICK_USERLEVEL) && !defined(CLICK_TOOL) && !defined(CLICK_LINUXMODULE) && !defined(CLICK_BSDMODULE)
+#if !defined(CLICK_USERLEVEL) && !defined(CLICK_TOOL) && !defined(CLICK_LINUXMODULE) && !defined(CLICK_BSDMODULE) && !defined(CLICK_MINIOS)
 # define CLICK_USERLEVEL 1
 #endif
 
@@ -255,11 +296,32 @@
 # include <click/config-userlevel.h>
 #endif
 
+/* Define stuff under a MiniOS application. */
+#ifdef CLICK_MINIOS
+# include <click/config-minios.h>
+#endif
+
 /* Ensure declaration of DefaultArg template. */
 #ifdef __cplusplus
 CLICK_DECLS
 template <typename T> struct DefaultArg;
+
+/** @class uninitialized_type
+    @brief Type tag indicating an object should not be initialized. */
+struct uninitialized_type {
+};
 CLICK_ENDDECLS
 #endif
+
+/* Define aliasing versions of integer and pointer types. */
+typedef uint16_t click_aliasable_uint16_t CLICK_MAY_ALIAS;
+typedef int16_t click_aliasable_int16_t CLICK_MAY_ALIAS;
+typedef uint32_t click_aliasable_uint32_t CLICK_MAY_ALIAS;
+typedef int32_t click_aliasable_int32_t CLICK_MAY_ALIAS;
+#if HAVE_INT64_TYPES
+typedef uint64_t click_aliasable_uint64_t CLICK_MAY_ALIAS;
+typedef int64_t click_aliasable_int64_t CLICK_MAY_ALIAS;
+#endif
+typedef void *click_aliasable_void_pointer_t CLICK_MAY_ALIAS;
 
 #endif /* CLICK_CONFIG_H */

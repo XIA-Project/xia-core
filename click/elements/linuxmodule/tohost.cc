@@ -25,7 +25,7 @@
 #include <click/cxxprotect.h>
 CLICK_CXX_PROTECT
 #include <net/dst.h>
-#include <linux/smp_lock.h>
+#include <net/xfrm.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
@@ -178,7 +178,7 @@ ToHost::push(int port, Packet *p)
     // check that device exists
     if (!skb->dev) {
 	if (++_drops == 1)
-	    click_chatter("%{element}: dropped a packet with null skb->dev", this);
+	    click_chatter("%p{element}: dropped a packet with null skb->dev", this);
 	p->kill();
 	return;
     }
@@ -198,6 +198,11 @@ ToHost::push(int port, Packet *p)
 	skb->dst = 0;
     }
 #endif
+
+    // skb->sp may be set if the packet came from Linux originally and
+    // had xfrm states applied.  This must be cleared or linux will
+    // try to validate that xfrm policies still apply.
+    secpath_reset(skb);
 
     // MAC header is the data pointer
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
@@ -220,7 +225,7 @@ ToHost::push(int port, Packet *p)
     int protocol = (_sniffers ? 0xFFFF : skb->protocol);
 
     // pass packet to Linux
-#ifdef HAVE_NETIF_RECEIVE_SKB /* from Linux headers */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0) || defined(HAVE_NETIF_RECEIVE_SKB) /* from Linux headers */
     struct net_device *dev = skb->dev;
     local_bh_disable();
     dev_hold(dev);
@@ -272,9 +277,7 @@ ToHost::push(int port, Packet *p)
     br_read_unlock(BR_NETPROTO_LOCK);
     local_bh_enable();
 #  else
-    lock_kernel();
-    ptype_dispatch(skb, protocol);
-    unlock_kernel();
+#   error "Linux 2.2 is no longer supported"
 #  endif
 # else
     ++_drops;

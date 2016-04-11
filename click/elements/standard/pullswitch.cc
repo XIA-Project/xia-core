@@ -23,11 +23,7 @@
 CLICK_DECLS
 
 PullSwitch::PullSwitch()
-    : _notifier(Notifier::SEARCH_CONTINUE_WAKE), _signals(0)
-{
-}
-
-PullSwitch::~PullSwitch()
+    : _signals(0)
 {
 }
 
@@ -42,6 +38,15 @@ PullSwitch::cast(const char *name)
 	return Element::cast(name);
 }
 
+void
+PullSwitch::wake_callback(void *user_data, Notifier *)
+{
+    PullSwitch *ps = static_cast<PullSwitch *>(user_data);
+    if (ps->_input >= 0 && !ps->_notifier.active()
+	&& ps->_signals[ps->_input].active())
+	ps->_notifier.wake();
+}
+
 int
 PullSwitch::initialize(ErrorHandler *errh)
 {
@@ -50,7 +55,7 @@ PullSwitch::initialize(ErrorHandler *errh)
     if (!(_signals = new NotifierSignal[ninputs()]))
 	return errh->error("out of memory!");
     for (int i = 0; i < ninputs(); ++i)
-	_signals[i] = Notifier::upstream_empty_signal(this, i, 0, &_notifier);
+	_signals[i] = Notifier::upstream_empty_signal(this, i, wake_callback, this);
     return 0;
 }
 
@@ -64,9 +69,10 @@ PullSwitch::cleanup(CleanupStage)
 Packet *
 PullSwitch::pull(int)
 {
-    if (_input < 0)
+    if (_input < 0) {
+	_notifier.set_active(false, false);
 	return 0;
-    else if (Packet *p = input(_input).pull()) {
+    } else if (Packet *p = input(_input).pull()) {
 	_notifier.set_active(true, false);
 	return p;
     } else {

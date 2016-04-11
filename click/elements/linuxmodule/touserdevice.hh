@@ -115,8 +115,8 @@ class ToUserDevice : public Element
 {
 public:
 
-    ToUserDevice();
-    ~ToUserDevice();
+    ToUserDevice() CLICK_COLD;
+    ~ToUserDevice() CLICK_COLD;
 
     static void static_initialize();
     static void static_cleanup();
@@ -125,17 +125,17 @@ public:
     const char *port_count() const      { return PORTS_1_0; }
     const char *processing() const      { return PUSH; }
 
-    int    configure(Vector<String> &, ErrorHandler *);
+    int    configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int    configure_phase() const      { return CONFIGURE_PHASE_DEFAULT - 1; }
     bool   run_task(Task *);
-    int    initialize(ErrorHandler *);
-    void   cleanup(CleanupStage);
-    void   add_handlers();
+    int    initialize(ErrorHandler *) CLICK_COLD;
+    void   cleanup(CleanupStage) CLICK_COLD;
+    void   add_handlers() CLICK_COLD;
     void   push(int, Packet *);
 
 private:
     struct file_priv {
-        ToUserDevice *dev;
+        uint8_t minor_num;
         uint8_t read_once;
         Packet *p;
     };
@@ -166,6 +166,7 @@ private:
     Task            _task;
     NotifierSignal  _signal;
     volatile bool   _exit;
+    atomic_uint32_t _use_count;
     // related to device management
     ulong                  _dev_major;
     ulong                  _dev_minor;
@@ -180,7 +181,7 @@ private:
     class FromUserDevice *_from_user_device;
 
     static struct file_operations *dev_fops;
-    static volatile ToUserDevice *elem_map[256];
+    static ToUserDevice * volatile elem_map[256];
 
     static ssize_t dev_read(struct file *file, char *buf, size_t count, loff_t *ppos);
     static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t *ppos);
@@ -188,7 +189,7 @@ private:
     static int     dev_release(struct inode *inode, struct file *file);
     static uint    dev_poll(struct file *, struct poll_table_struct *);
 
-    static int write_handler(const String &, Element *e, void *, ErrorHandler *);
+    static int write_handler(const String &, Element *e, void *, ErrorHandler *) CLICK_COLD;
 
     friend class FromUserDevice;
 };

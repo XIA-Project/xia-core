@@ -2,21 +2,34 @@
 #define CLICK_FROMDEVICE_USERLEVEL_HH
 #include <click/element.hh>
 #include "elements/userlevel/kernelfilter.hh"
+
 #ifdef __linux__
-# define FROMDEVICE_LINUX 1
+# define FROMDEVICE_ALLOW_LINUX 1
 #endif
+
 #if HAVE_PCAP
-# define FROMDEVICE_PCAP 1
-# include <click/task.hh>
+# define FROMDEVICE_ALLOW_PCAP 1
 extern "C" {
 # include <pcap.h>
 /* Prototype pcap_setnonblock if we have it, but not the prototype. */
 # if HAVE_PCAP_SETNONBLOCK && !HAVE_DECL_PCAP_SETNONBLOCK
 int pcap_setnonblock(pcap_t *p, int nonblock, char *errbuf);
 # endif
+}
+#endif
+
+#if HAVE_NET_NETMAP_H
+# define FROMDEVICE_ALLOW_NETMAP 1
+# include "elements/userlevel/netmapinfo.hh"
+#endif
+
+#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+# include <click/task.hh>
+extern "C" {
 void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*, const u_char*);
 }
 #endif
+
 CLICK_DECLS
 
 /*
@@ -102,6 +115,11 @@ Boolean. If true, then emit packets that the kernel sends to the given
 interface, as well as packets that the kernel receives from it. Default is
 false.
 
+=item PROTOCOL
+
+Integer. If set and nonzero, then only emit packets with this link-level
+protocol. Only affects METHOD LINUX. Default is 0.
+
 =item HEADROOM
 
 Integer. Amount of bytes of headroom to leave before the packet data. Defaults
@@ -110,6 +128,10 @@ to roughly 28.
 =item BURST
 
 Integer. Maximum number of packets to read per scheduling. Defaults to 1.
+
+=item TIMESTAMP
+
+Boolean. If false, then do not timestamp packets. Defaults to true.
 
 =back
 
@@ -145,8 +167,8 @@ Returns a string indicating the encapsulation type on this link. Can be
 
 class FromDevice : public Element { public:
 
-    FromDevice();
-    ~FromDevice();
+    FromDevice() CLICK_COLD;
+    ~FromDevice() CLICK_COLD;
 
     const char *class_name() const	{ return "FromDevice"; }
     const char *port_count() const	{ return "0/1-2"; }
@@ -154,49 +176,70 @@ class FromDevice : public Element { public:
 
     enum { default_snaplen = 2046 };
     int configure_phase() const		{ return KernelFilter::CONFIGURE_PHASE_FROMDEVICE; }
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
     inline String ifname() const	{ return _ifname; }
+#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
     inline int fd() const		{ return _fd; }
+#else
+    inline int fd() const		{ return -1; }
+#endif
 
     void selected(int fd, int mask);
-#if FROMDEVICE_PCAP
+
+#if FROMDEVICE_ALLOW_PCAP
     pcap_t *pcap() const		{ return _pcap; }
-    bool run_task(Task *);
-    static const char *pcap_error(pcap_t *pcap, const char *ebuf);
+    static const char* fetch_pcap_error(pcap_t* pcap, const char* ebuf);
     static pcap_t *open_pcap(String ifname, int snaplen, bool promisc, ErrorHandler *errh);
 #endif
 
-#if FROMDEVICE_LINUX
-    int linux_fd() const		{ return _capture == CAPTURE_LINUX ? _fd : -1; }
+#if FROMDEVICE_ALLOW_LINUX
+    int linux_fd() const		{ return _method == method_linux ? _fd : -1; }
     static int open_packet_socket(String, ErrorHandler *);
     static int set_promiscuous(int, String, bool);
+#endif
+
+#if FROMDEVICE_ALLOW_NETMAP
+    const NetmapInfo *netmap() const { return _method == method_netmap ? &_netmap : 0; }
+#endif
+
+#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+    bool run_task(Task *task);
 #endif
 
     void kernel_drops(bool& known, int& max_drops) const;
 
   private:
 
-#if FROMDEVICE_LINUX || FROMDEVICE_PCAP
+#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
     int _fd;
 #endif
-#if FROMDEVICE_LINUX
-    unsigned char *_linux_packetbuf;
+#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+    Task _task;
 #endif
-#if FROMDEVICE_PCAP
+#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+    void emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts);
+#endif
+#if FROMDEVICE_ALLOW_PCAP
     pcap_t *_pcap;
-    Task _pcap_task;
     int _pcap_complaints;
-    friend void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*,
-				      const u_char*);
-    const char *pcap_error(const char *ebuf) {
-	return pcap_error(_pcap, ebuf);
-    }
 #endif
+#if FROMDEVICE_ALLOW_NETMAP
+    NetmapInfo _netmap;
+    int netmap_dispatch();
+#endif
+#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+    friend void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*,
+                                      const u_char*);
+#endif
+
     bool _force_ip;
+#if FROMDEVICE_ALLOW_PCAP && TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
+    bool _pcap_nanosec;
+#endif
     int _burst;
     int _datalink;
 
@@ -211,17 +254,19 @@ class FromDevice : public Element { public:
     bool _sniffer : 1;
     bool _promisc : 1;
     bool _outbound : 1;
+    bool _timestamp : 1;
     int _was_promisc : 2;
     int _snaplen;
+    uint16_t _protocol;
     unsigned _headroom;
-    enum { CAPTURE_PCAP, CAPTURE_LINUX };
-    int _capture;
-#if FROMDEVICE_PCAP
+    enum { method_default, method_netmap, method_pcap, method_linux };
+    int _method;
+#if FROMDEVICE_ALLOW_PCAP
     String _bpf_filter;
 #endif
 
-    static String read_handler(Element*, void*);
-    static int write_handler(const String&, Element*, void*, ErrorHandler*);
+    static String read_handler(Element*, void*) CLICK_COLD;
+    static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
 
 };
 

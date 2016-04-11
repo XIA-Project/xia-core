@@ -54,7 +54,7 @@
  * =back */
 
 #include <click/bighashmap.hh>
-#include <click/dequeue.hh>
+#include <click/deque.hh>
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/etheraddress.hh>
@@ -130,7 +130,7 @@ public:
   struct link_entry {
     static const int size = 8;
 
-    struct EtherAddress eth;
+    class EtherAddress eth;
     unsigned short num_rx;    // number of probe bcasts received from node during last tau msecs
 
     link_entry() : num_rx(0) { }
@@ -161,7 +161,7 @@ private:
     EtherAddress    eth;
     unsigned int    period;   // period of this node's probes, as reported by the node
     unsigned int    tau;      // this node's stats averaging period, as reported by the node
-    DEQueue<probe_t> probes;   // most recently received probes
+    Deque<probe_t> probes;   // most recently received probes
     probe_list_t(const EtherAddress &e, unsigned int p, unsigned int t) : eth(e), period(p), tau(t) { }
     probe_list_t() : period(0), tau(0) { }
   };
@@ -227,18 +227,18 @@ private:
 
   unsigned get_probe_size() const { return _probe_size; }
 
-  LinkStat();
-  ~LinkStat();
+  LinkStat() CLICK_COLD;
+  ~LinkStat() CLICK_COLD;
 
   const char *class_name() const		{ return "LinkStat"; }
   const char *port_count() const		{ return "1/0-1"; }
   const char *processing() const		{ return PUSH; }
   const char *flow_code() const                 { return "x/y"; }
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *) CLICK_COLD;
 
   Packet *simple_action(Packet *);
 };

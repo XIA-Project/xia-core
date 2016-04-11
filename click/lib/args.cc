@@ -4,6 +4,7 @@
  * Eddie Kohler
  *
  * Copyright (c) 2011 Regents of the University of California
+ * Copyright (c) 2012-2013 Eddie Kohler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -43,6 +44,9 @@ Args::initialize(const Vector<String> *conf)
     _slots = 0;
     _simple_slotbuf[0] = 0;
     _my_conf = !!_conf;
+#if CLICK_DEBUG_ARGS_USAGE
+    _consumed = false;
+#endif
     _status = true;
     _simple_slotpos = 0;
     if (_conf)
@@ -80,12 +84,19 @@ Args::Args(const Args &x)
     : ArgContext(x),
       _my_conf(false), _simple_slotpos(0), _conf(0), _slots(0)
 {
+#if CLICK_DEBUG_ARGS_USAGE
+    _consumed = true;
+#endif
     _simple_slotbuf[0] = 0;
     *this = x;
 }
 
 Args::~Args()
 {
+#if CLICK_DEBUG_ARGS_USAGE
+    if (_my_conf && _consumed && errh())
+	errh()->warning("Args::consume() did nothing; did you mean Args(this, errh).bind(conf)?");
+#endif
     if (_my_conf)
 	delete _conf;
     while (Slot *s = _slots) {
@@ -120,6 +131,9 @@ Args::operator=(const Args &x)
 	_arg_keyword = x._arg_keyword;
 	_read_status = x._read_status;
 	_status = x._status;
+#if CLICK_DEBUG_ARGS_USAGE
+	_consumed = x._consumed;
+#endif
     }
     return *this;
 }
@@ -127,7 +141,7 @@ Args::operator=(const Args &x)
 void
 Args::reset_from(int i)
 {
-    _kwpos.clear();
+    _kwpos.resize(i);
     if (_conf) {
 	_kwpos.reserve(_conf->size());
 	for (String *it = _conf->begin() + i; it != _conf->end(); ++it) {
@@ -147,6 +161,9 @@ Args::reset_from(int i)
 	    else
 		_kwpos.push_back(s - it->begin());
 	}
+#if CLICK_DEBUG_ARGS_USAGE
+	_consumed = false;
+#endif
     }
 }
 
@@ -157,6 +174,9 @@ Args::bind(Vector<String> &conf)
 	delete _conf;
     _conf = &conf;
     _my_conf = false;
+#if CLICK_DEBUG_ARGS_USAGE
+    _consumed = false;
+#endif
     return reset();
 }
 
@@ -309,7 +329,7 @@ ArgContext::message(const char *fmt, ...) const
 void
 ArgContext::xmessage(const String &anno, const String &str) const
 {
-    PrefixErrorHandler perrh(_errh, _arg_keyword ? String(_arg_keyword) + ": " : "");
+    PrefixErrorHandler perrh(_errh, error_prefix());
     perrh.xmessage(anno, str);
     if (perrh.nerrors())
 	_read_status = false;
@@ -318,7 +338,7 @@ ArgContext::xmessage(const String &anno, const String &str) const
 void
 ArgContext::xmessage(const String &anno, const char *fmt, va_list val) const
 {
-    PrefixErrorHandler perrh(_errh, _arg_keyword ? String(_arg_keyword) + ": " : "");
+    PrefixErrorHandler perrh(_errh, error_prefix());
     perrh.xmessage(anno, fmt, val);
     if (perrh.nerrors())
 	_read_status = false;
@@ -330,6 +350,9 @@ Args::find(const char *keyword, int flags, Slot *&slot_status)
 {
     _arg_keyword = keyword;
     _read_status = true;
+#if CLICK_DEBUG_ARGS_USAGE
+    _consumed = false;
+#endif
     slot_status = _slots;
 
     // Check for common errors.
@@ -396,11 +419,13 @@ Args::find(const char *keyword, int flags, Slot *&slot_status)
 void
 Args::postparse(bool ok, Slot *slot_status)
 {
-    if (!ok && _read_status)
-	error("syntax error");
+    if (!ok && _read_status) {
+	error("parse error");
+	_read_status = false;
+    }
     _arg_keyword = 0;
 
-    if (_read_status) {
+    if (ok) {
 	while (_simple_slotpos < simple_slotbuf_size
 	       && _simple_slotbuf[_simple_slotpos] != 0)
 	    _simple_slotpos +=
@@ -475,6 +500,9 @@ int
 Args::consume()
 {
     strip();
+#if CLICK_DEBUG_ARGS_USAGE
+    _consumed = true;
+#endif
     return execute();
 }
 
@@ -591,19 +619,20 @@ IntArg::parse(const char *begin, const char *end, bool is_signed, int size,
 }
 
 void
-IntArg::report_error(const ArgContext &args, bool negative,
-		     click_uint_large_t value) const
+IntArg::range_error(const ArgContext &args, bool is_signed,
+		    click_intmax_t value)
 {
-    if (status == status_range) {
-	const char *sgn = "-" + !negative;
-	args.error("out of range, bound %s%" CLICK_ERRHuLARGE, sgn, value);
-    }
+    status = status_range;
+    if (is_signed)
+	args.error("out of range, bound %" CLICK_ERRHdMAX, value);
+    else
+	args.error("out of range, bound %" CLICK_ERRHuMAX, click_uintmax_t(value));
 }
 
 
 namespace {
-typedef click_uint_large_t value_type;
-typedef click_int_large_t signed_value_type;
+typedef click_uintmax_t value_type;
+typedef click_intmax_t signed_value_type;
 
 const char *
 preparse_fraction(const char *begin, const char *end, bool is_signed,
@@ -1098,10 +1127,6 @@ BoolArg::parse(const String &str, bool &result, const ArgContext &)
 	result = false;
     else if (len == 3 && memcmp(s, "yes", 3) == 0)
 	result = true;
-    else if (len == 2 && memcmp(s, "!0", 2) == 0)
-    result = true;
-    else if (len == 2 && memcmp(s, "!1", 2) == 0)
-    result = false;
     else
 	return false;
 

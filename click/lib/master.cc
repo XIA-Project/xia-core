@@ -204,7 +204,7 @@ Master::kill_router(Router *router)
 
     // Fix stopper
     request_stop();
-#if CLICK_LINUXMODULE && HAVE_LINUXMODULE_2_6
+#if CLICK_LINUXMODULE
     preempt_disable();
 #endif
     unlock_master();
@@ -233,8 +233,12 @@ Master::kill_router(Router *router)
 #endif
 
     unpause();
-#if CLICK_LINUXMODULE && HAVE_LINUXMODULE_2_6
+#if CLICK_LINUXMODULE
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+    preempt_enable();
+#  else
     preempt_enable_no_resched();
+#  endif
 #endif
 
     // something has happened, so wake up threads
@@ -481,7 +485,7 @@ Master::info() const
 	else
 	    sa << "\twake";
 # endif
-	if (t->_pending_head)
+	if (t->_pending_head.x)
 	    sa << "\tpending";
 # if CLICK_USERLEVEL
 	if (t->select_set()._wake_pipe[0] >= 0) {

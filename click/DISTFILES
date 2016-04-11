@@ -343,12 +343,6 @@ linux-2.6.16.13-patch
 linux-2.6.19.2-patch
 ns-2.30-patch
 ns-2.34-patch
-pkg-Makefile
-pkg-config.mk.in
-pkg-linuxmodule-26.mk
-pkg-linuxmodule.mk
-pkg-bsdmodule.mk
-pkg-userlevel.mk
 samplellrpc
 samplepackage
 
@@ -367,7 +361,7 @@ samp05_other.mp
 DISTFILES
 Makefile.in
 lc-Makefile.in
-lc-configure.in
+lc-configure.ac
 lc-libsrc-Makefile.in
 
 ./etc/samplellrpc:
@@ -392,6 +386,7 @@ clicknet
 algorithm.hh
 archive.hh
 args.hh
+array_memory.hh
 atomic.hh
 bighashmap.cc
 bighashmap.hh
@@ -403,7 +398,8 @@ confparse.hh
 crc32.h
 cxxprotect.h
 cxxunprotect.h
-dequeue.cc
+deque.cc
+deque.hh
 dequeue.hh
 driver.hh
 element.hh
@@ -435,6 +431,7 @@ iptable.hh
 lexer.hh
 list.hh
 llrpc.h
+machine.hh
 master.hh
 md5.h
 nameinfo.hh
@@ -533,19 +530,17 @@ straccum.cc
 strerror.c
 string.cc
 task.cc
-templatei.cc
 timer.cc
 timerset.cc
 timestamp.cc
 userutils.cc
 variableenv.cc
-vectorv.cc
 
 ./linuxmodule:
 Makefile.in
 clickfs.cc
+click-linuxtool.pl
 config.cc
-fixincludes.pl
 kernelversion.c
 module.cc
 moduleparm.h
@@ -564,6 +559,17 @@ CUT_BinHeap.h
 Makefile.in
 nsclick-test.cc
 nsclick.cc
+
+./share:
+click
+
+./share/click:
+pkg-Makefile
+pkg-config.mk.in
+pkg-linuxmodule-26.mk
+pkg-linuxmodule.mk
+pkg-bsdmodule.mk
+pkg-userlevel.mk
 
 ./test:
 IPRewriter
@@ -682,6 +688,7 @@ deviceup-01.testie
 ./test/standard:
 BandwidthRatedUnqueue-01.testie
 Classifier-01.testie
+Clipboard-01.testie
 DelayShaper-notifier-01.testie
 FullNoteQueue-upstream-notifier-01.testie
 Hub-01.testie
@@ -694,12 +701,14 @@ Queue-notifiers-01.testie
 Queue-yank-01.testie
 QuickNoteQueue-01.testie
 RatedSplitter-01.testie
+Resize-01.testie
 Script-01.testie
 Script-02.testie
 StrideSched-01.testie
 Unqueue-01.testie
 bigint-01.testie
 confparse-01.testie
+deque-01.testie
 error-01.testie
 functions-01.testie
 hashtable-01.testie
@@ -748,6 +757,9 @@ xform-ip-01.testie
 ./test/userlevel:
 ControlSocket-llrpc-01.testie
 ControlSocket-llrpc-02.testie
+McastSocket-01.testie
+McastSocket-02.testie
+McastSocket-03.testie
 Script-signal-01.testie
 Script-signal-02.testie
 Script-signal-03.testie
@@ -870,7 +882,6 @@ runparse.cc
 runparse.hh
 toolutils.cc
 toolutils.hh
-vectori.cc
 
 ./userlevel:
 Makefile.in

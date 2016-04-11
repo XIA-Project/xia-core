@@ -8,7 +8,7 @@
 #include <elements/grid/gridgenericrt.hh>
 #include <click/timer.hh>
 #include <elements/grid/gridgenericlogger.hh>
-#include <click/dequeue.hh>
+#include <click/deque.hh>
 #include <elements/grid/gridgenericmetric.hh>
 CLICK_DECLS
 
@@ -199,8 +199,8 @@ public:
   void get_all_entries(Vector<RouteEntry> &vec);
   unsigned get_number_direct_neigbors();
 
-  DSDVRouteTable();
-  ~DSDVRouteTable();
+  DSDVRouteTable() CLICK_COLD;
+  ~DSDVRouteTable() CLICK_COLD;
 
   const char *class_name() const		{ return "DSDVRouteTable"; }
   void *cast(const char *);
@@ -208,20 +208,20 @@ public:
   const char *processing() const		{ return "h/h"; }
   const char *flow_code() const                 { return "x/y"; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *) CLICK_COLD;
 
   virtual bool can_live_reconfigure() const { return false; }
 
   Packet *simple_action(Packet *);
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
 
 private:
 
 #if SEQ_METRIC
   bool _use_seq_metric; // use the `dsdv_seqs' metric
-  HashMap<IPAddress, DEQueue<unsigned> > _seq_history;
+  HashMap<IPAddress, Deque<unsigned> > _seq_history;
 #endif
 
   typedef GridGenericMetric::metric_t metric_t;
@@ -472,7 +472,7 @@ public:
   { return (CLICK_HZ * m) / 1000; }
 
 private:
-  class RouteEntry make_generic_rte(const RTEntry &rte) { return rte; }
+  struct RouteEntry make_generic_rte(const RTEntry &rte) { return rte; }
 
   /* update route metric with the last hop from the advertising node */
   void update_metric(RTEntry &);

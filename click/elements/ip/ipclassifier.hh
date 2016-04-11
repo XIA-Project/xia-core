@@ -228,18 +228,23 @@ is using to classify packets. At each step in the program, four bytes
 of packet data are ANDed with a mask and compared against four bytes of
 classifier pattern.
 
+=h pattern0 rw
+Returns or sets the element's pattern 0. There are as many C<pattern>
+handlers as there are output ports.
+
 =a Classifier, IPFilter, CheckIPHeader, MarkIPHeader, CheckIPHeader2,
 tcpdump(1) */
 
 class IPClassifier : public IPFilter { public:
 
-  IPClassifier();
-  ~IPClassifier();
+  IPClassifier() CLICK_COLD;
+  ~IPClassifier() CLICK_COLD;
 
   const char *class_name() const		{ return "IPClassifier"; }
   const char *processing() const		{ return PUSH; }
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  void add_handlers() CLICK_COLD;
 
 };
 

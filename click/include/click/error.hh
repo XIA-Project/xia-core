@@ -2,7 +2,7 @@
 #ifndef CLICK_ERROR_HH
 #define CLICK_ERROR_HH
 #include <click/string.hh>
-#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL) || defined(CLICK_MINIOS)
 # include <stdio.h>
 #endif
 #if CLICK_BSDMODULE
@@ -329,8 +329,8 @@ class ErrorHandler { public:
      * <tt>\%g</tt>, <tt>\%G</tt></td><td>Format a <tt>double</tt> (user-level
      * only).</td></tr>
      *
-     * <tr><td><tt>\%{...}</tt><td>Call a user-provided conversion function.
-     * For example, <tt>\%{ip_ptr}</tt> reads an <tt>IPAddress *</tt> argument
+     * <tr><td><tt>\%p{...}</tt><td>Call a user-provided conversion function.
+     * For example, <tt>\%p{ip_ptr}</tt> reads an <tt>IPAddress *</tt> argument
      * from the argument list, and formats the pointed-to address using
      * IPAddress::unparse().</td></tr>
      *
@@ -638,7 +638,7 @@ class ErrorVeneer : public ErrorHandler { public:
 };
 
 
-#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL) || defined(CLICK_MINIOS)
 /** @class FileErrorHandler
  * @brief An ErrorHandler that prints error messages to a given file.
  *
@@ -857,7 +857,7 @@ class LandmarkErrorHandler : public ErrorVeneer { public:
 };
 
 
-#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL) || defined(CLICK_MINIOS)
 /** @class BailErrorHandler
  * @brief A stackable ErrorHandler that exits when errors occur.
  *

@@ -336,7 +336,7 @@ FromDAGDump::read_packet(ErrorHandler *errh)
 		errh->warning("odd DAG cell type %d, assuming old-style ATM encapsulation", cell->type);
 		errh->message("(To avoid this warning, specify an explicit ENCAP.)");
 	    } else
-		click_chatter("%{element}: DAG cell with odd type %d, assuming old-style\n  ATM encapsulation for rest of dump.  Packets may have been read incorrectly!\n  (To avoid this warning, specify an explicit ENCAP.)", this, cell->type);
+		click_chatter("%p{element}: DAG cell with odd type %d, assuming old-style\n  ATM encapsulation for rest of dump.  Packets may have been read incorrectly!\n  (To avoid this warning, specify an explicit ENCAP.)", this, cell->type);
 	    goto use_base_linktype;
 	}
 	if (read_length < DAGCell::HEADER_SIZE)
@@ -463,7 +463,7 @@ void
 FromDAGDump::add_handlers()
 {
     add_read_handler("sampling_prob", read_handler, H_SAMPLING_PROB);
-    add_data_handlers("active", Handler::OP_READ | Handler::CHECKBOX, &_active);
+    add_data_handlers("active", Handler::f_read | Handler::f_checkbox, &_active);
     add_write_handler("active", write_handler, H_ACTIVE);
     add_read_handler("encap", read_handler, H_ENCAP);
     add_write_handler("stop", write_handler, H_STOP);

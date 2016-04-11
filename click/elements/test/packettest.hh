@@ -24,12 +24,11 @@ CheckPacket */
 
 class PacketTest : public Element { public:
 
-    PacketTest();
-    ~PacketTest();
+    PacketTest() CLICK_COLD;
 
     const char *class_name() const		{ return "PacketTest"; }
 
-    int initialize(ErrorHandler *);
+    int initialize(ErrorHandler *) CLICK_COLD;
 
 };
 

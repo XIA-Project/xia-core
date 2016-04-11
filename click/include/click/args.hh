@@ -85,51 +85,119 @@ class ArgContext { public:
 };
 
 
+/** @cond never */
+template <typename T> struct Args_has_enable_direct_parse {
+  private:
+    template <typename X> static char test(typename X::enable_direct_parse *);
+    template <typename> static int test(...);
+  public:
+    enum { value = (sizeof(test<T>(0)) == 1) };
+};
+template <typename P, bool direct = Args_has_enable_direct_parse<P>::value>
+struct Args_parse_helper;
+template <typename P> struct Args_parse_helper<P, false> {
+    template <typename T, typename A>
+    static inline T *slot(T &variable, A &args) {
+	return args.slot(variable);
+    }
+    template <typename T, typename A>
+    static inline T *initialized_slot(T &variable, A &args) {
+	return args.initialized_slot(variable);
+    }
+    template <typename T, typename A>
+    static inline bool parse(P parser, const String &str, T &s, A &args) {
+	return parser.parse(str, s, args);
+    }
+    template <typename T1, typename T2, typename A>
+    static inline bool parse(P parser, const String &str, T1 &s1, T2 &s2, A &args) {
+	return parser.parse(str, s1, s2, args);
+    }
+};
+template <typename P> struct Args_parse_helper<P, true> {
+    template <typename T, typename A>
+    static inline T *slot(T &variable, A &) {
+	return &variable;
+    }
+    template <typename T, typename A>
+    static inline T *initialized_slot(T &variable, A &) {
+	return &variable;
+    }
+    template <typename T, typename A>
+    static inline bool parse(P parser, const String &str, T &s, A &args) {
+	return parser.direct_parse(str, s, args);
+    }
+    template <typename T1, typename T2, typename A>
+    static inline bool parse(P parser, const String &str, T1 &s1, T2 &s2, A &args) {
+	return parser.direct_parse(str, s1, s2, args);
+    }
+};
+/** @endcond never */
+
+
 /** @class Args
   @brief Argument parser class.
 
-  The Args class parses Click configuration strings in a type-safe manner.
+  Args parses Click configuration strings in a type-safe manner.
 
-  Args manages two types of state, <em>arguments</em> and <em>results</em>.
-  Arguments are strings to be parsed, and results are parsed values.  As
-  arguments are successfully parsed, Args marks off arguments and adds new
-  results.
+  Args manages <em>arguments</em> and <em>result slots</em>. Arguments are
+  strings to be parsed and result slots are parsed values.
 
-  Each result is paired with a <em>variable</em> in the caller's context.  A
-  separate <em>execution</em> step assigns each parsed result to its variable
-  (but only if no parse error was previously encountered).
-
-  Arguments are named with keywords and parsed by read() functions.  For
-  example:
+  The read() functions parse arguments into result slots.
 
   @code
-  Args args; args.push_back("A 1"); // one argument
-  int a = 2;
+  Args args;
+  args.push_back("A 1"); // add argument
 
-  args.read("A", a);  // parses the argument "A" and creates a result
-  assert(a == 2);     // caller's variable not assigned yet
-  args.execute();     // now caller's variable is assigned
-  assert(a == 1);
+  int a_result;
+  args.read("A", a_result); // parse "A" into a result slot
   @endcode
 
-  Each read() function comes in five variants.  read() reads an optional
-  keyword argument.  read_m() reads a mandatory keyword argument: if the
-  argument was not supplied, Args will report an error.  read_p() reads an
-  optional positional argument: if the keyword was not supplied, but a
-  positional argument was, that is used.  read_mp() reads a mandatory
-  positional argument.  Positional arguments are parsed in order.  The fifth
+  As arguments are parsed, Args marks them off and adds new result slots.
+  Each result slot is paired with a variable belonging to the caller.
+  However, the caller's variables aren't modified until the parse
+  <em>executes</em> via complete(), consume(), or execute().
+
+  @code
+  Args args; args.push_back("A 1");
+
+  int a_result = 0;
+  args.read("A", a_result);
+  assert(a_result == 0);  // parsed value not yet assigned
+  args.execute();         // this call assigns results
+  assert(a_result == 1);
+  @endcode
+
+  If Args encounters a parse error, then execution doesn't modify
+  <em>any</em> of the caller's variables.
+
+  @code
+  Args args; args.push_back("A 1, B NOT_AN_INTEGER");
+
+  int a_result = 0, b_result = 0;
+  args.read("A", a_result)   // succeeds
+      .read("B", b_result)   // fails, since B is not an integer
+      .execute();
+  assert(a_result == 0 && b_result == 0);
+  @endcode
+
+  Each read() function comes in five variants. read() reads an optional
+  keyword argument. read_m() reads a mandatory keyword argument: if the
+  argument was not supplied, Args will report a parse error. read_p() reads
+  an optional positional argument. If the keyword was not supplied, but a
+  positional argument was, that is used. read_mp() reads a mandatory
+  positional argument. Positional arguments are parsed in order. The fifth
   variant of read() takes an integer <em>flags</em> argument; flags include
   Args::positional, Args::mandatory, and others, such as Args::deprecated.
 
   The complete() execution method checks that every argument has been
-  successfully parsed and reports an error if not.  The consume() execution
-  method doesn't check for completion, but removes parsed arguments from the
+  successfully parsed and reports an error if not.  consume()
+  doesn't check for completion, but removes parsed arguments from the
   argument set.  Execution methods return 0 on success and <0 on failure.
-  Check the parse status before execution using the status() method.
+  You can check the parse status before execution using status().
 
-  Args methods are designed to chain.  Many methods return a reference to the
-  called object, and it is often possible to parse a whole set of arguments
-  using a single temporary.  For example:
+  Args methods are designed to chain. All read() methods (and some others)
+  return a reference to the Args itself. It is often possible to parse a
+  whole set of arguments using a single temporary Args. For example:
 
   @code
   Vector<String> conf;
@@ -143,15 +211,15 @@ class ArgContext { public:
       click_chatter("Success! a=%d, b=%d", a, b);
   @endcode
 
-  Arguments are parsed by independent <em>parser objects</em>.  Many common
-  variable types have default parsers defined by the DefaultParser<T>
-  template.  For example, the default parser for an integer value understands
-  the common textual representations of integers.  You can also pass a parser
-  explicitly.  For example:
+  The actual work of parsing is handled by <em>parser objects</em>. Many
+  common variable types have default parsers defined by the DefaultArg<T>
+  template. For example, the default parser for an integer value understands
+  the common textual representations of integers. You can also pass a parser
+  explicitly. For example:
 
   @code
   int a, b, c;
-  args.read("A", a)      // parse A using DefaultParser<int> = IntArg()
+  args.read("A", a)      // parse A using DefaultArg<int> = IntArg()
       .read("B", IntArg(2), b);   // parse B using IntArg(2): base-2
   @endcode
 
@@ -171,10 +239,10 @@ class ArgContext { public:
   <b>args</b>.error().  For generic errors, the parse() method can simply
   return false; Args will generate a "KEYWORD: parse error" message.
 
-  parse() methods can be static or non-static.  Most parsers are
-  <em>disciplined</em>, meaning that they modify <b>result</b> only if the
-  parse succeeds.  (This doesn't matter in the context of Args, but can matter
-  to users who call a parse function directly.)
+  Most parsers are <em>disciplined</em>, meaning that they modify
+  <b>result</b> only if the parse succeeds. This doesn't matter in the
+  context of Args, but can matter to users who call a parse function
+  directly.
 */
 class Args : public ArgContext {
     struct Slot;
@@ -240,7 +308,7 @@ class Args : public ArgContext {
     /** @brief Bind this parser's arguments to @a conf.
      * @param conf reference to new arguments
      * @return *this
-     * @post The argument parser shares @a conf with the caller.
+     * @post This Args shares @a conf with the caller.
      * For instance, consume() will modify @a conf. */
     Args &bind(Vector<String> &conf);
 
@@ -292,83 +360,84 @@ class Args : public ArgContext {
 
     /** @brief Read an argument using its type's default parser.
      * @param keyword argument name
-     * @param variable reference to result variable
+     * @param x reference to result
      * @return *this
      *
-     * Creates a result for type T.  Calls DefaultParser<T>().parse(string,
-     * result, *this). */
-    template<typename T>
-    Args &read(const char *keyword, T &variable) {
-	return read(keyword, 0, variable);
+     * Creates a result slot for @a x and calls
+     * DefaultArg<T>().parse(string, result, *this). */
+    template <typename T>
+    Args &read(const char *keyword, T &x) {
+	return read(keyword, 0, x);
     }
-    template<typename T>
-    Args &read_m(const char *keyword, T &variable) {
-	return read(keyword, mandatory, variable);
+    template <typename T>
+    Args &read_m(const char *keyword, T &x) {
+	return read(keyword, mandatory, x);
     }
-    template<typename T>
-    Args &read_p(const char *keyword, T &variable) {
-	return read(keyword, positional, variable);
+    template <typename T>
+    Args &read_p(const char *keyword, T &x) {
+	return read(keyword, positional, x);
     }
-    template<typename T>
-    Args &read_mp(const char *keyword, T &variable) {
-	return read(keyword, mandatory | positional, variable);
+    template <typename T>
+    Args &read_mp(const char *keyword, T &x) {
+	return read(keyword, mandatory | positional, x);
     }
-    template<typename T>
-    Args &read(const char *keyword, int flags, T &variable) {
-	args_base_read(this, keyword, flags, variable);
+    template <typename T>
+    Args &read(const char *keyword, int flags, T &x) {
+	args_base_read(this, keyword, flags, x);
 	return *this;
     }
 
     /** @brief Read an argument using the default parser, or set it to a
      *    default value if the argument is was not supplied.
      * @param keyword argument name
-     * @param variable reference to result variable
-     * @param value default value
+     * @param x reference to result
+     * @param default_value default value
      * @return *this
      *
-     * Calls DefaultParser<T>().parse(string, result, this) if argument @a
-     * keyword was supplied.  Otherwise, adds a result that will set @a variable
-     * to @a value. */
-    template<typename T, typename V>
-    Args &read_or_set(const char *keyword, T &variable, const V &value) {
-	return read_or_set(keyword, 0, variable, value);
+     * Creates a result slot for @a x. If @a keyword was supplied, calls
+     * DefaultArg<T>().parse(string, result, this). Otherwise, assigns the
+     * result to @a value. */
+    template <typename T, typename V>
+    Args &read_or_set(const char *keyword, T &x, const V &default_value) {
+	return read_or_set(keyword, 0, x, default_value);
     }
-    template<typename T, typename V>
-    Args &read_or_set_p(const char *keyword, T &variable, const V &value) {
-	return read_or_set(keyword, positional, variable, value);
+    template <typename T, typename V>
+    Args &read_or_set_p(const char *keyword, T &x, const V &default_value) {
+	return read_or_set(keyword, positional, x, default_value);
     }
-    template<typename T, typename V>
-    Args &read_or_set(const char *keyword, int flags, T &variable, const V &value) {
-	args_base_read_or_set(this, keyword, flags, variable, value);
+    template <typename T, typename V>
+    Args &read_or_set(const char *keyword, int flags, T &x, const V &default_value) {
+	args_base_read_or_set(this, keyword, flags, x, default_value);
 	return *this;
     }
 
     /** @brief Read an argument using a specified parser.
      * @param keyword argument name
      * @param parser parser object
-     * @param variable reference to result variable
+     * @param x reference to result
      * @return *this
      *
-     * Calls @a parser.parse(string, variable, *this). */
-    template<typename P, typename T>
-    Args &read(const char *keyword, P parser, T &variable) {
-	return read(keyword, 0, parser, variable);
+     * Creates a result slot for @a x and calls @a parser.parse(string,
+     * result, *this). */
+    template <typename P, typename T>
+    Args &read(const char *keyword, P parser, T &x) {
+	return read(keyword, 0, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_m(const char *keyword, P parser, T &variable) {
-	return read(keyword, mandatory, parser, variable);
+    template <typename P, typename T>
+    Args &read_m(const char *keyword, P parser, T &x) {
+	return read(keyword, mandatory, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_p(const char *keyword, P parser, T &variable) {
-	return read(keyword, positional, parser, variable);
+    template <typename P, typename T>
+    Args &read_p(const char *keyword, P parser, T &x) {
+	return read(keyword, positional, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_mp(const char *keyword, P parser, T &variable) {
-	return read(keyword, mandatory | positional, parser, variable);
+    template <typename P, typename T>
+    Args &read_mp(const char *keyword, P parser, T &x) {
+	return read(keyword, mandatory | positional, parser, x);
     }
-    template<typename P, typename T>
-    Args &read(const char *keyword, int flags, P parser, T &variable) {
-	args_base_read(this, keyword, flags, parser, variable);
+    template <typename P, typename T>
+    Args &read(const char *keyword, int flags, P parser, T &x) {
+	args_base_read(this, keyword, flags, parser, x);
 	return *this;
     }
 
@@ -376,54 +445,55 @@ class Args : public ArgContext {
      *    default value if the argument is was not supplied.
      * @param keyword argument name
      * @param parser parser object
-     * @param variable reference to result variable
-     * @param value default value
+     * @param x reference to result variable
+     * @param default_value default value
      * @return *this
      *
-     * Calls @a parser.parse(string, variable, *this) if argument @a keyword was
-     * supplied.  Otherwise, adds a result that will set @a variable to @a
-     * value. */
-    template<typename P, typename T, typename V>
-    Args &read_or_set(const char *keyword, P parser, T &variable, const V &value) {
-	return read_or_set(keyword, 0, parser, variable, value);
+     * Creates a result slot for @a x. If argument @a keyword was supplied,
+     * calls @a parser.parse(string, result, *this). Otherwise, assigns the
+     * result to @a default_value. */
+    template <typename P, typename T, typename V>
+    Args &read_or_set(const char *keyword, P parser, T &x, const V &default_value) {
+	return read_or_set(keyword, 0, parser, x, default_value);
     }
-    template<typename P, typename T, typename V>
-    Args &read_or_set_p(const char *keyword, P parser, T &variable, const V &value) {
-	return read_or_set(keyword, positional, parser, variable, value);
+    template <typename P, typename T, typename V>
+    Args &read_or_set_p(const char *keyword, P parser, T &x, const V &default_value) {
+	return read_or_set(keyword, positional, parser, x, default_value);
     }
-    template<typename P, typename T, typename V>
-    Args &read_or_set(const char *keyword, int flags, P parser, T &variable, const V &value) {
-	args_base_read_or_set(this, keyword, flags, parser, variable, value);
+    template <typename P, typename T, typename V>
+    Args &read_or_set(const char *keyword, int flags, P parser, T &x, const V &default_value) {
+	args_base_read_or_set(this, keyword, flags, parser, x, default_value);
 	return *this;
     }
 
     /** @brief Read an argument using a specified parser with two results.
      * @param keyword argument name
      * @param parser parser object
-     * @param variable1 reference to first result variable
-     * @param variable2 reference to first result variable
+     * @param x1 reference to first result
+     * @param x2 reference to second result
      * @return *this
      *
-     * Calls @a parser.parse(string, variable1, variable2, *this). */
+     * Creates results for @a x1 and @a x2 and calls @a parser.parse(string,
+     * result1, result2, *this). */
     template<typename P, typename T1, typename T2>
-    Args &read(const char *keyword, P parser, T1 &variable1, T2 &variable2) {
-	return read(keyword, 0, parser, variable1, variable2);
+    Args &read(const char *keyword, P parser, T1 &x1, T2 &x2) {
+	return read(keyword, 0, parser, x1, x2);
     }
     template<typename P, typename T1, typename T2>
-    Args &read_m(const char *keyword, P parser, T1 &variable1, T2 &variable2) {
-	return read(keyword, mandatory, parser, variable1, variable2);
+    Args &read_m(const char *keyword, P parser, T1 &x1, T2 &x2) {
+	return read(keyword, mandatory, parser, x1, x2);
     }
     template<typename P, typename T1, typename T2>
-    Args &read_p(const char *keyword, P parser, T1 &variable1, T2 &variable2) {
-	return read(keyword, positional, parser, variable1, variable2);
+    Args &read_p(const char *keyword, P parser, T1 &x1, T2 &x2) {
+	return read(keyword, positional, parser, x1, x2);
     }
     template<typename P, typename T1, typename T2>
-    Args &read_mp(const char *keyword, P parser, T1 &variable1, T2 &variable2) {
-	return read(keyword, mandatory | positional, parser, variable1, variable2);
+    Args &read_mp(const char *keyword, P parser, T1 &x1, T2 &x2) {
+	return read(keyword, mandatory | positional, parser, x1, x2);
     }
     template<typename P, typename T1, typename T2>
-    Args &read(const char *keyword, int flags, P parser, T1 &variable1, T2 &variable2) {
-	args_base_read(this, keyword, flags, parser, variable1, variable2);
+    Args &read(const char *keyword, int flags, P parser, T1 &x1, T2 &x2) {
+	args_base_read(this, keyword, flags, parser, x1, x2);
 	return *this;
     }
 
@@ -433,23 +503,23 @@ class Args : public ArgContext {
      * @return *this
      *
      * Calls @a parser.parse(string, *this). */
-    template<typename P>
+    template <typename P>
     Args &read_with(const char *keyword, P parser) {
 	return read_with(keyword, 0, parser);
     }
-    template<typename P>
+    template <typename P>
     Args &read_m_with(const char *keyword, P parser) {
 	return read_with(keyword, mandatory, parser);
     }
-    template<typename P>
+    template <typename P>
     Args &read_p_with(const char *keyword, P parser) {
 	return read_with(keyword, positional, parser);
     }
-    template<typename P>
+    template <typename P>
     Args &read_mp_with(const char *keyword, P parser) {
 	return read_with(keyword, mandatory | positional, parser);
     }
-    template<typename P>
+    template <typename P>
     Args &read_with(const char *keyword, int flags, P parser) {
 	args_base_read_with(this, keyword, flags, parser);
 	return *this;
@@ -458,30 +528,32 @@ class Args : public ArgContext {
     /** @brief Pass an argument to a specified parser.
      * @param keyword argument name
      * @param parser parser object
-     * @param variable reference to result variable
+     * @param x reference to result
      * @return *this
      *
-     * Calls @a parser.parse(string, *this, variable). */
-    template<typename P, typename T>
-    Args &read_with(const char *keyword, P parser, T &variable) {
-	return read_with(keyword, 0, parser, variable);
+     * Creates a result slot for @a x and calls @a parser.parse(string,
+     * result, *this).
+     *
+     * @deprecated Use read(keyword, parser, variable) instead. */
+    template <typename P, typename T>
+    Args &read_with(const char *keyword, P parser, T &x) {
+	return read(keyword, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_m_with(const char *keyword, P parser, T &variable) {
-	return read_with(keyword, mandatory, parser, variable);
+    template <typename P, typename T>
+    Args &read_m_with(const char *keyword, P parser, T &x) {
+	return read_m(keyword, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_p_with(const char *keyword, P parser, T &variable) {
-	return read_with(keyword, positional, parser, variable);
+    template <typename P, typename T>
+    Args &read_p_with(const char *keyword, P parser, T &x) {
+	return read_p(keyword, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_mp_with(const char *keyword, P parser, T &variable) {
-	return read_with(keyword, mandatory | positional, parser, variable);
+    template <typename P, typename T>
+    Args &read_mp_with(const char *keyword, P parser, T &x) {
+	return read_mp(keyword, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_with(const char *keyword, int flags, P parser, T &variable) {
-	args_base_read_with(this, keyword, flags, parser, variable);
-	return *this;
+    template <typename P, typename T>
+    Args &read_with(const char *keyword, int flags, P parser, T &x) {
+	return read(keyword, flags, parser, x);
     }
 
     /** @brief Pass all matching arguments to a specified parser.
@@ -493,11 +565,11 @@ class Args : public ArgContext {
      *
      * @note The value of read_status() is true iff at least one argument
      * matched and all matching arguments successfully parsed. */
-    template<typename P>
+    template <typename P>
     Args &read_all_with(const char *keyword, P parser) {
 	return read_all_with(keyword, 0, parser);
     }
-    template<typename P>
+    template <typename P>
     Args &read_all_with(const char *keyword, int flags, P parser) {
 	args_base_read_all_with(this, keyword, flags | firstmatch, parser);
 	return *this;
@@ -506,21 +578,52 @@ class Args : public ArgContext {
     /** @brief Pass all matching arguments to a specified parser.
      * @param keyword argument name
      * @param parser parser object
-     * @param variable reference to result variable
+     * @param x reference to result
      * @return *this
      *
-     * Calls @a parser.parse(string, *this, variable) zero or more times.
+     * Creates a result for @a x and calls @a parser.parse(string, result,
+     * *this) zero or more times, once per matching argument.
      *
      * @note The value of read_status() is true iff at least one argument
      * matched and all matching arguments successfully parsed. */
-    template<typename P, typename T>
-    Args &read_all_with(const char *keyword, P parser, T &variable) {
-	return read_all_with(keyword, 0, parser, variable);
+    template <typename P, typename T>
+    Args &read_all_with(const char *keyword, P parser, T &x) {
+	return read_all_with(keyword, 0, parser, x);
     }
-    template<typename P, typename T>
-    Args &read_all_with(const char *keyword, int flags, P parser, T &variable) {
-	args_base_read_all_with(this, keyword, flags | firstmatch, parser, variable);
+    template <typename P, typename T>
+    Args &read_all_with(const char *keyword, int flags, P parser, T &x) {
+	args_base_read_all_with(this, keyword, flags | firstmatch, parser, x);
 	return *this;
+    }
+
+    /** @brief Pass all matching arguments to a specified parser.
+     * @param keyword argument name
+     * @param parser parser object
+     * @param x reference to vector of results
+     * @return *this
+     *
+     * For each @a keyword argument, calls @a parser.parse(string, value,
+     * *this). The resulting values are collected into a vector result slot
+     * for @a x.
+     *
+     * @note The value of read_status() is true iff at least one argument
+     * matched and all matching arguments successfully parsed. */
+    template <typename P, typename T>
+    Args &read_all(const char *keyword, P parser, Vector<T> &x) {
+	return read_all(keyword, 0, parser, x);
+    }
+    template <typename T>
+    Args &read_all(const char *keyword, Vector<T> &x) {
+	return read_all(keyword, 0, DefaultArg<T>(), x);
+    }
+    template <typename P, typename T>
+    Args &read_all(const char *keyword, int flags, P parser, Vector<T> &x) {
+	args_base_read_all(this, keyword, flags | firstmatch, parser, x);
+	return *this;
+    }
+    template <typename P, typename T>
+    Args &read_all(const char *keyword, int flags, Vector<T> &x) {
+	return read_all(keyword, flags, DefaultArg<T>(), x);
     }
 
 
@@ -590,20 +693,34 @@ class Args : public ArgContext {
     int complete();
 
 
-    /** @brief Create and return a result that assigns @a variable. */
-    template<typename T>
-    T *slot(T &variable) {
+    /** @brief Create and return a result slot for @a x.
+     *
+     * If T is a trivially copyable type, such as int, then the resulting
+     * slot might not be initialized. */
+    template <typename T>
+    T *slot(T &x) {
 	if (has_trivial_copy<T>::value)
-	    return reinterpret_cast<T *>(simple_slot(&variable, sizeof(T)));
+	    return reinterpret_cast<T *>(simple_slot(&x, sizeof(T)));
 	else
-	    return complex_slot(variable);
+	    return complex_slot(x);
     }
 
-    /** @brief Add a result that assigns @a variable to @a value.
+    /** @brief Create and return a result slot for @a x.
+     *
+     * The resulting slot is always default-initialized. */
+    template <typename T>
+    T *initialized_slot(T &x) {
+	T *s = slot(x);
+	if (has_trivial_copy<T>::value)
+	    *s = T();
+	return s;
+    }
+
+    /** @brief Add a result that assigns @a x to @a value.
      * @return *this */
-    template<typename T, typename V>
-    Args &set(T &variable, const V &value) {
-	if (T *s = slot(variable))
+    template <typename T, typename V>
+    Args &set(T &x, const V &value) {
+	if (T *s = slot(x))
 	    *s = value;
 	return *this;
     }
@@ -614,8 +731,8 @@ class Args : public ArgContext {
     void base_read(const char *keyword, int flags, T &variable) {
 	Slot *slot_status;
 	if (String str = find(keyword, flags, slot_status)) {
-	    T *s = slot(variable);
-	    postparse(s && DefaultArg<T>().parse(str, *s, *this), slot_status);
+	    T *s = Args_parse_helper<DefaultArg<T> >::slot(variable, *this);
+	    postparse(s && Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this), slot_status);
 	}
     }
 
@@ -623,16 +740,16 @@ class Args : public ArgContext {
     void base_read_or_set(const char *keyword, int flags, T &variable, const V &value) {
 	Slot *slot_status;
 	String str = find(keyword, flags, slot_status);
-	T *s = slot(variable);
-	postparse(s && (str ? DefaultArg<T>().parse(str, *s, *this) : (*s = value, true)), slot_status);
+	T *s = Args_parse_helper<DefaultArg<T> >::slot(variable, *this);
+	postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = value, true)), slot_status);
     }
 
     template<typename P, typename T>
     void base_read(const char *keyword, int flags, P parser, T &variable) {
 	Slot *slot_status;
 	if (String str = find(keyword, flags, slot_status)) {
-	    T *s = slot(variable);
-	    postparse(s && parser.parse(str, *s, *this), slot_status);
+	    T *s = Args_parse_helper<P>::slot(variable, *this);
+	    postparse(s && Args_parse_helper<P>::parse(parser, str, *s, *this), slot_status);
 	}
     }
 
@@ -640,8 +757,8 @@ class Args : public ArgContext {
     void base_read_or_set(const char *keyword, int flags, P parser, T &variable, const V &value) {
 	Slot *slot_status;
 	String str = find(keyword, flags, slot_status);
-	T *s = slot(variable);
-	postparse(s && (str ? parser.parse(str, *s, *this) : (*s = value, true)), slot_status);
+	T *s = Args_parse_helper<P>::slot(variable, *this);
+	postparse(s && (str ? Args_parse_helper<P>::parse(parser, str, *s, *this) : (*s = value, true)), slot_status);
     }
 
     template<typename P, typename T1, typename T2>
@@ -649,9 +766,9 @@ class Args : public ArgContext {
 		   P parser, T1 &variable1, T2 &variable2) {
 	Slot *slot_status;
 	if (String str = find(keyword, flags, slot_status)) {
-	    T1 *s1 = slot(variable1);
-	    T2 *s2 = slot(variable2);
-	    postparse(s1 && s2 && parser.parse(str, *s1, *s2, *this), slot_status);
+	    T1 *s1 = Args_parse_helper<P>::slot(variable1, *this);
+	    T2 *s2 = Args_parse_helper<P>::slot(variable2, *this);
+	    postparse(s1 && s2 && Args_parse_helper<P>::parse(parser, str, *s1, *s2, *this), slot_status);
 	}
     }
 
@@ -660,13 +777,6 @@ class Args : public ArgContext {
 	Slot *slot_status;
 	if (String str = find(keyword, flags, slot_status))
 	    postparse(parser.parse(str, *this), slot_status);
-    }
-
-    template<typename P, typename T>
-    void base_read_with(const char *keyword, int flags, P parser, T &variable) {
-	Slot *slot_status;
-	if (String str = find(keyword, flags, slot_status))
-	    postparse(parser.parse(str, *this, variable), slot_status);
     }
 
     template<typename P>
@@ -685,8 +795,25 @@ class Args : public ArgContext {
     void base_read_all_with(const char *keyword, int flags, P parser, T &variable) {
 	Slot *slot_status;
 	int read_status = -1;
+	T *s = Args_parse_helper<P>::initialized_slot(variable, *this);
 	while (String str = find(keyword, flags, slot_status)) {
-	    postparse(parser.parse(str, *this, variable), slot_status);
+	    postparse(s && Args_parse_helper<P>::parse(parser, str, *s, *this), slot_status);
+	    read_status = (read_status != 0) && _read_status;
+	    flags &= ~mandatory;
+	}
+	_read_status = (read_status == 1);
+    }
+
+    template<typename P, typename T>
+    void base_read_all(const char *keyword, int flags, P parser, Vector<T> &variable) {
+	Slot *slot_status;
+	int read_status = -1;
+	Vector<T> *s = slot(variable);
+	while (String str = find(keyword, flags, slot_status)) {
+	    T sx = T();
+	    postparse(parser.parse(str, sx, *this), slot_status);
+	    if (_read_status)
+		s->push_back(sx);
 	    read_status = (read_status != 0) && _read_status;
 	    flags &= ~mandatory;
 	}
@@ -740,7 +867,12 @@ class Args : public ArgContext {
 #endif
     };
 
+#if !CLICK_DEBUG_ARGS_USAGE
     bool _my_conf;
+#else
+    bool _my_conf : 1;
+    bool _consumed : 1;
+#endif
     bool _status;
     uint8_t _simple_slotpos;
 
@@ -847,16 +979,6 @@ void args_base_read_with(Args *args, const char *keyword, int flags, P parser)
     args->base_read_with(keyword, flags, parser);
 }
 
-template<typename P, typename T>
-void args_base_read_with(Args *args, const char *keyword, int flags,
-			 P parser, T &variable) CLICK_NOINLINE;
-template<typename P, typename T>
-void args_base_read_with(Args *args, const char *keyword, int flags,
-			 P parser, T &variable)
-{
-    args->base_read_with(keyword, flags, parser, variable);
-}
-
 template<typename P>
 void args_base_read_all_with(Args *args, const char *keyword, int flags, P parser)
     CLICK_NOINLINE;
@@ -874,6 +996,16 @@ void args_base_read_all_with(Args *args, const char *keyword, int flags,
 			     P parser, T &variable)
 {
     args->base_read_all_with(keyword, flags, parser, variable);
+}
+
+template <typename P, typename T>
+void args_base_read_all(Args *args, const char *keyword, int flags,
+			P parser, Vector<T> &variable) CLICK_NOINLINE;
+template <typename P, typename T>
+void args_base_read_all(Args *args, const char *keyword, int flags,
+			P parser, Vector<T> &variable)
+{
+    args->base_read_all(keyword, flags, parser, variable);
 }
 /** @endcond never */
 
@@ -919,15 +1051,16 @@ class IntArg : public NumArg { public:
 
     template<typename V>
     bool parse_saturating(const String &str, V &result, const ArgContext &args = blank_args) {
-	(void) args;
 	constexpr bool is_signed = integer_traits<V>::is_signed;
 	constexpr int nlimb = int((sizeof(V) + sizeof(limb_type) - 1) / sizeof(limb_type));
 	limb_type x[nlimb];
 	if (parse(str.begin(), str.end(), is_signed, int(sizeof(V)), x, nlimb)
 	    != str.end())
 	    status = status_inval;
-	if (status && status != status_range)
+	if (status && status != status_range) {
+	    args.error("invalid number");
 	    return false;
+	}
 	typedef typename make_unsigned<V>::type unsigned_v_type;
 	extract_integer(x, reinterpret_cast<unsigned_v_type &>(result));
 	return true;
@@ -940,9 +1073,8 @@ class IntArg : public NumArg { public:
 	    || (status && status != status_range))
 	    return false;
 	else if (status == status_range) {
-	    typedef typename make_unsigned<V>::type unsigned_v_type;
-	    report_error(args, integer_traits<V>::negative(x),
-			 unsigned_v_type(x));
+	    range_error(args, integer_traits<V>::is_signed,
+			click_int_large_t(x));
 	    return false;
 	} else {
 	    result = x;
@@ -957,8 +1089,8 @@ class IntArg : public NumArg { public:
 
     static const char *span(const char *begin, const char *end,
 			    bool is_signed, int &b);
-    void report_error(const ArgContext &args, bool negative,
-		      click_uint_large_t value) const;
+    void range_error(const ArgContext &args, bool is_signed,
+		     click_int_large_t value);
 
 };
 
@@ -988,19 +1120,23 @@ class SaturatingIntArg : public IntArg { public:
 
   @sa IntArg */
 class BoundedIntArg : public IntArg { public:
-    BoundedIntArg(int min_value, int max_value, int b = 0)
+    template <typename T>
+    BoundedIntArg(T min_value, T max_value, int b = 0)
 	: IntArg(b), min_value(min_value), max_value(max_value) {
+	static_assert(integer_traits<T>::is_integral, "BoundedIntArg argument must be integral");
+	is_signed = integer_traits<T>::is_signed;
     }
 
-    template<typename V>
+    template <typename V>
     bool parse(const String &str, V &result, const ArgContext &args = blank_args) {
 	V x;
 	if (!IntArg::parse(str, x, args))
 	    return false;
-	else if (x < min_value || x > max_value) {
-	    int bound = x < min_value ? min_value : max_value;
-	    status = status_range;
-	    report_error(args, bound < 0, bound < 0 ? -bound : bound);
+	else if (!check_min(typename integer_traits<V>::max_type(x))) {
+	    range_error(args, is_signed, min_value);
+	    return false;
+	} else if (!check_max(typename integer_traits<V>::max_type(x))) {
+	    range_error(args, is_signed, max_value);
 	    return false;
 	} else {
 	    result = x;
@@ -1008,8 +1144,34 @@ class BoundedIntArg : public IntArg { public:
 	}
     }
 
-    int min_value;
-    int max_value;
+    inline bool check_min(click_int_large_t x) const {
+	if (is_signed)
+	    return x >= min_value;
+	else
+	    return x >= 0 && click_uint_large_t(x) >= click_uint_large_t(min_value);
+    }
+    inline bool check_min(click_uint_large_t x) const {
+	if (is_signed)
+	    return min_value < 0 || x >= click_uint_large_t(min_value);
+	else
+	    return click_uint_large_t(x) >= click_uint_large_t(min_value);
+    }
+    inline bool check_max(click_int_large_t x) const {
+	if (is_signed)
+	    return x <= max_value;
+	else
+	    return x >= 0 && click_uint_large_t(x) <= click_uint_large_t(max_value);
+    }
+    inline bool check_max(click_uint_large_t x) const {
+	if (is_signed)
+	    return max_value >= 0 && x <= click_uint_large_t(max_value);
+	else
+	    return click_uint_large_t(x) <= click_uint_large_t(max_value);
+    }
+
+    click_intmax_t min_value;
+    click_intmax_t max_value;
+    bool is_signed;
 };
 
 template<> struct DefaultArg<unsigned char> : public IntArg {};
@@ -1169,7 +1331,7 @@ class AnyArg { public:
 	result = str;
 	return true;
     }
-    static bool parse(const String &str, const ArgContext &, Vector<String> &result) {
+    static bool parse(const String &str, Vector<String> &result, const ArgContext & = blank_args) {
 	result.push_back(str);
 	return true;
     }

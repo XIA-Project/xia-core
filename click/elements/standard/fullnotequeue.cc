@@ -24,10 +24,6 @@ FullNoteQueue::FullNoteQueue()
 {
 }
 
-FullNoteQueue::~FullNoteQueue()
-{
-}
-
 void *
 FullNoteQueue::cast(const char *n)
 {
@@ -60,7 +56,7 @@ void
 FullNoteQueue::push(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
-    Storage::index_type h = _head, t = _tail, nt = next_i(t);
+    Storage::index_type h = head(), t = tail(), nt = next_i(t);
 
     if (nt != h)
 	push_success(h, t, nt, p);
@@ -72,13 +68,30 @@ Packet *
 FullNoteQueue::pull(int)
 {
     // Code taken from SimpleQueue::deq.
-    Storage::index_type h = _head, t = _tail, nh = next_i(h);
+    Storage::index_type h = head(), t = tail(), nh = next_i(h);
 
     if (h != t)
 	return pull_success(h, nh);
     else
 	return pull_failure();
 }
+
+#if CLICK_DEBUG_SCHEDULING
+String
+FullNoteQueue::read_handler(Element *e, void *)
+{
+    FullNoteQueue *fq = static_cast<FullNoteQueue *>(e);
+    return "nonempty " + fq->_empty_note.unparse(fq->router())
+	+ "\nnonfull " + fq->_full_note.unparse(fq->router());
+}
+
+void
+FullNoteQueue::add_handlers()
+{
+    NotifierQueue::add_handlers();
+    add_read_handler("notifier_state", read_handler, 0);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(NotifierQueue)

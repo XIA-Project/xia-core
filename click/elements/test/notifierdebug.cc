@@ -27,17 +27,13 @@ NotifierDebug::NotifierDebug()
 {
 }
 
-NotifierDebug::~NotifierDebug()
-{
-}
-
 int
 NotifierDebug::initialize(ErrorHandler *)
 {
     if (input_is_push(0))
-	_signal = Notifier::downstream_full_signal(this, 0, 0);
+	_signal = Notifier::downstream_full_signal(this, 0);
     else
-	_signal = Notifier::upstream_empty_signal(this, 0, 0);
+	_signal = Notifier::upstream_empty_signal(this, 0);
     return 0;
 }
 

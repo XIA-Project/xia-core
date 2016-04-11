@@ -4,7 +4,6 @@
 #include <click/timer.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
-#include <click/hashmap.hh>
 CLICK_DECLS
 
 /*
@@ -36,15 +35,15 @@ class ARPFaker : public Element {
 
 public:
 
-  ARPFaker();
-  ~ARPFaker();
+  ARPFaker() CLICK_COLD;
+  ~ARPFaker() CLICK_COLD;
 
   const char *class_name() const		{ return "ARPFaker"; }
   const char *port_count() const		{ return PORTS_0_1; }
   const char *processing() const		{ return PUSH; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *) CLICK_COLD;
 
   void run_timer(Timer *);
 

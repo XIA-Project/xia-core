@@ -30,11 +30,7 @@ FunctionTest::FunctionTest()
 {
 }
 
-FunctionTest::~FunctionTest()
-{
-}
-
-#define CHECK(x) if (!(x)) return errh->error("%s:%d: test `%s' failed", __FILE__, __LINE__, #x);
+#define CHECK(x) if (!(x)) return errh->error("%s:%d: test %<%s%> failed", __FILE__, __LINE__, #x);
 
 int
 FunctionTest::initialize(ErrorHandler *errh)
@@ -81,6 +77,7 @@ FunctionTest::initialize(ErrorHandler *errh)
     CHECK(!glob_match("x.c", "?.o"));
     CHECK(!glob_match("xx.o", "?.o"));
     CHECK(glob_match("x.o.d", "x*.?*.*"));
+    CHECK(!glob_match("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacba", "*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*b*c*"));
 #endif
 
     errh->message("All tests pass!");

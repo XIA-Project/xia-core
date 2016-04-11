@@ -47,7 +47,7 @@ EtherAddress::unparse_dash() const
     static_assert(__alignof__(EtherAddress) <= 2, "EtherAddress has unexpectedly strict alignment requirements.");
 #endif
 
-    String str = String::make_garbage(17);
+    String str = String::make_uninitialized(17);
     // NB: mutable_c_str() creates space for the terminating null character
     if (char *x = str.mutable_c_str()) {
 	const unsigned char *p = this->data();
@@ -60,7 +60,7 @@ EtherAddress::unparse_dash() const
 String
 EtherAddress::unparse_colon() const
 {
-    String str = String::make_garbage(17);
+    String str = String::make_uninitialized(17);
     if (char *x = str.mutable_c_str()) {
 	const unsigned char *p = this->data();
 	sprintf(x, "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -82,7 +82,8 @@ operator<<(StringAccum &sa, const EtherAddress &ea)
 
 
 bool
-EtherAddressArg::parse(const String &str, EtherAddress &value, const ArgContext &args)
+EtherAddressArg::parse(const String& str, EtherAddress& value, const ArgContext& args,
+                       int flags)
 {
     unsigned char data[6];
     int d = 0, p = 0, sep = 0;
@@ -119,18 +120,19 @@ EtherAddressArg::parse(const String &str, EtherAddress &value, const ArgContext 
     }
 
 #if !CLICK_TOOL
-    return AddressInfo::query_ethernet(str, value.data(), args.context());
+    return AddressInfo::query_ethernet(str, value.data(), args.context(), flags);
 #else
-    (void) args;
+    (void) args, (void) flags;
     return false;
 #endif
 }
 
 bool
-EtherAddressArg::parse(const String &str, Args &args, unsigned char *value)
+EtherAddressArg::direct_parse(const String& str, EtherAddress& value, Args& args,
+                              int flags)
 {
-    EtherAddress *s = args.slot(*reinterpret_cast<EtherAddress *>(value));
-    return s && parse(str, *s, args);
+    EtherAddress *s = args.slot(value);
+    return s && parse(str, *s, args, flags);
 }
 
 CLICK_ENDDECLS

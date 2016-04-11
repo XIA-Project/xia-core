@@ -1,4 +1,4 @@
-// -*- mode: c++; c-basic-offset: 4 -*-
+// -*- related-file-name: "../include/click/fromfile.hh"; c-basic-offset: 4 -*-
 /*
  * fromfile.{cc,hh} -- provides convenient, fast access to files
  * Eddie Kohler
@@ -45,10 +45,10 @@ FromFile::FromFile()
 int
 FromFile::configure_keywords(Vector<String> &conf, Element *e, ErrorHandler *errh)
 {
-#ifndef ALLOW_MMAP
-    bool mmap = false;
-#else
+#ifdef ALLOW_MMAP
     bool mmap = _mmap;
+#else
+    bool mmap = false;
 #endif
     if (Args(e, errh).bind(conf)
 	.read("MMAP", mmap)
@@ -58,7 +58,7 @@ FromFile::configure_keywords(Vector<String> &conf, Element *e, ErrorHandler *err
     _mmap = mmap;
 #else
     if (mmap)
-	errh->warning("'MMAP true' is not supported on this platform");
+	errh->warning("%<MMAP true%> is not supported on this platform");
 #endif
     return 0;
 }
@@ -118,7 +118,7 @@ FromFile::warning(ErrorHandler *errh, const char *format, ...) const
 
 #ifdef ALLOW_MMAP
 static void
-munmap_destructor(unsigned char *data, size_t amount)
+munmap_destructor(unsigned char *data, size_t amount, void*)
 {
     if (munmap((caddr_t)data, amount) < 0)
 	click_chatter("FromFile: munmap: %s", strerror(errno));
@@ -156,7 +156,7 @@ FromFile::read_buffer_mmap(ErrorHandler *errh)
     if (mmap_data == MAP_FAILED)
 	return error(errh, "mmap: %s", strerror(errno));
 
-    _data_packet = Packet::make((unsigned char *)mmap_data, _len, munmap_destructor);
+    _data_packet = Packet::make((unsigned char *)mmap_data, _len, munmap_destructor, 0);
     _buffer = _data_packet->data();
     _file_offset = _mmap_off;
     _mmap_off += _len;
@@ -183,7 +183,7 @@ FromFile::read_buffer(ErrorHandler *errh)
     _len = 0;
 
     if (_fd < 0)
-	return -EBADF;
+	return _fd == -1 ? -EBADF : _len;
 
 #ifdef ALLOW_MMAP
     if (_mmap) {
@@ -328,6 +328,9 @@ FromFile::seek(off_t want, ErrorHandler* errh)
     }
 #endif
 
+    if (_fd < 0)
+        return _fd == -1 ? -EBADF : 0;
+
     // check length of file
     struct stat statbuf;
     if (fstat(_fd, &statbuf) < 0)
@@ -351,8 +354,27 @@ FromFile::seek(off_t want, ErrorHandler* errh)
 }
 
 int
+FromFile::set_data(const String& data, ErrorHandler* errh)
+{
+    assert(_fd == -1 && !_data_packet);
+    _data_packet = Packet::make(0, data.data(), data.length(), 0);
+    if (!_data_packet)
+	return error(errh, strerror(ENOMEM));
+    _buffer = _data_packet->data();
+    _file_offset = 0;
+    _pos = 0;
+    _len = data.length();
+    _filename = "<data>";
+    _fd = -2;
+    return 0;
+}
+
+int
 FromFile::initialize(ErrorHandler *errh, bool allow_nonexistent)
 {
+    // if set_data, initialize is noop
+    if (_fd == -2)
+        return 0;
     // must set for allow_nonexistent case
     _pos = _len = 0;
     // open file
@@ -486,7 +508,7 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 	_pos += size;
 	return String::make_stable((const char *) chunk, size);
     } else {
-	String s = String::make_garbage(size);
+	String s = String::make_uninitialized(size);
 	if (read(s.mutable_data(), size, errh) == (int) size)
 	    return s;
 	else

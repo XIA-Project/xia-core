@@ -83,7 +83,7 @@ ToDevice::static_cleanup()
 inline void
 ToDevice::tx_wake_queue(net_device *dev)
 {
-    //click_chatter("%{element}::%s for dev %s\n", this, __func__, dev->name);
+    //click_chatter("%p{element}::%s for dev %s\n", this, __func__, dev->name);
     _task.reschedule();
 }
 
@@ -258,7 +258,7 @@ ToDevice::cleanup(CleanupStage stage)
 #endif
 
 #ifdef NETIF_F_LLTX
-# define click_netif_needs_lock(dev)		(((dev)->features & NETIF_F_LLTX) != 0)
+# define click_netif_needs_lock(dev)		(((dev)->features & NETIF_F_LLTX) == 0)
 #else
 # define click_netif_needs_lock(dev)		1
 #endif
@@ -274,6 +274,34 @@ ToDevice::cleanup(CleanupStage stage)
 # define click_netif_lock_owner(dev, txq)	(dev)->xmit_lock_owner
 #endif
 
+static bool
+tx_trylock(struct net_device *dev, struct netdev_queue *txq) {
+    if (!click_netif_needs_lock(dev))
+        return true;
+
+    if (!spin_trylock_bh(&click_netif_lock(dev, txq)))
+        return false;
+
+    click_netif_lock_owner(dev, txq) = smp_processor_id();
+
+    return true;
+}
+
+static void
+tx_unlock(struct net_device *dev, struct netdev_queue *txq) {
+    if (!click_netif_needs_lock(dev))
+        return;
+
+#if HAVE_NETDEV_GET_TX_QUEUE
+    __netif_tx_unlock_bh(txq);
+#elif HAVE_NETIF_TX_LOCK
+    netif_tx_unlock_bh(dev);
+#else
+    dev->xmit_lock_owner = -1;
+    spin_unlock_bh(&dev->xmit_lock);
+#endif
+}
+
 bool
 ToDevice::run_task(Task *)
 {
@@ -287,14 +315,9 @@ ToDevice::run_task(Task *)
     struct netdev_queue *txq = 0;
 #endif
 
-    if (click_netif_needs_lock(dev)) {
-	ok = spin_trylock_bh(&click_netif_lock(dev, txq));
-	if (likely(ok))
-	    click_netif_lock_owner(dev, txq) = smp_processor_id();
-	else {
-	    _task.fast_reschedule();
-	    return false;
-	}
+    if (!tx_trylock(dev, txq)) {
+        _task.fast_reschedule();
+        return false;
     }
 
 #if CLICK_DEVICE_STATS
@@ -335,7 +358,17 @@ ToDevice::run_task(Task *)
 		p = 0;
 	    }
 	}
-	if (!p && !(p = input(0).pull()))
+        if (!p) {
+	    tx_unlock(dev, txq);
+	    p = input(0).pull();
+	    if (!tx_trylock(dev, txq)) {
+	        _task.reschedule();
+	        _q = p;
+	        _q_expiry_j = click_jiffies() + queue_timeout;
+	        goto bail;
+            }
+        }
+        if (!p)
 	    break;
 
 #if CLICK_DEVICE_THESIS_STATS && !CLICK_DEVICE_STATS
@@ -370,13 +403,6 @@ ToDevice::run_task(Task *)
     }
 #endif
 
-#if CLICK_DEVICE_STATS
-    if (sent > 0)
-	_activations++;
-#endif
-
-    if (busy && sent == 0)
-	_busy_returns++;
 
 #if HAVE_LINUX_POLLING
     if (is_polling) {
@@ -393,16 +419,17 @@ ToDevice::run_task(Task *)
     }
 #endif
 
-    if (click_netif_needs_lock(dev)) {
-#if HAVE_NETDEV_GET_TX_QUEUE
-	__netif_tx_unlock_bh(txq);
-#elif HAVE_NETIF_TX_LOCK
-	netif_tx_unlock_bh(dev);
-#else
-	dev->xmit_lock_owner = -1;
-	spin_unlock_bh(&dev->xmit_lock);
+    tx_unlock(dev, txq);
+
+bail:
+
+#if CLICK_DEVICE_STATS
+    if (sent > 0)
+	_activations++;
 #endif
-    }
+
+    if (busy && sent == 0)
+	_busy_returns++;
 
     // If we're polling, never go to sleep! We're relying on ToDevice to clean
     // the transmit ring.
@@ -470,14 +497,14 @@ ToDevice::queue_packet(Packet *p, struct netdev_queue *txq)
 	if (skb_tailroom(skb1) < need_tail) {
 	    if (++_too_short == 1)
 		printk("<1>ToDevice %s packet too small (len %d, tailroom %d, need %d), had to copy\n", dev->name, skb1->len, skb_tailroom(skb1), need_tail);
-	    struct sk_buff *nskb = skb_copy_expand(skb1, skb_headroom(skb1), skb_tailroom(skb1) + 60 - skb1->len, GFP_ATOMIC);
+	    struct sk_buff *nskb = skb_copy_expand(skb1, skb_headroom(skb1), need_tail, GFP_ATOMIC);
 	    kfree_skb(skb1);
 	    if (!nskb)
 		return -1;
 	    skb1 = nskb;
 	}
 	// printk("padding %d:%d:%d\n", skb1->truesize, skb1->len, 60-skb1->len);
-	skb_put(skb1, need_tail);
+	memset(skb_put(skb1, need_tail), 0, need_tail);
     }
 
     // set the device annotation;
@@ -502,7 +529,18 @@ ToDevice::queue_packet(Packet *p, struct netdev_queue *txq)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30)
-    ret = dev_queue_xmit(skb1);
+    // logic here should mirror logic in linux/net/core/pktgen.c
+    ret = dev->netdev_ops->ndo_start_xmit(skb1, dev);
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 31)
+    if (ret == NETDEV_TX_OK)
+	txq_trans_update(txq);
+# endif
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 33)
+    ret = !dev_xmit_complete(ret);
+# else
+    if (unlikely(ret == NET_XMIT_DROP))
+	p = NULL;
+# endif
 #else
     ret = dev->hard_start_xmit(skb1, dev);
 #endif
@@ -510,7 +548,7 @@ ToDevice::queue_packet(Packet *p, struct netdev_queue *txq)
 
  enqueued:
     if (ret != 0) {
-        _q = p;
+        _q = (Packet*)skb1;
 	_q_expiry_j = click_jiffies() + queue_timeout;
         if (++_holds == 1)
             printk("<1>ToDevice %s is full, packet delayed\n", dev->name);
@@ -604,18 +642,18 @@ void
 ToDevice::add_handlers()
 {
     add_read_handler("calls", read_calls, 0);
-    add_data_handlers("count", Handler::OP_READ, &_npackets);
-    add_data_handlers("drops", Handler::OP_READ, &_drops);
-    add_data_handlers("holds", Handler::OP_READ, &_holds);
-    add_data_handlers("packets", Handler::OP_READ | Handler::DEPRECATED, &_npackets);
+    add_data_handlers("count", Handler::f_read, &_npackets);
+    add_data_handlers("drops", Handler::f_read, &_drops);
+    add_data_handlers("holds", Handler::f_read, &_holds);
+    add_data_handlers("packets", Handler::f_read | Handler::f_deprecated, &_npackets);
 #if CLICK_DEVICE_THESIS_STATS || CLICK_DEVICE_STATS
-    add_read_handler("pull_cycles", Handler::OP_READ, &_pull_cycles);
+    add_read_handler("pull_cycles", Handler::f_read, &_pull_cycles);
 #endif
 #if CLICK_DEVICE_STATS
-    add_read_handler("enqueue_cycles", Handler::OP_READ, &_time_queue);
-    add_read_handler("clean_dma_cycles", Handler::OP_READ, &_time_clean);
+    add_read_handler("enqueue_cycles", Handler::f_read, &_time_queue);
+    add_read_handler("clean_dma_cycles", Handler::f_read, &_time_clean);
 #endif
-    add_write_handler("reset_counts", write_handler, 0, Handler::BUTTON);
+    add_write_handler("reset_counts", write_handler, 0, Handler::f_button);
     add_task_handlers(&_task);
 }
 

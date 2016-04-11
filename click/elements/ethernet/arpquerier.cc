@@ -54,14 +54,16 @@ ARPQuerier::cast(const char *name)
 int
 ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t capacity, entry_capacity;
+    uint32_t capacity, entry_capacity, entry_packet_capacity, capacity_slim_factor;
     Timestamp timeout, poll_timeout(60);
-    bool have_capacity, have_entry_capacity, have_timeout, have_broadcast,
+    bool have_capacity, have_entry_capacity, have_entry_packet_capacity, have_capacity_slim_factor, have_timeout, have_broadcast,
 	broadcast_poll = false;
     _arpt = 0;
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
 	.read("ENTRY_CAPACITY", entry_capacity).read_status(have_entry_capacity)
+	.read("ENTRY_PACKET_CAPACITY", entry_packet_capacity).read_status(have_entry_packet_capacity)
+	.read("CAPACITY_SLIM_FACTOR", capacity_slim_factor).read_status(have_capacity_slim_factor)
 	.read("TIMEOUT", timeout).read_status(have_timeout)
 	.read("BROADCAST", _my_bcast_ip).read_status(have_broadcast)
 	.read("TABLE", ElementCastArg("ARPTable"), _arpt)
@@ -76,6 +78,10 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	    subconf.push_back("CAPACITY " + String(capacity));
 	if (have_entry_capacity)
 	    subconf.push_back("ENTRY_CAPACITY " + String(entry_capacity));
+	if (have_entry_packet_capacity)
+	    subconf.push_back("ENTRY_PACKET_CAPACITY " + String(entry_packet_capacity));
+	if (have_capacity_slim_factor)
+	    subconf.push_back("CAPACITY_SLIM_FACTOR " + String(capacity_slim_factor));
 	if (have_timeout)
 	    subconf.push_back("TIMEOUT " + timeout.unparse());
 	_arpt = new ARPTable;
@@ -111,15 +117,17 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t capacity, entry_capacity;
+    uint32_t capacity, entry_capacity, entry_packet_capacity, capacity_slim_factor;
     Timestamp timeout, poll_timeout(Timestamp::make_jiffies((click_jiffies_t) _poll_timeout_j));
-    bool have_capacity, have_entry_capacity, have_timeout, have_broadcast,
+    bool have_capacity, have_entry_capacity, have_entry_packet_capacity, have_capacity_slim_factor, have_timeout, have_broadcast,
 	broadcast_poll(_broadcast_poll);
     IPAddress my_bcast_ip;
 
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
 	.read("ENTRY_CAPACITY", entry_capacity).read_status(have_entry_capacity)
+	.read("ENTRY_PACKET_CAPACITY", entry_packet_capacity).read_status(have_entry_packet_capacity)
+	.read("CAPACITY_SLIM_FACTOR", capacity_slim_factor).read_status(have_capacity_slim_factor)
 	.read("TIMEOUT", timeout).read_status(have_timeout)
 	.read("BROADCAST", my_bcast_ip).read_status(have_broadcast)
 	.read_with("TABLE", AnyArg())
@@ -142,6 +150,8 @@ ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	if (my_bcast_ip == my_ip)
 	    my_bcast_ip = 0xFFFFFFFFU;
     }
+    if (have_capacity_slim_factor && !capacity_slim_factor)
+        return errh->error("CAPACITY_SLIM_FACTOR cannot be zero");
 
     if ((my_ip != _my_ip || my_en != _my_en) && _my_arpt)
 	_arpt->clear();
@@ -153,6 +163,10 @@ ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	_arpt->set_capacity(capacity);
     if (_my_arpt && have_entry_capacity)
 	_arpt->set_entry_capacity(entry_capacity);
+    if (_my_arpt && have_entry_packet_capacity)
+	_arpt->set_entry_packet_capacity(entry_packet_capacity);
+    if (_my_arpt && have_capacity_slim_factor)
+	_arpt->set_capacity_slim_factor(capacity_slim_factor);
     if (_my_arpt && have_timeout)
 	_arpt->set_timeout(timeout);
 
@@ -305,9 +319,11 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	    r = _arpt->append_query(dst_ip, q);
 	    if (r == -EAGAIN)
 		goto retry_read_lock;
+	    if (r < 0)
+		q->kill();
 	    if (r > 0)
 		send_query_for(q, false); // q is on the ARP entry's queue
-	    // Do not q->kill() since it is stored in some ARP entry.
+	    // if r >= 0, do not q->kill() since it is stored in some ARP entry.
 	}
 	return;
     }

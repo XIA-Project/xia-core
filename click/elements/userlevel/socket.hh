@@ -4,7 +4,6 @@
 #include <click/element.hh>
 #include <click/string.hh>
 #include <click/task.hh>
-#include <click/timer.hh>
 #include <click/notifier.hh>
 #include "../ip/iproutetable.hh"
 #include <sys/un.h>
@@ -171,8 +170,8 @@ Integer. Per-packet headroom. Defaults to 28.
 
 class Socket : public Element { public:
 
-  Socket();
-  ~Socket();
+  Socket() CLICK_COLD;
+  ~Socket() CLICK_COLD;
 
 
   const char *class_name() const	{ return "Socket"; }
@@ -181,11 +180,11 @@ class Socket : public Element { public:
   const char *flow_code() const		{ return "x/y"; }
   const char *flags() const		{ return "S3"; }
 
-  virtual int configure(Vector<String> &conf, ErrorHandler *);
-  virtual int initialize(ErrorHandler *);
-  virtual void cleanup(CleanupStage);
+  virtual int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
+  virtual int initialize(ErrorHandler *) CLICK_COLD;
+  virtual void cleanup(CleanupStage) CLICK_COLD;
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
   bool run_task(Task *);
   void selected(int fd, int mask);
   void push(int port, Packet*);
@@ -196,7 +195,6 @@ class Socket : public Element { public:
 
 protected:
   Task _task;
-  Timer _timer;
 
 private:
   int _fd;	// socket descriptor
@@ -213,9 +211,7 @@ private:
 
   NotifierSignal _signal;	// packet is available to pull()
   WritablePacket *_rq;		// queue to receive pulled packets
-  int _backoff;			// backoff timer for when sendto() blocks
   Packet *_wq;			// queue to store pulled packet for when sendto() blocks
-  int _events;			// keeps track of the events for which select() is waiting
 
   int _family;			// AF_INET or AF_UNIX
   int _socktype;		// SOCK_STREAM or SOCK_DGRAM

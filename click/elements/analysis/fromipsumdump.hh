@@ -13,7 +13,7 @@ CLICK_DECLS
 /*
 =c
 
-FromIPSummaryDump(FILENAME [, I<keywords> STOP, TIMING, ACTIVE, ZERO, CHECKSUM, PROTO, MULTIPACKET, SAMPLE, CONTENTS, FLOWID])
+FromIPSummaryDump(FILENAME [, I<keywords> STOP, TIMING, ACTIVE, ZERO, CHECKSUM, PROTO, MULTIPACKET, SAMPLE, FIELDS, FLOWID, DATA])
 
 =s traces
 
@@ -87,10 +87,10 @@ C<sampling_prob> handler to find out the actual probability. If MULTIPACKET is
 true, then the sampling probability applies separately to the multiple packets
 generated per record.
 
-=item CONTENTS
+=item FIELDS
 
-String, containing a space-separated list of content names (see
-ToIPSummaryDump for the possibilities). Defines the default contents of the
+String, containing a space-separated list of field names (see
+ToIPSummaryDump for the possibilities). Defines the default fields for the
 dump.
 
 =item FLOWID
@@ -105,6 +105,11 @@ will override this setting.
 Boolean.  If true, allow nonexistent and empty files: FromIPSummaryDump will
 successfully initialize even if the input file is nonexistent or empty.
 Defaults to false.
+
+=item DATA
+
+String. If set, FromIPSummaryDump reads from the DATA string, rather than
+from a file.
 
 =back
 
@@ -152,17 +157,17 @@ ToIPSummaryDump */
 
 class FromIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
 
-    FromIPSummaryDump();
-    ~FromIPSummaryDump();
+    FromIPSummaryDump() CLICK_COLD;
+    ~FromIPSummaryDump() CLICK_COLD;
 
     const char *class_name() const	{ return "FromIPSummaryDump"; }
     const char *port_count() const	{ return PORTS_0_1; }
     void *cast(const char *);
 
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
     bool run_task(Task *);
     Packet *pull(int);
@@ -219,8 +224,8 @@ class FromIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
     Packet *read_packet(ErrorHandler *);
     Packet *handle_multipacket(Packet *);
 
-    static String read_handler(Element *, void *);
-    static int write_handler(const String &, Element *, void *, ErrorHandler *);
+    static String read_handler(Element *, void *) CLICK_COLD;
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 
 };
 

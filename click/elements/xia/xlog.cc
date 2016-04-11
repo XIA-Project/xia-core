@@ -27,7 +27,7 @@ XLog::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _level = 5;
     _verbose = false;
-  
+
     if (cp_va_kparse(conf, this, errh,
 		   "LEVEL", cpkP, cpInteger, &_level,
 		   "VERBOSE", 0, cpBool, &_verbose,
@@ -71,8 +71,8 @@ XLog::read_handler(Element *e, void *thunk)
     }
 }
 
-int 
-XLog::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+int
+XLog::write_handler(const String &str, Element *e, void *thunk, ErrorHandler * /*errh */)
 {
 	XLog *l = (XLog *) e;
     switch ((intptr_t)thunk) {

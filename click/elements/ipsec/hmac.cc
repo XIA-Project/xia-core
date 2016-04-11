@@ -56,8 +56,9 @@
  * [including the GNU Public Licence.]
  */
 
-
+#include <click/config.h>
 #include "hmac.hh"
+CLICK_DECLS
 
 void OpenSSLDie(void)
 	{
@@ -97,12 +98,12 @@ void HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len)
 		for (i=0; i<HMAC_MAX_MD_CBLOCK; i++)
 			pad[i]=0x36^ctx->key[i];
 		SHA1_init(&ctx->i_ctx);
-		SHA1_update(&ctx->i_ctx,pad,SHA_BLOCK);
+		SHA1_update(&ctx->i_ctx,pad,SHA_CBLOCK);
 
 		for (i=0; i<HMAC_MAX_MD_CBLOCK; i++)
 			pad[i]=0x5c^ctx->key[i];
 		SHA1_init(&ctx->o_ctx);
-		SHA1_update(&ctx->o_ctx,pad,SHA_BLOCK);
+		SHA1_update(&ctx->o_ctx,pad,SHA_CBLOCK);
 		}
 	memcpy((void *)&ctx->md_ctx,(void*)&ctx->i_ctx,sizeof(SHA1_ctx));
 	}
@@ -157,3 +158,4 @@ unsigned char *HMAC(void *key, int key_len,unsigned char *d, size_t n, unsigned 
 		return(md);
 	}
 
+CLICK_ENDDECLS

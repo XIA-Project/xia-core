@@ -28,6 +28,7 @@
 #include <click/handlercall.hh>
 #include <clicknet/ether.h>
 #include <click/etheraddress.hh>
+#include <click/standard/addressinfo.hh>
 #include <click/cxxprotect.h>
 CLICK_CXX_PROTECT
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
@@ -37,7 +38,6 @@ CLICK_CXX_PROTECT
 # include <linux/rtnetlink.h>
 # include <net/net_namespace.h>
 #endif
-#include <linux/smp_lock.h>
 CLICK_CXX_UNPROTECT
 #include <click/cxxunprotect.h>
 
@@ -184,7 +184,12 @@ AnyDevice::lookup_device(ErrorHandler *errh)
 void
 AnyDevice::set_device(net_device *dev, AnyDeviceMap *adm, int flags)
 {
-    if (_dev == dev) {		// no device change == carrier sense only
+     if (!dev && !_dev && !_in_map && adm) {
+	adm->insert(this, flags & anydev_change);
+	return;
+    }
+
+   if (_dev == dev) {		// no device change == carrier sense only
 	bool carrier_ok = (_dev && netif_carrier_ok(_dev));
 	if (carrier_ok != _carrier_ok) {
 	    _carrier_ok = carrier_ok;
@@ -328,7 +333,7 @@ AnyDeviceMap::lookup_unknown(net_device *dev, AnyDevice *last) const
 	    return d;
 	} else if ((dev->type == ARPHRD_ETHER || dev->type == ARPHRD_80211)
 		   && !d->_devname_exists
-		   && EtherAddressArg().parse(d->devname(), en, d)
+		   && EtherAddressArg(AddressInfo::f_nodevice).parse(d->devname(), en, d)
 		   && memcmp(en, dev->dev_addr, 6) == 0)
 	    return d;
 
@@ -355,7 +360,7 @@ net_device *
 AnyDevice::get_by_ether_address(const String &name, Element *context)
 {
     unsigned char en[6];
-    if (!EtherAddressArg().parse(name, en, context))
+    if (!EtherAddressArg(AddressInfo::f_nodevice).parse(name, en, context))
 	return 0;
     read_lock(&dev_base_lock);
     net_device *dev;

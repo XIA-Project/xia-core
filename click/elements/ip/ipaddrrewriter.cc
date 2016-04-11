@@ -153,7 +153,7 @@ IPAddrRewriter::push(int port, Packet *p_in)
     }
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.at_u(port);
+	IPRewriterInput &is = _input_specs.unchecked_at(port);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
 	if (result == rw_addmap)
@@ -189,7 +189,8 @@ IPAddrRewriter::dump_mappings_handler(Element *e, void *)
 void
 IPAddrRewriter::add_handlers()
 {
-    add_read_handler("mappings", dump_mappings_handler);
+    add_read_handler("table", dump_mappings_handler);
+    add_read_handler("mappings", dump_mappings_handler, 0, Handler::h_deprecated);
     add_rewriter_handlers(true);
 }
 

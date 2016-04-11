@@ -30,10 +30,6 @@ DelayShaper::DelayShaper()
 {
 }
 
-DelayShaper::~DelayShaper()
-{
-}
-
 void *
 DelayShaper::cast(const char *n)
 {
@@ -56,7 +52,7 @@ int
 DelayShaper::initialize(ErrorHandler *)
 {
     _timer.initialize(this);
-    _upstream_signal = Notifier::upstream_empty_signal(this, 0, 0, &_notifier);
+    _upstream_signal = Notifier::upstream_empty_signal(this, 0, &_notifier);
     return 0;
 }
 
@@ -131,8 +127,8 @@ DelayShaper::write_param(const String &s, Element *e, void *, ErrorHandler *errh
 void
 DelayShaper::add_handlers()
 {
-    add_read_handler("delay", read_param, 0, Handler::CALM);
-    add_write_handler("delay", write_param, 0, Handler::NONEXCLUSIVE);
+    add_read_handler("delay", read_param, 0, Handler::h_calm);
+    add_write_handler("delay", write_param, 0, Handler::h_nonexclusive);
 }
 
 CLICK_ENDDECLS

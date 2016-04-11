@@ -29,10 +29,6 @@ DRRSched::DRRSched()
 {
 }
 
-DRRSched::~DRRSched()
-{
-}
-
 void *
 DRRSched::cast(const char *n)
 {
@@ -61,7 +57,7 @@ DRRSched::initialize(ErrorHandler *errh)
     for (int i = 0; i < ninputs(); i++) {
 	_pi[i].head = 0;
 	_pi[i].deficit = 0;
-	_pi[i].signal = Notifier::upstream_empty_signal(this, i, 0, &_notifier);
+	_pi[i].signal = Notifier::upstream_empty_signal(this, i, &_notifier);
     }
     _next = 0;
     return 0;

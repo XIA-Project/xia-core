@@ -33,21 +33,20 @@ EtherEncap
 
 class StoreEtherAddress : public Element { public:
 
-    StoreEtherAddress();
-    ~StoreEtherAddress();
-
     const char *class_name() const		{ return "StoreEtherAddress"; }
     const char *port_count() const		{ return PORTS_1_1X2; }
     const char *processing() const		{ return PROCESSING_A_AH; }
 
-    int configure(Vector<String> &, ErrorHandler *);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *);
 
  private:
 
-    unsigned _offset;
+    uint32_t _offset;
+    bool _use_anno;
+    uint8_t _anno;
     EtherAddress _address;
 
 };

@@ -14,8 +14,7 @@ template <typename T> class Vector;
 
 class IPAddress { public:
 
-    struct uninitialized_t {
-    };
+    typedef uninitialized_type uninitialized_t;
 
     /** @brief Construct an IPAddress equal to 0.0.0.0. */
     inline IPAddress()
@@ -64,7 +63,7 @@ class IPAddress { public:
     explicit IPAddress(const String &x);
 
     /** @brief Construct an uninitialized IPAddress. */
-    inline IPAddress(const uninitialized_t &unused) {
+    inline IPAddress(const uninitialized_type &unused) {
 	(void) unused;
     }
 
@@ -105,7 +104,11 @@ class IPAddress { public:
      *
      * These are the class D addresses, 224.0.0.0-239.255.255.255. */
     inline bool is_multicast() const {
-	return (_addr & htonl(0xF0000000)) == htonl(0xE0000000);
+	return (_addr & htonl(0xF0000000U)) == htonl(0xE0000000U);
+    }
+
+    inline bool is_link_local() const {
+	return (_addr & htonl(0xFFFF0000)) == htonl(0xA9FE0000);
     }
 
     inline struct in_addr in_addr() const;
@@ -395,7 +398,7 @@ class IPPrefixArg { public:
 template<> struct DefaultArg<IPAddress> : public IPAddressArg {};
 template<> struct DefaultArg<struct in_addr> : public IPAddressArg {};
 template<> struct DefaultArg<Vector<IPAddress> > : public IPAddressArg {};
-template<> struct has_trivial_copy<IPAddress> : public true_type {};
+/* template<> struct has_trivial_copy<IPAddress> : public true_type {}; -- in type_traits.hh */
 
 
 /** @class IPPortArg

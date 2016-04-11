@@ -16,7 +16,7 @@ linux_srcdir = @linux_srcdir@
 linux_makeargs = @linux_makeargs@
 
 LIB_CXX_OBJS = string.o straccum.o nameinfo.o \
-	bitvector.o vectorv.o templatei.o bighashmap_arena.o hashallocator.o \
+	bitvector.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o gaprate.o \
@@ -43,20 +43,25 @@ ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements
 KSYMS = ksyms
-FINDELEMFLAGS = @FINDELEMFLAGS@
+FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
+-include elements.csmk
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
 KSYMS = ksyms_$(MINDRIVER)
 endif
 
+ifneq ($(ELEMENT_CHECKSUM),)
+ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
+$(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
+endif
+endif
+
 INSTALLOBJS = $(DRIVER).o proclikefs.o
 
 
-ifeq (@LINUXMODULE_2_6@,1)
-
 ##########################################################################
-## LINUX 2.6								##
+## LINUX RULES								##
 
 KERNELPATH = @linux_builddir@
 
@@ -85,22 +90,23 @@ CLICK_BUILD_INSTALL_IF_CHANGED = @CLICK_BUILD_INSTALL_IF_CHANGED@
 CLICK_BUILD_INSTALL_DATA = $(CLICK_BUILD_INSTALL) -m 644
 CLICK_BUILD_INSTALL_DATA_IF_CHANGED = $(CLICK_BUILD_INSTALL_IF_CHANGED) -m 644
 CLICKmkinstalldirs = $(conf_auxdir)/mkinstalldirs
-CLICK_BUILDTOOL = $(top_builddir)/click-buildtool
+CLICK_BUILDTOOL = $(top_builddir)/bin/click-buildtool
+MD5SUM = @MD5SUM@
 
-CLICK_ELEM2MAKE = $(CLICK_BUILDTOOL) elem2make --linux26
+CLICK_ELEM2MAKE = $(CLICK_BUILDTOOL) elem2make --linux
 
 CLICKCC = @KERNEL_CC@
 CLICKCXX = @KERNEL_CXX@
 
-LINUXCFLAGS = $(shell echo "$(CPPFLAGS) $(CFLAGS) $(LINUXINCLUDE)" \
+LINUXCFLAGS := $(shell echo "$(CPPFLAGS) $(CFLAGS) $(LINUXINCLUDE)" \
 	"$(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(CFLAGS_MODULE)" | sed \
 	-e s,-fno-unit-at-a-time,, -e s,-Wstrict-prototypes,, \
 	-e s,-Wdeclaration-after-statement,, \
 	-e s,-Wno-pointer-sign,, -e s,-fno-common,, \
 	-e s,-Werror-implicit-function-declaration,, \
-	-e "s,-Iinclude ,-I$(linux_builddir)/include ",g \
-	-e "s,-Iinclude2 ,-I$(linux_builddir)/include2 ",g \
-	-e s,-Iinclude/,-I$(linux_srcdir)include/,g @LINUX_FIXINCLUDES_PROGRAM@)
+	-e "s,-std=[-a-z0-9]*,," \
+	@LINUX_FIXINCLUDES_PROGRAM@)
+LINUX_DEBUG_FLAGS = @LINUX_DEBUG_FLAGS@
 CLICKCPPFLAGS = @CPPFLAGS@ -DCLICK_LINUXMODULE
 CLICKCFLAGS = @KERNEL_CFLAGS@
 CLICKCXXFLAGS = @KERNEL_CXXFLAGS@
@@ -110,9 +116,11 @@ CLICKDEFS = @DEFS@
 CLICKINCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
 	-I$(srcdir) -I$(top_srcdir)
 
-CXXCOMPILE = $(CLICKCXX) $(LINUXCFLAGS) $(CLICKCPPFLAGS) $(CLICKCFLAGS) \
-	$(CLICKCXXFLAGS) $(CLICKDEFS) $(CLICKINCLUDES)
-COMPILE = $(CLICKCC) $(LINUXCFLAGS) $(CLICKCPPFLAGS) $(CLICKCFLAGS) \
+CXXCOMPILE = $(CLICKCXX) $(LINUXCFLAGS) $(LINUX_DEBUG_FLAGS) \
+	$(CLICKCPPFLAGS) $(CLICKCFLAGS) $(CLICKCXXFLAGS) \
+	$(CLICKDEFS) $(CLICKINCLUDES)
+COMPILE = $(CLICKCC) $(LINUXCFLAGS) $(LINUX_DEBUG_FLAGS) \
+	$(CLICKCPPFLAGS) $(CLICKCFLAGS) \
 	$(CLICKDEFS) $(CLICKINCLUDES)
 
 ifeq ($(PREPROCESS),1)
@@ -121,13 +129,13 @@ else
 compile_option = -c
 endif
 
-cmd_shortensyms = $(CLICK_BUILDTOOL) shortensyms $@
+cmd_buildshorten = $(CLICK_BUILDTOOL) compile-shortensyms
 
 quiet_cmd_cxxcompile = CXX $(quiet_modtag) $(subst $(obj)/,,$@)
-cmd_cxxcompile = $(CXXCOMPILE) $(CLICKDEPCFLAGS) $(compile_option) -o $@ $< && $(cmd_shortensyms)
+cmd_cxxcompile = $(cmd_buildshorten) $(CXXCOMPILE) $(CLICKDEPCFLAGS) $(compile_option) -o $@ $<
 
 quiet_cmd_cxxcompile_nodep = CXX $(quiet_modtag) $(subst $(obj)/,,$@)
-cmd_cxxcompile_nodep = $(CXXCOMPILE) $(compile_option) -o $@ $< && $(cmd_shortensyms)
+cmd_cxxcompile_nodep = $(cmd_buildshorten) $(CXXCOMPILE) $(compile_option) -o $@ $<
 
 quiet_cmd_ccompile = CC $(quiet_modtag) $(subst $(obj)/,,$@)
 cmd_ccompile = $(COMPILE) $(CLICKDEPCFLAGS) $(compile_option) -o $@ $<
@@ -187,8 +195,8 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(obj)/$(ELEMENTSCONF).mk
 endif
 
-$(obj)/$(KSYMS).c: $(addprefix $(obj)/,$(KSYM_OBJS)) $(top_builddir)/click-buildtool $(addprefix $(obj)/,$(ELEMENTSCONF).mk)
-	$(call verbose_cmd,$(top_builddir)/click-buildtool ksyms -C $(obj) -x kernelversion.o $(KSYM_OBJS) >,CREATE,$(obj)/$(KSYMS).c)
+$(obj)/$(KSYMS).c: $(addprefix $(obj)/,$(KSYM_OBJS)) $(CLICK_BUILDTOOL) $(addprefix $(obj)/,$(ELEMENTSCONF).mk)
+	$(call verbose_cmd,$(CLICK_BUILDTOOL) ksyms -C $(obj) -x kernelversion.o $(KSYM_OBJS) >,CREATE,$(obj)/$(KSYMS).c)
 $(obj)/$(KSYMS).o: $(obj)/$(KSYMS).c
 	$(call if_changed_dep,ccompile)
 
@@ -199,150 +207,32 @@ install-local: Makefile $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc all
 	$(CLICKmkinstalldirs) $(DESTDIR)$(libdir)
 	for i in $(patsubst %.o,%.ko,$(INSTALLOBJS)); do $(CLICK_BUILD_INSTALL_DATA) $$i $(DESTDIR)$(libdir)/$$i; done
 	$(CLICK_BUILD_INSTALL_DATA) Module.symvers $(DESTDIR)$(libdir)/click.symvers
-install-include:
-	/bin/rm -f .install-include*
+install-include: $(CLICK_BUILDTOOL)
 	$(CLICKmkinstalldirs) $(DESTDIR)$(includedir)/click-linuxmodule
-	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type d -print | grep /) >.install-include0 || true
-	(cd $(top_builddir)/include/click-linuxmodule; find . -type d -print | grep /) >.install-include1 || true
-	cat .install-include0 .install-include1 | sort | uniq -u >.install-include2
-	cat .install-include0 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 /bin/rm -rf
-	cat .install-include1 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 $(CLICKmkinstalldirs)
-	/bin/rm -f .install-include*
-	(cd $(DESTDIR)$(includedir)/click-linuxmodule; find . -type f -print | grep /) >.install-include0 || true
-	(cd $(top_builddir)/include/click-linuxmodule; find . -type f -print | grep /) >.install-include1 || true
-	cat .install-include0 .install-include1 | sort | uniq -u >.install-include2
-	cat .install-include0 .install-include2 | sort | uniq -d | sed 's	^\.\(.*\)	'"$(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 /bin/rm -f
-	cat .install-include1 | sed 's	^\.\(.*\)	'"$(top_builddir)/include/click-linuxmodule"'\1'" $(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 $(CLICK_BUILD_INSTALL_DATA_IF_CHANGED)
-	/bin/rm -f .install-include*
+	$(call verbose_cmd,MD5SUM=$(MD5SUM) $(srcdir)/click-linuxtool.pl installtree -m 644 "$(top_builddir)/include/click-linuxmodule" "$(DESTDIR)$(includedir)/click-linuxmodule",INSTALLHEADERS $(DESTDIR)$(includedir)/click-linuxmodule)
 install-man:
 	@:
 uninstall:
 	for i in $(patsubst %.o,%.ko,$(INSTALLOBJS)); do /bin/rm -f $(DESTDIR)$(libdir)/$$i; done
 	(cd $(top_builddir)/include/click-linuxmodule; find . -type f -print) | grep / | sed 's	^\.\(.*\)	'"$(top_builddir)/include/click-linuxmodule"'\1'" $(DESTDIR)$(includedir)/click-linuxmodule"'\1	' | xargs -L 1 rm -f
 
-else
 
 ##########################################################################
-## LINUX 2.4								##
-
-top_srcdir := @top_srcdir@
-srcdir := @srcdir@
-top_builddir := ..
-
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
-
-CC = @KERNEL_CC@
-CPP = @CPP@
-CXX = @KERNEL_CXX@
-CXXCPP = @CXXCPP@
-LD = @LD@
-STRIP = @STRIP@
-INSTALL = @INSTALL@
-INSTALL_DATA = $(INSTALL) -m 644
-mkinstalldirs = $(conf_auxdir)/mkinstalldirs
-CLICK_ELEM2MAKE = $(top_builddir)/click-buildtool elem2make
-
-ifeq ($(V),1)
-ccompile = $(COMPILE) $(DEPCFLAGS) $(1)
-ccompile_nodep = $(COMPILE) $(1)
-cxxcompile = $(CXXCOMPILE) $(DEPCFLAGS) $(1)
-cxxcompile_nodep = $(CXXCOMPILE) $(1)
-else
-ccompile = @/bin/echo ' ' $(2) $< && $(COMPILE) $(DEPCFLAGS) $(1)
-ccompile_nodep = @/bin/echo ' ' $(2) $< && $(COMPILE) $(1)
-cxxcompile = @/bin/echo ' ' $(2) $< && $(CXXCOMPILE) $(DEPCFLAGS) $(1)
-cxxcompile_nodep = @/bin/echo ' ' $(2) $< && $(CXXCOMPILE) $(1)
-endif
-
-.SUFFIXES:
-.SUFFIXES: .c .cc .o .S .s .i .ii
-
-.c.o:
-	$(call ccompile,-c $< -o $@,CC)
-.c.i:
-	$(call ccompile_nodep,-E $< > $@,CPP)
-.s.o:
-	$(call ccompile,-c $< -o $@,ASM)
-.S.o:
-	$(call ccompile,-c $< -o $@,ASM)
-.cc.o:
-	$(call cxxcompile,-c $< -o $@,CXX)
-.cc.s:
-	$(call cxxcompile_nodep,-S $< -o $@,CXX -S)
-.cc.ii:
-	$(call cxxcompile_nodep,-E $< > $@,CXXCPP)
-
-
-OBJS = $(LIB_CXX_OBJS) $(LIB_C_OBJS) $(STD_ELEMENT_OBJS) $(ELEMENT_OBJS) \
-	$(LINUXMODULE_CXX_OBJS) $(LINUXMODULE_C_OBJS) $(ELEMENTSCONF).o
-
-CPPFLAGS = @CPPFLAGS@ -DCLICK_LINUXMODULE
-CFLAGS = @KERNEL_CFLAGS@
-CXXFLAGS = @KERNEL_CXXFLAGS@
-DEPCFLAGS = @DEPCFLAGS@
-
-DEFS = @DEFS@
-INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
-	-I$(srcdir) -I$(top_srcdir)
-LDFLAGS = @LDFLAGS@
-LIBS = @LIBS@
-
-CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS) $(CXXFLAGS)
-CXXLD = $(CXX)
-CXXLINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
-COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
-CCLD = $(CC)
-LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
-
-all: $(INSTALLOBJS)
-
-ifneq ($(MAKECMDGOALS),clean)
--include $(ELEMENTSCONF).mk
-endif
-
-$(DRIVER).o: Makefile $(OBJS)
-	$(LD) -r -o $(DRIVER).o $(OBJS)
-	$(STRIP) -g $(DRIVER).o
-
-proclikefs.o: proclikefs.c Makefile
-	$(COMPILE) -D__KERNEL__ -DMODULE $(DEPCFLAGS) -c $< -o $@
-
-DEPFILES := $(wildcard *.d)
-ifneq ($(DEPFILES),)
-include $(DEPFILES)
-endif
-
-install: install-local
-install-local: $(INSTALLOBJS)
-	$(mkinstalldirs) $(DESTDIR)$(libdir)
-	for i in $(INSTALLOBJS); do $(INSTALL_DATA) $$i $(DESTDIR)$(libdir)/$$i; done
-install-include:
-	@:
-install-man:
-	@:
-uninstall:
-	for i in $(INSTALLOBJS); do /bin/rm -f $(DESTDIR)$(libdir)/$$i; done
-
-endif
-
-
-##########################################################################
-## ANY LINUX								##
+## GENERIC RULES							##
 
 elemlist:
-	@/bin/rm -f elements.conf
+	@/bin/rm -f elements.conf elements.csmk
 	@$(MAKE) elements.conf
-elements.conf: $(top_builddir)/config.status $(top_builddir)/click-buildtool
-	echo "linuxmodule @element_groups@" | $(top_builddir)/click-buildtool findelem -r linuxmodule -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) > elements.conf
-$(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
+elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
+	echo "linuxmodule @element_groups@" | $(CLICK_BUILDTOOL) findelem -r linuxmodule -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) > elements.conf
+$(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(CLICK_ELEM2MAKE) -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).mk
-$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
-	$(top_builddir)/click-buildtool elem2export < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).cc
+$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).cc
 	@rm -f $(ELEMENTSCONF).d
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
-	cd $(top_builddir) \
-	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 always:
 	@:
@@ -350,7 +240,7 @@ always:
 clean:
 	-rm -f *~ *.d *.o *.mod.c *.ko
 	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
-	-rm -f $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(KSYMS).c elements.conf
+	-rm -f $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(KSYMS).c elements.conf elements.csmk
 	-rm -rf Module.symvers .tmp_versions modules.order
 distclean: clean
 	-rm -f Makefile

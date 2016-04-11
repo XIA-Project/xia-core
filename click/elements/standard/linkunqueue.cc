@@ -34,10 +34,6 @@ LinkUnqueue::LinkUnqueue()
 {
 }
 
-LinkUnqueue::~LinkUnqueue()
-{
-}
-
 void *
 LinkUnqueue::cast(const char *n)
 {
@@ -136,7 +132,7 @@ LinkUnqueue::run_task(Task *)
 	// hook up, and remember we were doing this back to back
 	_qtail = p;
 	p->set_next(0);
-	Storage::_tail++;
+	Storage::set_tail(Storage::tail() + 1);
 	worked = _back_to_back = true;
     }
 
@@ -147,9 +143,9 @@ LinkUnqueue::run_task(Task *)
 	if (!_qhead)
 	    _qtail = 0;
 	p->set_next(0);
-	//click_chatter("%{timestamp}: RELEASE %{timestamp}", &now, &p->timestamp_anno());
+	//click_chatter("%p{timestamp}: RELEASE %p{timestamp}", &now, &p->timestamp_anno());
 	output(0).push(p);
-	Storage::_tail--;
+	Storage::set_tail(Storage::tail() - 1);
 	worked = true;
     }
 
@@ -162,7 +158,7 @@ LinkUnqueue::run_task(Task *)
 	    if (expiry2 < expiry)
 		expiry = expiry2;
 	}
-	//{ Timestamp diff = expiry - now; click_chatter("%{timestamp}: %{timestamp} > + %{timestamp}", &now, &expiry, &diff); }
+	//{ Timestamp diff = expiry - now; click_chatter("%p{timestamp}: %p{timestamp} > + %p{timestamp}", &now, &expiry, &diff); }
 	expiry -= Timer::adjustment();
 	if (expiry <= now) {
 	    // small delay, reschedule Task
@@ -232,7 +228,7 @@ LinkUnqueue::write_handler(const String &s, Element *e, void *thunk, ErrorHandle
     /* do a full reset */
     u->cleanup(CLEANUP_MANUAL);
     u->_qhead = u->_qtail = 0;
-    u->Storage::_tail = 0;
+    u->Storage::set_tail(0);
     u->_timer.unschedule();
     u->_task.reschedule();
     return 0;

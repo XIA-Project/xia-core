@@ -7,6 +7,7 @@
  * Copyright (c) 2002 International Computer Science Institute
  * Copyright (c) 2004-2007 Regents of the University of California
  * Copyright (c) 2008-2009 Meraki, Inc.
+ * Copyright (c) 1999-2012 Eddie Kohler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -110,7 +111,7 @@ Task::error_hook(Task *, void *)
 
 Task::~Task()
 {
-    if (scheduled() || _pending_nextptr)
+    if (scheduled() || on_pending_list())
 	cleanup();
 }
 
@@ -125,9 +126,9 @@ Task::master() const
 inline void
 Task::add_pending_locked(RouterThread *thread)
 {
-    if (!_pending_nextptr) {
-	_pending_nextptr = 1;
-	*thread->_pending_tail = reinterpret_cast<uintptr_t>(this);
+    if (!_pending_nextptr.x) {
+	_pending_nextptr.x = 1;
+	thread->_pending_tail->t = this;
 	thread->_pending_tail = &_pending_nextptr;
 	thread->add_pending();
     }
@@ -150,21 +151,19 @@ Task::add_pending()
 inline void
 Task::remove_pending_locked(RouterThread *thread)
 {
-    if (_pending_nextptr) {
-	volatile uintptr_t *thead = &thread->_pending_head, *tptr = thead;
-	while (Task *t = pending_to_task(*tptr))
-	    if (t == this) {
-		Task *next = pending_to_task(_pending_nextptr);
-		if (tptr != thead)
-		    *tptr = _pending_nextptr;
-		else
-		    *tptr = reinterpret_cast<uintptr_t>(next);
-		if (!next)
-		    thread->_pending_tail = tptr;
-		_pending_nextptr = 0;
-		break;
-	    } else
-		tptr = &t->_pending_nextptr;
+    if (_pending_nextptr.x) {
+	Pending *tptr = &thread->_pending_head;
+	while (tptr->x > 1 && tptr->t != this)
+	    tptr = &tptr->t->_pending_nextptr;
+	if (tptr->t == this) {
+	    *tptr = _pending_nextptr;
+	    if (_pending_nextptr.x <= 1) {
+		thread->_pending_tail = tptr;
+		if (tptr == &thread->_pending_head)
+		    tptr->x = 0;
+	    }
+	    _pending_nextptr.x = 0;
+	}
     }
 }
 
@@ -224,24 +223,35 @@ Task::cleanup()
     GIANT_REQUIRED;
 #endif
     if (initialized()) {
+        // Mark the task as unscheduled.
 	strong_unschedule();
-	remove_from_scheduled_list();
 
 	// Perhaps the task is enqueued on the current pending
 	// collection.  If so, remove it.
-	if (_pending_nextptr) {
+	if (on_pending_list())
 	    remove_pending();
 
-	    // If not on the current pending list, perhaps this task
-	    // is on some list currently being processed by
-	    // RouterThread::process_pending().  Wait until that
-	    // processing is done.  It is safe to simply spin because
-	    // pending list processing is so simple: processing a
-	    // pending list will NEVER cause a task to get deleted, so
-	    // ~Task is never called from RouterThread::process_pending().
-	    while (_pending_nextptr)
-		/* do nothing */;
-	}
+        // If not on the current pending list, perhaps this task
+        // is on some list currently being processed by
+        // RouterThread::process_pending().  Wait until that
+        // processing is done.  It is safe to simply spin because
+        // pending list processing is so simple: processing a
+        // pending list will NEVER cause a task to get deleted, so
+        // ~Task is never called from RouterThread::process_pending().
+        while (on_pending_list())
+            click_relax_fence();
+
+        // If currently scheduled, remove from schedule list.
+        // If scheduled on another thread, wait for that thread to
+        // notice. If scheduled on this thread, remove it.
+        if (on_scheduled_list()) {
+            assert(_thread && _thread->thread_id() >= 0);
+            while (on_scheduled_list()
+                   && !_thread->current_thread_is_running())
+                click_relax_fence();
+            if (_thread->current_thread_is_running())
+                remove_from_scheduled_list();
+        }
 
 	_owner = 0;
 	_thread = 0;
@@ -252,26 +262,17 @@ Task::cleanup()
 void
 Task::true_reschedule()
 {
-    bool done = false;
     RouterThread *thread = _thread;
     if (unlikely(thread == 0 || thread->thread_id() < 0))
-	done = true;
-#if CLICK_LINUXMODULE
-    else if (in_interrupt())
-	goto pending;
-#endif
-    else if (thread->current_thread_is_running()) {
+	return;
+    if (thread->current_thread_is_running()) {
 	Router *router = _owner->router();
 	if (router->_running >= Router::RUNNING_BACKGROUND) {
 	    fast_schedule();
-	    done = true;
+	    return;
 	}
     }
-#if CLICK_LINUXMODULE
-  pending:
-#endif
-    if (!done)
-	add_pending();
+    add_pending();
 }
 
 void

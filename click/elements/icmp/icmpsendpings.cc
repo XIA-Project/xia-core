@@ -48,20 +48,25 @@ ICMPPingSource::~ICMPPingSource()
 int
 ICMPPingSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    bool has_interval;
     _icmp_id = 0;
     _interval = 1000;
     _data = String();
     _active = true;
     _verbose = true;
+    _stop = false;
+    _mirror = false;
     if (Args(conf, this, errh)
 	.read_mp("SRC", _src)
 	.read_mp("DST", _dst)
-	.read("INTERVAL", SecondsArg(3), _interval)
+	.read("INTERVAL", SecondsArg(3), _interval).read_status(has_interval)
 	.read("IDENTIFIER", _icmp_id)
 	.read("DATA", _data)
 	.read("LIMIT", _limit)
 	.read("ACTIVE", _active)
 	.read("VERBOSE", _verbose)
+	.read("STOP", _stop)
+	.read("MIRROR", _mirror)
 	.complete() < 0)
 	return -1;
 #ifndef __linux__
@@ -69,6 +74,10 @@ ICMPPingSource::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
     if (_interval == 0)
 	errh->warning("INTERVAL so small that it is zero");
+    if (output_is_pull(0) && has_interval)
+	errh->warning("element is pull, INTERVAL parameter will be ignored");
+    if (output_is_pull(0) && _mirror)
+	return errh->error("MIRROR invalid on pull element");
     return 0;
 }
 
@@ -109,13 +118,17 @@ ICMPPingSource::cleanup(CleanupStage)
 }
 
 Packet*
-ICMPPingSource::make_packet()
+ICMPPingSource::make_packet(WritablePacket *q)
 {
-    WritablePacket *q = Packet::make(sizeof(click_ip) + sizeof(struct click_icmp_echo) + _data.length());
+    size_t hsz = sizeof(click_ip) + sizeof(click_icmp_echo);
+    bool data = !q;
+    if (!q)
+	q = Packet::make(hsz + _data.length());
     if (!q)
 	return 0;
-    memset(q->data(), '\0', sizeof(click_ip) + sizeof(struct click_icmp_echo));
-    memcpy(q->data() + sizeof(click_ip) + sizeof(struct click_icmp_echo), _data.data(), _data.length());
+    memset(q->data(), '\0', hsz);
+    if (data)
+	memcpy(q->data() + hsz, _data.data(), _data.length());
 
     click_ip *nip = reinterpret_cast<click_ip *>(q->data());
     nip->ip_v = 4;
@@ -133,11 +146,7 @@ ICMPPingSource::make_packet()
     icp->icmp_type = ICMP_ECHO;
     icp->icmp_code = 0;
     icp->icmp_identifier = _icmp_id;
-#ifdef __linux__
-    icp->icmp_sequence = ip_id;
-#else
     icp->icmp_sequence = htons(ip_id);
-#endif
 
     icp->icmp_cksum = click_in_cksum((const unsigned char *)icp, sizeof(click_icmp_sequenced) + _data.length());
 
@@ -154,11 +163,13 @@ ICMPPingSource::make_packet()
 void
 ICMPPingSource::run_timer(Timer *)
 {
-    if (Packet *q = make_packet()) {
+    if (_count >= _limit && _limit >= 0) {
+	if (_stop)
+	    router()->please_stop_driver();
+    } else if (Packet *q = make_packet(0)) {
 	output(0).push(q);
 	_count++;
-	if (_count < _limit || _limit < 0)
-	    _timer.reschedule_after_msec(_interval);
+	_timer.reschedule_after_msec(_interval);
     }
 }
 
@@ -166,8 +177,13 @@ Packet*
 ICMPPingSource::pull(int)
 {
     Packet *p = 0;
-    if ((_count < _limit || _limit < 0) && (p = make_packet()))
-	_count++;
+    if (_count < _limit || _limit < 0) {
+	if ((p = make_packet(0)))
+	    _count++;
+    } else if (_stop) {
+	router()->please_stop_driver();
+	_stop = false;
+    }
     return p;
 }
 
@@ -206,13 +222,20 @@ ICMPPingSource::push(int, Packet *p)
 	    _receiver->nreceived++;
 	    *send_ts = -*send_ts;
 
-#ifdef __linux__
-	    uint16_t readable_seq = icmph->icmp_sequence;
-#else
 	    uint16_t readable_seq = ntohs(icmph->icmp_sequence);
-#endif
 	    if (_verbose)
-		click_chatter("%s: %d bytes from %{ip_ptr}: icmp_seq=%u ttl=%u time=%d.%03d ms", declaration().c_str(), ntohs(iph->ip_len) - (iph->ip_hl << 2) - sizeof(*icmph), &iph->ip_src, readable_seq, iph->ip_ttl, (unsigned)(diffval/1000), (unsigned)(diffval % 1000));
+		click_chatter("%s: %d bytes from %p{ip_ptr}: icmp_seq=%u ttl=%u time=%d.%03d ms", declaration().c_str(), ntohs(iph->ip_len) - (iph->ip_hl << 2) - sizeof(*icmph), &iph->ip_src, readable_seq, iph->ip_ttl, (unsigned)(diffval/1000), (unsigned)(diffval % 1000));
+	}
+
+	if (_mirror) {
+	    WritablePacket *q = p->uniqueify();
+	    if (q && q->data() < q->network_header())
+		q->pull(q->network_header() - q->data());
+	    if (q && (p = make_packet(q))) {
+		output(0).push(p);
+		++_count;
+	    }
+	    return;
 	}
     }
     p->kill();

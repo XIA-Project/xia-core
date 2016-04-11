@@ -29,10 +29,6 @@ TimerTest::TimerTest()
 {
 }
 
-TimerTest::~TimerTest()
-{
-}
-
 int
 TimerTest::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -82,7 +78,7 @@ TimerTest::initialize(ErrorHandler *)
 void
 TimerTest::run_timer(Timer *t)
 {
-    click_chatter("%{timestamp}: %{element} fired", &t->expiry_steady(), this);
+    click_chatter("%p{timestamp}: %p{element} fired", &t->expiry_steady(), this);
 }
 
 void

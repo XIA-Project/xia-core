@@ -37,13 +37,13 @@ static Lexer *lexer = 0;
 extern "C" int
 click_add_element_type(const char *name, Element *(*factory)(uintptr_t), uintptr_t thunk, struct module *module)
 {
-    lexer->add_element_type(name, factory, thunk, module);
+    return lexer->add_element_type(name, factory, thunk, module);
 }
 
 extern "C" int
 click_add_element_type_stable(const char *name, Element *(*factory)(uintptr_t), uintptr_t thunk, struct module *module)
 {
-    lexer->add_element_type(String::make_stable(name), factory, thunk, module);
+    return lexer->add_element_type(String::make_stable(name), factory, thunk, module);
 }
 
 extern "C" void
@@ -81,8 +81,8 @@ parse_router(String s)
 {
     LinuxModuleLexerExtra lextra;
     int cookie = lexer->begin_parse(s, "line ", &lextra, click_logged_errh);
-    while (lexer->ystatement())
-	/* do nothing */;
+    while (!lexer->ydone())
+	lexer->ystep();
     Router *r = lexer->create_router(click_master);
     lexer->end_parse(cookie);
     return r;
@@ -176,8 +176,8 @@ click_init_config()
     Router::add_read_handler(0, "classes", read_classes, 0);
     Router::add_write_handler(0, "config", write_config, 0);
     Router::add_write_handler(0, "hotconfig", write_config, (void *)1);
-    Router::set_handler_flags(0, "config", HANDLER_WRITE_UNLIMITED | Handler::RAW | Handler::NONEXCLUSIVE);
-    Router::set_handler_flags(0, "hotconfig", HANDLER_WRITE_UNLIMITED | Handler::RAW | Handler::NONEXCLUSIVE);
+    Router::set_handler_flags(0, "config", HANDLER_WRITE_UNLIMITED | Handler::f_raw);
+    Router::set_handler_flags(0, "hotconfig", HANDLER_WRITE_UNLIMITED | Handler::f_raw);
 
     click_config_generation = 1;
     current_config = new String;

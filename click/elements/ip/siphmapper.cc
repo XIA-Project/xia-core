@@ -118,12 +118,14 @@ SourceIPHashMapper::cleanup(CleanupStage)
 }
 
 void
-SourceIPHashMapper::notify_rewriter(IPRewriterBase *rw, ErrorHandler *errh)
+SourceIPHashMapper::notify_rewriter(IPRewriterBase *user,
+				    IPRewriterInput *input, ErrorHandler *errh)
 {
-    int no = rw->noutputs();
-    for (int i = 0; i < _is.size(); i++)
-	if (_is[i].foutput >= no || _is[i].routput >= no)
-	    errh->error("port in %<%s%> out of range for %<%s%>", declaration().c_str(), rw->declaration().c_str());
+    for (int i = 0; i < _is.size(); i++) {
+	if (_is[i].foutput >= user->noutputs()
+	    || _is[i].routput >= input->reply_element->noutputs())
+	    errh->error("output port out of range in %s pattern %d", declaration().c_str(), i);
+    }
 }
 
 int
@@ -144,8 +146,6 @@ SourceIPHashMapper::rewrite_flowid(IPRewriterInput *input,
     tmp = tmp % INT_MAX;
 
     int v = _hasher->hash2ind (tmp);
-    // debug code
-    click_chatter ("%p -> %d", (void *)tmp, v);
     _is[v].reply_element = input->reply_element;
     input->foutput = _is[v].foutput;
     input->routput = _is[v].routput;

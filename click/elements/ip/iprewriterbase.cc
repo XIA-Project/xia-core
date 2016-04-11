@@ -52,7 +52,7 @@ CLICK_DECLS
 //
 
 void
-IPMapper::notify_rewriter(IPRewriterBase *, ErrorHandler *)
+IPMapper::notify_rewriter(IPRewriterBase *, IPRewriterInput *, ErrorHandler *)
 {
 }
 
@@ -138,7 +138,6 @@ IPRewriterBase::parse_input_spec(const String &line, IPRewriterInput &is,
 	else {
 	    is.kind = IPRewriterInput::i_mapper;
 	    is.u.mapper = mapper;
-	    mapper->notify_rewriter(this, &cerrh);
 	}
 
     } else
@@ -194,15 +193,17 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 IPRewriterBase::initialize(ErrorHandler *errh)
 {
-    for (int i = 0; i < _input_specs.size(); ++i)
-	if ((_input_specs[i].kind == IPRewriterInput::i_pattern
-	     || _input_specs[i].kind == IPRewriterInput::i_keep)
-	    && _input_specs[i].reply_element->_heap != _heap)
-	    return errh->error("input spec %d: reply element %<%s%> must share this MAPPING_CAPACITY", i, _input_specs[i].reply_element->name().c_str());
+    for (int i = 0; i < _input_specs.size(); ++i) {
+	PrefixErrorHandler cerrh(errh, "input spec " + String(i) + ": ");
+	if (_input_specs[i].reply_element->_heap != _heap)
+	    cerrh.error("reply element %<%s%> must share this MAPPING_CAPACITY", i, _input_specs[i].reply_element->name().c_str());
+	if (_input_specs[i].kind == IPRewriterInput::i_mapper)
+	    _input_specs[i].u.mapper->notify_rewriter(this, &_input_specs[i], &cerrh);
+    }
     _gc_timer.initialize(this);
     if (_gc_interval_sec)
 	_gc_timer.schedule_after_sec(_gc_interval_sec);
-    return 0;
+    return errh->nerrors() ? -1 : 0;
 }
 
 void
@@ -247,8 +248,10 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
     if (!reply_map_ptr)
 	reply_map_ptr = &reply_element->_map;
     old = reply_map_ptr->set(&flow->entry(true));
-    if (unlikely(old))		// Assume every map has the same heap.
-	old->flow()->destroy(_heap);
+    if (unlikely(old)) {		// Assume every map has the same heap.
+	if (likely(old->flow() != flow))
+	    old->flow()->destroy(_heap);
+    }
 
     Vector<IPRewriterFlow *> &myheap = _heap->_heaps[flow->guaranteed()];
     myheap.push_back(flow);
@@ -443,7 +446,8 @@ IPRewriterBase::pattern_write_handler(const String &str, Element *e, void *user_
 void
 IPRewriterBase::add_rewriter_handlers(bool writable_patterns)
 {
-    add_read_handler("nmappings", read_handler, h_nmappings);
+    add_read_handler("table_size", read_handler, h_nmappings);
+    add_read_handler("nmappings", read_handler, h_nmappings, Handler::h_deprecated);
     add_read_handler("mapping_failures", read_handler, h_mapping_failures);
     add_read_handler("patterns", read_handler, h_patterns);
     add_read_handler("size", read_handler, h_size);
@@ -454,7 +458,7 @@ IPRewriterBase::add_rewriter_handlers(bool writable_patterns)
 	String name = "pattern" + String(i);
 	add_read_handler(name, read_handler, i);
 	if (writable_patterns)
-	    add_write_handler(name, pattern_write_handler, i, Handler::EXCLUSIVE);
+	    add_write_handler(name, pattern_write_handler, i);
     }
 }
 

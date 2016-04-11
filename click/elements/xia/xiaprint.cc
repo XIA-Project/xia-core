@@ -47,7 +47,7 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     bool bcontents;
     String channel;
 	verbosity = 0;
-  
+
     if (cp_va_kparse(conf, this, errh,
 		   "LABEL", cpkP, cpString, &_label,
 		   "CONTENTS", 0, cpWord, &contents,
@@ -89,12 +89,12 @@ XIAPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     	payloadv = 2;
     else
     	return errh->error("bad payload value '%s'; should be 'false', 'hex', or 'ascii'", contents.c_str());
-  
+
     if (payloadv > 0 && _contents > 0)
     	return errh->error("specify at most one of PAYLOAD and CONTENTS");
     else if (payloadv > 0)
     	_contents = payloadv, _payload = true;
-  
+
     _print_timestamp = print_time;
     _print_paint = print_paint;
     _print_hlim = print_hlim;
@@ -148,7 +148,7 @@ XIAPrint::should_print(Packet *p)
 {
     if (!_active || !p->has_network_header())
 		return 0;
-	
+
 	if (verbosity == 0) // print nothing
 		return 0;
 	else if (verbosity == 1) // TODO: implement custom filtering here
@@ -159,7 +159,7 @@ XIAPrint::should_print(Packet *p)
 
     	/*
     	if (p==NULL) return -1;
-    	if (!hdr) 
+    	if (!hdr)
     	    return -1;
     	if (hdr->dnode == 0 || hdr->snode == 0)
     	    return -1;
@@ -169,7 +169,7 @@ XIAPrint::should_print(Packet *p)
     	uint32_t dst_xid_type = ntohl(__dstID.type);
     	struct click_xia_xid __srcID = hdr->node[hdr->dnode + hdr->snode - 1].xid;
     	uint32_t src_xid_type = ntohl(__srcID.type);
-    	
+
 		// hack to the hack. Filter out weird xid types so the following code doesn't smash the stack
     	// for some reason we get garbage data periodically that causes the XID constructor to fail
     	if (dst_xid_type > CLICK_XIA_XID_TYPE_IP || src_xid_type > CLICK_XIA_XID_TYPE_IP)
@@ -197,6 +197,7 @@ XIAPrint::should_print(Packet *p)
 	}
 	else if (verbosity >= 3) // print everything
 		return 1;
+	return 1;
 }
 
 Packet *
@@ -235,11 +236,11 @@ XIAPrint::simple_action(Packet *p)
 
         if (xiah->nxt == CLICK_XIA_NXT_CID) {
             ContentHeader chdr(p);
-            if (chdr.opcode() == ContentHeader::OP_RESPONSE) 
-            sa << ", EXT_CONTENT " << "<OP RESPONSE OFF " << chdr.offset() << " CHUNK_OFF " 
+            if (chdr.opcode() == ContentHeader::OP_RESPONSE)
+            sa << ", EXT_CONTENT " << "<OP RESPONSE OFF " << chdr.offset() << " CHUNK_OFF "
                << chdr.chunk_offset() << " LEN " << chdr.length() << " CHUNK_LEN " << chdr.chunk_length() <<"> " ;
             else if (chdr.opcode() == ContentHeader::OP_REQUEST)
-            sa << ", EXT_CONTENT " << "<OP REQUEST> "; 
+            sa << ", EXT_CONTENT " << "<OP REQUEST> ";
         }
 
 		// print payload
@@ -286,8 +287,8 @@ XIAPrint::read_handler(Element *e, void *thunk)
     }
 }
 
-int 
-XIAPrint::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+int
+XIAPrint::write_handler(const String &str, Element *e, void *thunk, ErrorHandler * /*errh */)
 {
 	XIAPrint *p = (XIAPrint *) e;
     switch ((intptr_t)thunk) {

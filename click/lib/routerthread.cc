@@ -7,6 +7,7 @@
  * Copyright (c) 2001-2002 International Computer Science Institute
  * Copyright (c) 2004-2007 Regents of the University of California
  * Copyright (c) 2008-2010 Meraki, Inc.
+ * Copyright (c) 2000-2012 Eddie Kohler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -65,12 +66,14 @@ static unsigned long greedy_schedule_jiffies;
  * @brief A set of Tasks scheduled on the same CPU.
  */
 
-RouterThread::RouterThread(Master *m, int id)
-    : _stop_flag(0), _pending_head(0), _pending_tail(&_pending_head),
-      _master(m), _id(id)
+RouterThread::RouterThread(Master *master, int id)
+    : _stop_flag(0), _master(master), _id(id)
 {
+    _pending_head.x = 0;
+    _pending_tail = &_pending_head;
+
 #if !HAVE_TASK_HEAP
-    _prev = _next = this;
+    _task_link._prev = _task_link._next = &_task_link;
 #endif
 #if CLICK_LINUXMODULE
     _linux_task = 0;
@@ -105,6 +108,11 @@ RouterThread::RouterThread(Master *m, int id)
 #endif
 #if CLICK_LINUXMODULE
     greedy_schedule_jiffies = jiffies;
+#endif
+
+#if CLICK_NS
+    _ns_scheduled = _ns_last_active = Timestamp(-1, 0);
+    _ns_active_iter = 0;
 #endif
 
 #if CLICK_DEBUG_SCHEDULING
@@ -156,6 +164,7 @@ inline void
 RouterThread::driver_unlock_tasks()
 {
     uint32_t val = _task_blocker.compare_swap((uint32_t) -1, 0);
+    (void) val;
     assert(val == (uint32_t) -1);
 }
 
@@ -245,14 +254,14 @@ RouterThread::client_update_pass(int client, const Timestamp &t_before)
 {
     Client &c = _clients[client];
     Timestamp t_now = Timestamp::now();
-    Timestamp::seconds_type elapsed = (t_now - t_before).usec1();
+    Timestamp::value_type elapsed = (t_now - t_before).usecval();
     if (elapsed > 0)
 	c.pass += (c.stride * elapsed) / DRIVER_QUANTUM;
     else
 	c.pass += c.stride;
 
     // check_restride
-    Timestamp::seconds_type elapsed = (t_now - _adaptive_restride_timestamp).usec1();
+    elapsed = (t_now - _adaptive_restride_timestamp).usecval();
     if (elapsed > DRIVER_RESTRIDE_INTERVAL || elapsed < 0) {
 	// mark new measurement period
 	_adaptive_restride_timestamp = t_now;
@@ -434,14 +443,14 @@ RouterThread::run_tasks(int ntasks)
 		if (_task_heap.size() < 2)
 		    break;
 #else
-		if (t->_next == this)
+		if (t->_next == &_task_link)
 		    break;
 #endif
 #if HAVE_STRIDE_SCHED
 # if HAVE_TASK_HEAP
-		unsigned p1 = _task_heap.at_u(1).pass;
-		if (_task_heap.size() > 2 && PASS_GT(p1, _task_heap.at_u(2).pass))
-		    p1 = _task_heap.at_u(2).pass;
+		unsigned p1 = _task_heap.unchecked_at(1).pass;
+		if (_task_heap.size() > 2 && PASS_GT(p1, _task_heap.unchecked_at(2).pass))
+		    p1 = _task_heap.unchecked_at(2).pass;
 # else
 		unsigned p1 = t->_next->_pass;
 # endif
@@ -455,10 +464,10 @@ RouterThread::run_tasks(int ntasks)
 #else
 # if HAVE_STRIDE_SCHED
 	    TaskLink *n = t->_next;
-	    while (n != this && !PASS_GT(n->_pass, t->_pass))
+	    while (n != &_task_link && !PASS_GT(n->_pass, t->_pass))
 		n = n->_next;
 # else
-	    TaskLink *n = this;
+	    TaskLink *n = &_task_link;
 # endif
 	    if (t->_next != n) {
 		t->_next->_prev = t->_prev;
@@ -495,6 +504,12 @@ RouterThread::run_os()
 
 #if CLICK_USERLEVEL
     select_set().run_selects(this);
+#elif CLICK_MINIOS
+    /*
+     * MiniOS uses a cooperative scheduler. By schedule() we'll give a chance
+     * to the OS threads to run.
+     */
+    schedule();
 #elif CLICK_LINUXMODULE		/* Linux kernel module */
     if (_greedy) {
 	if (time_after(jiffies, greedy_schedule_jiffies + 5 * CLICK_HZ)) {
@@ -551,15 +566,16 @@ RouterThread::process_pending()
     // claim the current pending list
     set_thread_state(RouterThread::S_RUNPENDING);
     SpinlockIRQ::flags_t flags = _pending_lock.acquire();
-    uintptr_t my_pending = _pending_head;
-    _pending_head = 0;
+    Task::Pending my_pending = _pending_head;
+    _pending_head.x = 0;
     _pending_tail = &_pending_head;
     _pending_lock.release(flags);
 
     // process the list
-    while (Task *t = Task::pending_to_task(my_pending)) {
+    while (my_pending.x > 1) {
+	Task *t = my_pending.t;
 	my_pending = t->_pending_nextptr;
-	t->_pending_nextptr = 0;
+	t->_pending_nextptr.x = 0;
 	click_fence();
 	t->process_pending(this);
     }
@@ -577,9 +593,17 @@ RouterThread::driver()
 # if CLICK_USERLEVEL && HAVE_MULTITHREAD
     _running_processor = click_current_processor();
 #  if HAVE___THREAD_STORAGE_CLASS
-    click_current_thread_id = _id;
+    click_current_thread_id = _id | 0x40000000;
 #  endif
 # endif
+#endif
+
+#if CLICK_NS
+    {
+	Timestamp now = Timestamp::now();
+	if (now >= _ns_scheduled)
+	    _ns_scheduled.set_sec(-1);
+    }
 #endif
 
     driver_lock_tasks();
@@ -612,7 +636,8 @@ RouterThread::driver()
 	iter++;
 
 	// run task requests
-	if (_pending_head)
+	click_compiler_fence();
+	if (_pending_head.x)
 	    process_pending();
 
 	// run tasks
@@ -640,14 +665,6 @@ RouterThread::driver()
 	    _oticks = ticks;
 #endif
 	    timer_set().run_timers(this, _master);
-#if CLICK_NS
-	    // If there's another timer, tell the simulator to make us
-	    // run when it's due to go off.
-	    if (Timestamp next_expiry = timer_set().timer_expiry_steady()) {
-		struct timeval nexttime = next_expiry.timeval();
-		simclick_sim_command(_master->simnode(), SIMCLICK_SCHEDULE, &nexttime);
-	    }
-#endif
 	} while (0);
 
 	// run operating system
@@ -678,48 +695,43 @@ RouterThread::driver()
 #endif
 #if CLICK_LINUXMODULE
     _linux_task = 0;
-#elif CLICK_USERLEVEL && HAVE_MULTITHREAD
+#endif
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD
     _running_processor = click_invalid_processor();
 # if HAVE___THREAD_STORAGE_CLASS
     click_current_thread_id = 0;
 # endif
 #endif
-}
-
-
-/******************************/
-/* Secondary driver functions */
-/******************************/
-
-void
-RouterThread::driver_once()
-{
-    if (!_master->check_driver())
-	return;
-
-#if CLICK_LINUXMODULE
-    // this task is running the driver
-    _linux_task = current;
-#elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-    _running_processor = click_current_processor();
-# if HAVE___THREAD_STORAGE_CLASS
-    click_current_thread_id = _id;
-# endif
-#endif
-    driver_lock_tasks();
-
-    run_tasks(1);
-
-    driver_unlock_tasks();
-#if CLICK_LINUXMODULE
-    _linux_task = 0;
-#elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-    _running_processor = click_invalid_processor();
-# if HAVE___THREAD_STORAGE_CLASS
-    click_current_thread_id = 0;
-# endif
+#if CLICK_NS
+    do {
+	Timestamp t = Timestamp::uninitialized_t();
+	if (active()) {
+	    t = Timestamp::now();
+	    if (t != _ns_last_active) {
+		_ns_active_iter = 0;
+		_ns_last_active = t;
+	    } else if (++_ns_active_iter >= ns_iters_per_time)
+		t += Timestamp::epsilon();
+	} else if (Timestamp next_expiry = timer_set().timer_expiry_steady())
+	    t = next_expiry;
+	else
+	    break;
+	if (t >= _ns_scheduled && _ns_scheduled.sec() >= 0)
+	    break;
+	if (Timestamp::schedule_granularity == Timestamp::usec_per_sec) {
+	    t = t.usec_ceil();
+	    struct timeval tv = t.timeval();
+	    simclick_sim_command(_master->simnode(), SIMCLICK_SCHEDULE, &tv);
+	} else {
+	    t = t.nsec_ceil();
+	    struct timespec ts = t.timespec();
+	    simclick_sim_command(_master->simnode(), SIMCLICK_SCHEDULE, &ts);
+	}
+	_ns_scheduled = t;
+    } while (0);
 #endif
 }
+
 
 void
 RouterThread::kill_router(Router *r)
@@ -738,9 +750,9 @@ RouterThread::kill_router(Router *r)
 		tp++;
 	}
 #else
-    TaskLink *prev = this;
+    TaskLink *prev = &_task_link;
     TaskLink *t;
-    for (t = prev->_next; t != this; t = t->_next)
+    for (t = prev->_next; t != &_task_link; t = t->_next)
 	if (static_cast<Task *>(t)->router() == r)
 	    t->_prev = 0;
 	else {

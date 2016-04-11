@@ -2,7 +2,7 @@
 #define CLICK_PACKETLOGGER2_HH
 #include <click/element.hh>
 #include <click/glue.hh>
-#include <click/dequeue.hh>
+#include <click/deque.hh>
 
 CLICK_DECLS
 
@@ -45,12 +45,12 @@ class PacketLogger2 : public Element { public:
   const char *processing() const		{ return AGNOSTIC; }
   const char *flow_code() const			{ return "#/#"; }
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }
 
   Packet *simple_action(Packet *);
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
   static String print_log(Element *, void *);
   static int clear(const String &foo, Element *e, void *vparam, ErrorHandler *errh);
   static String left(Element *, void *);
@@ -68,7 +68,7 @@ class PacketLogger2 : public Element { public:
 
   unsigned int _nb;
 
-  DEQueue<log_entry> _p;
+  Deque<log_entry> _p;
 
 };
 

@@ -79,7 +79,7 @@ CLICK_DECLS
      // This function is called when the timer fires.
      assert(timer == &_timer);
      Timestamp now = Timestamp::now_steady();
-     click_chatter("%s: %{timestamp}: timer fired with expiry %{timestamp}!\n",
+     click_chatter("%s: %p{timestamp}: timer fired with expiry %p{timestamp}!\n",
                    declaration().c_str(), &now, &_timer.expiry_steady());
 		   // _timer.expiry_steady() is the steady-clock Timestamp
 		   // at which the timer was set to fire.
@@ -113,7 +113,7 @@ CLICK_DECLS
  @code
  void PeriodicPrinter::run_timer(Timer *timer) {
      Timestamp now = Timestamp::now_steady();
-     click_chatter("%s: %{timestamp}: timer fired with expiry %{timestamp}!\n",
+     click_chatter("%s: %p{timestamp}: timer fired with expiry %p{timestamp}!\n",
                    name().c_str(), &now, &_timer.expiry_steady());
      _timer.schedule_after_sec(5);  // Fire again 5 seconds later.
          // This is the same as:
@@ -240,7 +240,7 @@ Timer::initialize(Element *owner, bool quiet)
     assert(!initialized() || _owner->router() == owner->router());
     _owner = owner;
     if (unlikely(_hook.callback == do_nothing_hook && !_thunk) && !quiet)
-	click_chatter("initializing Timer %{element} [%p], which does nothing", _owner, this);
+	click_chatter("initializing Timer %p{element} [%p], which does nothing", _owner, this);
 
     int tid = owner->router()->home_thread_id(owner);
     _thread = owner->master()->thread(tid);
@@ -277,7 +277,7 @@ Timer::schedule_at_steady(const Timestamp &when)
 	_schedpos1 = ts._timer_heap.size() + 1;
 	ts._timer_heap.push_back(TimerSet::heap_element(this));
     } else
-	ts._timer_heap.at_u(_schedpos1 - 1).expiry_s = _expiry_s;
+	ts._timer_heap.unchecked_at(_schedpos1 - 1).expiry_s = _expiry_s;
     change_heap<4>(ts._timer_heap.begin(), ts._timer_heap.end(),
 		   ts._timer_heap.begin() + _schedpos1 - 1,
 		   TimerSet::heap_less(), TimerSet::heap_place());
@@ -295,7 +295,7 @@ Timer::schedule_at_steady(const Timestamp &when)
 void
 Timer::schedule_after(const Timestamp &delta)
 {
-    schedule_at_steady(Timestamp::recent_steady() + delta);
+    schedule_at_steady(Timestamp::now_steady() + delta);
 }
 
 void

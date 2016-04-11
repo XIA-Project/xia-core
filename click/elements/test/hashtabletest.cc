@@ -31,10 +31,6 @@ HashTableTest::HashTableTest()
 {
 }
 
-HashTableTest::~HashTableTest()
-{
-}
-
 #if 0
 # define MAP_S2I HashMap<String, int>
 # define MAP_VALUE(m, k) (m).find((k))
@@ -549,7 +545,7 @@ HashTableTest::initialize(ErrorHandler *errh)
 
     Timestamp ru_delta = Timestamp(ru1.ru_utime) - Timestamp(ru0.ru_utime);
     ts1 -= ts0;
-    errh->message("Time: %{timestamp}u %{timestamp} total %u/%u", &ru_delta, &ts1, map.size(), map.bucket_count());
+    errh->message("Time: %p{timestamp}u %p{timestamp} total %u/%u", &ru_delta, &ts1, map.size(), map.bucket_count());
 #endif
 
     {

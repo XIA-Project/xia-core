@@ -171,6 +171,7 @@ static void ip_inject(PacketOdesc& d, const FieldReader *f)
 	iph->ip_p = d.v;
 	break;
     case T_IP_OPT: {
+        d.have_ip_hl = true;
 	if (!d.vptr[0])
 	    return;
 	int olen = d.vptr[1] - d.vptr[0];
@@ -189,15 +190,8 @@ static void ip_inject(PacketOdesc& d, const FieldReader *f)
 	       IPOPT_EOL, ip_hl - olen);
 	break;
     }
-#if 0
-    case T_IP_CAPTURE_LEN: {
-	uint32_t allow_len = (iph ? network_length : d.p->length());
-	uint32_t len = (iph ? ntohs(iph->ip_len) : allow_len);
-	d.v = (len < allow_len ? len : allow_len);
-	break;
-    }
-#endif
     case T_IP_HL:
+        d.have_ip_hl = true;
 	d.v = (d.v + 3) & ~3;
 	if ((int) d.v > (int) (iph->ip_hl << 2)) {
 	    int more = d.v - (iph->ip_hl << 2);
@@ -211,6 +205,9 @@ static void ip_inject(PacketOdesc& d, const FieldReader *f)
 	break;
     case T_IP_LEN:
 	d.want_len = d.p->network_header_offset() + d.v;
+	break;
+    case T_IP_CAPTURE_LEN:
+        /* Best to simply ignore capture length on input. */
 	break;
     }
 }
@@ -347,7 +344,7 @@ static bool ip_ina(PacketOdesc& d, const String &s, const FieldReader *f)
 static void ip_outb(const PacketDesc& d, bool ok, const FieldWriter *f)
 {
     if (f->user_data == T_IP_OPT) {
-	if (!ok || !d.vptr)
+	if (!ok || !d.vptr[0])
 	    *d.sa << '\0';
 	else
 	    unparse_ip_opt_binary(*d.sa, d.vptr[0], d.vptr[1] - d.vptr[0], DO_IPOPT_ALL);
@@ -916,6 +913,8 @@ static const FieldReader ip_readers[] = {
     { "ip_hl", B_1, T_IP_HL, order_net - 1,
       num_ina, inb, ip_inject },
     { "ip_len", B_4, T_IP_LEN, order_net + 1,
+      num_ina, inb, ip_inject },
+    { "ip_capture_len", B_4, T_IP_CAPTURE_LEN, order_payload + 2,
       num_ina, inb, ip_inject },
     { "ip_opt", B_SPECIAL, T_IP_OPT, order_net,
       ip_opt_ina, ip_inb, ip_inject },

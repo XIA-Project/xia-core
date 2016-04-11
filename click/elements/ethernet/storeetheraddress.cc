@@ -1,8 +1,8 @@
 /*
- * storeipaddress.{cc,hh} -- element stores Ethernet address into packet
+ * storeetheraddress.{cc,hh} -- element stores Ethernet address into packet
  * Eddie Kohler
  *
- * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2008-2012 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,29 +21,33 @@
 #include <click/error.hh>
 CLICK_DECLS
 
-StoreEtherAddress::StoreEtherAddress()
-{
-}
-
-StoreEtherAddress::~StoreEtherAddress()
-{
-}
-
 int
 StoreEtherAddress::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String off;
+    bool address_specified, anno_specified;
+    int anno;
     if (Args(conf, this, errh)
-	.read_mp("ADDR", _address)
+	.read_p("ADDR", _address).read_status(address_specified)
 	.read_mp("OFFSET", WordArg(), off)
+	.read("ANNO", AnnoArg(6), anno).read_status(anno_specified)
 	.complete() < 0)
 	return -1;
+
+    if (!(address_specified ^ anno_specified))
+	return errh->error("must specify exactly one of ADDR/ANNO");
+
+    uint32_t offset = 0;
     if (off.lower() == "src")
-	_offset = 6;
+	offset = 6;
     else if (off.lower() == "dst")
-	_offset = 0;
-    else if (!IntArg().parse(off, _offset))
+	offset = 0;
+    else if (!IntArg().parse(off, offset) || offset + 6 < 6)
 	return errh->error("type mismatch: bad OFFSET");
+
+    _offset = offset;
+    _use_anno = anno_specified;
+    _anno = anno;
     return 0;
 }
 
@@ -52,7 +56,8 @@ StoreEtherAddress::simple_action(Packet *p)
 {
     if (_offset + 6 <= p->length()) {
 	if (WritablePacket *q = p->uniqueify()) {
-	    memcpy(q->data() + _offset, &_address, 6);
+	    const uint8_t *addr = _use_anno ? q->anno_u8() + _anno : _address.data();
+	    memcpy(q->data() + _offset, addr, 6);
 	    return q;
 	} else
 	    return 0;

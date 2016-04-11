@@ -2,7 +2,6 @@
 #define CLICK_WIFIDUPEFILTER_HH
 #include <click/element.hh>
 #include <click/string.hh>
-#include <click/dequeue.hh>
 #include <click/hashmap.hh>
 CLICK_DECLS
 
@@ -24,14 +23,14 @@ class WifiDupeFilter : public Element {
 
  public:
 
-  WifiDupeFilter();
-  ~WifiDupeFilter();
+  WifiDupeFilter() CLICK_COLD;
+  ~WifiDupeFilter() CLICK_COLD;
 
   const char *class_name() const		{ return "WifiDupeFilter"; }
   const char *port_count() const		{ return PORTS_1_1; }
   const char *processing() const		{ return AGNOSTIC; }
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   Packet *simple_action(Packet *);
 
@@ -39,7 +38,7 @@ class WifiDupeFilter : public Element {
   static String static_read_debug(Element *xf, void *);
   static int static_write_debug(const String &arg, Element *e,
 				void *, ErrorHandler *errh);
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
 
   class DstInfo {
   public:

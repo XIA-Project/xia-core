@@ -48,6 +48,11 @@ false.
 A write handler called once LIMIT packets are sent. END_CALL and
 STOP are mutually exclusive.
 
+=item TIMESTAMP
+
+Boolean. If false, do not set the timestamp annotation on generated
+packets. Defaults to true.
+
 =e
 
   RandomSource(64) -> Queue -> ...
@@ -79,13 +84,12 @@ InfiniteSource */
 
 class RandomSource : public InfiniteSource { public:
 
-  RandomSource();
-  ~RandomSource();
+  RandomSource() CLICK_COLD;
 
   const char *class_name() const		{ return "RandomSource"; }
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   bool run_task(Task *);
   Packet *pull(int);

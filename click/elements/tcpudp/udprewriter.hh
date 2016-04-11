@@ -152,10 +152,10 @@ packets to the rewritten destination address. Default is true.
 
 =back
 
-=h mappings read-only
+=h table read-only
 
-Returns a human-readable description of the UDPRewriter's current set of
-mappings.
+Returns a human-readable description of the UDPRewriter's current mapping
+table.
 
 =a TCPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter */
@@ -179,13 +179,13 @@ class UDPRewriter : public IPRewriterBase { public:
 
     };
 
-    UDPRewriter();
-    ~UDPRewriter();
+    UDPRewriter() CLICK_COLD;
+    ~UDPRewriter() CLICK_COLD;
 
     const char *class_name() const		{ return "UDPRewriter"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
 			      const IPFlowID &rewritten_flowid, int input);
@@ -196,7 +196,7 @@ class UDPRewriter : public IPRewriterBase { public:
 
     void push(int, Packet *);
 
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
   private:
 

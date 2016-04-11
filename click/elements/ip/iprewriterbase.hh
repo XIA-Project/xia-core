@@ -85,8 +85,8 @@ class IPRewriterBase : public Element { public:
 	rw_drop = -1, rw_addmap = -2
     };
 
-    IPRewriterBase();
-    ~IPRewriterBase();
+    IPRewriterBase() CLICK_COLD;
+    ~IPRewriterBase() CLICK_COLD;
 
     enum ConfigurePhase {
 	CONFIGURE_PHASE_PATTERNS = CONFIGURE_PHASE_INFO,
@@ -99,11 +99,14 @@ class IPRewriterBase : public Element { public:
     const char *processing() const	{ return PUSH; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_REWRITER; }
-    int configure(Vector<String> &conf, ErrorHandler *errh);
-    int initialize(ErrorHandler *errh);
+    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+    int initialize(ErrorHandler *errh) CLICK_COLD;
     void add_rewriter_handlers(bool writable_patterns);
-    void cleanup(CleanupStage);
+    void cleanup(CleanupStage) CLICK_COLD;
 
+    const IPRewriterHeap *flow_heap() const {
+	return _heap;
+    }
     IPRewriterBase *reply_element(int input) const {
 	return _input_specs[input].reply_element;
     }
@@ -161,9 +164,9 @@ class IPRewriterBase : public Element { public:
 	h_nmappings = -1, h_mapping_failures = -2, h_patterns = -3,
 	h_size = -4, h_capacity = -5, h_clear = -6
     };
-    static String read_handler(Element *e, void *user_data);
-    static int write_handler(const String &str, Element *e, void *user_data, ErrorHandler *errh);
-    static int pattern_write_handler(const String &str, Element *e, void *user_data, ErrorHandler *errh);
+    static String read_handler(Element *e, void *user_data) CLICK_COLD;
+    static int write_handler(const String &str, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
+    static int pattern_write_handler(const String &str, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
 
     friend int IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
 			IPFlowID &rewritten_flowid, Packet *p, int mapid);
@@ -184,7 +187,8 @@ class IPMapper { public:
     IPMapper()				{ }
     virtual ~IPMapper()			{ }
 
-    void notify_rewriter(IPRewriterBase*, ErrorHandler*);
+    virtual void notify_rewriter(IPRewriterBase *user, IPRewriterInput *input,
+				 ErrorHandler *errh);
     virtual int rewrite_flowid(IPRewriterInput *input,
 			       const IPFlowID &flowid,
 			       IPFlowID &rewritten_flowid,

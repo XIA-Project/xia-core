@@ -22,12 +22,11 @@ time. It does not route packets.
 
 class TokenBucketTest : public Element { public:
 
-    TokenBucketTest();
-    ~TokenBucketTest();
+    TokenBucketTest() CLICK_COLD;
 
     const char *class_name() const		{ return "TokenBucketTest"; }
 
-    int initialize(ErrorHandler *);
+    int initialize(ErrorHandler *) CLICK_COLD;
 
 };
 

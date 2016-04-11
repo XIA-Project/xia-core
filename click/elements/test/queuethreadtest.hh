@@ -26,13 +26,12 @@ runs regression tests for Queue threading
 class QueueThreadTest1 : public Element { public:
 
     QueueThreadTest1();
-    ~QueueThreadTest1();
 
     const char *class_name() const		{ return "QueueThreadTest1"; }
     const char *port_count() const		{ return PORTS_0_1; }
 
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
 
   private:
 
@@ -60,13 +59,12 @@ runs regression tests for Queue threading
 class QueueThreadTest2 : public Element { public:
 
     QueueThreadTest2();
-    ~QueueThreadTest2();
 
     const char *class_name() const		{ return "QueueThreadTest2"; }
     const char *port_count() const		{ return PORTS_1_0; }
     const char *processing() const		{ return PULL; }
 
-    int initialize(ErrorHandler *);
+    int initialize(ErrorHandler *) CLICK_COLD;
     bool run_task(Task *);
 
   private:

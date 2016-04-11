@@ -30,10 +30,6 @@ SortTest::SortTest()
 {
 }
 
-SortTest::~SortTest()
-{
-}
-
 static const char * const unsorted_classes[] = {
 "ToyTCP",
 "SetIPDSCP",
@@ -656,7 +652,7 @@ SortTest::configure(Vector<String> &conf, ErrorHandler *errh)
 	FromFile ff;
 	int r, complain = 0;
 	String s;
-	size_t sz;
+	size_t sz = 0;
 	ff.filename() = filename;
 	if (ff.initialize(errh) < 0)
 	    return -1;

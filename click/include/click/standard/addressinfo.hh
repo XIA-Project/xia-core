@@ -2,10 +2,6 @@
 #ifndef CLICK_ADDRESSINFO_HH
 #define CLICK_ADDRESSINFO_HH
 #include <click/element.hh>
-#include <click/hashmap.hh>
-#ifdef HAVE_IP6
-# include <click/ip6address.hh>
-#endif
 CLICK_DECLS
 
 /*
@@ -74,27 +70,32 @@ If C<NAME:ipnet> is a valid IPv4 network address, then C<NAME:bcast> is a
 valid IPv4 address equaling the broadcast address for that network.  This is
 obtained by setting all the host bits in the address prefix to 1.
 
-If C<NAME:ipnet> is a valid IPv4 network address, then C<NAME:gw> is a valid
-IPv4 address equaling the default gateway address for that network.  This is
-obtained by setting all the host bits in the address prefix to 0, except for
-the lowest order bit.
+C<NAME:gw> usually equals the default gateway address for network
+C<NAME>. If C<NAME> is a device, then C<NAME:gw> can sometimes be
+looked up explicitly; otherwise, C<NAME:gw> is calculated from
+C<NAME:ipnet> by setting the lowest-order bit in the network address.
 
 =head1 DEFAULT ADDRESSES
 
-If you do not define an address for a given name, AddressInfo will use the
+If you do not define an address for a given NAME, AddressInfo will use the
 default, if any.  Defaults are as follows:
 
 =over 2
 
 =item *
 
-If DEVNAME is the name of an Ethernet device, then C<DEVNAME:eth> defaults to
-DEVNAME's Ethernet address.  (At userlevel, this works only on BSD and Linux.)
+For Ethernet addresses, Click checks for an Ethernet device named NAME, and
+uses its address. (At userlevel, this works only on BSD and Linux.)
 
 =item *
 
-C<DEVNAME:ip> defaults to the first primary IPv4 address associated with the
-device DEVNAME.
+For IPv4 addresses, Click checks for a network device named NAME, and uses
+its primary IPv4 address.
+
+=item *
+
+For C<NAME:gw>, Click checks for a network device named NAME, and uses its
+default gateway.
 
 =back
 
@@ -107,24 +108,26 @@ PortInfo */
 class AddressInfo : public Element { public:
 
     AddressInfo();
-    ~AddressInfo();
 
     const char *class_name() const	{ return "AddressInfo"; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FIRST; }
     int configure(Vector<String> &conf, ErrorHandler *errh);
 
-    static bool query_ip(String s, unsigned char *store, const Element *context);
-    static bool query_ip_prefix(String s, unsigned char *store_addr, unsigned char *store_mask, const Element *context);
+    enum {
+        f_nodevice = 1
+    };
+    static bool query_ip(const String &s, unsigned char *store, const Element *context, int flags = 0);
+    static bool query_ip_prefix(String s, unsigned char *store_addr, unsigned char *store_mask, const Element *context, int flags = 0);
 #if HAVE_IP6
-    static bool query_ip6(String s, unsigned char *store, const Element *context);
-    static bool query_ip6_prefix(String s, unsigned char *store_addr, int *store_prefixlen, const Element *context);
+    static bool query_ip6(String s, unsigned char *store, const Element *context, int flags = 0);
+    static bool query_ip6_prefix(String s, unsigned char *store_addr, int *store_prefixlen, const Element *context, int flags = 0);
 #endif
-    static bool query_ethernet(String s, unsigned char *store, const Element *context);
+    static bool query_ethernet(String s, unsigned char *store, const Element *context, int flags = 0);
 
- private:
+  private:
 
-  static bool query_netdevice(const String &name, unsigned char *store, int type, int len, const Element *context);
+    static bool query_netdevice(const String &name, unsigned char *store, int type, int len, const Element *context, int flags);
 
 };
 

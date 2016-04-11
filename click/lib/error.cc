@@ -29,7 +29,7 @@
 #include <click/timestamp.hh>
 #include <click/confparse.hh>
 #include <click/algorithm.hh>
-#if CLICK_USERLEVEL || CLICK_TOOL
+#if CLICK_USERLEVEL || CLICK_TOOL || CLICK_MINIOS
 # include <unistd.h>
 #endif
 CLICK_DECLS
@@ -458,6 +458,7 @@ ErrorHandler::vxformat(int default_flags, const char *s, va_list val)
 	    s++;
 	    goto width_flags;
 	case 'z':
+	case 't':
 	    if (width_flag)
 		break;
 	    width_flag = *s++;
@@ -616,6 +617,9 @@ ErrorHandler::vxformat(int default_flags, const char *s, va_list val)
 #if SIZEOF_SIZE_T == 4
 	    case 'z':
 #endif
+#if SIZEOF_PTRDIFF_T == 4
+	    case 't':
+#endif
 		num = va_arg(val, unsigned);
 		if ((flags & cf_signed) && (int) num < 0)
 		    num = -(int) num, flags |= cf_negative;
@@ -630,12 +634,15 @@ ErrorHandler::vxformat(int default_flags, const char *s, va_list val)
 # if SIZEOF_SIZE_T == 8
 	    case 'z':
 # endif
+# if SIZEOF_PTRDIFF_T == 8
+	    case 't':
+# endif
 	    case -64: {
 		uint64_t qnum = va_arg(val, uint64_t);
 		if ((flags & cf_signed) && (int64_t)qnum < 0)
 		    qnum = -(int64_t) qnum, flags |= cf_negative;
 		StringAccum sa;
-		sa.append_numeric(static_cast<String::uint_large_t>(qnum), base, (flags & cf_uppercase));
+		sa.append_numeric(static_cast<String::uintmax_t>(qnum), base, (flags & cf_uppercase));
 		s1 = s2 - sa.length();
 		memcpy(const_cast<char*>(s1), sa.data(), s2 - s1);
 		goto got_number;
@@ -665,6 +672,13 @@ ErrorHandler::vxformat(int default_flags, const char *s, va_list val)
 	    goto number;
 
 	case 'p': {
+	    if (*s == '{') {
+		s1 = s2 = s + 1;
+		while (*s2 && *s2 != '}' && !isspace((unsigned char) *s2))
+		    ++s2;
+		if (*s2 == '}')
+		    goto braces;
+	    }
 	    void *v = va_arg(val, void *);
 	    s2 = numbuf + NUMBUF_SIZE;
 	    s1 = do_number((unsigned long)v, (char *)s2, 16, flags);
@@ -695,21 +709,24 @@ ErrorHandler::vxformat(int default_flags, const char *s, va_list val)
 	}
 #endif
 
-	case '{': {
-	    const char *rbrace = strchr(s, '}');
-	    if (!rbrace || rbrace == s)
-		assert(0 /* Bad %{ in error */);
-	    String name(s, rbrace - s);
-	    s = rbrace + 1;
+	case '{':
+	    s1 = s2 = s;
+	    while (*s2 && *s2 != '}' && !isspace((unsigned char) *s2))
+		++s2;
+	    if (*s2 != '}')
+		goto error;
+	    goto braces;
+
+	braces:
+	    s = s2 + 1;
 	    for (Conversion *item = error_items; item; item = item->next)
-		if (item->name == name) {
+		if (item->name.equals(s1, s2 - s1)) {
 		    strstore = item->hook(flags, VA_LIST_REF(val));
 		    s1 = strstore.begin();
 		    s2 = strstore.end();
 		    goto got_result;
 		}
 	    goto error;
-	}
 
 	error:
 	default:
@@ -912,7 +929,7 @@ ErrorHandler::emit(const String &, void *user_data, bool)
 }
 
 
-#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL) || defined(CLICK_MINIOS)
 //
 // FILE ERROR HANDLER
 //
@@ -1205,7 +1222,7 @@ LandmarkErrorHandler::decorate(const String &str)
 // BAIL ERROR HANDLER
 //
 
-#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL) || defined(CLICK_MINIOS)
 
 BailErrorHandler::BailErrorHandler(ErrorHandler *errh, int l)
     : ErrorVeneer(errh), _level(l)

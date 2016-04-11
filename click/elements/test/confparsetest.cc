@@ -49,10 +49,6 @@ ConfParseTest::ConfParseTest()
 {
 }
 
-ConfParseTest::~ConfParseTest()
-{
-}
-
 #define CHECK(x) do {				\
 	if (!(x))				\
 	    return errh->error("%s:%d: test %<%s%> failed", __FILE__, __LINE__, #x); \
@@ -136,6 +132,7 @@ ConfParseTest::initialize(ErrorHandler *errh)
     CHECK(IntArg().parse("-0", i32) == true && i32 == 0);
     CHECK(IntArg().parse("-5", i32) == true && i32 == -5);
     CHECK(u32 == 97);
+    CHECK_ERR(IntArg().parse("aoeu", u32, args) == false && u32 == 97, "invalid number");
     CHECK(IntArg().parse("0", u32) == true && u32 == 0);
     CHECK(IntArg().parse("-0", u32) == false);
     CHECK(IntArg().parse("4294967294", u32) == true && u32 == 4294967294U);
@@ -174,6 +171,11 @@ ConfParseTest::initialize(ErrorHandler *errh)
     CHECK_ERR(BoundedIntArg(0, 10).parse("10", i32, args) == true && i32 == 10, "");
     CHECK_ERR(BoundedIntArg(0, 9).parse("10", i32, args) == false && i32 == 10, "out of range, bound 9");
     CHECK_ERR(BoundedIntArg(-1, 9).parse("-10", i32, args) == false && i32 == 10, "out of range, bound -1");
+    CHECK_ERR(BoundedIntArg(-1000, -90).parse("0xFFFFFF00", u32, args) == false && i32 == 10, "out of range, bound -90");
+    CHECK_ERR(BoundedIntArg(0U, 100U).parse("-1", i32, args) == false && i32 == 10, "out of range, bound 0");
+    CHECK_ERR(BoundedIntArg(0U, 100U).parse("-1", i32, args) == false && i32 == 10, "out of range, bound 0");
+    CHECK_ERR(BoundedIntArg(0U, ~0U).parse("-1", i32, args) == false && i32 == 10, "out of range, bound 0");
+    CHECK_ERR(BoundedIntArg(-1, 9).parse("aoeu", i32, args) == false && i32 == 10, "invalid number");
 
     bool b; (void) b;
     CHECK(FixedPointArg(1).parse("0.5", i32) == true && i32 == 1);
@@ -267,6 +269,17 @@ ConfParseTest::initialize(ErrorHandler *errh)
 		  && a.data32()[0] == 0x00000000 && a.data32()[1] == 0x00000000
 		  && a.data32()[2] == 0x00000000
 		  && a.data32()[3] == a4.addr());
+	if (IPAddressArg().parse("ip4_addr", a4, this) == true)
+	    CHECK(cp_ip6_address("0::ffff:ip4_addr", &a, this) == true
+		  && a.data32()[0] == 0x00000000 && a.data32()[1] == 0x00000000
+		  && a.data32()[2] == htonl(0x0000FFFFU)
+		  && a.data32()[3] == a4.addr());
+	IPAddress b4("18.26.4.9");
+	CHECK(IP6Address(b4).is_ip4_mapped());
+	CHECK(IP6Address(b4).ip4_address() == b4);
+	a = IP6Address("::ffff:18.26.4.9");
+	CHECK(a.is_ip4_mapped());
+	CHECK(a.ip4_address() == b4);
 	CHECK(cp_ip6_address("ffff:ffff:ffff:ffff:ffff:ffff::", &a, this) == true
 	      && a.data32()[0] == 0xFFFFFFFF
 	      && a.data32()[1] == 0xFFFFFFFF
@@ -349,6 +362,15 @@ ConfParseTest::initialize(ErrorHandler *errh)
     CHECK((-t).msecval() == -999);
     CHECK((-t).usecval() == -999000);
     CHECK((-t).nsecval() == -999000000);
+    t = Timestamp(0, 0) - Timestamp::make_msec(10000001);
+    CHECK(t.sec() == -10001 && t.usec() == 999000);
+    CHECK(t.subsec() == 999 * Timestamp::subsec_per_msec);
+
+    CHECK(Timestamp(Timestamp::make_nsec(0, 999).timeval()) == Timestamp::make_usec(0, 0));
+#if TIMESTAMP_NANOSEC
+    CHECK(Timestamp(Timestamp::make_nsec(0, 1).timeval_ceil()) == Timestamp::make_usec(0, 1));
+    CHECK(Timestamp(Timestamp::make_nsec(0, 0).timeval_ceil()) == Timestamp::make_usec(0, 0));
+#endif
 
     // some string tests for good measure
     CHECK(String("abcdef").substring(-3) == "def");
@@ -370,6 +392,22 @@ ConfParseTest::initialize(ErrorHandler *errh)
     x += x;
     CHECK(x == "abcdefghijklmnbcdefghijklmabcdefghijklmnbcdefghijklm");
 
+    {
+	String z;
+	z += x;
+	CHECK(z == "abcdefghijklmnbcdefghijklmabcdefghijklmnbcdefghijklm");
+	CHECK(z.data() == x.data());
+	z = String();
+	z += x.substring(0, 5);
+	CHECK(z.data() == x.data());
+	z += x.substring(0, 5);
+	CHECK(z == "abcdeabcde");
+	CHECK(z.data() != x.data());
+	z = String::make_out_of_memory();
+	z += x;
+	CHECK(z.out_of_memory());
+    }
+
     StringAccum xx(24);
     xx << "abcdefghijklmn";
     CHECK(xx.capacity() - xx.length() < 12);
@@ -378,9 +416,11 @@ ConfParseTest::initialize(ErrorHandler *errh)
     xx << xx;
     CHECK(strcmp(xx.c_str(), "abcdefghijklmnbcdefghijklmabcdefghijklmnbcdefghijklm") == 0);
     xx << String::make_out_of_memory();
-    CHECK(xx.out_of_memory());
+    CHECK(!xx.out_of_memory());
+    xx.assign_out_of_memory();
     xx.append("X", 1);
     CHECK(xx.out_of_memory());
+    CHECK(xx.take_string() == String::make_out_of_memory());
 
     // String hash codes
     {
@@ -399,6 +439,28 @@ ConfParseTest::initialize(ErrorHandler *errh)
 	CHECK(((uintptr_t) s1.data() & 3) != ((uintptr_t) s4.data() & 3));
 	CHECK(((uintptr_t) s2.data() & 3) != ((uintptr_t) s4.data() & 3));
 	CHECK(((uintptr_t) s3.data() & 3) != ((uintptr_t) s4.data() & 3));
+    }
+
+    // String confparse
+    {
+	String s1 = String::make_stable("click-align");
+	CHECK(s1.find_left('c') == 0);
+	CHECK(s1.find_left('c', 1) == 3);
+	CHECK(s1.find_left('c', 3) == 3);
+	CHECK(s1.find_left('c', 4) == -1);
+	CHECK(s1.find_left("c") == 0);
+	CHECK(s1.find_left("c", 1) == 3);
+	CHECK(s1.find_left("c", 3) == 3);
+	CHECK(s1.find_left("c", 5) == -1);
+	CHECK(s1.find_left("li") == 1);
+	CHECK(s1.find_left("li", 2) == 7);
+	CHECK(s1.find_left("li", 8) == -1);
+	CHECK(s1.find_left("", 0) == 0);
+	CHECK(s1.find_left("", 10) == 10);
+	CHECK(s1.find_left("", 11) == 11);
+	CHECK(s1.find_left("", 12) == -1);
+	CHECK(s1.find_left("a") == 6);
+	CHECK(s1.substring(0, -1).find_left('n') == -1);
     }
 
 #if CLICK_USERLEVEL
@@ -468,6 +530,41 @@ ConfParseTest::initialize(ErrorHandler *errh)
 	  .complete() >= 0
 	  && b == false && b2 == true && i32 == 3
 	  && results.size() == 0);
+
+    {
+	CHECK(String(true) + " " + String(false) == "true false");
+	StringAccum sa;
+	sa << true << ' ' << false;
+	CHECK(sa.take_string() == "true false");
+    }
+
+    results.clear();
+    CHECK(Args(this, errh).push_back_args("A 1, B 2, A 3, A 4, A 5")
+	  .read_all("A", AnyArg(), results).read_status(b)
+	  .consume() >= 0);
+    CHECK(b == true);
+    CHECK(results.size() == 4);
+    CHECK(results[0] == "1" && results[1] == "3" && results[2] == "4" && results[3] == "5");
+
+    int32_t i32b;
+    i32 = i32b = 99;
+    CHECK(Args(this, errh).push_back_args("A 1")
+          .read_or_set("A", i32, 9).read_status(b)
+          .read_or_set("B", i32b, 3).read_status(b2)
+          .consume() >= 0);
+    CHECK(b == true);
+    CHECK(b2 == false);
+    CHECK(i32 == 1);
+    CHECK(i32b == 3);
+
+    CHECK(Args(this, errh).push_back("1").push_back("2")
+	  .read_mp("A", i32).read_status(b)
+	  .read_mp("B", i32b).read_status(b2)
+	  .complete() >= 0);
+    CHECK(b == true);
+    CHECK(b2 == true);
+    CHECK(i32 == 1);
+    CHECK(i32b == 2);
 
     errh->message("All tests pass!");
     return 0;

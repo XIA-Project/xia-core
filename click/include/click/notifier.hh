@@ -3,163 +3,60 @@
 #define CLICK_NOTIFIER_HH
 #include <click/task.hh>
 #include <click/atomic.hh>
+#include <click/algorithm.hh>
 #if HAVE_CXX_PRAGMA_INTERFACE
 # pragma interface "click/notifier.hh"
 #endif
 CLICK_DECLS
 
-class NotifierSignal { public:
-
-    /** @brief Construct a busy signal.
-     *
-     * The returned signal is always active. */
-    inline NotifierSignal();
-
-    /** @brief Construct an activity signal.
-     *
-     * Elements should not use this constructor directly.
-     * @sa Router::new_notifier_signal */
-    inline NotifierSignal(atomic_uint32_t* value, uint32_t mask);
-
-    /** @brief Copy construct a signal. */
-    inline NotifierSignal(const NotifierSignal &x);
-
-    /** @brief Destroy a signal. */
-    inline ~NotifierSignal();
-
-    /** @brief Return an idle signal.
-     *
-     * The returned signal is never active. */
-    static inline NotifierSignal idle_signal();
-
-    /** @brief Return a busy signal.
-     *
-     * The returned signal is always active. */
-    static inline NotifierSignal busy_signal();
-
-    /** @brief Return an overderived busy signal.
-     *
-     * Overderived signals replace derived signals that are too complex to
-     * represent.  An overderived signal, like a busy signal, is always
-     * active. */
-    static inline NotifierSignal overderived_signal();
-
-    /** @brief Return an uninitialized signal.
-     *
-     * Uninitialized signals may be used occasionally as placeholders for true
-     * signals to be added later.  Uninitialized signals are never active. */
-    static inline NotifierSignal uninitialized_signal();
-
+class NotifierSignal {
+  public:
     typedef bool (NotifierSignal::*unspecified_bool_type)() const;
 
-    /** @brief Return whether the signal is active.
-     * @return true iff the signal is currently active. */
+    inline NotifierSignal();
+    inline NotifierSignal(atomic_uint32_t* value, uint32_t mask);
+    inline NotifierSignal(const NotifierSignal& x);
+    inline ~NotifierSignal();
+
+    static inline NotifierSignal idle_signal();
+    static inline NotifierSignal busy_signal();
+    static inline NotifierSignal overderived_signal();
+    static inline NotifierSignal uninitialized_signal();
+
+    inline bool active() const;
     inline operator unspecified_bool_type() const;
 
-    /** @brief Return whether the signal is active.
-     * @return true iff the signal is currently active. */
-    inline bool active() const;
-
-    /** @brief Return whether the signal is idle.
-     * @return true iff the signal is idle, i.e. it will never be active. */
-    inline bool idle() const;
-
-    /** @brief Return whether the signal is busy.
-     * @return true iff the signal is busy, i.e. it will always be active.
-     *
-     * @note An overderived_signal() is busy(), but a busy_signal() is not
-     * overderived(). */
-    inline bool busy() const;
-
-    /** @brief Return whether the signal is overderived.
-     * @return true iff the signal equals overderived_signal().
-     *
-     * @note An overderived_signal() is busy(), but a busy_signal() is not
-     * overderived(). */
-    inline bool overderived() const;
-
-    /** @brief Return whether the signal is initialized.
-     * @return true iff the signal doesn't equal uninitialized_signal(). */
-    inline bool initialized() const;
-
-    /** @brief Set whether the basic signal is active.
-     * @param active true iff the basic signal is active
-     * @return previous active state
-     *
-     * Use this function to set whether a basic signal is active.
-     *
-     * It is illegal to call set_active() on derived, idle, busy, or
-     * overderived signals.  Some of these actions may cause an assertion
-     * failure. */
     inline bool set_active(bool active);
 
-    /** @brief Assign a signal. */
-    NotifierSignal &operator=(const NotifierSignal &x);
+    inline bool idle() const;
+    inline bool busy() const;
+    inline bool overderived() const;
+    inline bool initialized() const;
 
-    /** @brief Make this signal derived by adding information from @a x.
-     * @param x the signal to add
-     *
-     * Creates a derived signal that combines information from this signal and
-     * @a x.  Equivalent to "*this = (*this + @a x)".
-     *
-     * @sa operator+(NotifierSignal, const NotifierSignal&) */
-    NotifierSignal &operator+=(const NotifierSignal& x);
+    friend bool operator==(const NotifierSignal &a, const NotifierSignal &b);
+    friend bool operator!=(const NotifierSignal &a, const NotifierSignal &b);
 
-    /** @brief Return a human-readable representation of the signal.
-     * @param router the relevant router or null
-     *
-     * Useful for signal debugging. */
+    NotifierSignal& operator=(const NotifierSignal& x);
+    NotifierSignal& operator+=(const NotifierSignal& x);
+    friend NotifierSignal operator+(NotifierSignal a, const NotifierSignal &b);
+
+    inline void swap(NotifierSignal& x);
+
     String unparse(Router *router) const;
 
     static void static_initialize();
 
-    /** @relates NotifierSignal
-     * @brief Compare two NotifierSignals for equality.
-     *
-     * Returns true iff the two NotifierSignals are the same -- i.e., they
-     * combine information about exactly the same sets of basic signals.
-     *
-     * All idle() signals compare equal.  busy_signal() and
-     * overderived_signal() do not compare equal, however. */
-    friend bool operator==(const NotifierSignal &a, const NotifierSignal &b);
-
-    /** @relates NotifierSignal
-     * @brief Compare two NotifierSignals for inequality.
-     *
-     * Returns true iff !(@a a == @a b). */
-    friend bool operator!=(const NotifierSignal &a, const NotifierSignal &b);
-
-    /** @relates NotifierSignal
-     * @brief Return a derived signal.
-     *
-     * Returns a derived signal that combines information from its arguments.
-     * The result will be active whenever @a a and/or @a b is active.  If the
-     * combination of @a a and @a b is too complex to represent, returns an
-     * overderived signal; this trivially follows the invariant since it is
-     * always active.
-     *
-     * Signal derivation is commutative and associative.  The following
-     * special combinations are worth remembering:
-     *
-     *  - An idle() signal plus any other signal @a a equals @a a.  Thus,
-     *    idle_signal() is the identity for signal derivation.
-     *  - A busy() signal plus any other signal is busy().  Thus,
-     *    busy_signal() is the "zero element" for signal derivation.
-     *
-     * @sa NotifierSignal::operator+= */
-    friend NotifierSignal operator+(NotifierSignal a, const NotifierSignal &b);
-
   private:
-
     struct vmpair {
 	atomic_uint32_t *value;
 	uint32_t mask;
     };
-
-    union {
+    union vmvalue {
 	atomic_uint32_t *v1;
 	vmpair *vm;
-    } _v;
+    };
+
+    vmvalue _v;
     uint32_t _mask;
 
     enum {
@@ -171,12 +68,12 @@ class NotifierSignal { public:
     void hard_assign_vm(const NotifierSignal &x);
     void hard_derive_one(atomic_uint32_t *value, uint32_t mask);
     static bool hard_equals(const vmpair *a, const vmpair *b);
-
 };
 
 class Notifier { public:
 
     enum SearchOp { SEARCH_STOP = 0, SEARCH_CONTINUE, SEARCH_CONTINUE_WAKE };
+    typedef void (*callback_type)(void *, Notifier *);
 
     inline Notifier(SearchOp op = SEARCH_STOP);
     inline Notifier(const NotifierSignal &signal, SearchOp op = SEARCH_STOP);
@@ -198,20 +95,37 @@ class Notifier { public:
     inline void wake();
     inline void sleep();
 
-    virtual int add_listener(Task *task);
-    virtual void remove_listener(Task *task);
-    virtual int add_dependent_signal(NotifierSignal *signal);
+    virtual int add_activate_callback(callback_type f, void *user_data);
+    virtual void remove_activate_callback(callback_type f, void *user_data);
+    inline int add_listener(Task *task);
+    inline void remove_listener(Task *task);
+    inline int add_dependent_signal(NotifierSignal *signal);
+    inline void remove_dependent_signal(NotifierSignal *signal);
 
     static const char EMPTY_NOTIFIER[];
     static const char FULL_NOTIFIER[];
 
-    static NotifierSignal upstream_empty_signal(Element* e, int port, Task* task, Notifier* dependent_notifier = 0);
-    static NotifierSignal downstream_full_signal(Element* e, int port, Task* task, Notifier* dependent_notifier = 0);
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port);
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port, Task *task);
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port, Notifier *dependent_notifier);
+    static NotifierSignal upstream_empty_signal(Element *e, int port, callback_type f, void *user_data);
+
+    static inline NotifierSignal downstream_full_signal(Element *e, int port);
+    static inline NotifierSignal downstream_full_signal(Element *e, int port, Task *task);
+    static inline NotifierSignal downstream_full_signal(Element *e, int port, Notifier *dependent_notifier);
+    static NotifierSignal downstream_full_signal(Element *e, int port, callback_type f, void *user_data);
+
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port, int) CLICK_DEPRECATED;
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port, int, Notifier *) CLICK_DEPRECATED;
+    static inline NotifierSignal downstream_full_signal(Element *e, int port, int) CLICK_DEPRECATED;
+    static inline NotifierSignal downstream_full_signal(Element *e, int port, int, Notifier *) CLICK_DEPRECATED;
 
   private:
 
     NotifierSignal _signal;
     SearchOp _search_op;
+
+    static void dependent_signal_callback(void *, Notifier *);
 
 };
 
@@ -220,27 +134,32 @@ class ActiveNotifier : public Notifier { public:
     ActiveNotifier(SearchOp op = SEARCH_STOP);
     ~ActiveNotifier();
 
-    int add_listener(Task *task);	// complains on out of memory
-    void remove_listener(Task *task);
-    int add_dependent_signal(NotifierSignal *signal);
-    void listeners(Vector<Task*> &v) const;
+    int add_activate_callback(callback_type f, void *v);
+    void remove_activate_callback(callback_type f, void *v);
+    void listeners(Vector<Task*> &v) const CLICK_DEPRECATED;
 
     inline void set_active(bool active, bool schedule = true);
     inline void wake();
     inline void sleep();
 
+#if CLICK_DEBUG_SCHEDULING
+    String unparse(Router *router) const;
+#endif
+
   private:
 
     typedef union {
 	Task *t;
-	NotifierSignal *s;
+	callback_type f;
 	void *v;
+	uintptr_t p;
     } task_or_signal_t;
 
     Task* _listener1;
     task_or_signal_t* _listeners;
 
-    int listener_change(void *what, int where, bool rem);
+    int listener_add(callback_type f, void *v);
+    int listener_remove(callback_type f, void *v);
 
     ActiveNotifier(const ActiveNotifier&); // does not exist
     ActiveNotifier& operator=(const ActiveNotifier&); // does not exist
@@ -248,67 +167,74 @@ class ActiveNotifier : public Notifier { public:
 };
 
 
-inline
-NotifierSignal::NotifierSignal()
-    : _mask(true_mask)
-{
+/** @brief Construct a busy signal.
+ *
+ * The returned signal is always active. */
+inline NotifierSignal::NotifierSignal()
+    : _mask(true_mask) {
     _v.v1 = &static_value;
 }
 
-inline
-NotifierSignal::NotifierSignal(atomic_uint32_t* value, uint32_t mask)
-    : _mask(mask)
-{
+/** @brief Construct an activity signal.
+ *
+ * Elements should not use this constructor directly.
+ * @sa Router::new_notifier_signal */
+inline NotifierSignal::NotifierSignal(atomic_uint32_t* value, uint32_t mask)
+    : _mask(mask) {
     _v.v1 = value;
 }
 
-inline
-NotifierSignal::NotifierSignal(const NotifierSignal &x)
-    : _mask(x._mask)
-{
+/** @brief Copy construct a signal. */
+inline NotifierSignal::NotifierSignal(const NotifierSignal& x)
+    : _mask(x._mask) {
     if (likely(_mask))
 	_v.v1 = x._v.v1;
     else
 	hard_assign_vm(x);
 }
 
-inline
-NotifierSignal::~NotifierSignal()
-{
+/** @brief Destroy a signal. */
+inline NotifierSignal::~NotifierSignal() {
     if (unlikely(_mask == 0))
 	delete[] _v.vm;
 }
 
-inline NotifierSignal
-NotifierSignal::idle_signal()
-{
+/** @brief Return an idle signal.
+ *
+ * The returned signal is never active. */
+inline NotifierSignal NotifierSignal::idle_signal() {
     return NotifierSignal(&static_value, false_mask);
 }
 
-inline NotifierSignal
-NotifierSignal::busy_signal()
-{
+/** @brief Return a busy signal.
+ *
+ * The returned signal is always active. */
+inline NotifierSignal NotifierSignal::busy_signal() {
     return NotifierSignal(&static_value, true_mask);
 }
 
-inline NotifierSignal
-NotifierSignal::overderived_signal()
-{
+/** @brief Return an overderived busy signal.
+ *
+ * Overderived signals replace derived signals that are too complex to
+ * represent.  An overderived signal, like a busy signal, is always
+ * active. */
+inline NotifierSignal NotifierSignal::overderived_signal() {
     return NotifierSignal(&static_value, overderived_mask | true_mask);
 }
 
-inline NotifierSignal
-NotifierSignal::uninitialized_signal()
-{
+/** @brief Return an uninitialized signal.
+ *
+ * Uninitialized signals may be used occasionally as placeholders for true
+ * signals to be added later.  Uninitialized signals are never active. */
+inline NotifierSignal NotifierSignal::uninitialized_signal() {
     return NotifierSignal(&static_value, uninitialized_mask);
 }
 
-inline bool
-NotifierSignal::active() const
-{
-    // 2011.Jul.3 Is this fence actually necessary with the new reschedule()
-    // plan??  It doesn't seem to be on one simple test, anyway.
-    // click_fence();
+/** @brief Test if the signal is active. */
+inline bool NotifierSignal::active() const {
+    // 2012.May.16 This fence is necessary; consider, for example,
+    // InfiniteSource's checking of nonfull notifiers.
+    click_fence();
     if (likely(_mask))
 	return (*_v.v1 & _mask) != 0;
     else {
@@ -319,43 +245,55 @@ NotifierSignal::active() const
     }
 }
 
-inline
-NotifierSignal::operator unspecified_bool_type() const
-{
+/** @brief Test if the signal is active. */
+inline NotifierSignal::operator unspecified_bool_type() const {
     return active() ? &NotifierSignal::active : 0;
 }
 
-inline bool
-NotifierSignal::idle() const
-{
+/** @brief Test if the signal is idle.
+ * @return true iff the signal is idle, i.e. it will never be active. */
+inline bool NotifierSignal::idle() const {
     return (_mask == false_mask && _v.v1 == &static_value);
 }
 
-inline bool
-NotifierSignal::busy() const
-{
+/** @brief Test if the signal is busy.
+ * @return true iff the signal is busy, i.e. it will always be active.
+ *
+ * @note An overderived_signal() is busy(), but a busy_signal() is not
+ * overderived(). */
+inline bool NotifierSignal::busy() const {
     return ((_mask & true_mask) && _v.v1 == &static_value);
 }
 
-inline bool
-NotifierSignal::overderived() const
-{
+/** @brief Test if the signal is overderived.
+ * @return true iff the signal equals overderived_signal().
+ *
+ * @note An overderived_signal() is busy(), but a busy_signal() is not
+ * overderived(). */
+inline bool NotifierSignal::overderived() const {
     return ((_mask & overderived_mask) && _v.v1 == &static_value);
 }
 
-inline bool
-NotifierSignal::initialized() const
-{
+/** @brief Test if the signal is initialized.
+ * @return true iff the signal doesn't equal uninitialized_signal(). */
+inline bool NotifierSignal::initialized() const {
     return (!(_mask & uninitialized_mask) || _v.v1 != &static_value);
 }
 
-inline bool
-NotifierSignal::set_active(bool active)
-{
-    assert(_mask && _v.v1 != &static_value && !(_mask & (_mask - 1)));
+/** @brief Set whether the basic signal is active.
+ * @param active true iff the basic signal is active
+ * @return previous active state
+ *
+ * Use this function to set whether a basic signal is active.
+ *
+ * It is illegal to call set_active() on derived, idle, busy, or
+ * overderived signals.  Some of these actions may cause an assertion
+ * failure. */
+inline bool NotifierSignal::set_active(bool active) {
+    assert(_v.v1 != &static_value && !(_mask & (_mask - 1)));
     uint32_t expected = *_v.v1;
 #if !CLICK_USERLEVEL || HAVE_MULTITHREAD
-    while (1) {
+    while (_mask) {
 	uint32_t desired = (active ? expected | _mask : expected & ~_mask);
 	uint32_t actual = _v.v1->compare_swap(expected, desired);
 	if (expected == actual)
@@ -368,9 +306,8 @@ NotifierSignal::set_active(bool active)
     return expected & _mask;
 }
 
-inline NotifierSignal &
-NotifierSignal::operator=(const NotifierSignal &x)
-{
+/** @brief Assign a signal. */
+inline NotifierSignal& NotifierSignal::operator=(const NotifierSignal& x) {
     if (likely(this != &x)) {
 	if (unlikely(_mask == 0))
 	    delete[] _v.vm;
@@ -383,9 +320,21 @@ NotifierSignal::operator=(const NotifierSignal &x)
     return *this;
 }
 
-inline bool
-operator==(const NotifierSignal& a, const NotifierSignal& b)
-{
+/** @brief Exchange the values of this signal and @a x. */
+inline void NotifierSignal::swap(NotifierSignal& x) {
+    click_swap(_v, x._v);
+    click_swap(_mask, x._mask);
+}
+
+/** @relates NotifierSignal
+ * @brief Test if two NotifierSignals are equal.
+ *
+ * Returns true iff the two NotifierSignals are the same -- i.e., they
+ * combine information about exactly the same sets of basic signals.
+ *
+ * All idle() signals compare equal.  busy_signal() and
+ * overderived_signal() do not compare equal, however. */
+inline bool operator==(const NotifierSignal& a, const NotifierSignal& b) {
     if (a._mask == b._mask) {
 	if (likely(a._mask))
 	    return a._v.v1 == b._v.v1;
@@ -395,15 +344,33 @@ operator==(const NotifierSignal& a, const NotifierSignal& b)
 	return false;
 }
 
-inline bool
-operator!=(const NotifierSignal& a, const NotifierSignal& b)
-{
+/** @relates NotifierSignal
+ * @brief Test if two NotifierSignals are unequal.
+ *
+ * Returns true iff !(@a a == @a b). */
+inline bool operator!=(const NotifierSignal& a, const NotifierSignal& b) {
     return !(a == b);
 }
 
-inline NotifierSignal
-operator+(NotifierSignal a, const NotifierSignal& b)
-{
+/** @relates NotifierSignal
+ * @brief Return a derived signal.
+ *
+ * Returns a derived signal that combines information from its arguments.
+ * The result will be active whenever @a a and/or @a b is active.  If the
+ * combination of @a a and @a b is too complex to represent, returns an
+ * overderived signal; this trivially follows the invariant since it is
+ * always active.
+ *
+ * Signal derivation is commutative and associative.  The following
+ * special combinations are worth remembering:
+ *
+ *  - An uninitialized signal plus any other signal is uninitialized.
+ *  - An idle signal plus any signal @a a equals @a a.
+ *  - A busy signal plus any other initialized signal is busy.
+ *  - overderived_signal() plus busy_signal() equals busy_signal().
+ *
+ * @sa NotifierSignal::operator+= */
+inline NotifierSignal operator+(NotifierSignal a, const NotifierSignal& b) {
     return a += b;
 }
 
@@ -446,10 +413,8 @@ operator+(NotifierSignal a, const NotifierSignal& b)
  * nonempty.</dd>
  * </dl>
  */
-inline
-Notifier::Notifier(SearchOp op)
-    : _signal(NotifierSignal::uninitialized_signal()), _search_op(op)
-{
+inline Notifier::Notifier(SearchOp op)
+    : _signal(NotifierSignal::uninitialized_signal()), _search_op(op) {
 }
 
 /** @brief Constructs a Notifier associated with a given signal.
@@ -462,10 +427,8 @@ Notifier::Notifier(SearchOp op)
  * NotifierSignal.  The @a op argument is as in
  * Notifier::Notifier(SearchOp), above.
  */
-inline
-Notifier::Notifier(const NotifierSignal &signal, SearchOp op)
-    : _signal(signal), _search_op(op)
-{
+inline Notifier::Notifier(const NotifierSignal &signal, SearchOp op)
+    : _signal(signal), _search_op(op) {
 }
 
 /** @brief Return this Notifier's associated NotifierSignal.
@@ -474,9 +437,7 @@ Notifier::Notifier(const NotifierSignal &signal, SearchOp op)
  * returns it.  The signal is @link NotifierSignal::idle idle() @endlink
  * before initialize() is called.
  */
-inline const NotifierSignal &
-Notifier::signal() const
-{
+inline const NotifierSignal& Notifier::signal() const {
     return _signal;
 }
 
@@ -484,9 +445,7 @@ Notifier::signal() const
  *
  * @sa Notifier() for a detailed explanation of search operations.
  */
-inline Notifier::SearchOp
-Notifier::search_op() const
-{
+inline Notifier::SearchOp Notifier::search_op() const {
     return _search_op;
 }
 
@@ -494,41 +453,227 @@ Notifier::search_op() const
  *
  * Same as signal().active().
  */
-inline bool
-Notifier::active() const
-{
+inline bool Notifier::active() const {
     return _signal.active();
 }
 
-/** @brief Sets the associated signal's activity.
+/** @brief Set the associated signal's activity.
  * @param active true iff the signal should be active
  * @return previous active state
  */
-inline bool
-Notifier::set_active(bool active)
-{
+inline bool Notifier::set_active(bool active) {
     return _signal.set_active(active);
 }
 
-/** @brief Sets the associated signal to active.
+/** @brief Set the associated signal to active.
  * @sa set_active
  */
-inline void
-Notifier::wake()
-{
+inline void Notifier::wake() {
     set_active(true);
 }
 
-/** @brief Sets the associated signal to inactive.
+/** @brief Set the associated signal to inactive.
  * @sa set_active
  */
-inline void
-Notifier::sleep()
-{
+inline void Notifier::sleep() {
     set_active(false);
 }
 
-/** @brief Sets the associated signal's activity, possibly scheduling any
+/** @brief Register a listener with this Notifier.
+ * @param task Task to reschedule when this Notifier becomes active
+ *
+ * When this Notifier's associated signal is activated, the Notifier should
+ * schedule @a task. Not all types of Notifier provide this functionality. The
+ * default implementation does nothing.
+ *
+ * @sa remove_listener, add_activate_callback, add_dependent_signal
+ */
+inline int Notifier::add_listener(Task* task) {
+    return add_activate_callback(0, task);
+}
+
+/** @brief Unregister a listener with this Notifier.
+ * @param task listener Task
+ *
+ * Undoes the effect of all prior add_listener(@a task) calls. Does nothing if
+ * @a task was never added. The default implementation does nothing.
+ *
+ * @sa add_listener
+ */
+inline void Notifier::remove_listener(Task* task) {
+    remove_activate_callback(0, task);
+}
+
+/** @brief Register a dependent signal with this Notifier.
+ * @param signal dependent signal
+ *
+ * When this Notifier's associated signal is activated, the Notifier should
+ * also activate @a signal. Not all types of Notifier provide this
+ * functionality. The default implementation does nothing.
+ *
+ * @sa add_listener, add_activate_callback, remove_dependent_signal
+ */
+inline int Notifier::add_dependent_signal(NotifierSignal* signal) {
+    return add_activate_callback(dependent_signal_callback, signal);
+}
+
+/** @brief Unregister a dependent signal with this Notifier.
+ * @param signal dependent signal
+ *
+ * Undoes the effect of all prior add_dependent_signal(@a signal) calls. Does
+ * nothing if @a signal was never added. The default implementation does
+ * nothing.
+ *
+ * @sa add_dependent_signal
+ */
+inline void Notifier::remove_dependent_signal(NotifierSignal* signal) {
+    remove_activate_callback(dependent_signal_callback, signal);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all empty
+ * notifiers upstream of element @a e's input @a port.
+ * @param e an element
+ * @param port the input port of @a e at which to start the upstream search
+ *
+ * Searches the configuration upstream of element @a e's input @a port for @e
+ * empty @e notifiers.  These notifiers are associated with packet storage,
+ * and should be true when packets are available (or likely to be available
+ * quite soon), and false when they are not.  All notifiers found are combined
+ * into a single derived signal.  Thus, if any of the base notifiers are
+ * active, indicating that at least one packet is available upstream, the
+ * derived signal will also be active.  Element @a e's code generally uses the
+ * resulting signal to decide whether or not to reschedule itself.
+ *
+ * The returned signal is generally conservative, meaning that the signal
+ * is true whenever a packet exists upstream, but the elements that provide
+ * notification are responsible for ensuring this.
+ *
+ * Overloaded versions of this function can also register a task (as in
+ * add_listener()), a signal (as in add_dependent_notifier()), or a callback
+ * function (as in add_active_callback()) for each located notifier. When
+ * packets become available, the task will be scheduled, the signal will be
+ * activated, or the callback will be called.
+ *
+ * <h3>Supporting upstream_empty_signal()</h3>
+ *
+ * Elements that have an empty notifier must override the Element::cast()
+ * method.  When passed the @a name Notifier::EMPTY_NOTIFIER, this method
+ * should return a pointer to the corresponding Notifier object.
+ *
+ * @sa downstream_full_signal
+ */
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port) {
+    return upstream_empty_signal(e, port, (callback_type) 0, 0);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all empty
+ * notifiers upstream of element @a e's input @a port.
+ * @param e an element
+ * @param port the input port of @a e at which to start the upstream search
+ * @param task task to schedule when packets become available
+ * @sa add_listener */
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port,
+                                                      Task* task) {
+    return upstream_empty_signal(e, port, (callback_type) 0, task);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all empty
+ * notifiers upstream of element @a e's input @a port.
+ * @param e an element
+ * @param port the input port of @a e at which to start the upstream search
+ * @param notifier notifier to activate when packets become available
+ * @sa add_dependent_signal */
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port,
+                                                      Notifier* dependent_notifier) {
+    return upstream_empty_signal(e, port, dependent_signal_callback, &dependent_notifier->_signal);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all full
+ * notifiers downstream of element @a e's output @a port.
+ * @param e an element
+ * @param port the output port of @a e at which to start the downstream search
+ *
+ * Searches the configuration downstream of element @a e's output @a port for
+ * @e full @e notifiers.  These notifiers are associated with packet storage,
+ * and should be true when there is space for at least one packet, and false
+ * when there is not.  All notifiers found are combined into a single derived
+ * signal.  Thus, if any of the base notifiers are active, indicating that at
+ * least one path has available space, the derived signal will also be active.
+ * Element @a e's code generally uses the resulting signal to decide whether
+ * or not to reschedule itself.
+ *
+ * Overloaded versions of this function can also register a task (as in
+ * add_listener()), a signal (as in add_dependent_notifier()), or a callback
+ * function (as in add_active_callback()) for each located notifier. When
+ * space becomes available, the task will be scheduled, the signal will be
+ * activated, or the callback will be called.
+ *
+ * In current Click, the returned signal is conservative: if it's inactive,
+ * then there is no space for packets downstream.
+ *
+ * <h3>Supporting downstream_full_signal()</h3>
+ *
+ * Elements that have a full notifier must override the Element::cast()
+ * method.  When passed the @a name Notifier::FULL_NOTIFIER, this method
+ * should return a pointer to the corresponding Notifier object.
+ *
+ * @sa upstream_empty_signal
+ */
+inline NotifierSignal Notifier::downstream_full_signal(Element* e, int port) {
+    return downstream_full_signal(e, port, (callback_type) 0, 0);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all full
+ * notifiers downstream of element @a e's output @a port.
+ * @param e an element
+ * @param port the output port of @a e at which to start the downstream search
+ * @param task task to schedule when packets become available
+ * @sa add_listener */
+inline NotifierSignal Notifier::downstream_full_signal(Element* e, int port,
+                                                       Task* task) {
+    return downstream_full_signal(e, port, (callback_type) 0, task);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all full
+ * notifiers downstream of element @a e's output @a port.
+ * @param e an element
+ * @param port the output port of @a e at which to start the downstream search
+ * @param notifier notifier to activate when packets become available
+ * @sa add_dependent_signal */
+inline NotifierSignal Notifier::downstream_full_signal(Element* e, int port,
+                                                       Notifier* dependent_notifier) {
+    return downstream_full_signal(e, port, dependent_signal_callback, &dependent_notifier->_signal);
+}
+
+/** @cond never */
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port, int x) {
+    (void) x;
+    assert(x == 0);
+    return upstream_empty_signal(e, port);
+}
+
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port, int x,
+                                                      Notifier* notifier) {
+    (void) x;
+    assert(x == 0);
+    return upstream_empty_signal(e, port, notifier);
+}
+
+inline NotifierSignal Notifier::downstream_full_signal(Element* e, int port, int x) {
+    (void) x;
+    assert(x == 0);
+    return downstream_full_signal(e, port);
+}
+
+inline NotifierSignal Notifier::downstream_full_signal(Element* e, int port, int x,
+                                                       Notifier* notifier) {
+    (void) x;
+    assert(x == 0);
+    return downstream_full_signal(e, port, notifier);
+}
+/** @endcond never */
+
+/** @brief Set the associated signal's activity, possibly scheduling any
  * listener tasks.
  * @param active true iff the signal should be active
  * @param schedule if true, wake up listener tasks
@@ -538,9 +683,7 @@ Notifier::sleep()
  *
  * @sa wake, sleep, add_listener
  */
-inline void
-ActiveNotifier::set_active(bool active, bool schedule)
-{
+inline void ActiveNotifier::set_active(bool active, bool schedule) {
     bool was_active = Notifier::set_active(active);
     if (active && schedule && !was_active) {
 	// 2007.Sep.6: Perhaps there was a race condition here.  Make sure
@@ -551,15 +694,16 @@ ActiveNotifier::set_active(bool active, bool schedule)
 	if (_listener1)
 	    _listener1->reschedule();
 	else if (task_or_signal_t *tos = _listeners) {
-	    for (; tos->t; tos++)
+	    for (; tos->p > 1; tos++)
 		tos->t->reschedule();
-	    for (tos++; tos->s; tos++)
-		tos->s->set_active(true);
+	    if (tos->p == 1)
+		for (tos++; tos->p; tos += 2)
+		    tos->f(tos[1].v, this);
 	}
     }
 }
 
-/** @brief Sets the associated signal to active and schedules any listener
+/** @brief Set the associated signal to active and schedule any listener
  * tasks.
  *
  * If the signal was previously inactive, then any listener Tasks are
@@ -567,19 +711,19 @@ ActiveNotifier::set_active(bool active, bool schedule)
  *
  * @sa set_active, add_listener
  */
-inline void
-ActiveNotifier::wake()
-{
+inline void ActiveNotifier::wake() {
     set_active(true, true);
 }
 
-/** @brief Sets the associated signal to inactive.
+/** @brief Set the associated signal to inactive.
  * @sa set_active
  */
-inline void
-ActiveNotifier::sleep()
-{
+inline void ActiveNotifier::sleep() {
     set_active(false, true);
+}
+
+inline void click_swap(NotifierSignal& x, NotifierSignal& y) {
+    x.swap(y);
 }
 
 CLICK_ENDDECLS

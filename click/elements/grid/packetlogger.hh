@@ -2,7 +2,7 @@
 #define CLICK_PACKETLOGGER_HH
 #include <click/element.hh>
 #include <click/glue.hh>
-#include <click/dequeue.hh>
+#include <click/deque.hh>
 
 CLICK_DECLS
 
@@ -29,19 +29,19 @@ CLICK_DECLS
 
 class PacketLogger : public Element { public:
 
-  PacketLogger();
-  ~PacketLogger();
+  PacketLogger() CLICK_COLD;
+  ~PacketLogger() CLICK_COLD;
 
   const char *class_name() const		{ return "PacketLogger"; }
   const char *port_count() const		{ return PORTS_1_1; }
   const char *processing() const		{ return AGNOSTIC; }
 
-  int configure(Vector<String> &, ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }
 
   Packet *simple_action(Packet *);
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
   static String print_log(Element *, void *);
 
   enum { NBYTES = 8 };
@@ -57,7 +57,7 @@ class PacketLogger : public Element { public:
   uint16_t _et;
   unsigned int _nb;
 
-  DEQueue<log_entry> _p;
+  Deque<log_entry> _p;
 
 };
 

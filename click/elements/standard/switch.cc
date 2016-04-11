@@ -26,10 +26,6 @@ Switch::Switch()
 {
 }
 
-Switch::~Switch()
-{
-}
-
 int
 Switch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -72,7 +68,7 @@ void
 Switch::add_handlers()
 {
     add_read_handler("switch", read_param, 0);
-    add_write_handler("switch", write_param, 0, Handler::NONEXCLUSIVE);
+    add_write_handler("switch", write_param, 0, Handler::h_nonexclusive);
     add_read_handler("config", read_param, 0);
     set_handler_flags("config", 0, Handler::CALM);
 }

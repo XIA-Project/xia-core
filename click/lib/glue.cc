@@ -25,12 +25,14 @@
 #include <click/timestamp.hh>
 #include <click/error.hh>
 
-#ifdef CLICK_USERLEVEL
+#if CLICK_USERLEVEL || CLICK_MINIOS
 # include <stdarg.h>
 # include <unistd.h>
 # include <sys/types.h>
 # include <sys/stat.h>
-# include <fcntl.h>
+# if CLICK_USERLEVEL
+#  include <fcntl.h>
+# endif
 #elif CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
 #  include <click/cxxprotect.h>
@@ -146,12 +148,12 @@ click_chatter(const char *fmt, ...)
     static char buf[NR_CPUS][512];	// XXX
     click_processor_t cpu = click_get_processor();
     int i = vsnprintf(buf[cpu], 512, fmt, val);
-    printk("<1>%s\n", buf[cpu]);
+    printk(KERN_ALERT "%.*s\n", i, buf[cpu]);
     click_put_processor();
 # else
     static char buf[512];		// XXX
     int i = vsnprintf(buf, 512, fmt, val);
-    printk("<1>%s\n", buf);
+    printk(KERN_ALERT "%.*s\n", i, buf);
 # endif
 #elif CLICK_BSDMODULE
     vprintf(fmt, val);
@@ -177,15 +179,18 @@ size_t click_dmalloc_curmem = 0;
 size_t click_dmalloc_maxmem = 0;
 #endif
 
-#if CLICK_LINUXMODULE || CLICK_BSDMODULE
+#if CLICK_LINUXMODULE || CLICK_BSDMODULE || CLICK_MINIOS
 
 # if CLICK_LINUXMODULE
 struct task_struct *clickfs_task;
 #  define CLICK_ALLOC(size)	kmalloc((size), (current == clickfs_task ? GFP_KERNEL : GFP_ATOMIC))
 #  define CLICK_FREE(ptr)	kfree((ptr))
-# else
+# elif CLICK_BSDMODULE
 #  define CLICK_ALLOC(size)	malloc((size), M_TEMP, M_WAITOK)
 #  define CLICK_FREE(ptr)	free(ptr, M_TEMP)
+# else
+#  define CLICK_ALLOC(size)	malloc((size))
+#  define CLICK_FREE(ptr)	free((ptr))
 # endif
 
 # if CLICK_DMALLOC
@@ -363,7 +368,7 @@ click_dmalloc_cleanup()
 # endif
 }
 
-#endif /* CLICK_LINUXMODULE || CLICK_BSDMODULE */
+#endif /* CLICK_LINUXMODULE || CLICK_BSDMODULE || CLICK_MINIOS */
 
 
 // LALLOC
@@ -386,7 +391,6 @@ click_lalloc(size_t size)
 	click_dmalloc_curnew++;
 # if CLICK_DMALLOC
 	click_dmalloc_curmem += size;
-	click_dmalloc_totalmem += size;
 # endif
     } else
 	click_dmalloc_failnew++;
@@ -490,7 +494,7 @@ click_random(uint32_t low, uint32_t high)
     } else {
 	uint32_t count = ((uint32_t) CLICK_RAND_MAX + 1) / (high - low + 1);
 	uint32_t max = count * (high - low + 1);
-	while ((r = click_random()) > max)
+	while ((r = click_random()) >= max)
 	    /* try again */;
 	return (r / count) + low;
     }
@@ -703,10 +707,21 @@ click_jiffies()
 CLICK_ENDDECLS
 #endif
 
+#if CLICK_MINIOS
+CLICK_DECLS
+
+click_jiffies_t
+click_jiffies()
+{
+    return Timestamp::now().msecval();
+}
+
+CLICK_ENDDECLS
+#endif
 
 // OTHER
 
-#if CLICK_LINUXMODULE || CLICK_BSDMODULE
+#if CLICK_LINUXMODULE || CLICK_BSDMODULE || CLICK_MINIOS
 
 #if CLICK_BSDMODULE
 
@@ -775,7 +790,11 @@ __assert_fail(const char *__assertion,
 	 __file,
 	 __line,
 	 __function);
+#if CLICK_LINUXMODULE || CLICK_BSDMODULE
   panic("Click assertion failed");
+#elif CLICK_MINIOS
+  do_exit();
+#endif
 }
 
 /*

@@ -105,7 +105,7 @@ WifiDecap::simple_action(Packet *p)
     bssid = EtherAddress(w->i_addr3);
     break;
   default:
-    click_chatter("%{element}: invalid dir %d\n",
+    click_chatter("%p{element}: invalid dir %d\n",
 		  this,
 		  dir);
     if (_strict) {
@@ -123,7 +123,7 @@ WifiDecap::simple_action(Packet *p)
   }
 
   uint16_t ether_type;
-  if (!_strict || memcmp(WIFI_LLC_HEADER, p_out->data() + wifi_header_size,
+  if (!_strict || !memcmp(WIFI_LLC_HEADER, p_out->data() + wifi_header_size,
 			 WIFI_LLC_HEADER_LEN)) {
 	  memcpy(&ether_type, p_out->data() + wifi_header_size + sizeof(click_llc) - 2, 2);
   } else {
@@ -144,7 +144,7 @@ WifiDecap::simple_action(Packet *p)
 	  memcpy(p_out->data() + 12, &ether_type, 2);
 
 	  if (_debug) {
-		  click_chatter("%{element}: dir %d src %s dst %s bssid %s eth 0x%02x\n",
+		  click_chatter("%p{element}: dir %d src %s dst %s bssid %s eth 0x%02x\n",
 				this,
 				dir,
 				src.unparse().c_str(),

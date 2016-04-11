@@ -77,12 +77,11 @@ Boolean. Determines whether to print each packet's paint annotation. Default is 
 
 =item SWAP
 
-Boolean.  Determines whether to swap bytes before printing the values
-of ICMP sequence and ID numbers.  Default is false.  The RFC does not
-require these two-byte values to be sent in any particular byte order.
-For example, OpenBSD/i386 writes ping (ICMP echo) sequence numbers in
-network byte order, while Linux/i386 writes them in host byte order
-(often little-endian).
+Boolean. Determines whether to print ICMP sequence and ID numbers in
+network order. Default is true. The RFC does not require these
+two-byte values to be sent in any particular byte order. When Click
+was originally designed, Linux/i386 wrote ping sequence numbers in
+host byte order (often little endian), but it uses network order now.
 
 =item OUTFILE
 
@@ -99,16 +98,16 @@ Boolean.  If false, then don't print messages.  Default is true.
 
 class IPPrint : public Element { public:
 
-  IPPrint();
-  ~IPPrint();
+  IPPrint() CLICK_COLD;
+  ~IPPrint() CLICK_COLD;
 
   const char *class_name() const		{ return "IPPrint"; }
   const char *port_count() const		{ return PORTS_1_1; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
-  void cleanup(CleanupStage);
-  void add_handlers();
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *) CLICK_COLD;
+  void cleanup(CleanupStage) CLICK_COLD;
+  void add_handlers() CLICK_COLD;
 
   Packet *simple_action(Packet *);
 

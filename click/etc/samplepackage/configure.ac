@@ -12,11 +12,7 @@ dnl The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
 dnl notice is a summary of the Click LICENSE file; the license in that file is
 dnl legally binding.
 
-dnl
-dnl the usual 'configure.ac' boilerplate
-dnl
-
-AC_INIT(click-samplepackage, 1.7.0)
+AC_INIT(click-samplepackage, 2.0.1)
 AC_SUBST(ac_configure_args)
 
 CLICKPACKAGENAME=sample
@@ -49,12 +45,11 @@ Are you sure '$clickprefix' is a Click install directory?
 ==============================================])
 fi
 
+clickbuild_prefix="$clickprefix"
 . $clickdatadir/config.mk
 
-AC_SUBST(clickprefix)
-AC_SUBST(clickbindir)
-AC_SUBST(clicksbindir)
-AC_SUBST(clickdatadir)
+AC_SUBST(clickbuild_prefix)
+AC_SUBST(clickbuild_datadir)
 
 
 dnl
@@ -72,7 +67,7 @@ AC_ARG_ENABLE(linuxmodule, [  --enable-linuxmodule    enable Linux kernel driver
     [BUILD_LINUXMODULE=`onezero $enableval`],
     [BUILD_LINUXMODULE=$CLICK_HAVE_LINUXMODULE_DRIVER])
 AC_ARG_ENABLE(bsdmodule, [  --enable-bsdmodule      enable FreeBSD kernel driver
-                          [[Default drivers are those Click supports.]]], 
+                          [[Default drivers are those Click supports.]]],
     [BUILD_BSDMODULE=`onezero $enableval`],
     [BUILD_BSDMODULE=$CLICK_HAVE_BSDMODULE_DRIVER])
 

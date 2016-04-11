@@ -70,19 +70,18 @@ ThreadSafeQueue */
 
 class NotifierQueue : public SimpleQueue { public:
 
-    NotifierQueue();
-    ~NotifierQueue();
+    NotifierQueue() CLICK_COLD;
 
     const char *class_name() const		{ return "NotifierQueue"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &conf, ErrorHandler *);
+    int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
 
     void push(int port, Packet *);
     Packet *pull(int port);
 
-#if NOTIFIERQUEUE_DEBUG
-    void add_handlers();
+#if CLICK_DEBUG_SCHEDULING
+    void add_handlers() CLICK_COLD;
 #endif
 
   protected:
@@ -95,8 +94,8 @@ class NotifierQueue : public SimpleQueue { public:
     friend class InOrderQueue;
     friend class ECNQueue;
     friend class TokenQueue;
-#if NOTIFIERQUEUE_DEBUG
-    static String read_handler(Element *, void *);
+#if CLICK_DEBUG_SCHEDULING
+    static String read_handler(Element *, void *) CLICK_COLD;
 #endif
 
 };

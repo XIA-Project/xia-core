@@ -48,10 +48,10 @@ CLICK_DECLS
  bool SyslogErrorHandler::_enabled = false;
 
 SyslogErrorHandler::SyslogErrorHandler(int level, bool verbose, const String &context)
-//: _context(context)
 {
     _level = level;
     _verbose = verbose;
+	_context = context;
 	int flags = LOG_CONS | LOG_NDELAY | (verbose ? LOG_PERROR : 0);
 	openlog("Click", flags, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
@@ -87,7 +87,7 @@ SyslogErrorHandler::emit(const String &str, void *, bool)
 {
 	int level;
 
-    String landmark;   
+    String landmark;
     const char *s = parse_anno(str, str.begin(), str.end(),
 			       "#<>", &level, "l", &landmark, (const char *) 0);
     StringAccum sa;

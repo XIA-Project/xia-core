@@ -59,13 +59,12 @@ PacketTest */
 
 class CheckPacket : public Element { public:
 
-    CheckPacket();
-    ~CheckPacket();
+    CheckPacket() CLICK_COLD;
 
     const char *class_name() const		{ return "CheckPacket"; }
     const char *port_count() const		{ return PORTS_1_1; }
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     Packet *simple_action(Packet *);
 
@@ -78,7 +77,6 @@ class CheckPacket : public Element { public:
     uint32_t _length;
     uint8_t _data_op;
     uint8_t _length_op;
-    bool _do_align : 1;
 
 };
 

@@ -8,8 +8,7 @@ class Packet;
 
 class IPFlowID { public:
 
-    struct uninitialized_t {
-    };
+    typedef uninitialized_type uninitialized_t;
 
 
     /** @brief Construct an empty flow ID.
@@ -48,7 +47,7 @@ class IPFlowID { public:
     explicit IPFlowID(const click_ip *iph, bool reverse = false);
 
     /** @brief Construct an uninitialized flow ID. */
-    inline IPFlowID(const uninitialized_t &unused) {
+    inline IPFlowID(const uninitialized_type &unused) {
 	(void) unused;
     }
 
@@ -159,8 +158,7 @@ inline hashcode_t IPFlowID::hashcode() const
     uint16_t d = ntohs(dport());
     hashcode_t sx = CLICK_NAME(hashcode)(saddr());
     hashcode_t dx = CLICK_NAME(hashcode)(daddr());
-    return (ROT(sx, s%16)
-	    ^ ROT(dx, 31-d%16))
+    return (ROT(sx, (s % 16) + 1) ^ ROT(dx, 31 - (d % 16)))
 	^ ((d << 16) | s);
 }
 

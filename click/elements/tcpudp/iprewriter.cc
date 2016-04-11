@@ -132,7 +132,7 @@ IPRewriter::push(int port, Packet *p_in)
     IPRewriterEntry *m = map->get(flowid);
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.at_u(port);
+	IPRewriterInput &is = _input_specs.unchecked_at(port);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p, iph->ip_p == IP_PROTO_TCP ? 0 : IPRewriterInput::mapid_iprewriter_udp);
 	if (result == rw_addmap)
@@ -181,8 +181,11 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
 void
 IPRewriter::add_handlers()
 {
-    add_read_handler("tcp_mappings", tcp_mappings_handler);
-    add_read_handler("udp_mappings", udp_mappings_handler);
+    add_read_handler("tcp_table", tcp_mappings_handler);
+    add_read_handler("udp_table", udp_mappings_handler);
+    add_read_handler("tcp_mappings", tcp_mappings_handler, 0, Handler::h_deprecated);
+    add_read_handler("udp_mappings", udp_mappings_handler, 0, Handler::h_deprecated);
+    set_handler("tcp_lookup", Handler::OP_READ | Handler::READ_PARAM, tcp_lookup_handler, 0);
     add_rewriter_handlers(true);
 }
 

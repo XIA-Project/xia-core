@@ -18,13 +18,13 @@ CLICK_DECLS
   <dt>value</dt>
   <dd>The value argument V.</dd>
   </dl> */
-template<typename T, T V>
+template <typename T, T V>
 struct integral_constant {
     typedef integral_constant<T, V> type;
     typedef T value_type;
     static constexpr T value = V;
 };
-template<typename T, T V> constexpr T integral_constant<T, V>::value;
+template <typename T, T V> constexpr T integral_constant<T, V>::value;
 
 /** @class true_type
   @brief Type wrapper for the constant true. */
@@ -35,60 +35,157 @@ typedef integral_constant<bool, true> true_type;
 typedef integral_constant<bool, false> false_type;
 
 
+/** @class conditional
+  @brief Conditional type transformation.
+
+  If B is true, then conditional<B, T, F>::type is equivalent to T.
+  Otherwise, it is equivalent to F. */
+template <bool B, typename T, typename F> struct conditional {};
+
+template <typename T, typename F>
+struct conditional<true, T, F> {
+    typedef T type;
+};
+
+template <typename T, typename F>
+struct conditional<false, T, F> {
+    typedef F type;
+};
+
+
 /** @class has_trivial_copy
   @brief Template determining whether T may be copied by memcpy.
 
   has_trivial_copy<T> is equivalent to true_type if T has a trivial
   copy constructor, false_type if it does not. */
 #if HAVE___HAS_TRIVIAL_COPY
-template<typename T> struct has_trivial_copy : public integral_constant<bool, __has_trivial_copy(T)> {};
+template <typename T> struct has_trivial_copy : public integral_constant<bool, __has_trivial_copy(T)> {};
 #else
-template<typename T> struct has_trivial_copy : public false_type {};
-template<> struct has_trivial_copy<unsigned char> : public true_type {};
-template<> struct has_trivial_copy<signed char> : public true_type {};
-template<> struct has_trivial_copy<char> : public true_type {};
-template<> struct has_trivial_copy<unsigned short> : public true_type {};
-template<> struct has_trivial_copy<short> : public true_type {};
-template<> struct has_trivial_copy<unsigned> : public true_type {};
-template<> struct has_trivial_copy<int> : public true_type {};
-template<> struct has_trivial_copy<unsigned long> : public true_type {};
-template<> struct has_trivial_copy<long> : public true_type {};
+template <typename T> struct has_trivial_copy : public false_type {};
+template <> struct has_trivial_copy<unsigned char> : public true_type {};
+template <> struct has_trivial_copy<signed char> : public true_type {};
+template <> struct has_trivial_copy<char> : public true_type {};
+template <> struct has_trivial_copy<unsigned short> : public true_type {};
+template <> struct has_trivial_copy<short> : public true_type {};
+template <> struct has_trivial_copy<unsigned> : public true_type {};
+template <> struct has_trivial_copy<int> : public true_type {};
+template <> struct has_trivial_copy<unsigned long> : public true_type {};
+template <> struct has_trivial_copy<long> : public true_type {};
 # if HAVE_LONG_LONG
-template<> struct has_trivial_copy<unsigned long long> : public true_type {};
-template<> struct has_trivial_copy<long long> : public true_type {};
+template <> struct has_trivial_copy<unsigned long long> : public true_type {};
+template <> struct has_trivial_copy<long long> : public true_type {};
 # endif
-template<typename T> struct has_trivial_copy<T *> : public true_type {};
+template <typename T> struct has_trivial_copy<T *> : public true_type {};
 #endif
+class IPAddress;
+template <> struct has_trivial_copy<IPAddress> : public true_type {};
+
+/** @class is_reference
+  @brief Template determining whether T is a reference type.
+
+  is_reference<T> is equivalent to true_type if T is a reference type (T& or
+  T&&), false_type if it is not. */
+template <typename T> struct is_reference : public false_type {};
+template <typename T> struct is_reference<T &> : public true_type {};
+#if HAVE_CXX_RVALUE_REFERENCES
+template <typename T> struct is_reference<T &&> : public true_type {};
+#endif
+
+/** @class remove_reference
+  @brief Template removing any reference layer from T.
+
+  Assuming T is a non-reference type, then all of remove_reference<T>::type,
+  remove_reference<T&>::type, and remove_reference<T&&>::type are equivalent
+  to T. */
+template <typename T> struct remove_reference {
+    typedef T type;
+};
+template <typename T> struct remove_reference<T &> {
+    typedef T type;
+};
+#if HAVE_CXX_RVALUE_REFERENCES
+template <typename T> struct remove_reference<T &&> {
+    typedef T type;
+};
+template <typename T>
+inline typename remove_reference<T>::type &&click_move(T &&x) {
+    return static_cast<typename remove_reference<T>::type &&>(x);
+}
+#endif
+
+/** @class fast_argument
+  @brief Template defining a fast argument type for objects of type T.
+
+  fast_argument<T>::type equals either "const T &" or "T".
+  fast_argument<T>::is_reference is true iff fast_argument<T>::type is
+  a reference. If fast_argument<T>::is_reference is true, then
+  fast_argument<T>::enable_rvalue_reference is a typedef to void; otherwise
+  it is not defined. */
+template <typename T, bool use_reference = (!is_reference<T>::value
+					    && (!has_trivial_copy<T>::value
+						|| sizeof(T) > sizeof(void *)))>
+struct fast_argument;
+
+template <typename T> struct fast_argument<T, true> {
+    static constexpr bool is_reference = true;
+    typedef const T &type;
+#if HAVE_CXX_RVALUE_REFERENCES
+    typedef void enable_rvalue_reference;
+#endif
+};
+template <typename T> struct fast_argument<T, false> {
+    static constexpr bool is_reference = false;
+    typedef T type;
+};
+template <typename T> constexpr bool fast_argument<T, true>::is_reference;
+template <typename T> constexpr bool fast_argument<T, false>::is_reference;
+
+
+/** @class char_array
+    @brief Template defining a fixed-size character array. */
+template <size_t S> struct char_array {
+    char x[S];
+} CLICK_SIZE_PACKED_ATTRIBUTE;
+template <size_t S> struct has_trivial_copy<char_array<S> > : public true_type {};
 
 
 #if HAVE_INT64_TYPES && (!HAVE_LONG_LONG || SIZEOF_LONG_LONG < 8)
-typedef int64_t click_int_large_t;
-typedef uint64_t click_uint_large_t;
-# define SIZEOF_CLICK_INT_LARGE_T 8
-# define CLICK_ERRHdLARGE "^64d"
-# define CLICK_ERRHuLARGE "^64u"
-# define CLICK_ERRHoLARGE "^64o"
-# define CLICK_ERRHxLARGE "^64x"
-# define CLICK_ERRHXLARGE "^64X"
+typedef int64_t click_intmax_t;
+typedef uint64_t click_uintmax_t;
+# define SIZEOF_CLICK_INTMAX_T 8
+# define CLICK_ERRHdMAX "^64d"
+# define CLICK_ERRHuMAX "^64u"
+# define CLICK_ERRHoMAX "^64o"
+# define CLICK_ERRHxMAX "^64x"
+# define CLICK_ERRHXMAX "^64X"
 #elif HAVE_LONG_LONG
-typedef long long click_int_large_t;
-typedef unsigned long long click_uint_large_t;
-# define SIZEOF_CLICK_INT_LARGE_T SIZEOF_LONG_LONG
-# define CLICK_ERRHdLARGE "lld"
-# define CLICK_ERRHuLARGE "llu"
-# define CLICK_ERRHoLARGE "llo"
-# define CLICK_ERRHxLARGE "llx"
-# define CLICK_ERRHXLARGE "llX"
+typedef long long click_intmax_t;
+typedef unsigned long long click_uintmax_t;
+# define SIZEOF_CLICK_INTMAX_T SIZEOF_LONG_LONG
+# define CLICK_ERRHdMAX "lld"
+# define CLICK_ERRHuMAX "llu"
+# define CLICK_ERRHoMAX "llo"
+# define CLICK_ERRHxMAX "llx"
+# define CLICK_ERRHXMAX "llX"
 #else
-typedef long click_int_large_t;
-typedef unsigned long click_uint_large_t;
-# define SIZEOF_CLICK_INT_LARGE_T SIZEOF_LONG
-# define CLICK_ERRHdLARGE "ld"
-# define CLICK_ERRHuLARGE "lu"
-# define CLICK_ERRHoLARGE "lo"
-# define CLICK_ERRHxLARGE "lx"
-# define CLICK_ERRHXLARGE "lX"
+typedef long click_intmax_t;
+typedef unsigned long click_uintmax_t;
+# define SIZEOF_CLICK_INTMAX_T SIZEOF_LONG
+# define CLICK_ERRHdMAX "ld"
+# define CLICK_ERRHuMAX "lu"
+# define CLICK_ERRHoMAX "lo"
+# define CLICK_ERRHxMAX "lx"
+# define CLICK_ERRHXMAX "lX"
 #endif
+
+typedef click_intmax_t click_int_large_t;
+typedef click_uintmax_t click_uint_large_t;
+#define SIZEOF_CLICK_INT_LARGE_T SIZEOF_CLICK_INTMAX_T
+#define CLICK_ERRHdLARGE CLICK_ERRHdMAX
+#define CLICK_ERRHuLARGE CLICK_ERRHuMAX
+#define CLICK_ERRHoLARGE CLICK_ERRHoMAX
+#define CLICK_ERRHxLARGE CLICK_ERRHxMAX
+#define CLICK_ERRHXLARGE CLICK_ERRHXMAX
 
 
 /** @class integer_traits
@@ -122,15 +219,15 @@ typedef unsigned long click_uint_large_t;
   <dt>constexpr bool is_integral</dt>
   <dd>False.</dd>
   </dl> */
-template<typename T>
+template <typename T>
 struct integer_traits {
     static constexpr bool is_numeric = false;
     static constexpr bool is_integral = false;
 };
-template<typename T> constexpr bool integer_traits<T>::is_numeric;
-template<typename T> constexpr bool integer_traits<T>::is_integral;
+template <typename T> constexpr bool integer_traits<T>::is_numeric;
+template <typename T> constexpr bool integer_traits<T>::is_integral;
 
-template<>
+template <>
 struct integer_traits<unsigned char> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -140,10 +237,11 @@ struct integer_traits<unsigned char> {
     typedef signed char signed_type;
     typedef unsigned char unsigned_type;
     typedef unsigned char type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<signed char> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -153,11 +251,12 @@ struct integer_traits<signed char> {
     typedef signed char signed_type;
     typedef unsigned char unsigned_type;
     typedef signed char type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 
 #if __CHAR_UNSIGNED__
-template<>
+template <>
 struct integer_traits<char> : public integer_traits<unsigned char> {
     static constexpr char const_min = 0;
     static constexpr char const_max = ~const_min;
@@ -165,7 +264,7 @@ struct integer_traits<char> : public integer_traits<unsigned char> {
     static bool negative(type) { return false; }
 };
 #else
-template<>
+template <>
 struct integer_traits<char> : public integer_traits<signed char> {
     static constexpr char const_min = -128;
     static constexpr char const_max = 127;
@@ -174,7 +273,7 @@ struct integer_traits<char> : public integer_traits<signed char> {
 };
 #endif
 
-template<>
+template <>
 struct integer_traits<unsigned short> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -184,10 +283,11 @@ struct integer_traits<unsigned short> {
     typedef short signed_type;
     typedef unsigned short unsigned_type;
     typedef unsigned short type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<short> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -197,10 +297,11 @@ struct integer_traits<short> {
     typedef short signed_type;
     typedef unsigned short unsigned_type;
     typedef short type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 
-template<>
+template <>
 struct integer_traits<unsigned int> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -210,10 +311,11 @@ struct integer_traits<unsigned int> {
     typedef int signed_type;
     typedef unsigned int unsigned_type;
     typedef unsigned int type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<int> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -223,10 +325,11 @@ struct integer_traits<int> {
     typedef int signed_type;
     typedef unsigned int unsigned_type;
     typedef int type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 
-template<>
+template <>
 struct integer_traits<unsigned long> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -236,10 +339,11 @@ struct integer_traits<unsigned long> {
     typedef long signed_type;
     typedef unsigned long unsigned_type;
     typedef unsigned long type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<long> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -249,11 +353,12 @@ struct integer_traits<long> {
     typedef long signed_type;
     typedef unsigned long unsigned_type;
     typedef long type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 
 #if HAVE_LONG_LONG
-template<>
+template <>
 struct integer_traits<unsigned long long> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -263,10 +368,11 @@ struct integer_traits<unsigned long long> {
     typedef long long signed_type;
     typedef unsigned long long unsigned_type;
     typedef unsigned long long type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<long long> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -276,12 +382,13 @@ struct integer_traits<long long> {
     typedef long long signed_type;
     typedef unsigned long long unsigned_type;
     typedef long long type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 #endif
 
 #if HAVE_INT64_TYPES && !HAVE_INT64_IS_LONG && !HAVE_INT64_IS_LONG_LONG
-template<>
+template <>
 struct integer_traits<uint64_t> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -291,10 +398,11 @@ struct integer_traits<uint64_t> {
     typedef int64_t signed_type;
     typedef uint64_t unsigned_type;
     typedef uint64_t type;
+    typedef click_uintmax_t max_type;
     static bool negative(type) { return false; }
 };
 
-template<>
+template <>
 struct integer_traits<int64_t> {
     static constexpr bool is_numeric = true;
     static constexpr bool is_integral = true;
@@ -304,6 +412,7 @@ struct integer_traits<int64_t> {
     typedef int64_t signed_type;
     typedef uint64_t unsigned_type;
     typedef int64_t type;
+    typedef click_intmax_t max_type;
     static bool negative(type x) { return x < 0; }
 };
 #endif
@@ -316,7 +425,7 @@ struct integer_traits<int64_t> {
   of T.
 
   @sa integer_traits */
-template<typename T>
+template <typename T>
 struct make_signed {
     typedef typename integer_traits<T>::signed_type type;
 };
@@ -328,14 +437,14 @@ struct make_signed {
   version of T.
 
   @sa integer_traits */
-template<typename T>
+template <typename T>
 struct make_unsigned {
     typedef typename integer_traits<T>::unsigned_type type;
 };
 
 
 /** @cond never */
-template<typename T, typename Thalf>
+template <typename T, typename Thalf>
 struct make_fast_half_integer {
     typedef T type;
     typedef Thalf half_type;
@@ -352,14 +461,14 @@ struct make_fast_half_integer {
 
 /** @class fast_half_integer
   @brief Type transformation for big integers. */
-template<typename T> struct fast_half_integer : public make_fast_half_integer<T, T> {};
+template <typename T> struct fast_half_integer : public make_fast_half_integer<T, T> {};
 
 #if SIZEOF_LONG >= 8 && SIZEOF_LONG <= 2 * SIZEOF_INT
-template<> struct fast_half_integer<unsigned long> : public make_fast_half_integer<unsigned long, unsigned int> {};
+template <> struct fast_half_integer<unsigned long> : public make_fast_half_integer<unsigned long, unsigned int> {};
 #endif
 
 #if HAVE_LONG_LONG && SIZEOF_LONG_LONG <= 2 * SIZEOF_INT
-template<> struct fast_half_integer<unsigned long long> : public make_fast_half_integer<unsigned long long, unsigned int> {};
+template <> struct fast_half_integer<unsigned long long> : public make_fast_half_integer<unsigned long long, unsigned int> {};
 #endif
 
 #if HAVE_INT64_TYPES && !HAVE_INT64_IS_LONG_LONG && !HAVE_INT64_IS_LONG && SIZEOF_INT >= 4
@@ -367,45 +476,25 @@ template <> struct fast_half_integer<uint64_t> : public make_fast_half_integer<u
 #endif
 
 
-/** @class conditional
-  @brief Conditional type transformation.
-
-  If B is true, then conditional<B, T, F>::type is equivalent to T.
-  Otherwise, it is equivalent to F. */
-template<bool B, typename T, typename F>
-struct conditional {
-};
-
-template<typename T, typename F>
-struct conditional<true, T, F> {
-    typedef T type;
-};
-
-template<typename T, typename F>
-struct conditional<false, T, F> {
-    typedef F type;
-};
-
-
-template<int n, typename Limb, typename V>
-struct extract_integer_template {
+template <int n, typename Limb, typename V>
+struct extract_integer_helper {
     static void extract(const Limb *x, V &value) {
-	extract_integer_template<n - 1, Limb, V>::extract(x + 1, value);
+	extract_integer_helper<n - 1, Limb, V>::extract(x + 1, value);
 	value = (value << (sizeof(Limb) * 8)) | *x;
     }
 };
 
-template<typename Limb, typename V>
-struct extract_integer_template<1, Limb, V> {
+template <typename Limb, typename V>
+struct extract_integer_helper<1, Limb, V> {
     static void extract(const Limb *x, V &value) {
 	value = x[0];
     }
 };
 
 /** @brief Extract an integral type from a multi-limb integer. */
-template<typename Limb, typename V>
+template <typename Limb, typename V>
 inline void extract_integer(const Limb *x, V &value) {
-    extract_integer_template<
+    extract_integer_helper<
 	int((sizeof(V) + sizeof(Limb) - 1) / sizeof(Limb)), Limb, V
 	>::extract(x, value);
 }

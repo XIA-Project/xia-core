@@ -29,6 +29,7 @@ asm
 xia.mk
 .DS_Store
 *.dSYM
+.fuse*
 
 # directories
 key

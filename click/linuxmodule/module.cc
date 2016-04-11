@@ -5,6 +5,7 @@
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2000 Mazu Networks, Inc.
  * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 1999-2013 Eddie Kohler
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -100,6 +101,7 @@ extern "C" void
 click_assert_failed(const char *file, int line, const char *problem_text)
 {
     click_chatter(KERN_ALERT "%s:%d: assertion failed: %s", file, line, problem_text);
+    dump_stack();
 #if HAVE_KERNEL_ASSERT
     if (assert_stops_router) {
 	if (click_router) {
@@ -196,8 +198,13 @@ KernelErrorHandler::emit(const String &str, void *, bool)
 	level = chatterlevel_ceiling;
 
     landmark = clean_landmark(landmark, true);
+#ifdef KERN_SOH
+    printk(KERN_SOH "%d%.*s%.*s\n", level, landmark.length(), landmark.begin(),
+	   (int) (str.end() - s), s);
+#else
     printk("<%d>%.*s%.*s\n", level, landmark.length(), landmark.begin(),
-	   str.end() - s, s);
+	   (int) (str.end() - s), s);
+#endif
     log_line(landmark, s, str.end());
     return 0;
 }
@@ -213,7 +220,7 @@ KernelErrorHandler::account(int level)
 String
 KernelErrorHandler::read(click_handler_direct_info *hdi) const
 {
-    uint32_t initial;
+    uint32_t initial = 0;
     if (!*hdi->string) {
 	initial = (_wrapped ? _tail - logbuf_siz : 0);
 	*hdi->string = String(initial);
@@ -308,7 +315,7 @@ init_module()
     Router::add_read_handler(0, "messages", read_messages, 0, HANDLER_DIRECT);
 #if HAVE_KERNEL_ASSERT
     Router::add_read_handler(0, "assert_stop", read_global, (void *) (intptr_t) h_assert_stop);
-    Router::add_write_handler(0, "assert_stop", write_assert_stop, 0, Handler::NONEXCLUSIVE);
+    Router::add_write_handler(0, "assert_stop", write_assert_stop, 0, Handler::f_nonexclusive);
 #endif
 
     // filesystem interface
@@ -322,8 +329,14 @@ init_module()
     }
     click_fsmode.write = S_IWUSR | S_IWGRP;
     click_fsmode.dir = S_IFDIR | click_fsmode.read | click_fsmode.exec;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+    struct user_namespace* user_ns = current_user_ns();
+    click_fsmode.uid = make_kuid(user_ns, click_parm(CLICKPARM_UID));
+    click_fsmode.gid = make_kgid(user_ns, click_parm(CLICKPARM_GID));
+#else
     click_fsmode.uid = click_parm(CLICKPARM_UID);
     click_fsmode.gid = click_parm(CLICKPARM_GID);
+#endif
 
     init_clickfs();
 
@@ -358,7 +371,7 @@ cleanup_module()
     delete syslog_errh;
     click_logged_errh = syslog_errh = 0;
 
-    printk("<1>click module exiting\n");
+    printk(KERN_ALERT "click module exiting\n");
 
     // HashMap
     HashMap_ArenaFactory::static_cleanup();
@@ -368,13 +381,13 @@ cleanup_module()
 
     // report memory leaks
     if (Element::nelements_allocated)
-	printk("<1>click error: %d elements still allocated\n", Element::nelements_allocated);
+	printk(KERN_ALERT "click error: %d elements still allocated\n", Element::nelements_allocated);
     if (click_dmalloc_curnew) {
-	printk("<1>click error: %d outstanding news\n", click_dmalloc_curnew);
+	printk(KERN_ALERT "click error: %d outstanding news\n", (int) click_dmalloc_curnew);
 	click_dmalloc_cleanup();
     }
 #ifdef HAVE_LINUX_READ_NET_SKBCOUNT
-    printk("<1>net_skbcount: %d\n", read_net_skbcount());
+    printk(KERN_ALERT "net_skbcount: %d\n", read_net_skbcount());
 #endif
 }
 

@@ -19,7 +19,6 @@
 #include <click/config.h>
 #include "aggregateipflows.hh"
 #include <click/error.hh>
-#include <click/hashmap.hh>
 #include <click/straccum.hh>
 #include <click/args.hh>
 #include <clicknet/ip.h>
@@ -479,7 +478,7 @@ AggregateIPFlows::handle_packet(Packet *p)
     // assign timestamp if no timestamp given
     if (!p->timestamp_anno()) {
 	if (!_timestamp_warning) {
-	    click_chatter("%{element}: warning: packet received without timestamp", this);
+	    click_chatter("%p{element}: warning: packet received without timestamp", this);
 	    _timestamp_warning = true;
 	}
 	p->timestamp_anno().assign_now();

@@ -43,86 +43,6 @@
 
 CLICK_DECLS
 
-
-bool
-glob_match(const String &str, const String &pattern)
-{
-    const char *send = str.end();
-    const char *pend = pattern.end();
-
-    // quick common-case check for suffix matches
-    while (pattern.begin() < pend && str.begin() < send
-	   && pend[-1] != '*' && pend[-1] != '?' && pend[-1] != ']'
-	   && (pattern.begin() + 1 == pend || pend[-2] != '\\'))
-	if (pend[-1] == send[-1])
-	    --pend, --send;
-	else
-	    return false;
-
-    Vector<const char *> state, nextstate;
-    state.push_back(pattern.data());
-
-    for (const char *s = str.data(); s != send && state.size(); ++s) {
-	nextstate.clear();
-	for (const char **pp = state.begin(); pp != state.end(); ++pp)
-	    if (*pp != pend) {
-	      reswitch:
-		switch (**pp) {
-		  case '?':
-		    nextstate.push_back(*pp + 1);
-		    break;
-		  case '*':
-		    if (*pp + 1 == pend)
-			return true;
-		    nextstate.push_back(*pp);
-		    ++*pp;
-		    goto reswitch;
-		  case '\\':
-		    if (*pp + 1 != pend)
-			++*pp;
-		    goto normal_char;
-		  case '[': {
-		      const char *ec = *pp + 1;
-		      bool negated;
-		      if (ec != pend && *ec == '^') {
-			  negated = true;
-			  ++ec;
-		      } else
-			  negated = false;
-		      if (ec == pend)
-			  goto normal_char;
-
-		      bool found = false;
-		      do {
-			  if (*++ec == *s)
-			      found = true;
-		      } while (ec != pend && *ec != ']');
-		      if (ec == pend)
-			  goto normal_char;
-
-		      if (found == !negated)
-			  nextstate.push_back(ec + 1);
-		      break;
-		  }
-		  normal_char:
-		  default:
-		    if (**pp == *s)
-			nextstate.push_back(*pp + 1);
-		    break;
-		}
-	    }
-	state.swap(nextstate);
-    }
-
-    for (const char **pp = state.begin(); pp != state.end(); ++pp) {
-	while (*pp != pend && **pp == '*')
-	    ++*pp;
-	if (*pp == pend)
-	    return true;
-    }
-    return false;
-}
-
 void
 click_signal(int signum, void (*handler)(int), bool resethand)
 {
@@ -536,7 +456,8 @@ remove_file_on_exit(const String &file)
 	    click_signal(SIGINT, signal_handler, false);
 	    click_signal(SIGTERM, signal_handler, false);
 	    click_signal(SIGPIPE, signal_handler, false);
-	    atexit(atexit_remover);
+            if (!getenv("CLICK_PRESERVE_TEMPORARIES"))
+                atexit(atexit_remover);
 	}
 	if (char *x = new char[file.length() + 1]) {
 	    memcpy(x, file.data(), file.length());
@@ -572,6 +493,14 @@ set_clickpath(const char* p)
 }
 
 
+static void
+path_check(String& fn_store, const String& fn)
+{
+    struct stat st;
+    if (!fn_store && stat(fn.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+        fn_store = fn;
+}
+
 static bool
 path_find_file_2(const String &filename, const String &path,
 		 String default_path, String subdir,
@@ -580,18 +509,19 @@ path_find_file_2(const String &filename, const String &path,
     if (subdir && subdir.back() != '/')
 	subdir += "/";
 
-    const char *begin = path.begin();
-    const char *end = path.end();
+    const char* first = path.begin();
+    const char* last = path.end();
     int before_size = results.size();
 
-    do {
-	String dir = path.substring(begin, find(begin, end, ':'));
-	begin = dir.end() + 1;
+    while (1) {
+        const char* colon = find(first, last, ':');
+	String dir = path.substring(first, colon);
 
 	if (!dir && default_path) {
 	    // look in default path
 	    if (path_find_file_2(filename, default_path, "", 0, results, exit_early) && exit_early)
 		return true;
+            default_path = "";
 
 	} else if (dir) {
 	    if (dir.back() != '/')
@@ -599,23 +529,22 @@ path_find_file_2(const String &filename, const String &path,
 	    String fn;
 	    // look for 'dir/subdir/click/filename' and 'dir/subdir/filename'
 	    if (subdir) {
-		fn = dir + subdir + "click/" + filename;
-		if (access(fn.c_str(), F_OK) >= 0)
-		    goto found;
-		fn = dir + subdir + filename;
-		if (access(fn.c_str(), F_OK) >= 0)
-		    goto found;
+                path_check(fn, dir + subdir + "click/" + filename);
+                path_check(fn, dir + subdir + filename);
 	    }
 	    // look for 'dir/filename'
-	    fn = dir + filename;
-	    if (access(fn.c_str(), F_OK) >= 0) {
-	      found:
+            path_check(fn, dir + filename);
+            if (fn) {
 		results.push_back(fn);
 		if (exit_early)
 		    return true;
 	    }
 	}
-    } while (begin < end);
+
+        if (colon == last)
+            break;
+        first = colon + 1;
+    }
 
     return results.size() == before_size;
 }

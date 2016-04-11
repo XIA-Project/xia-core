@@ -18,7 +18,7 @@ TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t se
     //this->map()[TransportHeader::SRC_XID]= String((const char*)&src_xid, sizeof(src_xid));
     //this->map()[TransportHeader::DST_XID]= String((const char*)&dst_xid, sizeof(dst_xid));
     this->map()[TransportHeader::SEQ_NUM]= String((const char*)&seq_num, sizeof(seq_num));
-    this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));        
+    this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));
     this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
 	this->map()[TransportHeader::RECV_WINDOW]= String((const char*)&recv_window, sizeof(recv_window));
     this->update();
@@ -38,6 +38,7 @@ const char *TransportHeader::TypeStr(char type)
         case MIGRATE:    t = "MIGRATE"; break;
         case MIGRATEACK: t = "MIGRATEACK"; break;
         case RST:        t = "RST"; break;
+		default:         t = "UNKNOWN"; break;
     }
     return t;
 }

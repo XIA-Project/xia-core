@@ -6,6 +6,7 @@
  * Copyright (c) 2001 Massachusetts Institute of Technology
  * Copyright (c) 2001 International Computer Science Institute
  * Copyright (c) 2004-2011 Regents of the University of California
+ * Copyright (c) 2013 President and Fellows of Harvard College
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -71,6 +72,7 @@ static const Clp_Option options[] = {
 static const char *program_name;
 
 static int driver = -1;
+static String subpackage;
 static HashTable<String, int> initial_requirements(-1);
 static bool verbose = false;
 
@@ -106,13 +108,13 @@ Options:\n\
   -d, --directory DIR      Put files in DIR. DIR must contain a 'Makefile'\n\
                            for the relevant driver. Default is '.'.\n\
   -E, --elements ELTS      Include element classes ELTS.\n\
-      --no-extras          Do include useful non-required element classes.\n\
+      --no-extras          Don't include surplus often-useful elements.\n\
   -V, --verbose            Print progress information.\n\
   -C, --clickpath PATH     Use PATH for CLICKPATH.\n\
       --help               Print this message and exit.\n\
   -v, --version            Print version number and exit.\n\
 \n\
-Report bugs to <click@pdos.lcs.mit.edu>.\n", program_name);
+Report bugs to <click@librelist.com>.\n", program_name);
 }
 
 
@@ -124,7 +126,7 @@ class Mindriver { public:
     void require(const String&, ErrorHandler*);
     void add_source_file(const String&, ErrorHandler*);
 
-    void add_router_requirements(RouterT*, const ElementMap&, ErrorHandler*);
+    void add_router_requirements(RouterT*, ElementMap&, ErrorHandler*);
     bool add_traits(const Traits&, const ElementMap&, ErrorHandler*);
     bool resolve_requirement(const String& requirement, const ElementMap& emap, ErrorHandler* errh, bool complain = true);
     void print_elements_conf(FILE*, String package, const ElementMap&, const String &top_srcdir);
@@ -169,11 +171,10 @@ Mindriver::add_source_file(const String& fn, ErrorHandler* errh)
 }
 
 void
-Mindriver::add_router_requirements(RouterT* router, const ElementMap& default_map, ErrorHandler* errh)
+Mindriver::add_router_requirements(RouterT* router, ElementMap& emap, ErrorHandler* errh)
 {
     // find and parse elementmap
-    ElementMap emap(default_map);
-    emap.parse_requirement_files(router, CLICK_DATADIR, errh);
+    emap.parse_requirement_files(router, CLICK_DATADIR, errh, verbose);
 
     // check whether suitable for driver
     if (!emap.driver_compatible(router, driver)) {
@@ -193,8 +194,6 @@ Mindriver::add_router_requirements(RouterT* router, const ElementMap& default_ma
 	String tname = i.key()->name();
 	if (!emap.has_traits(tname))
 	    missing_sa << (nmissing++ ? ", " : "") << tname;
-	else if (emap.package(tname))
-	    /* do nothing; element was defined in a package */;
 	else
 	    require(tname, errh);
     }
@@ -206,7 +205,7 @@ Mindriver::add_router_requirements(RouterT* router, const ElementMap& default_ma
 }
 
 static void
-handle_router(Mindriver& md, String filename_in, const ElementMap &default_map, ErrorHandler *errh)
+handle_router(Mindriver& md, String filename_in, ElementMap &emap, ErrorHandler *errh)
 {
     // decide if 'filename' should be flattened
     bool flattenable = (filename_in[0] != 'a');
@@ -224,7 +223,7 @@ handle_router(Mindriver& md, String filename_in, const ElementMap &default_map, 
     if (router && flattenable)
 	router->flatten(&lerrh);
     if (router && errh->nerrors() == before)
-	md.add_router_requirements(router, default_map, &lerrh);
+	md.add_router_requirements(router, emap, &lerrh);
     delete router;
 }
 
@@ -307,7 +306,7 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
     for (int i = 1; i < emap.size(); i++) {
 	const Traits &elt = emap.traits_at(i);
 	int sourcei = _source_files.get(elt.source_file);
-	if (sourcei >= 0) {
+	if (sourcei >= 0 && emap.package(elt) == subpackage) {
 	    // track ELEMENT_LIBS
 	    // ah, if only I had regular expressions
 	    if (!headervec[sourcei] && elt.libs) {
@@ -370,19 +369,41 @@ analyze_makefile(const String &directory, ErrorHandler *errh)
     if (before != errh->nerrors())
 	return String();
 
-    String expectation = String("\n## Click ") + Driver::requirement(driver) + " driver Makefile ##\n";
-    if (text.find_left(expectation) < 0) {
-	errh->error("%s lacks magic string\n(Does this directory have a Makefile for Click%,s %s driver?)", fn.c_str(), Driver::name(driver));
+    // What kind of driver is this?
+    int allowed_drivers = 0;
+    int pos;
+    if ((pos = text.find_left("\npackage := ")) >= 0) {
+        int endpos = text.find_left('\n', pos + 1);
+        subpackage = text.substring(pos + 12, endpos - (pos + 12));
+        if (text.find_left("\nMAKE_UPACKAGE = 1\n") >= 0)
+            allowed_drivers |= 1 << Driver::USERLEVEL;
+        if (text.find_left("\nMAKE_KPACKAGE = 1\n") >= 0)
+            allowed_drivers |= 1 << Driver::LINUXMODULE;
+    } else {
+        subpackage = String();
+        if (text.find_left("\n## Click userlevel driver Makefile ##\n") >= 0)
+            allowed_drivers |= 1 << Driver::USERLEVEL;
+        if (text.find_left("\n## Click linuxmodule driver Makefile ##\n") >= 0)
+            allowed_drivers |= 1 << Driver::LINUXMODULE;
+    }
+    if (allowed_drivers == 0) {
+        errh->error("%s unrecognized as Click Makefile", fn.c_str());
+        return String();
+    }
+
+    if (driver < 0)
+        driver = (allowed_drivers & (1 << Driver::USERLEVEL) ? Driver::USERLEVEL : Driver::LINUXMODULE);
+    if (!(allowed_drivers & (1 << driver))) {
+	errh->error("%s does not support %s driver", fn.c_str(), Driver::name(driver));
 	return String();
     }
 
-    int top_srcdir_pos = text.find_left("\ntop_srcdir := ");
-    if (top_srcdir_pos < 0) {
+    if ((pos = text.find_left("\ntop_srcdir := ")) < 0) {
 	errh->error("%s lacks top_srcdir variable", fn.c_str());
 	return String();
     }
-    int top_srcdir_end = text.find_left('\n', top_srcdir_pos + 1);
-    String top_srcdir = text.substring(top_srcdir_pos + 15, top_srcdir_end - (top_srcdir_pos + 15));
+    int endpos = text.find_left('\n', pos + 1);
+    String top_srcdir = text.substring(pos + 15, endpos - (pos + 15));
     if (top_srcdir.back() != '/')
 	top_srcdir += '/';
     return top_srcdir;
@@ -506,18 +527,22 @@ particular purpose.\n");
     }
 
   done:
-    if (driver < 0)
-	driver = Driver::USERLEVEL;
     if (!package_name)
 	errh->fatal("fatal error: no package name specified\nPlease supply the %<-p PKG%> option.");
-    if (extras) {
+
+    String top_srcdir = analyze_makefile(directory, (check ? errh : ErrorHandler::silent_handler()));
+
+    if (extras && !subpackage) {
 	md.require("Align", errh);
 	md.require("IPNameInfo", errh);
     }
 
     ElementMap default_emap;
-    if (!default_emap.parse_default_file(CLICK_DATADIR, errh))
+    if (!default_emap.parse_default_file(CLICK_DATADIR, errh, verbose))
 	default_emap.report_file_not_found(CLICK_DATADIR, false, errh);
+
+    if (subpackage)
+        default_emap.parse_package_file(subpackage, 0, CLICK_DATADIR, errh, verbose);
 
     for (int i = 0; i < router_filenames.size(); i++)
 	handle_router(md, router_filenames[i], default_emap, errh);
@@ -526,7 +551,7 @@ particular purpose.\n");
 	errh->fatal("no elements required");
 
     // add types that are always required
-    {
+    if (!subpackage) {
 	LandmarkErrorHandler lerrh(errh, "default requirements");
 	md.require("AddressInfo", &lerrh);
 	md.require("AlignmentInfo", &lerrh);
@@ -549,7 +574,8 @@ particular purpose.\n");
 	HashTable<String, int> old_reqs(-1);
 	old_reqs.swap(md._requirements);
 
-	for (HashTable<String, int>::iterator iter = old_reqs.begin(); iter.live(); iter++)
+	for (HashTable<String, int>::iterator iter = old_reqs.begin();
+             iter.live(); iter++)
 	    md.resolve_requirement(iter.key(), default_emap, errh);
 
 	if (!md._requirements.size())
@@ -560,10 +586,14 @@ particular purpose.\n");
 	exit(1);
 
     // Print elements_PKG.conf
-    String top_srcdir = analyze_makefile(directory, (check ? errh : ErrorHandler::silent_handler()));
-
     if (errh->nerrors() == 0) {
-	String fn = directory + String("elements_") + package_name + ".conf";
+	String fn = directory;
+        if (subpackage && driver == Driver::USERLEVEL)
+            fn += String(package_name) + "-uelem.conf";
+        else if (subpackage && driver == Driver::LINUXMODULE)
+            fn += String(package_name) + "-kelem.conf";
+        else
+            fn += String("elements_") + package_name + ".conf";
 	errh->message("Creating %s...", fn.c_str());
 	FILE *f = fopen(fn.c_str(), "w");
 	if (!f)
@@ -574,7 +604,11 @@ particular purpose.\n");
 
     // Final message
     if (errh->nerrors() == 0) {
-	if (driver == Driver::USERLEVEL)
+        if (subpackage && driver == Driver::USERLEVEL)
+            errh->message("Build %<%s.uo%> with %<make MINDRIVER=%s%>.", package_name, package_name);
+        else if (subpackage && driver == Driver::LINUXMODULE)
+            errh->message("Build %<%s.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);
+	else if (driver == Driver::USERLEVEL)
 	    errh->message("Build %<%sclick%> with %<make MINDRIVER=%s%>.", package_name, package_name);
 	else
 	    errh->message("Build %<%sclick.ko%> with %<make MINDRIVER=%s%>.", package_name, package_name);

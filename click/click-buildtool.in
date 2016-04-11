@@ -8,7 +8,7 @@
 # Copyright (c) 2001-2003 International Computer Science Institute
 # Copyright (c) 2008 Meraki, Inc.
 # Copyright (c) 2004-2011 Regents of the University of California
-# Copyright (c) 2000-2011 Eddie Kohler
+# Copyright (c) 2000-2014 Eddie Kohler
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -20,13 +20,13 @@
 # notice is a summary of the Click LICENSE file; the license in that file is
 # legally binding.
 
+set_clickbuild () {
+    clickbuild_prefix="`echo "$1" | sed 's,/$,,'`"
+    clickbuild_clickdatadir="@clickbuild_clickdatadir@"
+}
+
 prefix=@prefix@
-exec_prefix=@exec_prefix@
-bindir=@bindir@
-datarootdir=@datarootdir@
-datadir=@datadir@
-clickdatadir=@clickdatadir@
-LINUXMODULE_2_6=@LINUXMODULE_2_6@
+set_clickbuild "$prefix"
 gmake=@GMAKE@
 
 verbose=""
@@ -84,7 +84,7 @@ Options:
   -n, --length=N           Set maximum symbol length to N.
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -132,6 +132,10 @@ $1"; shift 1;;
 9IPAddress 2IP \
 12EtherAddress 3Eth \
 10IP6Address 3IP6 \
+13vector_memory 1v \
+18typed_array_memory 1T \
+18sized_array_memory 1S \
+10char_array 1C \
 6Vector 1V \
 11StringAccum 2SA \
 6String 1S \
@@ -145,7 +149,7 @@ $1"; shift 1;;
   if (length() > '$len') {
     ("echo " orig " | '"$MD5SUM"'") | getline hash
     sub("[^A-Za-z_0-9.].*", "", hash)
-    $0 = substr($0, 1, '$len' - 12) ".H" substr(hash, 1, 10)
+    $0 = substr($0, 1, '$len' - 12) "_H" substr(hash, 1, 10)
   }
   print orig, $0;
 }' > $obj.shortenmap || exit 1
@@ -156,6 +160,54 @@ $1"; shift 1;;
 
 if test "$1" = shortensyms; then
     shift 1; shortensyms "$@"; exit 0
+fi
+
+
+#######################
+# COMPILE-SHORTENSYMS #
+#######################
+
+compile_shortensyms_usage () {
+    echo "Usage: click-buildtool compile-shortensyms [BUILD COMMAND]..." 1>&2
+    echo "Try 'click-buildtool compile-shortensyms --help' for more information." 1>&2
+    exit 1
+}
+
+compile_shortensyms () {
+    args=
+    obj=
+    while [ x"$1" != x ]; do
+    case $1 in
+    -o)
+	if test $# -lt 2; then compile_shortensyms_usage; fi
+	obj="$2"; args="$args -o '$obj'"; shift 2;;
+    -h|--h|--he|--hel|--help)
+	cat <<'EOF' 1>&2
+'Click-buildtool compile-shortensyms' runs a build command and then runs
+'click-buildtool shortensyms' on the results. The BUILD COMMAND must contain
+a '-o OBJECT' argument.
+
+Usage: click-buildtool compile-shortensyms [BUILD COMMAND]
+
+Options:
+  -h, --help               Print this message and exit.
+
+Report bugs to <click@librelist.com>.
+EOF
+	exit 0;;
+    *)
+	args="$args '$1'"; shift 1;;
+    esac
+    done
+
+    eval $args
+    result=$?
+    test $result = 0 || exit $result
+    shortensyms $obj
+}
+
+if test "$1" = compile-shortensyms; then
+    shift 1; compile_shortensyms "$@"; exit 0
 fi
 
 
@@ -201,6 +253,7 @@ findelem () {
     filenames=
     standards=
     unprovisions='false 0'
+    checksum_data=
     while [ x"$1" != x ]; do
     case $1 in
     -S|--s|--st|--sta|--stan|--stand|--standa|--standar|--standard|--standards)
@@ -263,8 +316,11 @@ $provisions"; shift 1;;
 	provisions="`elementmap_provisions "$emap"`
 $provisions"; shift 1;;
     -P|--pa|--pac|--pack|--packa|--packag|--package)
-	provisions="`elementmap_provisions "${clickdatadir}/elementmap.xml"`
+	provisions="`elementmap_provisions "${clickbuild_clickdatadir}/elementmap.xml"`
 $provisions"; shift 1;;
+    --c|--ch|--che|--chec|--check|--checks|--checksu|--checksum)
+	if test $# -lt 2; then findelem_usage; fi
+	checksum_data="$2"; shift 2;;
     -h|--h|--he|--hel|--help)
 	cat <<'EOF' 1>&2
 'Click-buildtool findelem' locates valid Click element source code. It starts
@@ -292,9 +348,10 @@ Options:
   -X, --unprovide-file FILE  Reject requirement(s) from FILE.
   -f, --filenames            Output filenames only.
   -F, --filename-pairs       Output "sourcefile:headerfile" pairs for elements.
+      --checksum FILE        Write checksum data to FILE.
   -h, --help                 Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -340,18 +397,22 @@ EOF
 
     # expand list of files
     if test -n "$all"; then
-	fdir=${pfx}
-	test -d ${pfx}elements && fdir=${pfx}elements
-	first_files=`cd $fdir >/dev/null && ls`
-	bad_first_files=`echo "$first_files
-$unprovisions" | sort | uniq -d`
-	first_files=`echo "$first_files
-$bad_first_files" | sort | uniq -u`
+	first_files=${pfx}
+	test -d ${pfx}elements && first_files=${pfx}elements
+	first_files=`cd $first_files >/dev/null && ls`
     else
 	first_files=`cat`
     fi
 
+    # eliminate unprovisions
+    bad_first_files=`echo "$first_files
+$unprovisions" | sort | uniq -d`
+    first_files=`echo "$first_files
+$bad_first_files" | sort | uniq -u`
+
+    # create first list of files
     files=""
+    checksum_files=
     for i in $first_files; do
 	ppfx="$pfx"
 	if test -d "${pfx}elements/$i" && echo "$i" | $grep -v '^\.' >/dev/null; then
@@ -364,8 +425,24 @@ $bad_first_files" | sort | uniq -u`
 	    files="$files
 ${ppfx}$i"
 	fi
+	if expr "$checksum_data" != "" '&' "${ppfx}$i" : '[^$ 	
+]*$' >/dev/null; then
+	    checksum_files="$checksum_files ${ppfx}$i"
+	elif test -n "$checksum_data"; then rm -f "$checksum_data"; checksum_data=; fi
     done
     files=`echo "$files" | sort | uniq | $grep .`
+
+    # create checksum to help run "make elemlist" automatically
+    if test -n "$checksum_data"; then
+	rm -f "$checksum_data"
+	if test -z "$MD5SUM"; then MD5SUM="@MD5SUM@"; fi
+	if test -n "$MD5SUM"; then
+	    checksum_command="LC_ALL=C ls -1R $checksum_files | $MD5SUM | sed 's/[^0-9a-f].*//'"
+	    checksum=`eval "$checksum_command"`
+	    echo "ELEMENT_CHECKSUM=$checksum" >"$checksum_data"
+	    echo "ELEMENT_CHECKSUMCOMMAND=$checksum_command" >>"$checksum_data"
+	fi
+    fi
 
     # die if no files
     if test -z "$files"; then
@@ -636,7 +713,7 @@ elem2make () {
     driver=""
     makevar=""
     date=`date`
-    linux26=x
+    linux=x
     bsdmake=0
     while [ x"$1" != x ]; do
     case $1 in
@@ -672,12 +749,12 @@ elem2make () {
 	this_exclude=`echo "$1" | sed 's/^[^=]*=//'`
 	for i in $this_exclude; do excludes=";/^$i"' \\$'"/d$excludes"; done
 	shift 1;;
-    --l|--li|--lin|--linu|--linux|--linux2|--linux26)
-	linux26=1; shift 1;;
+    --l|--li|--lin|--linu|--linux)
+	linux=1; shift 1;;
     --b|--bs|--bsd)
 	bsdmake=1; shift 1;;
-    --no-l|--no-li|--no-lin|--no-linu|--no-linux|--no-linux2|--no-linux26)
-	linux26=0; shift 1;;
+    --no-l|--no-li|--no-lin|--no-linu|--no-linux)
+	linux=0; shift 1;;
     -V|--verb|--verbo|--verbos|--verbose)
 	verbose=1; shift 1;;
     -h|--h|--he|--hel|--help)
@@ -692,13 +769,13 @@ Options:
   -t, --driver DRIVER      Set target driver to DRIVER ('userlevel',
                            'linuxmodule', 'bsdmodule', 'ns', or 'tool').
   -v, --make-variable N    Use make variable N.
-      --linux26            Generate Linux 2.6-style makefile fragment.
+      --linux              Generate Linux style makefile fragment.
       --bsd                Generate BSD make compatible Makefile.
   -x, --exclude FILE       Do not include FILE.
   -V, --verbose            Print more information.
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -713,7 +790,6 @@ EOF
 	    L=u
 	elif test "$driver" = 'kernel' -o "$driver" = 'linuxmodule'; then
 	    L=k
-	    test "$linux26" = x && linux26="$LINUXMODULE_2_6"
 	elif test "$driver" = 'bsdmodule'; then
 	    L=b
 	elif test "$driver" = 'ns' -o "$driver" = 'nsmodule'; then
@@ -725,11 +801,14 @@ EOF
 	    exit 1
 	fi
     fi
-    if test "$linux26" = 1 -a "$bsdmake" = 1; then
-	echo "--linux26 and --bsd are mutually exclusive" 1>&2
+    if test "$L" = k -a "$linux" = x -a "$bsdmake" = 0; then
+        linux=1
+    fi
+    if test "$linux" = 1 -a "$bsdmake" = 1; then
+	echo "--linux and --bsd are mutually exclusive" 1>&2
 	exit 1
     fi
-    osuffix=".${L}o"
+    if test -n "$L"; then osuffix=".$L.o"; else osuffix=".o"; fi
     if test -z "$makevar"; then
 	makevar=$defmakevar
     fi
@@ -750,7 +829,7 @@ EOF
     test -n "$libs" && libs=`echo "$libs" | tsort`
 
     # massage awk script based on Linux 2.6 or not
-    if test "$linux26" = 1; then
+    if test "$linux" = 1; then
 	set_subdir_scriptlet='
 	    if (dir != "" && substr(dir, 1, 1) == "/")
 		subdirs[dirid] = dir;
@@ -883,7 +962,7 @@ Options:
   -V, --verbose            Print more information.
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     -*)
@@ -895,12 +974,9 @@ EOF
 
     # set up awk program
     if test -n "$package"; then
-	includes="  $includes "'print "#define WANT_MOD_USE_COUNT 1\n#include <click/config.h>\n#include <click/package.hh>\n#include <click/glue.hh>";
-  for (file in INCLUDES) {
-    if (file != "-") print "#include ", file;
-  }'
+	includes="  $includes "'print "#define WANT_MOD_USE_COUNT 1\n#include <click/config.h>\n#include <click/package.hh>\n#include <click/glue.hh>", includefiles;'
 	awk_program='BEGIN {
-  OFS = ""; nrebecca = 0; packname="'"$package"'";
+  OFS = ""; nrebecca = 0; packname="'"$package"'"; includefiles=""
 }
 /^#/ { next; }
 {
@@ -922,8 +998,10 @@ EOF
       anyprovides++; nrebecca++;
     }
   }
-  if (anyprovides)
+  if (anyprovides && !($2 in INCLUDES) && $2 != "-") {
+    includefiles = includefiles "\n#include " $2;
     INCLUDES[$2] = 1;
+  }
 }
 END {
   print "/* Generated by \"click-buildtool elem2package\" on '"$date"' */";
@@ -942,10 +1020,7 @@ END {
 '
 
     else
-	includes="$includes"'  print "#include <click/config.h>\n#include <click/package.hh>";
-  for (file in INCLUDES) {
-    if (file != "-") print "#include ", file;
-  }'
+	includes="$includes"'  print "#include <click/config.h>\n#include <click/package.hh>", includefiles;'
 	awk_program='BEGIN {
   OFS = ""; nrebecca = 0;
 }
@@ -968,8 +1043,10 @@ END {
       anyprovides++; nrebecca++;
     }
   }
-  if (anyprovides)
+  if (anyprovides && !($2 in INCLUDES) && $2 != "-") {
+    includefiles = includefiles "\n#include " $2;
     INCLUDES[$2] = 1;
+  }
 }
 END {
   print "/* Generated by \"click-buildtool elem2export\" on '"$date"' */\n";
@@ -1012,10 +1089,35 @@ provides_usage () {
     exit 1
 }
 
+default_elementmap_provisions () {
+    e=
+    oldprefix="$clickbuild_prefix"
+    path="$CLICKPATH"
+    while [ -z "$e" ]; do
+        clickbuild_prefix="`echo "$path" | sed 's/^\([^:]*\).*$/\1/'`"
+        path="`echo "$path" | sed 's/^[^:]*:*//'`"
+        if [ -n "$clickbuild_prefix" -a -f "@clickbuild_clickdatadir@/elementmap.xml" ]; then
+            e="@clickbuild_clickdatadir@/elementmap.xml"
+        elif [ -n "$clickbuild_prefix" -a -f "$clickbuild_prefix/elementmap.xml" ]; then
+            e="$clickbuild_prefix/elementmap.xml"
+        elif [ -z "$clickbuild_prefix" -a -f "${clickbuild_clickdatadir}/elementmap.xml" ]; then
+            e="$clickbuild_clickdatadir/elementmap.xml"
+        fi
+        if test -z "$path"; then break; fi
+    done
+    clickbuild_prefix="$oldprefix"
+
+    if [ -n "$e" ]; then
+        elementmap_provisions "$e"
+    else
+        echo "click-buildtool: can't find default elementmap" 1>&2
+    fi
+}
+
 provides () {
     provisions="$default_provisions
 $driver_provisions
-"`elementmap_provisions ${clickdatadir}/elementmap.xml`
+"`default_elementmap_provisions`
     requirements=""
     stdin=n; query=n; print=n
     while [ x"$1" != x ]; do
@@ -1060,7 +1162,7 @@ Options:
   -l, --print              Print 0 (REQs not provided) or 1 (REQs provided).
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     -)
@@ -1111,7 +1213,7 @@ Usage: ld ... 2>&1 | click-buildtool quietlink
 Options:
   -h, --help                 Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -1165,7 +1267,7 @@ Usage: click-buildtool prefix
 Options:
   -h, --help                 Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -1189,7 +1291,6 @@ kversion_usage () {
 
 kversion () {
     gpl=0
-    linux26=$LINUXMODULE_2_6
     while [ x"$1" != x ]; do
     case $1 in
     --g|--gp|--gpl)
@@ -1206,7 +1307,7 @@ Options:
                            no license).
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -1254,7 +1355,7 @@ Usage: click-buildtool kbuild > Kbuild
 Options:
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -1262,7 +1363,7 @@ EOF
     esac
     done
 
-    echo "include ${clickdatadir}/pkg-linuxmodule-26.mk"
+    echo "include ${clickbuild_clickdatadir}/pkg-linuxmodule-26.mk"
 }
 
 
@@ -1326,7 +1427,7 @@ Options:
   -h, --help               Print this message and exit.
   -[other options]         Passed to the C/C++ compiler.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     -*)
@@ -1359,12 +1460,12 @@ $1"; shift 1
 	echo "Unknown driver $driver" 1>&2
 	exit 1
     fi
-    osuffix=".${L}o"
+    if test -n "$L"; then osuffix=".${L}o"; else osuffix=".o"; fi
 
     if test -n "$dir"; then cd "$dir"; fi
-    echo > ${L}elements.conf
-    echo "$srcs" | $grep . | elem2make -t $driver > ${L}elements.mk
-    echo "PACKAGE_OBJS :=" >> ${L}elements.mk
+    echo > ${pkg}-${L}elem.conf
+    echo "$srcs" | $grep . | elem2make -t $driver > ${pkg}-${L}elem.mk
+    echo "PACKAGE_OBJS :=" >> ${pkg}-${L}elem.mk
 
     echo "package = $pkg
 
@@ -1375,8 +1476,9 @@ top_builddir = .
 PACKAGE_CFLAGS = $cflags
 PACKAGE_CXXFLAGS = $cflags
 
-include ${clickdatadir}/config.mk
-include ${clickdatadir}/pkg-Makefile" > Makefile
+clickbuild_prefix := ${clickbuild_prefix}
+include ${clickbuild_clickdatadir}/config.mk
+include ${clickbuild_clickdatadir}/pkg-Makefile" > Makefile
 
     test -z "$quiet" && echo "+" $gmake $pkg$osuffix
     $gmake $quiet $pkg$osuffix
@@ -1431,7 +1533,7 @@ Options:
   -C, --directory DIR      Switch to DIR directory before running.
   -h, --help               Print this message and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
 	exit 0;;
     *)
@@ -1447,7 +1549,7 @@ $exclude" | sort | uniq -u`
 
     if test -n "$dir"; then cd "$dir"; fi
     if test -z "$NM"; then NM="@NM@"; fi
-    echo "// Created by 'click-buildtool ksyms' on $date"
+    echo "// Generated by 'click-buildtool ksyms' on $date"
     echo "#include <click/config.h>"
     echo "#include <linux/version.h>"
     echo "#include <linux/module.h>"
@@ -1475,6 +1577,12 @@ BEGIN {
 # MAIN PROGRAM #
 ################
 
+main_usage () {
+     echo "Usage: click-buildtool TOOLNAME [ARGUMENTS]
+Try 'click-buildtool --help' for more information." 1>&2
+     exit 1
+}
+
 if test $# = 0; then
     # force usage message
     set crapfunc
@@ -1485,10 +1593,7 @@ case $1 in
   --vers|--versi|--versio|--version)
      cat <<'EOF'
 click-buildtool (Click) @CLICK_VERSION@
-Copyright (c) 2000-2001 Massachusetts Institute of Technology
-Copyright (c) 2000-2004 Mazu Networks, Inc.
-Copyright (c) 2001-2003 International Computer Science Institute
-Copyright (c) 2004-2007 Regents of the University of California
+Copyright (c) 2000-2014 Eddie Kohler and others
 This is free software; see the source for copying conditions.
 There is NO warranty, not even for merchantability or fitness for a
 particular purpose.
@@ -1496,6 +1601,13 @@ EOF
      exit 0;;
   -V|--verb|--verbo|--verbos|--verbose)
      verbose=1; shift 1;;
+  -C|--cl|--cli|--clic|--click|--clickp|--clickpr|--clickpre|--clickpref|--clickprefi|--clickprefix)
+     test $# -lt 2 && main_usage
+     shift 1; set_clickbuild "$1"; shift 1;;
+  -C*)
+     set_clickbuild "`echo "$1" | sed 's/^-C//'`"; shift 1;;
+  --cl=*|--cli=*|--clic=*|--click=*|--clickp=*|--clickpr=*|--clickpre=*|--clickpref=*|--clickprefi=*|--clickprefix=*)
+     set_clickbuild "`echo "$1" | sed 's/^[^=]*=//'`"; shift 1;;
   -h|--h|--he|--hel|--help)
      cat <<'EOF' 1>&2
 'Click-buildtool' is a set of tools used when building Click. For information
@@ -1513,14 +1625,16 @@ Usage: click-buildtool elem2make [-V] [-p PREFIX] < [ELEMENTS]
    or: click-buildtool kversion [--gpl]
    or: click-buildtool ksyms OBJS > KSYMSFILE
    or: click-buildtool shortensyms OBJS
+   or: click-buildtool compile-shortensyms [BUILD COMMAND]
    or: click-buildtool [--cflags | --otherlibs | --toolcflags | --toollibs]
 
 Options:
   -V, --verbose            Print more information.
   -h, --help               Print this message and exit.
+  -C, --clickprefix PFX    Set the prefix for locating data files.
       --version            Print version number and exit.
 
-Report bugs to <click@pdos.lcs.mit.edu>.
+Report bugs to <click@librelist.com>.
 EOF
      exit 0;;
   findelem)
@@ -1547,8 +1661,10 @@ EOF
      shift 1; ksyms "$@"; exit 0;;
   shortensyms)
      shift 1; shortensyms "$@"; exit 0;;
-  --c|--cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
-     echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ -I@includedir@; exit 0;;
+  compile-shortensyms)
+     shift 1; compile_shortensyms "$@"; exit 0;;
+  --cf|--cfl|--cfla|--cflag|--cflags|--d|--de|--def|--defs)
+     echo @PROPER_INCLUDES@ @PCAP_INCLUDES@ @NETMAP_INCLUDES@ -I@includedir@; exit 0;;
   --o|--ot|--oth|--othe|--other|--otherl|--otherli|--otherlib|--otherlibs)
      echo @PROPER_LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @PTHREAD_LIBS@ @POSIX_CLOCK_LIBS@;
      exit 0;;
@@ -1557,8 +1673,6 @@ EOF
   --tooll|--toolli|--toollib|--toollibs)
      echo -L@libdir@ -lclicktool @DL_LIBS@ @SOCKET_LIBS@ @POSIX_CLOCK_LIBS@; exit 0;;
   *)
-     echo "Usage: click-buildtool TOOLNAME [ARGUMENTS]
-Try 'click-buildtool --help' for more information." 1>&2
-     exit 1;;
+     main_usage;;
 esac
 done

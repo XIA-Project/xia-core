@@ -7,7 +7,7 @@ CLICK_DECLS
 /*
  * =c
  * LookupIPRouteMP(DST1/MASK1 [GW1] OUT1, DST2/MASK2 [GW2] OUT2, ...)
- * =s smpclick
+ * =s threads
  * simple static IP routing table
  * V<classification>
  * =d
@@ -19,12 +19,6 @@ CLICK_DECLS
  */
 
 class LookupIPRouteMP : public Element {
-#ifdef CLICK_LINUXMODULE
-  static const int _cache_buckets = NR_CPUS;
-#else
-  static const int _cache_buckets = 1;
-#endif
-
   struct cache_entry {
     IPAddress _last_addr_1;
     IPAddress _last_gw_1;
@@ -32,24 +26,26 @@ class LookupIPRouteMP : public Element {
     IPAddress _last_addr_2;
     IPAddress _last_gw_2;
     int _last_output_2;
-    int pad[2];
-  };
+  } __attribute__((aligned(64)));
 
-  // XXX a bit annoying that we don't get better alignment =(
-  int _pad[2];
-  struct cache_entry _cache[_cache_buckets];
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD
+  struct cache_entry *_cache;
+#else
+  struct cache_entry _cache[CLICK_CPU_MAX];
+#endif
 
   IPTable _t;
 
 public:
-  LookupIPRouteMP();
-  ~LookupIPRouteMP();
+  LookupIPRouteMP() CLICK_COLD;
+  ~LookupIPRouteMP() CLICK_COLD;
 
   const char *class_name() const		{ return "LookupIPRouteMP"; }
   const char *port_count() const		{ return "1/-"; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *) CLICK_COLD;
+  void cleanup(CleanupStage stage) CLICK_COLD;
 
   void push(int port, Packet *p);
 };

@@ -59,20 +59,20 @@ Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in)
     XIAHeader xhdr(p_in);  // parse xia header and locate nodes and payload
     ContentHeader ch(p_in);
 
-    const unsigned char *payload=xhdr.payload();
+//	const unsigned char *payload=xhdr.payload();
     int offset=ch.chunk_offset();
     int length=ch.length();
     int chunkSize=ch.chunk_length();
-	
+
     uint32_t contextID=ch.contextID();
     uint32_t cacheSize=ch.cacheSize();
     uint32_t cachePolicy=ch.cachePolicy();
-    uint32_t ttl=ch.ttl();	
-		
-	
+    uint32_t ttl=ch.ttl();
+
+
     XIAHeaderEncap encap;
     XIAHeader hdr(p_in);
-  
+
     encap.set_dst_path(hdr.dst_path());
     encap.set_src_path(hdr.src_path());
     encap.set_nxt(CLICK_XIA_NXT_CID);
@@ -80,36 +80,36 @@ Packet * XIAContentModule::makeChunkPush(CChunk * chunk, Packet *p_in)
 
 //     ContentHeaderEncap  *contenth = ContentHeaderEncap::MakePushHeader(0,  chunk->GetSize() ); //contenth(0, 0, 0, chunk->GetSize());
     ContentHeaderEncap  contenth( offset, offset, length, chunkSize, ContentHeader::OP_PUSH, contextID, ttl, cacheSize, cachePolicy);
-    
-    
+
+
     uint16_t hdrsize = encap.hdr_size()+ contenth.hlen();
     //build packet
     WritablePacket *p = Packet::make(hdrsize, chunk->GetPayload() , chunk->GetSize(), 20 );
 
     p=contenth.encap(p);		// add XIA header
     p=encap.encap( p, false );
-	
+
     if(CACHE_DEBUG)
       click_chatter("Push message built in contentmodule \n");
-    
+
     return p;
 }
 
 
 void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID & dstCID)
 {
-	
+
     printf("process_request - local HID: %s, src HID: %s,  Dest CID: %s\n", _transport->local_hid().unparse().c_str(), srcHID.unparse().c_str(), dstCID.unparse().c_str());
     HashTable<XID,CChunk*>::iterator it;
     it=_contentTable.find(dstCID);
-	
+
 	// simple.html vs. simple_malicious_explanation.html
-	if (malicious && 
+	if (malicious &&
 		strcmp(dstCID.unparse().c_str(), "CID:f85579621d88b11490773d2b6196230bd2beb7b5") == 0)
 	{
-		// If this router is malicous, then this content 
+		// If this router is malicous, then this content
 		// module reponds to requests for the simple.html page
-		// with a version explaining CID security 
+		// with a version explaining CID security
 		XID fakeCID = XID();
 		fakeCID.parse("CID:4e3f8b2d710eb4b1937d22bc2966462b068144d8");
 
@@ -117,25 +117,25 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 	}
 
 	// image.jpg vs. anon.jpg
-	if (malicious && 
+	if (malicious &&
 		strcmp(dstCID.unparse().c_str(), "CID:8b35bac835526705709b4a9560e15a9d066a6900") == 0)
 	{
-		// If this router is malicous, then this content 
+		// If this router is malicous, then this content
 		// module reponds to requests for the umbrella image
-		// with the anonymous image instead. 
+		// with the anonymous image instead.
 		XID fakeCID = XID();
 		fakeCID.parse("CID:5830f441b0895cd2a82d5a13fc64f6e9a5f710ad");
 
     	it=_contentTable.find(fakeCID);
 	}
-	
+
 	// 1st chunk of dongsu demo image vs. 1st chunk of anon.jpg
-	if (malicious && 
+	if (malicious &&
 		strcmp(dstCID.unparse().c_str(), "CID:fc65c7a4afaae5e59fd79af6c3f49fddbc2698de") == 0)
 	{
-		// If this router is malicous, then this content 
+		// If this router is malicous, then this content
 		// module reponds to requests for the umbrella image
-		// with the anonymous image instead. 
+		// with the anonymous image instead.
 		XID fakeCID = XID();
 		fakeCID.parse("CID:dd44c65bc81365ea7dfd2958732a6df937604613");
 
@@ -175,7 +175,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
 
             newp=contenth.encap(newp);
             newp=encap.encap( newp, false );	      // add XIA header
-	    
+
 // 	    click_chatter("Found in my local cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
             _transport->checked_output_push(1 , newp);
             //std::cout<<"In client"<<std::endl;
@@ -220,7 +220,7 @@ void XIAContentModule::process_request(Packet *p, const XID & srcHID, const XID 
             encap.set_plen(l);	// add XIA header
             newp=encap.encap( newp, false );
 // 	    click_chatter("Found in router cache! CID: %s, Local Address: %s\n", dstCID.unparse().c_str(),  _transport->local_hid().unparse().c_str());
-	    
+
             _transport->checked_output_push(0 , newp);
             //std::cout<<"have pushed out"<<std::endl;
             cp += l;
@@ -306,7 +306,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
     int offset=ch.chunk_offset();
     int length=ch.length();
     int chunkSize=ch.chunk_length();
-	
+
 	uint32_t contextID=ch.contextID();
 	uint32_t cacheSize=ch.cacheSize();
     uint32_t cachePolicy=ch.cachePolicy();
@@ -336,7 +336,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
 // 	  click_chatter("Found the Chunk! Push: %d Put:%d\n", pushcid, local_putcid);
 	  if (pushcid){
 // 	      click_chatter("Pushing something that we already have\n");
-	      
+
 	      chunk=cit->second;
 	      chunk->fill(payload, offset, length);
 	      if(chunk->full()) {
@@ -350,7 +350,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
                 _timer = 0;
                 cache_management();
 		}
-	      
+
 	    }else{
 	      if (!local_putcid)
 		  content[srcCID]=1;
@@ -363,7 +363,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
 	      return;
 	    }
         }
-    
+
 #endif
     it=_partialTable.find(srcCID);
     if(it!=_partialTable.end()) { //already in partial table
@@ -414,7 +414,7 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
             gettimeofday(&(ctm->timestamp),NULL);
             HashTable <XID, struct contentMeta*> *cmTable=cm->contentMetaTable;
             (*cmTable)[srcCID]=ctm;
-            
+
             _contentTable[srcCID]=chunk;
             if (local_putcid) {
                 assert(ContentHeader::OP_LOCAL_PUTCID>1);
@@ -444,11 +444,11 @@ void XIAContentModule::cache_incoming_local(Packet* p, const XID& srcCID, bool l
     p->kill();
 }
 
-/** 
- * @brief Clean up local cache based on policy 
+/**
+ * @brief Clean up local cache based on policy
  *
  * @returns Void
- */ 
+ */
 void XIAContentModule::applyLocalCachePolicy(int contextID){
 #ifdef CLIENTCACHE
     struct cacheMeta *cm=_cacheMetaTable[contextID];
@@ -475,16 +475,16 @@ void XIAContentModule::applyLocalCachePolicy(int contextID){
                     cmTable->erase(cit->first);
                     content.erase(cit->first);
                     if(CACHE_DEBUG){
-                    click_chatter("RM [%s] Size: %d\n", cit->first.unparse().c_str(), 
+                    click_chatter("RM [%s] Size: %d\n", cit->first.unparse().c_str(),
                             chunkSize);
                     }
                     _contentTable.erase(cit);
                     free(cPtr);
                     if(cm->curSize < cm->maxSize){
-                        done=true;                        
+                        done=true;
                         break;
                     }
-                }       
+                }
             }
             cit++;
         }
@@ -500,7 +500,7 @@ void XIAContentModule::applyLocalCachePolicy(int contextID){
                     cmTable->erase(tmp);
                     content.erase(tmp);
                     if(CACHE_DEBUG){
-                    click_chatter("RM [%s] Size: %d\n", _contentTable.find(tmp)->first.unparse().c_str(), 
+                    click_chatter("RM [%s] Size: %d\n", _contentTable.find(tmp)->first.unparse().c_str(),
                             chunkSize);
                     }
                     _contentTable.erase(tmp);
@@ -518,12 +518,12 @@ void XIAContentModule::applyLocalCachePolicy(int contextID){
 
 /**
  * @brief check if a content is expired
- * 
+ *
  * @returns True if it is expired
  */
 bool XIAContentModule::isExpiredContent(struct contentMeta* cm){
     int ttl=cm->ttl;
-    struct timeval *thisTime=&(cm->timestamp);    
+    struct timeval *thisTime=&(cm->timestamp);
     struct timeval curTime;
     gettimeofday(&curTime,NULL);
     if(thisTime->tv_sec+ttl >= curTime.tv_sec){
@@ -557,7 +557,7 @@ const XID* XIAContentModule::findOldestContent(int contextID){
 }
 
 void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
-    XIAHeader xhdr(p); 
+    XIAHeader xhdr(p);
     ContentHeader ch(p);
 
 	uint32_t contextID=ch.contextID();
@@ -571,7 +571,7 @@ void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
             cmTable->erase(srcCID);
             content.erase(srcCID);
             if(CACHE_DEBUG){
-            click_chatter("RMCID Request [%s] Size: %d\n", _contentTable.find(srcCID)->first.unparse().c_str(), 
+            click_chatter("RMCID Request [%s] Size: %d\n", _contentTable.find(srcCID)->first.unparse().c_str(),
                             chunkSize);
             }
             delRoute(srcCID);
@@ -582,7 +582,7 @@ void XIAContentModule::cache_incoming_remove(Packet *p, const XID& srcCID){
             }
         }
     }
-    
+
 }
 
 void XIAContentModule::cache_management()
@@ -634,12 +634,12 @@ void XIAContentModule::cache_incoming(Packet *p, const XID& srcCID, const XID& d
 	}
     //FIXME: This comparison is just wrong. dstHID that is passed is hardcoded and sometimes different types are being compared
     if(local_putcid || dstHID==_transport->local_hid()){
-      
+
         // cache in client: if it is local putCID() then store content. Otherwise, should return the whole chunk if possible
 // 	printf("cache_incoming_local - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
-        cache_incoming_local(p, srcCID, local_putcid, local_pushcid);	    
+        cache_incoming_local(p, srcCID, local_putcid, local_pushcid);
     }else if(local_removecid){
-      
+
 // 	printf("cache_incoming_remove - local HID: %s, Dest HID: %s\n", _transport->local_hid().unparse().c_str(), dstHID.unparse().c_str());
         cache_incoming_remove(p, srcCID);
     }

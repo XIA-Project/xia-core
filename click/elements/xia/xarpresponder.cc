@@ -4,7 +4,7 @@
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2005 Regents of the University of California
- * Copyright (c) 2008-2009 Meraki, Inc. 
+ * Copyright (c) 2008-2009 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -16,8 +16,8 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
- 
-// Modified from original ARP code 
+
+// Modified from original ARP code
 
 #include <click/config.h>
 #include "xarpresponder.hh"
@@ -49,25 +49,22 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
 
     Vector<Entry> entries;
     EtherAddress ena;
-    bool have_ena = false;
-    
+
     if (cp_va_kparse(words, this, errh,
 	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
-	return -1;    
-    
+	return -1;
+
     v.push_back(Entry());
-    v.back().xida = _my_xid;    
-    
-    if (EtherAddressArg().parse(words[1], ena, this)) {
-    	have_ena = true;
-    } else {
+    v.back().xida = _my_xid;
+
+    if (!EtherAddressArg().parse(words[1], ena, this)) {
     	return errh->error("Ethernet address format error");
     }
-    
-    v.back().ena = ena; 
-    return 0;  
+
+    v.back().ena = ena;
+    return 0;
 }
 
 int
@@ -170,15 +167,15 @@ XARPResponder::simple_action(Packet *p)
 	&& ea->ea_hdr.ar_hrd == htons(XARPHRD_ETHER)
 	&& ea->ea_hdr.ar_pro == htons(ETHERTYPE_XIP)
 	&& ea->ea_hdr.ar_op == htons(XARPOP_REQUEST)) {
-		
+
 	struct click_xia_xid xid_tmp;
-    	memcpy( &(xid_tmp.type), ea->xarp_tpa, 4); 
+    	memcpy( &(xid_tmp.type), ea->xarp_tpa, 4);
     	for (size_t d = 0; d < sizeof(xid_tmp.id); d++) {
     		xid_tmp.id[d] = ea->xarp_tpa[4 + d];
     	}
     	XID xid = xid_tmp;
-	
-	
+
+
 	if (const EtherAddress *ena = lookup(xid))
 	    q = make_response(ea->xarp_sha, ea->xarp_spa, ena->data(), ea->xarp_tpa, p);
     }
@@ -200,7 +197,7 @@ XARPResponder::read_handler(Element *e, void *)
 }
 
 int
-XARPResponder::lookup_handler(int, String &str, Element *e, const Handler *, ErrorHandler *errh)
+XARPResponder::lookup_handler(int, String &str, Element *e, const Handler *, ErrorHandler * /* errh */)
 {
     XARPResponder *ar = static_cast<XARPResponder *>(e);
     XID xid(str);

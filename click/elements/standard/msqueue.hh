@@ -8,7 +8,7 @@ CLICK_DECLS
  * MSQueue
  * MSQueue(CAPACITY)
  * =deprecated ThreadSafeQueue
- * =s smpclick
+ * =s threads
  * stores packets in a FIFO queue
  * =d
  * Stores incoming packets in a multiple producer single consumer
@@ -27,13 +27,12 @@ CLICK_DECLS
 
 class MSQueue : public ThreadSafeQueue { public:
 
-    MSQueue();
-    ~MSQueue();
+    MSQueue() CLICK_COLD;
 
     const char *class_name() const		{ return "MSQueue"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 #if CLICK_LINUXMODULE && __i386__ && HAVE_INTEL_CPU
     static void prefetch_packet(Packet *p);

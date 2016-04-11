@@ -281,7 +281,7 @@ void outb(const PacketDesc& d, bool, const FieldWriter *f)
       }
       case B_6PTR: {
 	  char* c = d.sa->extend(6);
-	  memcpy(c, d.vptr, 6);
+	  memcpy(c, d.vptr[0], 6);
 	  break;
       }
       case B_8: {
@@ -375,6 +375,7 @@ void ip_prepare(PacketDesc &d, const FieldWriter *)
 	    /* This doesn't actually kill the IP header. */
 	    int scratch;
 	    BAD2("truncated IP missing ", (ntohs(d.iph->ip_len) - p->network_length() - EXTRA_LENGTH_ANNO(p)), scratch);
+	    (void) scratch;
 	}
     }
 

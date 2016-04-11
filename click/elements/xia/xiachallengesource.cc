@@ -117,7 +117,7 @@ XIAChallengeSource::generate_secret()
 {
     static const char characters[] =
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    for (int i=0;i<router_secret_length;i++) {
+    for (size_t i=0;i<router_secret_length;i++) {
         router_secret[i] = characters[rand() % (sizeof(characters) - 1)];
     }
     router_secret[router_secret_length] = 0;
@@ -148,8 +148,6 @@ XIAChallengeSource::digest_to_hex_string(unsigned char *digest, int digest_len, 
 void
 XIAChallengeSource::verify_response(Packet *p_in)
 {
-    int i, j;
-	char* pch;
 	uint16_t length;
 
 	// Get the src and dst addresses
@@ -273,9 +271,6 @@ XIAChallengeSource::is_verified(Packet *p)
 void
 XIAChallengeSource::send_challenge(Packet *p)
 {
-	int i;
-	char* pch;
-
 	// Get the src and dst addresses
 	XIAHeader xiah(p->xia_header());
 	XIAPath src_dag = xiah.src_path();

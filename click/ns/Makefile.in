@@ -26,6 +26,8 @@ RANLIB = @RANLIB@
 INSTALL = @INSTALL@
 mkinstalldirs = $(conf_auxdir)/mkinstalldirs
 
+CLICK_BUILDTOOL = $(top_builddir)/bin/click-buildtool
+
 ifeq ($(V),1)
 ccompile = $(COMPILE) $(DEPCFLAGS) $(1)
 ccompile_nodep = $(COMPILE) $(1)
@@ -56,7 +58,7 @@ endif
 
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
-	bitvector.o vectorv.o templatei.o bighashmap_arena.o hashallocator.o \
+	bitvector.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
@@ -80,9 +82,9 @@ CXXFLAGS = @CXXFLAGS@ -fPIC
 
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
-	-I$(srcdir) -I$(top_srcdir) @PCAP_INCLUDES@
+	-I$(srcdir) -I$(top_srcdir) @PCAP_INCLUDES@ @NETMAP_INCLUDES@
 LDFLAGS = @LDMODULEFLAGS@
-LIBS = @LIBS@ `$(top_builddir)/click-buildtool --otherlibs` $(ELEMENT_LIBS)
+LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
 
 CXXCOMPILE = $(CXX) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS)
 CXXLD = $(CXX)
@@ -94,10 +96,17 @@ LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 ifndef MINDRIVER
 ELEMENTSCONF = elements
 INSTALLLIBS = libnsclick.@SOSUFFIX@
-FINDELEMFLAGS = @FINDELEMFLAGS@
+FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
+-include elements.csmk
 else
 ELEMENTSCONF = elements_$(MINDRIVER)
 INSTALLLIBS = libns$(MINDRIVER)click.@SOSUFFIX@
+endif
+
+ifneq ($(ELEMENT_CHECKSUM),)
+ifneq ($(shell $(ELEMENT_CHECKSUMCOMMAND)),$(ELEMENT_CHECKSUM))
+$(shell rm -f $(ELEMENTSCONF).conf $(ELEMENTSCONF).csmk)
+endif
 endif
 
 all: $(INSTALLLIBS)
@@ -107,29 +116,28 @@ ifneq ($(MAKECMDGOALS),clean)
 endif
 
 libnsclick.so: Makefile $(LIBOBJS) $(OBJS)
-	$(CXXLINK) -shared $(LIBOBJS) $(OBJS)
+	$(CXXLINK) -shared $(LIBOBJS) $(OBJS) $(LIBS)
 libnsclick.dylib: Makefile $(LIBOBJS) $(OBJS)
-	$(CXXLINK) -dynamiclib $(LIBOBJS) $(OBJS)
+	$(CXXLINK) -dynamiclib $(LIBOBJS) $(OBJS) $(LIBS)
 libnsclick.a: Makefile $(LIBOBJS) $(OBJS)
-	$(AR_CREATE) libnsclick.a $(LIBOBJS) $(OBJS)
+	$(AR_CREATE) libnsclick.a $(LIBOBJS) $(OBJS) $(LIBS)
 	$(RANLIB) libnsclick.a
 
 nsclick-test: libnsclick.a nsclick-test.o
 	$(CXXLD) $(CXXFLAGS) @LDFLAGS@ -o $@ nsclick-test.o libnsclick.a $(LIBS)
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
-	cd $(top_builddir) \
-	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 elemlist:
-	@rm -f elements.conf
+	@rm -f elements.conf elements.csmk
 	@$(MAKE) elements.conf
-elements.conf: $(top_builddir)/config.status $(top_builddir)/click-buildtool
-	echo "ns userlevel @element_groups@" | $(top_builddir)/click-buildtool findelem -r ns -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) > elements.conf
-$(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
-	$(top_builddir)/click-buildtool elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).mk
-$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
-	$(top_builddir)/click-buildtool elem2export < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).cc
+elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
+	echo "ns userlevel @element_groups@" | $(CLICK_BUILDTOOL) findelem -r ns -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) > elements.conf
+$(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(CLICK_BUILDTOOL) elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).mk
+$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf > $(ELEMENTSCONF).cc
 	@rm -f $(ELEMENTSCONF).d
 
 DEPFILES := $(wildcard *.d)
@@ -146,7 +154,7 @@ uninstall:
 	for i in $(INSTALLLIBS); do rm -f $(DESTDIR)$(libdir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libnsclick.a \
+	rm -f *.d *.o $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libnsclick.a \
 	$(INSTALLLIBS)
 distclean: clean
 	-rm -f Makefile

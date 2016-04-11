@@ -8,29 +8,28 @@ CLICK_DECLS
  * =c
  * Truncate(LENGTH)
  * =s basicmod
- * limit packet length.
+ * limit packet length
  * =d
  * Shorten packets to at most LENGTH bytes.
  *
  * The EXTRA_LENGTH keyword argument determines whether packets' extra length
  * annotations are updated to account for any dropped bytes.  Default is true.
- * =a Strip
+ * =a Strip, Pad
  */
 
 class Truncate : public Element { public:
 
-    Truncate();
-    ~Truncate();
+    Truncate() CLICK_COLD;
 
     const char *class_name() const		{ return "Truncate"; }
     const char *port_count() const		{ return PORTS_1_1; }
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }
 
     Packet *simple_action(Packet *);
 
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
   private:
 

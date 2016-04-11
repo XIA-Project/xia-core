@@ -5,7 +5,7 @@
 #include <click/packet.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
-#include <click/dequeue.hh>
+#include <click/deque.hh>
 CLICK_DECLS
 
 /*
@@ -65,22 +65,22 @@ CLICK_DECLS
 
 class ACKRetrySender : public Element {
 public:
-  ACKRetrySender();
-  ~ACKRetrySender();
+  ACKRetrySender() CLICK_COLD;
+  ~ACKRetrySender() CLICK_COLD;
 
   const char *class_name() const { return "ACKRetrySender"; }
   const char *port_count() const { return "-/-"; }
   const char *processing() const { return "la/hh"; }
   const char *flow_code()  const { return "xy/xx"; }
 
-  int configure(Vector<String> &, ErrorHandler *);
-  int initialize(ErrorHandler *errh);
+  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+  int initialize(ErrorHandler *errh) CLICK_COLD;
 
   bool run_task(Task *);
   void run_timer(Timer *);
   void push(int, Packet *);
 
-  void add_handlers();
+  void add_handlers() CLICK_COLD;
 
 private:
   unsigned int _timeout; // msecs
@@ -96,7 +96,7 @@ private:
     bool success;
   };
 
-  typedef DEQueue<tx_result_t> HistQ;
+  typedef Deque<tx_result_t> HistQ;
   HistQ _history;
 
   Packet *_waiting_packet;

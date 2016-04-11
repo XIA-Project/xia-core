@@ -3,6 +3,8 @@ use Symbol 'qualify_to_ref';
 use IO::Handle;
 use Errno;
 use POSIX ":sys_wait_h";
+use MIME::Base64;
+use Time::HiRes qw(gettimeofday);
 no locale;
 use bytes;
 require 5.006;
@@ -201,6 +203,7 @@ package Testie;
 
 my %_special_filerefs = ('stdin' => 1, 'stdout' => 2, 'stderr' => 2);
 %_variables = ();
+$timeout = 45;
 
 sub _get ($;$) {
     my($tt, $acrossfiles) = @_;
@@ -392,7 +395,8 @@ sub braces_to_regex ($$) {
 	    $x = $before . $after;
 	} else {
 	    $before = quotemeta($before) if $mode == 1;
-	    $re .= $before . $middle;
+            $middle =~ s,(\A|[^\\]|\\\\)/,$1\\/,g; # not 100% right sadly
+            $re .= $before . "(?:" . $middle . ")";
 	    $x = $after;
 	}
     }
@@ -400,8 +404,8 @@ sub braces_to_regex ($$) {
     wantarray ? ($re . $x, $message) : $re . $x;
 }
 
-sub _read_file_section ($$$$) {
-    my($tt, $args, $secname, $prefix) = @_;
+sub _read_file_section ($$$$;$) {
+    my($tt, $args, $secname, $prefix, $backup_file) = @_;
     $args =~ s/\s+$//;
 
     # split arguments to get fileref
@@ -411,8 +415,8 @@ sub _read_file_section ($$$$) {
     die if $secname ne 'file' && $secname ne 'expect' && $secname ne 'expectv' && $secname ne 'expectx' && $secname ne 'ignore' && $secname ne 'ignorex' && $secname ne 'ignorev';
 
     # check for alternates and length
-    my($alternate, $delfirst, $whitespace, $regex_opts, $length)
-	= (0, 0, 0, '', undef);
+    my($alternate, $delfirst, $whitespace, $base64, $regex_opts, $length)
+	= (0, 0, 0, 0, '', undef);
     while (@args) {
 	if ($args[0] =~ /\A-a/) {
 	    $alternate = 1;
@@ -420,6 +424,8 @@ sub _read_file_section ($$$$) {
 	    $delfirst = 1;
 	} elsif ($args[0] =~ /\A-i/) {
 	    $regex_opts .= "(?i)";
+        } elsif ($args[0] =~ /\A-e/) {
+            $base64 = 1;
 	} elsif ($args[0] =~ /\A-w/) {
 	    $whitespace = 1;
 	} elsif ($args[0] =~ /\A\+(\d+)\z/) {
@@ -432,7 +438,9 @@ sub _read_file_section ($$$$) {
     }
 
     # make sure there are filerefs
-    if (!@args) {
+    if (!@args && $backup_file) {
+        push @args, $backup_file;
+    } elsif (!@args) {
 	push @args, "stdin" if $secname eq 'file';
 	push @args, "stdout" if $secname eq 'expect' || $secname eq 'expectv' || $secname eq 'expectx';
 	push @args, "all" if $secname eq 'ignore' || $secname eq 'ignorev' || $secname eq 'ignorex';
@@ -447,6 +455,10 @@ sub _read_file_section ($$$$) {
     }
     if (($secname eq 'file' || $secname eq 'expectv') && $whitespace) {
 	$tt->file_err("'\%$secname -w' is illegal");
+    }
+    $secname .= "v" if $secname eq "expect" && $base64;
+    if (($secname eq "filex" || $secname eq "expectx" || $secname eq "ignore" || $secname eq "ignorev" || $secname eq "ignorex") && $base64) {
+	$tt->file_err("'\%$secname -e' is illegal");
     }
 
     # read contents
@@ -489,6 +501,9 @@ sub _read_file_section ($$$$) {
 	$file_data =~ s{\{\{}{\{\{$regex_opts}g;
     } elsif ($regex_opts) {
 	$file_data =~ s{^(?=.)}{$regex_opts}mg;
+    }
+    if ($base64) {
+        $file_data = MIME::Base64::decode_base64($file_data);
     }
 
     # stick contents where appropriate
@@ -560,13 +575,13 @@ sub parse ($) {
 	    } elsif ($command eq 'cut') {
 		$tt->_read_text_into('cut');
 	    } elsif ($command eq 'stdin' || $command eq 'input') {
-		$tt->_read_file_section($args, 'file', 'f');
+		$tt->_read_file_section($args, "file", "f", "stdin");
 	    } elsif ($command eq 'file') {
 		$tt->_read_file_section($args, 'file', 'f');
 	    } elsif ($command eq 'stdout' || $command eq 'output') {
-		$tt->_read_file_section($args, 'expect', 'e');
+		$tt->_read_file_section($args, "expect", "e", "stdout");
 	    } elsif ($command eq 'stderr') {
-		$tt->_read_file_section($args, 'expect', 'e');
+		$tt->_read_file_section($args, "expect", "e", "stderr");
 	    } elsif ($command eq 'expect') {
 		$tt->_read_file_section($args, 'expect', 'e');
 	    } elsif ($command eq 'expectx') {
@@ -593,7 +608,7 @@ sub parse ($) {
 		    push @ilines, [$tt->{"_file"}, $tt->{"_line"}];
 		    unshift @{$tt->{"_data"}}, @ilines;
 		} else {
-		    $tt->file_err("%include $args: $!");
+		    $tt->file_err("\%include $args: $!");
 		}
 	    } elsif ($command eq 'eot') {
 		unshift @{$tt->{"_data"}}, [$tt->{"_file"}, $tt->{"_line"}];
@@ -689,14 +704,18 @@ EOD;
     }
 
     my($scriptarr, $linenoarr) = ($tt->{$script_type}, $tt->{$script_type . "_lineno"});
+    my($last_unfinished) = 0;
     foreach my $i (0..$#{$tt->{$script_type}}) {
 	my($ln, $text) = ($linenoarr->[$i], $scriptarr->[$i]);
-	$t .= "echo >&2; echo testie_lineno:$ln >&2\n" if !$::expand_mode;
+        if (!$::expand_mode && !$last_unfinished) {
+            $t .= "echo >&2; echo testie_lineno:$ln >&2\n";
+        }
 	my(@c, @d);
 	_shell_split(@c, "", @d, $text, 0);
 	die if @c != 1;
 	chomp $c[0];
 	next if $c[0] =~ /^\s*$/s;
+        $last_unfinished = ($c[0] =~ /(?:\&\&|\|\||\|)\s*\z/);
 	$c[0] =~ s,^(\s*)\./,$1../, if !$::expand_mode;
 	$t .= $c[0] . "\n";
     }
@@ -714,13 +733,15 @@ sub output_error ($$$$) {
 	return $tctr;
     }
 
-    my($errortext, $t, $lineno, $failure) = ('');
+    my($errortext, $subtest, $t, $lineno, $failure) = ('', '');
     while ($t = <ERR>) {
 	if ($t =~ /^testie_lineno:(.*)$/) {
 	    $lineno = $1;
 	    $errortext = '';
 	} elsif ($t =~ /^testie_failure:(.*)$/) {
 	    $failure = $1;
+        } elsif ($t =~ /^testie_subtest (.*)$/) {
+            $subtest = " subtest $1";
 	} else {
 	    $errortext .= $t;
 	}
@@ -732,8 +753,10 @@ sub output_error ($$$$) {
     my($failure_text);
     if (!defined($failure)) {
 	$failure_text = "undefined error";
+    } elsif ($failure eq "timeout") {
+        $failure_text = "timed out after $Testie::timeout sec";
     } elsif ($failure == 1) {
-	$failure_text = "failure";
+        $failure_text = "failure";
     } else {
 	$failure_text = "error $failure";
     }
@@ -751,6 +774,7 @@ sub output_error ($$$$) {
     # exit early if quiet
     return $tctr if $tt->{$script_type . '_quietline'}->{$lineno} && $::verbose <= 0;
 
+    $lineno .= $subtest;
     if ($errortext =~ /^testie_error:/) {
 	while ($errortext =~ /^testie_error:([^\n]*)/g) {
 	    $tt->eh->message($lineno, ": ", $1, "\n");
@@ -937,11 +961,11 @@ sub _create_ignores ($$) {
     if ($ignores eq "" && $wignores eq "") {
 	return undef;
     } elsif ($wignores eq "") {
-	$ignores =~ s{^([ \t]*\S[^\n]*)}{\$t =~ s\376^$1\[ \\t\]*\$\376\\377\376mg;}mg;
+	$ignores =~ s{^([ \t]*\S[^\n]*)}{\$t =~ s/^$1\[ \\t\]*\$/\\377/mg;}mg;
 	$body = "sub (\$) { my(\$t) = \@_; $ignores \$t; }\n";
     } else {
-	$ignores =~ s{^([ \t]*\S[^\n]*)}{s\376\\A$1\[ \\t\]*\\z\376\\377\376;}mg;
-	$wignores =~ s{^(\S[^\n]*)}{\$_ = "\\377" if \$x =~ m\376\\A$1\\z\376;}mg;
+	$ignores =~ s{^([ \t]*\S[^\n]*)}{s/\\A$1\[ \\t\]*\\z/\\377/;}mg;
+	$wignores =~ s{^(\S[^\n]*)}{\$_ = "\\377" if \$x =~ m/\\A$1\\z/;}mg;
 	$body = "sub (\$) { my(\$t) = \@_; my(\$x); join(\"\\n\", map { "
 	    . "\$x = \$_; \$x =~ tr/ \\f\\r\\t\\013//d;\n$ignores$wignores "
 	    . "\"\$_\\n\" } split /\\n/, \"\$t\\n\"); }\n";
@@ -1028,11 +1052,31 @@ sub _shell ($$$$$) {
 	open(STDERR, ">", $stderr) || die "$stderr: $!\n";
 	my($var, $val);
 	$ENV{$var} = $val while (($var, $val) = each %Testie::_variables);
+        $ENV{"rundir"} = "..";
 	exec $SHELL, "-e", $scriptfn;
     } else {
 	$running_pid = $child_pid;
-	waitpid($child_pid, 0);	# assume it succeeds
-	my($result) = $?;
+        my($result) = undef;
+        if ($Testie::timeout > 0) {
+            my($before) = Time::HiRes::time();
+            my($delta) = 10;
+            do {
+                Time::HiRes::usleep($delta);
+                $result = $? if waitpid($child_pid, WNOHANG) > 0;
+                $delta = ($delta < 150000 ? $delta * 2 : 300000);
+            } while (!defined($result) && Time::HiRes::time() < $before + $Testie::timeout);
+            if (!defined($result)) {
+                if (open(X, ">>", out_script_fn_to_fn($stderr))) {
+                    print X "testie_failure:timeout\n";
+                    close X;
+                }
+                $result = 124;
+            }
+            $result = 124 if !defined($result);
+        } else {
+            waitpid($child_pid, 0);
+        }
+        $result = $? if !defined($result);
 	# sleep for 1 millisecond to give remaining background jobs a chance
 	# to die
 	select(undef, undef, undef, 0.001);
@@ -1082,12 +1126,12 @@ sub execute_test ($$) {
 
     # check requirements
     if (exists $tt->{'require'}) {
-	open(SCR, ">", "$dir/+require+") || die "$dir/+require+: $!\n";
+	open(SCR, ">", "$dir/\%require") || die "$dir/\%require: $!\n";
 	print SCR $tt->script_text(\&script_fn_to_fn, 'require');
 	close SCR;
 
 	if (!$expand_mode) {
-	    my($exitval) = _shell($dir, '+require+', '/dev/null', '/dev/null', script_fn_to_fn('stderr'));
+	    my($exitval) = _shell($dir, '%require', '/dev/null', '/dev/null', script_fn_to_fn('stderr'));
 
 	    # if it exited with a bad value, quit
 	    if ($exitval) {
@@ -1100,7 +1144,7 @@ sub execute_test ($$) {
     $tt->save_files(\&out_script_fn_to_fn);
 
     # save the script
-    open(SCR, ">", "$dir/+script+") || die "$dir/+script+: $!\n";
+    open(SCR, ">", "$dir/\%script") || die "$dir/\%script: $!\n";
     print SCR $tt->script_text(\&script_fn_to_fn, 'script');
     close SCR;
 
@@ -1111,7 +1155,7 @@ sub execute_test ($$) {
     my($actual_stdin) = ($tt->have_file('stdin') ? script_fn_to_fn('stdin') : "/dev/null");
     my($actual_stdout) = ($show_stdout || $tt->have_file('stdout') ? script_fn_to_fn('stdout') : "/dev/null");
     my($actual_stderr) = script_fn_to_fn('stderr');
-    my($exitval) = _shell($dir, '+script+', $actual_stdin, $actual_stdout, $actual_stderr);
+    my($exitval) = _shell($dir, '%script', $actual_stdin, $actual_stdout, $actual_stderr);
 
     # expand "--show-alls"
     my(@xshow);
@@ -1394,17 +1438,19 @@ Usage: testie [OPTIONS] [FILE]...
 Options:
   VARIABLE=VALUE             Variable settings for test script.
   -V, --verbose              Print information for successful tests.
-  -VV, --superverbose        Print initial \%info for all tests.
+  -VV, --superverbose        Print initial %info for all tests.
   -s, --show TESTIEFILE      Show contents of TESTIEFILE on completion.
   -S, --show-raw TESTIEFILE  Like --show, but include ignored lines.
   --show-all                 Show contents of all TESTIEFILEs on completion.
   --show-all-raw             Like --show-all, but include ignored lines.
   --preserve-temporaries     Preserve temporary files.
   -e, --expand               Expand test files into current directory.
+  -p, --path DIR             Prepend DIR to PATH.
+  -t, --timeout T            Set timeout to T [45 sec].
   -v, --version              Print version information and exit.
   --help                     Print this message and exit.
 
-Report bugs and suggestions to <kohler@icir.org>.
+Report bugs and suggestions to <kohler@seas.harvard.edu>.
 EOD;
     exit(0);
 }
@@ -1420,6 +1466,7 @@ EOD;
 sub print_version () {
     print <<'EOD;';
 Testie 1.3
+Copyright (c) 2002-2016 Eddie Kohler
 Copyright (c) 2002-2003 International Computer Science Institute
 Copyright (c) 2004-2007 Regents of the University of California
 Copyright (c) 2008-2010 Meraki, Inc.
@@ -1468,7 +1515,7 @@ sub search_dir ($$) {
 
 $dir = undef;
 
-my(@tests, $arg, $jobs);
+my(@tests, $arg, $jobs, @pathprepend);
 $Testie::_variables{"LC_ALL"} = "C";
 
 while (@ARGV) {
@@ -1497,9 +1544,16 @@ while (@ARGV) {
 	$dir = ".";
     } elsif (argcmp($_, '--help', 1)) {
 	help;
-    } elsif (argcmp($_, '--preserve-temporaries', 1)
-	     || argcmp($_, '--preserve-temps', 1)) {
+    } elsif (argcmp($_, '--preserve-temporaries', 2)
+	     || argcmp($_, '--preserve-temps', 2)) {
 	$preserve_temporaries = 1;
+    } elsif (/^-p$/ || argcmp($_, '--path', 2)) {
+	usage if @ARGV == 0;
+	push @pathprepend, shift @ARGV;
+    } elsif (/^-p(.+)$/) {
+	push @pathprepend, $1;
+    } elsif (argcmp($_, '--path', 2, $arg)) {
+	push @pathprepend, $arg;
     } elsif (/^-s$/ || argcmp($_, '--show', 2)) {
 	usage if @ARGV == 0;
 	push @show, [(shift @ARGV), 1];
@@ -1518,6 +1572,13 @@ while (@ARGV) {
 	push @show, ["*", 1];
     } elsif (argcmp($_, '--show-all-raw', 9)) {
 	push @show, ["*", 0];
+    } elsif (/^-t$/ || argcmp($_, '--timeout', 1)) {
+        usage if @ARGV == 0;
+        $Testie::timeout = shift @ARGV;
+    } elsif (/^-t(.+)$/) {
+        $Testie::timeout = $1;
+    } elsif (argcmp($_, '--timeout', 1, $arg)) {
+        $Testie::timeout = $arg;
     } elsif (/^-j$/ || argcmp($_, "--jobs", 1)) {
 	usage if @ARGV == 0 || $ARGV[0] !~ /\A\d+\z/;
 	$jobs = shift @ARGV;
@@ -1528,6 +1589,19 @@ while (@ARGV) {
     } else {
 	usage;
     }
+}
+
+# prepend to path
+if (@pathprepend) {
+    my($i, $cwd);
+    chomp($cwd = `pwd`);
+    for ($i = 0; $i != @pathprepend; ++$i) {
+        if ($pathprepend[$i] !~ m{\A/}) {
+            $pathprepend[$i] =~ s{\A\./}{};
+            $pathprepend[$i] = $cwd . "/" . $pathprepend[$i];
+        }
+    }
+    $ENV{"PATH"} = join(":", @pathprepend) . ":" . $ENV{"PATH"};
 }
 
 # check @show for stdout/stderr
@@ -1592,229 +1666,248 @@ testie - simple test harness
 
 =head1 SYNOPSIS
 
-  testie [OPTIONS] [FILE]...
+testie [OPTIONS] [FILE]...
 
 =head1 DESCRIPTION
 
-Testie is a simple test harness. Each testie test file incorporates a shell
-script to be run and, optionally, input and expected output files for that
-script. Testie runs the script; the test fails if any of the script
-commands fail, or if the script generates unexpected output.
+Testie is a simple test harness. A testie test comprises a shell
+script and, optionally, input and expected output files for that
+script. Testie runs the script; the test succeeds if all of the script
+commands succeed, and the actual output files match expectations.
 
-To run testie, pass it one or more test filenames. It will print useful
-error messages for failed tests. Alternatively, give it directory names;
-the directories are recursively searched for 'F<*.testie>' files.
+Testie accepts test filenames and directories as arguments.
+Directories are recursively searched for F<*.testie> files. It
+reports problems for failed tests, plus a summary.
 
-Return status is 0 if all tests succeed, 1 if any test fails, and 2 if a
-test fails due to an internal error. Tests whose %require prerequisites
-fail do not affect the return status, except that if all tests'
-prerequisites fail, the return status is 1 instead of 0.
+Testie exits with status 0 if all tests succeed, 1 if any test fails,
+and 2 if a test fails due to an internal error. Tests whose B<%require>
+prerequisites fail do not affect the exit status, except that if all
+tests' prerequisites fail, the return status is 1 instead of 0.
 
 =head1 OPTIONS
 
 =over 8
 
+=item B<-j>I<N>, B<--jobs>=I<N>
+
+Run up to I<N> tests simultaneously. Like Make's B<-j> option.
+
 =item I<VARIABLE>=I<VALUE>
 
 Provide an environment variable setting for I<VARIABLE> within the script.
 
-=item -V, --verbose
+=item B<-s>, B<--show> I<FILE>
+
+Echo the contents of I<FILE> on completion. I<FILE> should be one of the
+filenames specified by B<%file> or B<%expect>, or B<stdout> or B<stderr>.
+Leaves out any ignored lines.
+
+=item B<-S>, B<--show-raw> I<FILE>
+
+Like B<--show>, but includes any ignored lines.
+
+=item B<--show-all>
+
+Calls B<--show> for all filenames specified by any B<%expect>, plus B<stdout>
+and B<stderr>. Leaves out any ignored lines.
+
+=item B<--show-all-raw>
+
+Like B<--show-all>, but includes any ignored lines.
+
+=item B<-e>, B<--expand>
+
+Don't run the given test; instead, expand its files into the current
+directory. The script is stored in a file called F<%script>.
+
+=item B<--preserve-temporaries>
+
+Preserve temporary test directories. Testie runs each test in its own
+subdirectory of the current directory. Test directories are named
+F<testieNNNNN>, and are typically removed on test completion.
+Examining the contents of a test directory can be useful when
+debugging a test.
+
+=item B<-p>, B<--path> I<DIR>
+
+Prepend I<DIR> to the C<PATH> environment variable before running the
+test script.
+
+=item B<-V>, B<--verbose>
 
 Print information to standard error about successful tests as well as
 unsuccessful tests.
 
-=item -VV, --superverbose
+=item B<-VV>, B<--superverbose>
 
-Like --verbose, but use a slightly different format, and additionally print
-every test's %info section before the test results.
+Like B<--verbose>, but use a slightly different format, and
+additionally print every test's B<%info> section before the test results.
 
-=item -q, --quiet
+=item B<-q>, B<--quiet>
 
 Don't print information to the terminal while running multiple tests.
 
-=item -v, --version
+=item B<-v>, B<--version>
 
 Print version number information and exit.
 
-=item --help
+=item B<--help>
 
 Print help information and exit.
-
-=item --preserve-temporaries
-
-Preserve the temporary directory created for the test.
-
-=item -s, --show FILE
-
-Echo the contents of FILE on completion. FILE should be one of the
-filenames specified by %file or %expect*, or 'stdout' or 'stderr'.
-Leaves out any ignored lines.
-
-=item -S, --show-raw FILE
-
-Like --show, but includes any ignored lines.
-
-=item --show-all
-
-Like '--show' for all filenames specified by any %expect*, plus 'stdout'
-and 'stderr'.  Leaves out any ignored lines.
-
-=item --show-all-raw
-
-Like '--show-raw' for all filenames specified by any %expect*,
-plus 'stdout' and 'stderr'.  Includes any ignored lines.
-
-=item -e, --expand
-
-Don't run the given test; instead, expand its files into the current
-directory.  The script is stored in a file called '+script+'.
-
-=item -jI<N>, --jobs=I<N>
-
-Run up to I<N> tests simultaneously.  Like Make's '-j' option.
 
 =back
 
 =head1 FILE FORMAT
 
 Testie test files consist of several sections, each introduced by a line
-starting with %. There must be, at least, a %script section.
-
-The %file and %expect* sections define input and/or output files by
-name. Testie runs its script in a private directory in F</tmp>; any files
-mentioned in %file or %expect* are placed in that directory.
+starting with B<%>. There must be, at least, a B<%script> section.
+The B<%file> and B<%expect> sections define input and output files by
+name.
 
 =over 8
 
-=item %script
+=item B<%script>
 
-The shell script (in sh syntax) that controls the test. Testie will run
-each command in sequence. Every command in the script must succeed, with
-exit status 0, or the test will fail. Use %file sections to define script
-input files and %expect* sections to check script output files for expected
-values.
+The B<sh> shell script that controls the test. Testie will run each
+command in sequence. Every command in the script must succeed, with
+exit status 0, or the test will fail. Use B<%file> sections to define
+script input files and B<%expect> sections to check script output files
+for expected values.
 
-The %script section can contain multiple subtests. To start a new subtest,
-execute a command like "testie_subtest SECTIONNAME". Testie will report the
-offending SECTIONNAME when standard output or error doesn't match an
-expected value.
+The B<%script> section can contain subtests. To start a new subtest,
+execute a command like S<C<testie_subtest SECTIONNAME>>. Testie will
+report the problematic C<SECTIONNAME> when standard output or error
+doesn't match an expected value.
 
-=item %require [-q]
+The script's environment is populated with any I<VARIABLE>s set on the
+testie command line with B<I<VARIABLE>=I<VALUE>> syntax. Also, the
+B<$rundir> environment variable is set to the directory in which
+testie was originally run.
 
-A shell script (in sh syntax) defining prerequisites that must be satisfied
+=item B<%require [-q]>
+
+An B<sh> shell script defining prerequisites that must be satisfied
 before the test can run. Every command in the script must succeed, with
 exit status 0, for the test to run. Standard output and error are not
-checked, however. The C<-q> flag tells testie not to print an error message
+checked, however. The B<-q> flag tells testie not to print an error message
 if a requirement fails.
 
 Testie runs the requirement script before creating any other test files.
-For example, contents of %file sections are not available.
+For example, contents of B<%file> sections are not available.
 
-=item %info
+=item B<%info>
 
-A short description of the test.  In --superverbose mode, the first
+A short description of the test. In B<--superverbose> mode, the first
 paragraph of its contents is printed before the test results.
 
-=item %cut
+=item B<%cut>
 
 This section is ignored. It is intended to comment out obsolete parts of
 the test.
 
-=item %file [-d] [+LENGTH] FILENAME...
+=item B<%file [-de] [+I<LENGTH>] I<FILENAME>...>
 
-Create an input file for the script. FILENAME can be 'stdin', which sets
-the script's standard input. If LENGTH is provided, the file data consists
-of the LENGTH bytes following this line. Otherwise, it consists of the data
-up to the next section. The C<-d> flag tells testie to delete the
-first character of each line in the section; this makes it possible to
-include files that have lines that start with %.
+Create an input file for the script. I<FILENAME> can be B<stdin>,
+which sets the script's standard input. If B<+>I<LENGTH> is provided,
+the file data consists of the I<LENGTH> bytes following this line;
+otherwise, it consists of the data up to the next section. The B<-d>
+flag tells testie to delete the first character of each line in the
+section. The B<-e> flag indicates that the section was MIME
+Base64-encoded (see L<base64(1)>); it is decoded before use. To
+include a file with lines that start with B<%> (which would normally
+start a new section), use B<-d> and preface each line of the file with
+a space, or use B<-e>.
 
-=item %expectv [-ad] [+LENGTH] FILENAME...
+=item B<%expect [-adeiw] [+I<LENGTH>] I<FILENAME>...>
 
-An expected output file for the script. FILENAME can be 'stdout', for
-standard output. If LENGTH is provided, the file data consists of the
-LENGTH bytes following this line; otherwise, it consists of the data up to
-the next section.
+Define an expected output file. Differences between the script's
+output I<FILENAME> and the contents of the B<%expect> section will
+cause the test to fail.
 
-Testie will run the script, then compare the script's output file with the
-provided data. They must match exactly or the test fails.
+I<FILENAME> can be B<stdout>, for standard output. If B<+>I<LENGTH> is
+provided, the file data consists of the I<LENGTH> bytes following this
+line; otherwise, it consists of the data up to the next section.
 
-The C<-a> flag marks this expected output as an alternate. Testie will
-compare the script's output file with each provided alternate; the test
-succeeds if any of the alternates match. The C<-d> flag behaves as in
-%file.
+After running the script, testie compares the I<FILENAME> generated by
+the script with the provided data. The files are compared
+line-by-line. Testie ignores blank lines, differences in trailing
+whitespace, and lines in the script output that match B<%ignore>
+patterns (see below). The B<-w> flag causes testie to ignore
+differences in amount of whitespace within each line.
 
-=item %expect [-adiw] [+LENGTH] FILENAME...
-
-An expected output file for the script. Arguments are as for %expectv.
-
-Testie will run the script, then compare the file generated by script
-with the provided data. The files are compared line-by-line. Testie
-ignores blank lines and trailing whitespace on each line. It also
-ignores lines in the script output that match %ignore patterns (see below).
-%expect lines can contain Perl regular expressions, enclosed by two
-sets of braces; so the %expect line
+B<%expect> lines can contain Perl regular expressions, enclosed by two
+sets of braces. The B<%expect> line
 
     foo{{(bar)?}}
 
-matches either 'foo' or 'foobar'.
+matches either C<foo> or C<foobar>. The B<-i> flag makes all such
+regular expressions case-insensitive. (Text outside of regular
+expressions must match case.)
 
-Document an %expect line with "{{?comment}}" blocks.  For example:
+Document an B<%expect> line with C<{{?comment}}> blocks. For example:
 
     foo                {{? the sort was in the right order}}
 
-Testie ignores whitespace before and after the "{{?comment}}" block, and if
+Testie ignores whitespace before and after the C<{{?comment}}> block, and if
 the actual output differs from this expected line, it prints the comment in
 addition to the line differences.
 
-The C<-a> and C<-d> flags may also be used for %expect sections. Also, the
-C<-i> flag makes any regular expressions case-insensitive (text outside of
-regular expressions must match case), and the C<-w> flag ignores any
-differences in amount of whitespace within a line.
+The B<-a> flag marks this expected output as an alternate. Testie will
+compare the script's output file with each provided alternate; the
+test succeeds if any of the alternates match. The B<-d> flag behaves
+as in B<%file>.
 
-=item %expectx [-adiw] [+LENGTH] FILENAME...
+=item B<%expectv [-ade] [+I<LENGTH>] I<FILENAME>...>
 
-%expectx is just like %expect, except that every line is treated as a
-regular expression.  The input is parsed for "{{?comment}}" blocks, but
-other brace pairs are treated according to the normal regular expression
-rules.
+Define a literal expected output file. This behaves like B<%expect>,
+except that the script's output file must match the provided data
+I<exactly>: B<%expectv> never ignores whitespace differences, does not
+treat C<{{}}> blocks as regular expressions, and does not parse
+B<%ignore> patterns.
 
-=item %stdin [+LENGTH]
+=item B<%expectx [-adiw] [+I<LENGTH>] I<FILENAME>...>
 
-Same as '%file stdin [ARGS]'.
+Define a regular-expression expected output file. This behaves like
+B<%expect>, except that every line is treated as a regular expression.
+C<{{?comment}}> blocks are ignored, but other brace pairs are treated
+according to the normal regular expression rules.
 
-=item %stdout [-adiw] [+LENGTH]
+=item B<%stdin [-de] [+I<LENGTH>]>
 
-Same as '%expect stdout'.
+Same as B<%file stdin>.
 
-=item %stderr [-adiw] [+LENGTH]
+=item B<%stdout [-adeiw] [+I<LENGTH>]>
 
-Same as '%expect stderr'.
+Same as B<%expect stdout>.
 
-=item %ignorex [-di] [+LENGTH] [FILENAME]
+=item B<%stderr [-adeiw] [+I<LENGTH>]>
 
-Each line in the %ignorex section is a Perl regular expression.  Lines in
-the supplied FILENAME that match any of those regular expressions will not
-be considered when comparing files with %expect data.  The regular
-expression must match the whole line.  FILENAME may be 'all', in which case
-the regular expressions will apply to all %expect files.  "{{?comment}}"
+Same as B<%expect stderr>.
+
+=item B<%ignorex [-di] [+I<LENGTH>] [I<FILENAME>]>
+
+Each line in the B<%ignorex> section is a Perl regular expression. Lines in
+the supplied I<FILENAME> that match any of those regular expressions will not
+be considered when comparing files with B<%expect> data. The regular
+expression must match the whole line. I<FILENAME> may be B<all>, in which case
+the regular expressions will apply to all B<%expect> files. C<{{?comment}}>
 blocks are ignored.
 
-=item %ignore, %ignorev
+=item B<%ignore>, B<%ignorev [-adeiw] [+I<LENGTH>] [I<FILENAME>]>
 
-Like '%ignorex', but '%ignore' parses regular expressions only inside
-double braces ("{{ }}"), and '%ignorev' lines must match exactly.
+Like B<%ignorex>, but B<%ignore> parses regular expressions only inside
+double braces (C<{{ }}>), and B<%ignorev> lines must match exactly.
 
-=item %include FILENAME
+=item B<%include I<FILENAME>>
 
 Interpolate the contents of another testie file.
 
-=item %eot
+=item B<%eot>
 
-Marks the end of the current test.  The rest of the file will be parsed for
+Marks the end of the current test. The rest of the file will be parsed for
 additional tests.
 
-=item %eof
+=item B<%eof>
 
 The rest of the file is ignored.
 
@@ -1836,9 +1929,9 @@ file.
 =head1 ENVIRONMENT
 
 By default, testie sets the C<LC_ALL> environment variable to "C"; without
-this setting commands like 'sort' have unpredictable effects.  To set
-C<LC_ALL> to another value, set it in the %script section.
+this setting commands like B<sort> have unpredictable effects. To set
+C<LC_ALL> to another value, set it in the B<%script> section.
 
 =head1 AUTHOR
 
-Eddie Kohler, <kohler@cs.ucla.edu>
+Eddie Kohler, <kohler@seas.harvard.edu>

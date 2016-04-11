@@ -26,17 +26,13 @@ RRSched::RRSched()
 {
 }
 
-RRSched::~RRSched()
-{
-}
-
 int
 RRSched::initialize(ErrorHandler *errh)
 {
     if (!(_signals = new NotifierSignal[ninputs()]))
 	return errh->error("out of memory!");
     for (int i = 0; i < ninputs(); i++)
-	_signals[i] = Notifier::upstream_empty_signal(this, i, 0);
+	_signals[i] = Notifier::upstream_empty_signal(this, i);
     return 0;
 }
 

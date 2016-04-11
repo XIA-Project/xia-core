@@ -54,6 +54,9 @@
 #  include <linux/if_packet.h>
 # endif
 #endif
+#if TODEVICE_ALLOW_NETMAP
+//# include <sys/mman.h>
+#endif
 
 CLICK_DECLS
 
@@ -64,7 +67,7 @@ ToDevice::ToDevice()
     _pcap = 0;
     _my_pcap = false;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
     _fd = -1;
     _my_fd = false;
 #endif
@@ -92,19 +95,8 @@ ToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	return errh->error("bad BURST");
 
     if (method == "") {
-#if TODEVICE_ALLOW_PCAP && TODEVICE_ALLOW_LINUX
-	_method = method_pcap;
-	if (FromDevice *fd = find_fromdevice())
-	    if (fd->linux_fd())
-		_method = method_linux;
-#elif TODEVICE_ALLOW_PCAP
-	_method = method_pcap;
-#elif TODEVICE_ALLOW_LINUX
-	_method = method_linux;
-#elif TODEVICE_ALLOW_DEVBPF
-	_method = method_devbpf;
-#elif TODEVICE_ALLOW_PCAPFD
-	_method = method_pcapfd;
+#if TODEVICE_ALLOW_PCAP || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_NETMAP
+	_method = method_default;
 #else
 	return errh->error("cannot send packets on this platform");
 #endif
@@ -124,6 +116,10 @@ ToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if TODEVICE_ALLOW_PCAPFD
     else if (method == "PCAPFD")
 	_method = method_pcapfd;
+#endif
+#if TODEVICE_ALLOW_NETMAP
+    else if (method == "NETMAP")
+	_method = method_netmap;
 #endif
     else
 	return errh->error("bad METHOD");
@@ -148,9 +144,45 @@ ToDevice::initialize(ErrorHandler *errh)
 {
     _timer.initialize(this);
 
+    FromDevice *fd = find_fromdevice();
+    if (fd && _method == method_default) {
+#if FROMDEVICE_ALLOW_NETMAP && TODEVICE_ALLOW_NETMAP
+	if (fd->netmap())
+	    _method = method_netmap;
+#endif
+#if FROMDEVICE_ALLOW_PCAP && TODEVICE_ALLOW_PCAP
+	if (fd->pcap())
+	    _method = method_pcap;
+#endif
+#if FROMDEVICE_ALLOW_LINUX && TODEVICE_ALLOW_LINUX
+	if (fd->linux_fd() >= 0)
+	    _method = method_linux;
+#endif
+    }
+
+#if TODEVICE_ALLOW_NETMAP
+    // first choice is netmap by default
+    if (_method == method_default || _method == method_netmap) {
+	if (fd && fd->netmap()) { // fromdevice already open, reuse
+	    _fd = fd->fd();
+	    _netmap = *fd->netmap();
+	} else {
+	    _fd = _netmap.open(_ifname, _method == method_netmap, errh);
+	    if (_fd >= 0) {
+		_my_fd = true;
+		add_select(_fd, SELECT_READ); // NB NOT writable!
+	    } else if (_method == method_netmap)
+		return -1; // fail
+	}
+	if (_fd >= 0) {
+	    _method = method_netmap;
+	    _netmap.initialize_rings_tx(); // no-op
+	}
+    }
+#endif
+
 #if TODEVICE_ALLOW_PCAP
-    if (_method == method_pcap) {
-	FromDevice *fd = find_fromdevice();
+    if (_method == method_default || _method == method_pcap) {
 	if (fd && fd->pcap())
 	    _pcap = fd->pcap();
 	else {
@@ -160,12 +192,12 @@ ToDevice::initialize(ErrorHandler *errh)
 	    _my_pcap = true;
 	}
 	_fd = pcap_fileno(_pcap);
-	/* _my_fd = false by default */
+	_method = method_pcap;
     }
 #endif
 
 #if TODEVICE_ALLOW_DEVBPF
-    if (_method == method_devbpf) {
+    if (_method == method_default || _method == method_devbpf) {
 	/* pcap_open_live() doesn't open for writing. */
 	for (int i = 0; i < 16 && _fd < 0; i++) {
 	    char tmp[64];
@@ -186,12 +218,12 @@ ToDevice::initialize(ErrorHandler *errh)
 	if (ioctl(_fd, BIOCSHDRCMPLT, (caddr_t)&yes) < 0)
 	    errh->warning("BIOCSHDRCMPLT %s failed", ifr.ifr_name);
 # endif
+	_method = method_devbpf;
     }
 #endif
 
 #if TODEVICE_ALLOW_LINUX
-    if (_method == method_linux) {
-	FromDevice *fd = find_fromdevice();
+    if (_method == method_default || _method == method_linux) {
 	if (fd && fd->linux_fd() >= 0)
 	    _fd = fd->linux_fd();
 	else {
@@ -200,16 +232,18 @@ ToDevice::initialize(ErrorHandler *errh)
 		return -1;
 	    _my_fd = true;
 	}
+	_method = method_linux;
     }
 #endif
 
 #if TODEVICE_ALLOW_PCAPFD
-    if (_method == method_pcapfd) {
+    if (_method == method_default || _method == method_pcapfd) {
 	FromDevice *fd = find_fromdevice();
 	if (fd && fd->pcap())
 	    _fd = fd->fd();
 	else
 	    return errh->error("initialized FromDevice required on this platform");
+	_method = method_pcapfd;
     }
 #endif
 
@@ -232,7 +266,13 @@ ToDevice::cleanup(CleanupStage)
 	pcap_close(_pcap);
     _pcap = 0;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
+#if TODEVICE_ALLOW_NETMAP
+    if (_fd >= 0 && _my_fd && _method == method_netmap) {
+	_netmap.close(_fd); // XXX _fd is not really needed
+	_fd = -1;
+    }
+#endif
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
     if (_fd >= 0 && _my_fd)
 	close(_fd);
     _fd = -1;
@@ -255,6 +295,16 @@ ToDevice::send_packet(Packet *p)
 {
     int r = 0;
     errno = 0;
+
+#if TODEVICE_ALLOW_NETMAP
+    if (_method == method_netmap) {
+	if (_netmap.send_packet(p, noutputs())) { // fail
+	    errno = ENOBUFS;
+	    r = -1;
+	} else
+	    r = 0;
+    }
+#endif
 
 #if TODEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
@@ -306,6 +356,7 @@ ToDevice::run_task(Task *)
 	    _backoff = 0;
 	    checked_output_push(0, p);
 	    ++count;
+	    p = 0;
 	} else
 	    break;
     } while (count < _burst);
@@ -323,7 +374,7 @@ ToDevice::run_task(Task *)
 		_backoff *= 2;
 	    if (_debug) {
 		Timestamp now = Timestamp::now();
-		click_chatter("%{element} backing off for %d at %{timestamp}\n", this, _backoff, &now);
+		click_chatter("%p{element} backing off for %d at %p{timestamp}\n", this, _backoff, &now);
 	    }
 	}
 	return count > 0;

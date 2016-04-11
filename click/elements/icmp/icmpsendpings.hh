@@ -33,30 +33,40 @@ Keyword arguments are:
 
 =item INTERVAL
 
-Amount of time between pings, in seconds. Default is 1.
+Amount of time between pings, in seconds. Defaults to 1.
 
 =item IDENTIFIER
 
-Integer. Determines the ICMP identifier field in emitted pings. Default is
+Integer. Determines the ICMP identifier field in emitted pings. Defaults to
 0.
 
 =item LIMIT
 
 Integer. The number of pings to send; but if LIMIT is negative, sends pings
-forever. Default is -1.
+forever. Defaults to -1.
+
+=item STOP
+
+Boolean. If true, stop the router when LIMIT is reached. Defaults to false.
 
 =item DATA
 
-String. Extra data in emitted pings. Default is the empty string (nothing).
+String. Extra data in emitted pings. Defaults to the empty string (nothing).
 
 =item ACTIVE
 
-Boolean.  Whether ICMPPingSource is active.  Default is true.
+Boolean. Whether ICMPPingSource is active. Defaults to true.
+
+=item MIRROR
+
+Boolean. If true, then when ICMPPingSource receives an echo reply, it
+generates the next echo request immediately, using the same packet data.
+Overrides LIMIT; only available if output is push. Defaults to false.
 
 =item VERBOSE
 
-Boolean.  Whether ICMPPingSource should print reports when echo replies
-arrive.  Default is true.
+Boolean. Whether ICMPPingSource should print reports when echo replies
+arrive. Defaults to true.
 
 =back
 
@@ -115,16 +125,16 @@ ICMPPingEncap, ICMPPingResponder, ICMPPingRewriter */
 
 class ICMPPingSource : public Element { public:
 
-    ICMPPingSource();
-    ~ICMPPingSource();
+    ICMPPingSource() CLICK_COLD;
+    ~ICMPPingSource() CLICK_COLD;
 
     const char *class_name() const		{ return "ICMPPingSource"; }
     const char *port_count() const		{ return "0-1/1"; }
     const char *processing() const		{ return "h/a"; }
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
     void run_timer(Timer *);
     void push(int, Packet *);
@@ -142,6 +152,8 @@ class ICMPPingSource : public Element { public:
     String _data;
     bool _active;
     bool _verbose;
+    bool _stop;
+    bool _mirror;
 
 #if HAVE_INT64_TYPES && !CLICK_LINUXMODULE
     typedef uint64_t counter_t;
@@ -159,9 +171,9 @@ class ICMPPingSource : public Element { public:
     };
     ReceiverInfo *_receiver;
 
-    Packet* make_packet();
-    static String read_handler(Element*, void*);
-    static int write_handler(const String&, Element*, void*, ErrorHandler*);
+    Packet* make_packet(WritablePacket *q);
+    static String read_handler(Element*, void*) CLICK_COLD;
+    static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
 
 };
 

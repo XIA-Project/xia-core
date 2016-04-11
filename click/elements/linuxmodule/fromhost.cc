@@ -99,7 +99,8 @@ FromHost::FromHost()
       _task(this), _wakeup_timer(fl_wakeup, this),
       _drops(0), _ninvalid(0)
 {
-    _head = _tail = 0;
+    set_head(0);
+    set_tail(0);
     _capacity = 100;
     _q.lgq = 0;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
@@ -137,15 +138,15 @@ static void fromhost_inet_setup(struct net_device *dev)
 net_device *
 FromHost::new_device(const char *name)
 {
-    read_lock(&dev_base_lock);
     void (*setup)(struct net_device *) = (_macaddr ? ether_setup : fromhost_inet_setup);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
     net_device *dev = alloc_netdev(0, name, setup);
 #else
     int errcode;
+    read_lock(&dev_base_lock);
     net_device *dev = dev_alloc(name, &errcode);
-#endif
     read_unlock(&dev_base_lock);
+#endif
     if (!dev)
 	return 0;
 
@@ -173,6 +174,7 @@ FromHost::configure(Vector<String> &conf, ErrorHandler *errh)
     _destaddr = IPAddress();
     _destmask = IPAddress();
     _clear_anno = true;
+    _burst = 8;
 
     if (Args(conf, this, errh)
 	.read_mp("DEVNAME", _devname)
@@ -182,6 +184,7 @@ FromHost::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("MTU", mtu)
 	.read("CAPACITY", _capacity)
 	.read("CLEAR_ANNO", _clear_anno)
+	.read("BURST", BoundedIntArg(1, 1000000), _burst)
 	.complete() < 0)
 	return -1;
 
@@ -282,7 +285,7 @@ FromHost::set_device_addresses(ErrorHandler *errh)
         sin->sin_family = AF_INET;
         sin->sin_addr = _destaddr;
 # if HAVE_LINUX_INET_CTL_SOCK_CREATE
-	struct socket *sock = kmalloc(sizeof(struct socket), GFP_KERNEL);
+	struct socket *sock = (struct socket*) kmalloc(sizeof(struct socket), GFP_KERNEL);
 	sock->sk = 0;
 	if (res >= 0 && (res = inet_ctl_sock_create(&sock->sk, AF_INET, SOCK_RAW, IPPROTO_TCP, dev_net(_dev))) != 0) {
 	    errh->error("error %d creating control socket for device '%s'", res, _devname.c_str());
@@ -358,15 +361,16 @@ FromHost::cleanup(CleanupStage)
     fromlinux_map.remove(this, false);
 
     Packet * volatile *q = queue();
-    while (_head != _tail) {
-	Packet *p = q[_head];
+    while (head() != tail()) {
+	Packet *p = q[head()];
 	p->kill();
-	_head = next_i(_head);
+	set_head(next_i(head()));
     }
     if (_capacity > smq_size)
 	delete[] _q.lgq;
     _capacity = 1;
-    _head = _tail = 0;
+    set_head(0);
+    set_tail(0);
 
     if (_dev) {
 	dev_put(_dev);
@@ -442,7 +446,7 @@ FromHost::fl_stats(net_device *dev)
 #endif
 }
 
-int
+netdev_tx_t
 FromHost::fl_tx(struct sk_buff *skb, net_device *dev)
 {
     /* 8.May.2003 - Doug and company had crashes with FromHost configurations.
@@ -455,12 +459,12 @@ FromHost::fl_tx(struct sk_buff *skb, net_device *dev)
          particularly with the task list. The solution is a queue in
          FromHost. fl_tx puts a packet onto the queue, a regular Click Task
          takes the packet off the queue. */
-    int ret;
+    netdev_tx_t ret;
     unsigned long lock_flags;
     fromlinux_map.lock(false, lock_flags);
     if (FromHost *fl = (FromHost *)fromlinux_map.lookup(dev, 0)) {
-	Storage::index_type next = fl->next_i(fl->_tail);
-	if (likely(next != fl->_head)) {
+        Storage::index_type t = fl->tail(), nt = fl->next_i(t);
+	if (likely(nt != fl->head())) {
 	    Packet * volatile *q = fl->queue();
 
 	    // skb->dst may be set since the packet came from Linux.  Since
@@ -481,16 +485,15 @@ FromHost::fl_tx(struct sk_buff *skb, net_device *dev)
 	    fl->stats()->tx_packets++;
 	    fl->stats()->tx_bytes += p->length();
 	    fl->_task.reschedule();
-	    q[fl->_tail] = p;
-	    packet_memory_barrier(q[fl->_tail], fl->_tail);
-	    fl->_tail = next;
-	    ret = NETDEV_TX_OK;
+	    q[t] = p;
+	    fl->set_tail(nt);
+	    ret = (netdev_tx_t) NETDEV_TX_OK;
 	} else {
 	    fl->_drops++;
-	    ret = NETDEV_TX_BUSY;	// Linux will free the packet.
+	    ret = (netdev_tx_t) NETDEV_TX_BUSY;	// Linux will free the packet.
 	}
     } else
-	ret = -1;
+	ret = (netdev_tx_t) NETDEV_TX_BUSY;
     fromlinux_map.unlock(false, lock_flags);
     return ret;
 }
@@ -498,14 +501,14 @@ FromHost::fl_tx(struct sk_buff *skb, net_device *dev)
 bool
 FromHost::run_task(Task *)
 {
-    if (!_nonfull_signal)
+    if (!_nonfull_signal || unlikely(empty()))
 	return false;
 
-    if (likely(!empty())) {
-	Packet * volatile *q = queue();
-	Packet *p = q[_head];
-	packet_memory_barrier(q[_head], _head);
-	_head = next_i(_head);
+    Packet * volatile *q = queue();
+    for (int count = 0; count < _burst && !empty(); ++count) {
+        Storage::index_type h = head();
+	Packet *p = q[h];
+	set_head(next_i(h));
 
 	// Convenience for TYPE IP: set the IP header and destination address.
 	if (_dev->type == ARPHRD_NONE && p->length() >= 1) {
@@ -527,18 +530,16 @@ FromHost::run_task(Task *)
 	      bad:
 	        _ninvalid++;
 		checked_output_push(1, p);
-		goto done;
+		continue;
 	    }
 	}
 
 	output(0).push(p);
+    }
 
-      done:
-	if (!empty())
-	    _task.fast_reschedule();
-	return true;
-    } else
-	return false;
+    if (!empty())
+        _task.fast_reschedule();
+    return true;
 }
 
 String
@@ -548,6 +549,40 @@ FromHost::read_handler(Element *e, void *)
     return String(fh->size());
 }
 
+int FromHost::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+{
+    FromHost *fh = static_cast<FromHost *>(e);
+    switch (reinterpret_cast<intptr_t>(thunk)) {
+    case h_burst:
+        if (!BoundedIntArg(1, 1000000).parse(str, fh->_burst))
+            return errh->error("burst parameter must be integer between 1 and 1000000");
+	return 0;
+    case h_ether: {
+        EtherAddress macaddr;
+        if (Args(errh).push_back_words(str)
+                .read_mp("ETHER", macaddr)
+                .complete() < 0)
+            return -1;
+        if (!macaddr)
+            return errh->error("ether parameter must be set");
+
+        if (fh->_macaddr != macaddr) {
+            fh->_macaddr = macaddr;
+            if (fh->_dev->flags & IFF_UP) {
+                if (!fh->_wakeup_timer.initialized())
+                    fh->_wakeup_timer.initialize(fh);
+                fh->_wakeup_timer.schedule_now();
+                return 0;
+            } else if (fh->set_device_addresses(errh) < 0)
+                return -1;
+        }
+        return 0;
+    }
+    default:
+	return 0;
+    }
+}
+
 void
 FromHost::add_handlers()
 {
@@ -555,6 +590,12 @@ FromHost::add_handlers()
     add_read_handler("length", read_handler, h_length);
     add_data_handlers("capacity", Handler::OP_READ, &_capacity);
     add_data_handlers("drops", Handler::OP_READ, &_drops);
+    add_data_handlers("burst", Handler::OP_READ, &_burst);
+    add_write_handler("burst", write_handler, h_burst);
+    if (_dev->type == ARPHRD_ETHER) {
+        add_data_handlers("ether", Handler::OP_READ, &_macaddr);
+        add_write_handler("ether", write_handler, h_ether);
+    }
 }
 
 ELEMENT_REQUIRES(AnyDevice linuxmodule)

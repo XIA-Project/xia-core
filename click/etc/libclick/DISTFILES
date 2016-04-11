@@ -4,6 +4,7 @@ LICENSE
 NEWS
 README
 
+aclocal.m4
 etc/libclick/lc-Makefile.in:Makefile.in
 click-buildtool.in
 click-mkelemmap
@@ -11,7 +12,8 @@ config.guess
 config.h.in
 config-userlevel.h.in
 config.sub
-etc/libclick/lc-configure.in:configure.in
+etc/libclick/lc-configure.ac:configure.ac
+etc/libclick/lc-gitignore:.gitignore
 install-sh
 m4
 m4/click.m4
@@ -24,6 +26,7 @@ include/click
 include/click/algorithm.hh
 include/click/archive.hh
 include/click/args.hh
+include/click/array_memory.hh
 include/click/atomic.hh
 include/click/bitvector.hh
 include/click/bighashmap.cc
@@ -35,6 +38,8 @@ include/click/confparse.hh
 include/click/crc32.h
 include/click/cxxprotect.h
 include/click/cxxunprotect.h
+include/click/deque.cc
+include/click/deque.hh
 include/click/driver.hh
 include/click/element.hh
 include/click/elemfilter.hh
@@ -64,6 +69,7 @@ include/click/ip6table.hh
 include/click/lexer.hh
 include/click/list.hh
 include/click/llrpc.h
+include/click/machine.hh
 include/click/master.hh
 include/click/md5.h
 include/click/nameinfo.hh
@@ -157,13 +163,11 @@ lib/straccum.cc:libsrc/straccum.cc
 lib/strerror.c:libsrc/strerror.c
 lib/string.cc:libsrc/string.cc
 lib/task.cc:libsrc/task.cc
-lib/templatei.cc:libsrc/templatei.cc
 lib/timer.cc:libsrc/timer.cc
 lib/timerset.cc:libsrc/timerset.cc
 lib/timestamp.cc:libsrc/timestamp.cc
 lib/userutils.cc:libsrc/userutils.cc
 lib/variableenv.cc:libsrc/variableenv.cc
-lib/vectorv.cc:libsrc/vectorv.cc
 
 elements/standard/addressinfo.cc:libsrc/addressinfo.cc
 elements/standard/alignmentinfo.cc:libsrc/alignmentinfo.cc

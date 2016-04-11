@@ -73,6 +73,11 @@ If false, this area is left as it was received from Linux.
 (Note that the packet type, device, and header annotations are left as is.)
 Defaults to true.
 
+=item BURST
+
+Integer.  Sets the BURST parameter affecting how many packets are
+emitted per task execution.  BURST is 8 by default.
+
 =back
 
 =n
@@ -121,10 +126,14 @@ CLICK_CXX_UNPROTECT
 #include "elements/linuxmodule/anydevice.hh"
 class EtherAddress;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
+typedef int netdev_tx_t;
+#endif
+
 class FromHost : public AnyDevice, public Storage { public:
 
-    FromHost();
-    ~FromHost();
+    FromHost() CLICK_COLD;
+    ~FromHost() CLICK_COLD;
 
     static void static_initialize();
 
@@ -134,10 +143,10 @@ class FromHost : public AnyDevice, public Storage { public:
     void *cast(const char *name);
 
     int configure_phase() const		{ return CONFIGURE_PHASE_FROMHOST; }
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void add_handlers();
-    void cleanup(CleanupStage);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
 
     int set_device_addresses(ErrorHandler *);
 
@@ -151,6 +160,8 @@ class FromHost : public AnyDevice, public Storage { public:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
     net_device_stats _stats;
 #endif
+
+    int _burst;
 
     Task _task;
     Timer _wakeup_timer;
@@ -168,8 +179,8 @@ class FromHost : public AnyDevice, public Storage { public:
 
     static FromHost *configuring;
     net_device *new_device(const char *);
-    static int fl_tx(struct sk_buff *, net_device *);
-    inline Packet * volatile *queue() const {
+    static netdev_tx_t fl_tx(struct sk_buff *, net_device *);
+    inline Packet * volatile *queue() {
 	return _capacity <= smq_size ? _q.smq : _q.lgq;
     }
 
@@ -180,9 +191,9 @@ class FromHost : public AnyDevice, public Storage { public:
     static net_device_stats *fl_stats(net_device *dev);
 #endif
 
-    enum { h_length };
-    static String read_handler(Element *e, void *thunk);
-
+    enum { h_length, h_burst, h_ether };
+    static String read_handler(Element *e, void *thunk) CLICK_COLD;
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 };
 
 #endif

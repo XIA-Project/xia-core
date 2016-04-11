@@ -25,8 +25,7 @@ Tee, EtherSwitch
 
 class Hub : public Element { public:
 
-    Hub();
-    ~Hub();
+    Hub() CLICK_COLD;
 
     const char *class_name() const		{ return "Hub"; }
     const char *port_count() const		{ return "-/="; }

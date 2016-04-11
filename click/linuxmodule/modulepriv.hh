@@ -13,22 +13,19 @@ CLICK_CXX_PROTECT
 CLICK_CXX_UNPROTECT
 #include <click/cxxunprotect.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0)
 # error "Linux version too old"
 #endif
 
-#if 0
-# define MDEBUG(args...) do { printk("<1>kclick: " args); printk("\n"); } while (0)
+#if CLICK_MODULE_DEBUGGING
+# define MDEBUG(args...) do { printk(KERN_ALERT "kclick: " args); printk("\n"); } while (0)
 #else
 # define MDEBUG(args...) /* nada */
 #endif
 
 // see static_assert in clickfs.cc
-#define HANDLER_DIRECT			(Handler::DRIVER_FLAG_0)
-#define HANDLER_DONE			(Handler::DRIVER_FLAG_0 << 1)
-#define HANDLER_RAW			(Handler::DRIVER_FLAG_0 << 2)
-#define HANDLER_SPECIAL_INODE		(Handler::DRIVER_FLAG_0 << 3)
-#define HANDLER_WRITE_UNLIMITED		(Handler::DRIVER_FLAG_0 << 4)
+#define HANDLER_DIRECT			(Handler::f_driver0)
+#define HANDLER_WRITE_UNLIMITED		(Handler::f_driver1)
 struct click_handler_direct_info;
 
 class KernelErrorHandler : public ErrorHandler { public:
@@ -76,8 +73,13 @@ struct click_fsmode_t {
     int write;
     int exec;
     int dir;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+    kuid_t uid;
+    kgid_t gid;
+#else
     uid_t uid;
     gid_t gid;
+#endif
 };
 extern click_fsmode_t click_fsmode;
 

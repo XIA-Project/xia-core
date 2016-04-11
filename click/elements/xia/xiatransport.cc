@@ -15,7 +15,7 @@
 CLICK_DECLS
 XIATransport::XIATransport()
 {
-    cp_xid_type("CID", &_cid_type);   
+    cp_xid_type("CID", &_cid_type);
     // oldPartial=contentTable;
     _content_module = new XIAContentModule(this);
 }
@@ -25,7 +25,7 @@ XIATransport::~XIATransport()
     delete _content_module;
 }
 
-int 
+int
 XIATransport::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* routing_table_elem;
@@ -37,7 +37,7 @@ XIATransport::configure(Vector<String> &conf, ErrorHandler *errh)
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
 		"CACHE_CONTENT_FROM_NETWORK", cpkP, cpBool, &cache_content_from_network,
 		cpEnd) < 0)
-	return -1;   
+	return -1;
 #if USERLEVEL
     _content_module->_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
 #else
@@ -49,7 +49,7 @@ XIATransport::configure(Vector<String> &conf, ErrorHandler *errh)
     _content_module->_cache_content_from_network = true;
     /*
        std::cout<<"Route Table Name: "<<routing_table_name.c_str()<<std::endl;
-       if(routeTable==NULL) 
+       if(routeTable==NULL)
             std::cout<<"NULL routeTable"<<std::endl;
        if(ad_given)
        {
@@ -66,18 +66,6 @@ XIATransport::configure(Vector<String> &conf, ErrorHandler *errh)
        std::cout<<"pkt size: "<<PKTSIZE<<std::endl;
      */
     return 0;
-}
-
-//TODO: remove
-static void say(const char *fmt, ...)
-{
-	if (1) {
-		va_list args;
-
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
 }
 
 void XIATransport::push(int port, Packet *p)

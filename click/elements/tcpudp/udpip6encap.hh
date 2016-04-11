@@ -32,7 +32,7 @@ The Strip element can be used by the receiver to get rid of the
 encapsulation header.
 
 =e
-  UDPIPEncap(2001:2001:2001:2001::1, 1234, 2001:2001:2001:2001::2, 1234)
+  UDPIP6Encap(2001:2001:2001:2001::1, 1234, 2001:2001:2001:2001::2, 1234)
 
 =h src read/write
 
@@ -62,16 +62,16 @@ class UDPIP6Encap : public Element { public:
     const char *port_count() const	{ return PORTS_1_1; }
     const char *flags() const		{ return "A"; }
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const	{ return true; }
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *);
 
   private:
 
-    struct click_in6_addr _saddr;
-    struct click_in6_addr _daddr;
+    struct in6_addr _saddr;
+    struct in6_addr _daddr;
     uint16_t _sport;
     uint16_t _dport;
     bool _use_dst_anno;
@@ -80,7 +80,7 @@ class UDPIP6Encap : public Element { public:
     bool _checked_aligned;
 #endif
 
-    static String read_handler(Element *, void *);
+    static String read_handler(Element *, void *) CLICK_COLD;
 
 
 };

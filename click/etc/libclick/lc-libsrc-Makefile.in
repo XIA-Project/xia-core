@@ -24,6 +24,9 @@ RANLIB = @RANLIB@
 INSTALL = @INSTALL@
 mkinstalldirs = $(conf_auxdir)/mkinstalldirs
 
+DEPDIR = .deps
+DEPSTAMP = $(DEPDIR)/stamp
+
 .SUFFIXES:
 .SUFFIXES: .S .c .cc .o .s .ii
 
@@ -42,7 +45,7 @@ mkinstalldirs = $(conf_auxdir)/mkinstalldirs
 INSTALLLIBS = libclick.a
 
 GENERIC_OBJS = string.o straccum.o nameinfo.o \
-	bitvector.o vectorv.o templatei.o bighashmap_arena.o hashallocator.o \
+	bitvector.o bighashmap_arena.o hashallocator.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
@@ -62,11 +65,11 @@ STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o errorelement.o \
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
 CFLAGS = @CFLAGS@
 CXXFLAGS = @CXXFLAGS@
-DEPCFLAGS = @DEPCFLAGS@
+DEPCFLAGS = @DEPCFLAGS@ @DEPDIRFLAG@
 
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
-	@PCAP_INCLUDES@
+	@PCAP_INCLUDES@ @NETMAP_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ @PCAP_LIBS@ @DL_LIBS@ @SOCKET_LIBS@
 
@@ -85,15 +88,19 @@ libclick.a: Makefile $(LIBOBJS)
 	$(RANLIB) libclick.a
 
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
-	cd $(top_builddir) \
-	  && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= $(SHELL) ./config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 #!gmake
-DEPFILES := $(wildcard *.d)
+DEPFILES := $(wildcard $(DEPDIR)/*.d)
 ifneq ($(DEPFILES),)
 include $(DEPFILES)
 endif
 #!end gmake
+
+$(LIBOBJS): $(DEPSTAMP)
+$(DEPSTAMP):
+	@-mkdir $(DEPDIR) >/dev/null 2>&1
+	@touch $@
 
 install: install-lib
 install-lib: $(INSTALLLIBS)
@@ -103,9 +110,10 @@ uninstall:
 	for i in $(INSTALLLIBS); do rm -f $(DESTDIR)$(libdir)/$$i; done
 
 clean:
-	rm -f *.d *.o libclick.a
+	-rm -rf $(DEPDIR)
+	-rm -f *.o libclick.a
 clean-lib:
-	rm -f $(LIBOBJS) libclick.a
+	-rm -f $(LIBOBJS) libclick.a
 distclean: clean
 	-rm -f Makefile
 

@@ -2,7 +2,6 @@
 #ifndef CLICK_PORTINFO_HH
 #define CLICK_PORTINFO_HH
 #include <click/element.hh>
-#include <click/hashmap.hh>
 CLICK_DECLS
 
 /*
@@ -60,7 +59,6 @@ AddressInfo */
 class PortInfo : public Element { public:
 
     PortInfo();
-    ~PortInfo();
 
     const char *class_name() const	{ return "PortInfo"; }
 

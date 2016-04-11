@@ -20,20 +20,20 @@ CLICK_DECLS
 
 class StaticThreadSched : public Element, public ThreadSched { public:
 
-    StaticThreadSched();
-    ~StaticThreadSched();
+    StaticThreadSched() CLICK_COLD;
+    ~StaticThreadSched() CLICK_COLD;
 
     const char *class_name() const	{ return "StaticThreadSched"; }
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     int initial_home_thread_id(const Element *e);
 
   private:
-
     Vector<int> _thread_preferences;
     ThreadSched *_next_thread_sched;
 
+    bool set_preference(int eindex, int preference);
 };
 
 CLICK_ENDDECLS

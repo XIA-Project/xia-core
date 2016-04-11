@@ -12,9 +12,10 @@ subdir := .
 
 # Require Click prefix settings.
 # Generally, you will provide a '--with-click=CLICKPREFIX' option, and set:
-include @clickdatadir@/config.mk
+clickbuild_prefix := @clickbuild_prefix@
+include @clickbuild_datadir@/config.mk
 
-# Set 'MAKE_UPACKAGE', 'MAKE_KPACKAGE', and 'MAKE_BPACKAGE' to '0' or '1' 
+# Set 'MAKE_UPACKAGE', 'MAKE_KPACKAGE', and 'MAKE_BPACKAGE' to '0' or '1'
 # to determine whether to build userlevel, linuxmodule, and bsdmodule
 # packages, respectively.
 MAKE_UPACKAGE = @BUILD_USERLEVEL@
@@ -42,8 +43,8 @@ INCLUDES = -I. -I$(top_builddir) -I$(srcdir) $(CLICKINCLUDES)
 
 # Everything below here will probably stay unchanged
 
-srcdir = @srcdir@
-top_srcdir = @top_srcdir@
+srcdir := @srcdir@
+top_srcdir := @top_srcdir@
 
 ifeq ($(CLICK_PACKAGE_MAKING),)
 prefix = @prefix@
@@ -56,4 +57,4 @@ datarootdir = @datarootdir@
 datadir = @datadir@
 endif
 
-include $(clickdatadir)/pkg-Makefile
+include $(clickbuild_datadir)/pkg-Makefile

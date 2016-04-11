@@ -44,6 +44,12 @@ NATIVE_VLAN, then the output packet is encapsulated in a conventional Ethernet
 header, rather than an 802.1Q header (i.e., the shim header is not added).
 Set to -1 for no native VLAN.  Defaults to 0.
 
+=item ETHERTYPE
+
+Specifies the ethertype designating VLAN encapsulated packets. The default is
+0x8100 (standard 802.1Q customer VLANs); other useful values are 0x88a8 (for
+802.1ad service VLANs, aka QinQ) and 0x9100 (old non-standard VLANs).
+
 =a
 
 EtherVLANEncap, VLANDecap
@@ -51,14 +57,14 @@ EtherVLANEncap, VLANDecap
 
 class VLANEncap : public Element { public:
 
-    VLANEncap();
-    ~VLANEncap();
+    VLANEncap() CLICK_COLD;
+    ~VLANEncap() CLICK_COLD;
 
     const char *class_name() const	{ return "VLANEncap"; }
     const char *port_count() const	{ return PORTS_1_1; }
-    void add_handlers();
+    void add_handlers() CLICK_COLD;
 
-    int configure(Vector<String> &, ErrorHandler *);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     Packet *simple_action(Packet *);
 
@@ -67,9 +73,10 @@ class VLANEncap : public Element { public:
     uint16_t _vlan_tci;
     bool _use_anno;
     int _native_vlan;
+    uint16_t _ethertype;
 
     enum { h_config, h_vlan_tci };
-    static String read_handler(Element *e, void *user_data);
+    static String read_handler(Element *e, void *user_data) CLICK_COLD;
 
 };
 

@@ -35,10 +35,6 @@ Print::Print()
 {
 }
 
-Print::~Print()
-{
-}
-
 int
 Print::configure(Vector<String> &conf, ErrorHandler* errh)
 {
@@ -49,7 +45,7 @@ Print::configure(Vector<String> &conf, ErrorHandler* errh)
   bool print_anno = false, headroom = false, bcontents;
   _active = true;
   String label, contents = "HEX";
-  unsigned bytes = 24;
+  int bytes = 24;
 
     if (Args(conf, this, errh)
 	.read_p("LABEL", label)

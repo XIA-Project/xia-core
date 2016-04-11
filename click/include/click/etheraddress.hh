@@ -8,8 +8,7 @@ CLICK_DECLS
 
 class EtherAddress { public:
 
-    struct uninitialized_t {
-    };
+    typedef uninitialized_type uninitialized_t;
 
     /** @brief Construct an EtherAddress equal to 00-00-00-00-00-00. */
     inline EtherAddress() {
@@ -25,7 +24,7 @@ class EtherAddress { public:
     }
 
     /** @brief Construct an uninitialized EtherAddress. */
-    inline EtherAddress(const uninitialized_t &unused) {
+    inline EtherAddress(const uninitialized_type &unused) {
 	(void) unused;
     }
 
@@ -63,7 +62,16 @@ class EtherAddress { public:
      *
      * The Ethernet broadcast address is FF-FF-FF-FF-FF-FF. */
     inline bool is_broadcast() const {
-	return _data[0] == 0xFFFF && _data[1] == 0xFFFF && _data[2] == 0xFFFF;
+	return _data[0] + _data[1] + _data[2] == 0x2FFFD;
+    }
+
+    /** @brief Return true if @a data points to a broadcast address. */
+    static inline bool is_broadcast(const unsigned char *data) {
+#if HAVE_INDIFFERENT_ALIGNMENT
+	return reinterpret_cast<const EtherAddress *>(data)->is_broadcast();
+#else
+	return data[0] + data[1] + data[2] + data[3] + data[4] + data[5] == 0x5FA;
+#endif
     }
 
     /** @brief Return a pointer to the address data. */
@@ -184,22 +192,35 @@ extern const ArgContext blank_args;
 /** @class EtherAddressArg
   @brief Parser class for Ethernet addresses.
 
-  This is the default parser for objects of EtherAddress type.  For 6-byte
-  arrays like "click_ether::ether_shost" and "click_ether::ether_dhost", it is
-  necessary use Args::read_with:
+  This is the default parser for objects of EtherAddress type. For 6-byte
+  arrays like "click_ether::ether_shost" and "click_ether::ether_dhost", you
+  must pass an EtherAddressArg() explicitly:
 
   @code
   struct click_ether ethh;
   ... Args(...) ...
-      .read_mp_with("SRC", EtherAddressArg(), ethh.ether_shost)
+      .read_mp("SRC", EtherAddressArg(), ethh.ether_shost)
       ...
   @endcode */
 class EtherAddressArg { public:
-    static bool parse(const String &str, EtherAddress &value, const ArgContext &args = blank_args);
-    static bool parse(const String &str, unsigned char *value, const ArgContext &args = blank_args) {
+    typedef void enable_direct_parse;
+    EtherAddressArg(int flags = 0) : flags_(flags) {}
+    inline bool parse(const String& str, EtherAddress& value, const ArgContext& args = blank_args) {
+        return parse(str, value, args, flags_);
+    }
+    inline bool parse(const String& str, unsigned char* value, const ArgContext& args = blank_args) {
 	return parse(str, *reinterpret_cast<EtherAddress *>(value), args);
     }
-    static bool parse(const String &str, Args &args, unsigned char *value);
+    inline bool direct_parse(const String& str, EtherAddress& value, Args& args) {
+        return direct_parse(str, value, args, flags_);
+    }
+    inline bool direct_parse(const String& str, unsigned char* value, Args& args) {
+	return direct_parse(str, *reinterpret_cast<EtherAddress *>(value), args);
+    }
+  private:
+    int flags_;
+    static bool parse(const String& str, EtherAddress& value, const ArgContext& args, int flags);
+    static bool direct_parse(const String& str, EtherAddress& value, Args& args, int flags);
 };
 
 template<> struct DefaultArg<EtherAddress> : public EtherAddressArg {};

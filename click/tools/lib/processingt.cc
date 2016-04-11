@@ -103,13 +103,14 @@ ProcessingT::create(const String &compound_pcode, bool resolve_agnostics,
     Vector<ConnectionT> conn;
     for (RouterT::conn_iterator it = _router->begin_connections(); it; ++it)
 	conn.push_back(*it);
+    Bitvector invalid_conn(conn.size(), false);
     // do processing
     initial_processing(compound_pcode, &lerrh);
-    check_processing(conn, &lerrh);
+    check_processing(conn, invalid_conn, &lerrh);
     // change remaining agnostic ports to agnostic-push
     if (resolve_agnostics)
 	this->resolve_agnostics();
-    check_connections(conn, &lerrh);
+    check_connections(conn, invalid_conn, &lerrh);
 
     ElementMap::pop_default();
 }
@@ -308,7 +309,7 @@ ProcessingT::processing_error(const ConnectionT &conn, int processing_from,
 }
 
 void
-ProcessingT::check_processing(Vector<ConnectionT> &conn, ErrorHandler *errh)
+ProcessingT::check_processing(Vector<ConnectionT> &conn, Bitvector &invalid_conn, ErrorHandler *errh)
 {
     // add fake connections for agnostics
     int old_size = conn.size();
@@ -326,12 +327,13 @@ ProcessingT::check_processing(Vector<ConnectionT> &conn, ErrorHandler *errh)
 		if (bv[j] && _processing[end_from][opidx + j] == pagnostic)
 		    conn.push_back(ConnectionT(PortT(e, j), PortT(e, port), agnostic_landmark));
 	}
+    invalid_conn.resize(conn.size());
 
     // spread personalities
     while (true) {
 	bool changed = false;
 	for (int c = 0; c < conn.size(); c++) {
-	    if (!conn[c])
+	    if (invalid_conn[c])
 		continue;
 
 	    int offf = output_pidx(conn[c].from());
@@ -357,7 +359,7 @@ ProcessingT::check_processing(Vector<ConnectionT> &conn, ErrorHandler *errh)
 		    changed = true;
 		} else if (((pf ^ pt) & 3) != 0) {
 		    processing_error(conn[c], pf, errh);
-		    conn[c] = ConnectionT();
+		    invalid_conn[c] = true;
 		}
 		break;
 
@@ -372,6 +374,7 @@ ProcessingT::check_processing(Vector<ConnectionT> &conn, ErrorHandler *errh)
     }
 
     conn.resize(old_size);
+    invalid_conn.resize(old_size);
 }
 
 static const char *
@@ -478,7 +481,7 @@ ProcessingT::check_nports(Vector<ConnectionT> &conn, const ElementT *e,
 }
 
 void
-ProcessingT::check_connections(Vector<ConnectionT> &conn, ErrorHandler *errh)
+ProcessingT::check_connections(Vector<ConnectionT> &conn, Bitvector &invalid_conn, ErrorHandler *errh)
 {
     Vector<int> input_used(ninput_pidx(), -1);
     Vector<int> output_used(noutput_pidx(), -1);
@@ -489,7 +492,7 @@ ProcessingT::check_connections(Vector<ConnectionT> &conn, ErrorHandler *errh)
 	int fp = output_pidx(hf), tp = input_pidx(ht);
 
 	if ((_processing[end_from][fp] & ppush) && output_used[fp] >= 0
-	    && conn[output_used[fp]] != ht) {
+	    && conn[output_used[fp]] != ht && !invalid_conn[c]) {
 	    errh->lerror(conn[c].decorated_landmark(),
 			 "illegal reuse of %<%s%> push output %d",
 			 hf.element->name_c_str(), hf.port);
@@ -501,7 +504,7 @@ ProcessingT::check_connections(Vector<ConnectionT> &conn, ErrorHandler *errh)
 	    output_used[fp] = c;
 
 	if ((_processing[end_to][tp] & ppull) && input_used[tp] >= 0
-	    && conn[input_used[tp]] != hf) {
+	    && conn[input_used[tp]] != hf && !invalid_conn[c]) {
 	    errh->lerror(conn[c].decorated_landmark(),
 			 "illegal reuse of %<%s%> pull input %d",
 			 ht.element->name_c_str(), ht.port);
@@ -674,7 +677,7 @@ next_flow_code(const char *&p, const char *last,
 		errh->error("flow code: invalid character %<%c%>", *p);
 	}
 	if (negated)
-	    code.negate();
+	    code.flip();
 	if (p == last) {
 	    if (errh)
 		errh->error("flow code: missing %<]%>");
@@ -788,9 +791,9 @@ ProcessingT::follow_flow(const Bitvector &source, bool source_isoutput,
 	   && sink.size() == npidx(!source_isoutput));
     Bitvector bv;
     // for speed with sparse Bitvectors, look into the Bitvector implementation
-    const uint32_t *source_words = source.data_words();
-    const int wb = Bitvector::data_word_bits;
-    for (int w = 0; w <= source.max_word(); ++w)
+    const Bitvector::word_type *source_words = source.words();
+    const int wb = Bitvector::wbits;
+    for (int w = 0; w < source.word_size(); ++w)
 	if (source_words[w]) {
 	    int m = std::min(source.size(), (w + 1) * wb);
 	    for (int pidx = w * wb; pidx < m; ++pidx)
@@ -918,7 +921,7 @@ ProcessingT::compound_flow_code(ErrorHandler *errh) const
 		found++;
 	    } else
 		disjoint |= codes[j];
-	disjoint.negate();
+	disjoint.flip();
 
 	common &= disjoint;
 	for (int j = 0; j < i; j++)

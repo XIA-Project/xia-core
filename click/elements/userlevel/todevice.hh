@@ -34,7 +34,9 @@ CLICK_DECLS
  *
  * Word. Defines the method ToDevice will use to write packets to the
  * device. Linux targets generally support PCAP and LINUX; other targets
- * support PCAP or, occasionally, other methods. Generally defaults to PCAP.
+ * support PCAP or, occasionally, other methods. Defaults to the method
+ * specified for a matching L<FromDevice(n)>, or the first supported
+ * method among NETMAP, PCAP, DEVBPF, LINUX and PCAPFD otherwise.
  *
  * =item DEBUG
  *
@@ -77,12 +79,14 @@ extern "C" {
 #elif defined(__sun)
 # define TODEVICE_ALLOW_PCAPFD 1
 #endif
-class FromDevice;
+#if FROMDEVICE_ALLOW_NETMAP
+# define TODEVICE_ALLOW_NETMAP 1
+#endif
 
 class ToDevice : public Element { public:
 
-    ToDevice();
-    ~ToDevice();
+    ToDevice() CLICK_COLD;
+    ~ToDevice() CLICK_COLD;
 
     const char *class_name() const		{ return "ToDevice"; }
     const char *port_count() const		{ return "1/0-2"; }
@@ -90,10 +94,10 @@ class ToDevice : public Element { public:
     const char *flags() const			{ return "S2"; }
 
     int configure_phase() const { return KernelFilter::CONFIGURE_PHASE_TODEVICE; }
-    int configure(Vector<String> &, ErrorHandler *);
-    int initialize(ErrorHandler *);
-    void cleanup(CleanupStage);
-    void add_handlers();
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
     String ifname() const			{ return _ifname; }
     int fd() const				{ return _fd; }
@@ -101,7 +105,7 @@ class ToDevice : public Element { public:
     bool run_task(Task *);
     void selected(int fd, int mask);
 
-  private:
+  protected:
 
     Task _task;
     Timer _timer;
@@ -110,10 +114,13 @@ class ToDevice : public Element { public:
 #if TODEVICE_ALLOW_PCAP
     pcap_t *_pcap;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
     int _fd;
 #endif
-    enum { method_linux, method_pcap, method_devbpf, method_pcapfd };
+#if TODEVICE_ALLOW_NETMAP
+    NetmapInfo _netmap;
+#endif
+    enum { method_default, method_netmap, method_linux, method_pcap, method_devbpf, method_pcapfd };
     int _method;
     NotifierSignal _signal;
 
@@ -124,7 +131,7 @@ class ToDevice : public Element { public:
 #if TODEVICE_ALLOW_PCAP
     bool _my_pcap;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
     bool _my_fd;
 #endif
     int _backoff;
@@ -133,8 +140,8 @@ class ToDevice : public Element { public:
     enum { h_debug, h_signal, h_pulls, h_q };
     FromDevice *find_fromdevice() const;
     int send_packet(Packet *p);
-    static int write_param(const String &in_s, Element *e, void *vparam, ErrorHandler *errh);
-    static String read_param(Element *e, void *thunk);
+    static int write_param(const String &in_s, Element *e, void *vparam, ErrorHandler *errh) CLICK_COLD;
+    static String read_param(Element *e, void *thunk) CLICK_COLD;
 
 };
 
