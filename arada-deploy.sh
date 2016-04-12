@@ -73,7 +73,7 @@ if [ $? -ne 0 ]; then
 fi
 
 cd $SANDBOX
-tar -czf ../$TARBALL *
+tar -chzf ../$TARBALL *
 if [ $? -ne 0 ]; then
 	echo "Failed creating tarball for target"
 	exit -10
