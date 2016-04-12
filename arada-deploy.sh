@@ -18,13 +18,18 @@ CURRENTDIR=`pwd`
 CURRENTDIRNAME=`basename $CURRENTDIR`
 if [ "$CURRENTDIRNAME" != "$XIADIR" ]; then
 	echo "Run this script from xia-core directory"
-	exit 1
+	exit -1
 fi
 
 # The user is required to provide IP address of the target
 if [ "$1" == "" ]; then
 	echo "Usage: $0 <Arada_Target_IP_Addr>"
-	exit 1
+	exit -2
+fi
+
+if [ ! -f click/userlevel/click ]; then
+	echo "Click executable not found. Please build XIA. Aborting"
+	exit -3
 fi
 
 # prepare a directory tree to send over to target
@@ -47,12 +52,22 @@ if [ $? -ne 0 ]; then
 fi
 
 cp -ax api/lib/* $SANDBOXXIAAPILIB
+if [ $? -ne 0 ]; then
+	echo "Failed copying XIA libraries to $SANDBOXXIAAPILIB"
+	exit -7
+fi
+
+cp click/userlevel/click $SANDBOXBIN
+if [ $? -ne 0 ]; then
+	echo "Failed copying click executable"
+	exit -8
+fi
 
 cd $SANDBOX
 tar -czf ../$TARBALL *
 if [ $? -ne 0 ]; then
 	echo "Failed creating tarball for target"
-	exit -7
+	exit -9
 fi
 cd .. #sandbox
 
@@ -63,14 +78,14 @@ sleep 1
 scp $TARBALL root@$1:/tmp/usb/
 if [ $? -ne 0 ]; then
 	echo "Failed copying tarball to target"
-	exit -8
+	exit -10
 fi
 
 echo "Deploying files on target"
 ssh root@$1 "cd /tmp/usb; tar -xzf $TARBALL"
 if [ $? -ne 0 ]; then
 	echo "Failed unpacking tarball on target"
-	exit -9
+	exit -11
 fi
 
 # Clean up the sandbox
