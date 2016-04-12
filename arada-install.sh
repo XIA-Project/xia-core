@@ -7,6 +7,22 @@ echo "***"
 echo "*** NOTE: Do not store arada stuff on a public location"
 echo "***"
 sleep 5
+echo ""
+echo "Updating your distro."
+echo "Needed to ensure correct source packages are cross-compiled."
+sleep 5
+sudo apt-get update &> apt-get_update.log
+if [ $? -ne 0 ]; then
+	echo "Failed to update package database for your distro. Aborting"
+	exit -1
+fi
+
+sudo apt-get -y upgrade &> apt-get_upgrade.log
+if [ $? -ne 0 ]; then
+	echo "Failed to update packages for your distro. Aborting"
+	exit -1
+fi
+
 if [ ! -f arada.tar.gz ]; then
 	echo "ERROR: arada.tar.gz not in current directory. Aborting"
 	exit -1
@@ -220,4 +236,5 @@ echo ""
 echo ""
 echo "XIA can now be built with the following commands in xia-core:"
 echo "export PATH=\$PATH:/opt/buildroot-2013.11/output/host/usr/bin/"
+echo "git pull; make clean"
 echo "tarch=mips ./configure; make"
