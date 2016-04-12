@@ -47,19 +47,19 @@ if [ $? -ne 0 ]; then
 	exit -5
 fi
 
-cp -ax $BUILDROOTLIB/* $SANDBOXLIB
+cp -R $BUILDROOTLIB/* $SANDBOXLIB
 if [ $? -ne 0 ]; then
 	echo "Failed copying libraries from $BUILDROOTLIB"
 	exit -6
 fi
 
-cp -ax api/lib/* $SANDBOXXIAAPILIB
+cp -R api/lib/* $SANDBOXXIAAPILIB
 if [ $? -ne 0 ]; then
 	echo "Failed copying XIA libraries to $SANDBOXXIAAPILIB"
 	exit -7
 fi
 
-cp -ax bin/* $SANDBOXXIABIN
+cp -R bin/* $SANDBOXXIABIN
 if [ $? -ne 0 ]; then
 	echo "Failed copying XIA executables to $SANDBOXXIABIN"
 	exit -8
