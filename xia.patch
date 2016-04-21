@@ -1,0 +1,991 @@
+diff -bcr click-2.0.1/click-buildtool.in xia-core/click-2.0.1/click-buildtool.in
+*** click-2.0.1/click-buildtool.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/click-buildtool.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 311,317 ****
+
+      # add standards to provisions if necessary
+      if test "x$standards" != x; then
+! 	provisions="$provisions AddressInfo AlignmentInfo ErrorElement PortInfo ScheduleInfo Storage"
+      fi
+
+      # add 'multithread' provision based on driver
+--- 311,317 ----
+
+      # add standards to provisions if necessary
+      if test "x$standards" != x; then
+! 	provisions="$provisions AddressInfo AlignmentInfo ErrorElement PortInfo ScheduleInfo Storage XIAXIDInfo"
+      fi
+
+      # add 'multithread' provision based on driver
+***************
+*** 993,998 ****
+--- 993,999 ----
+  -	<click/standard/errorelement.hh>	ErrorElement-ErrorElement
+  -	<click/standard/portinfo.hh>	PortInfo-PortInfo
+  -	<click/standard/scheduleinfo.hh>	ScheduleInfo-ScheduleInfo
++ -   <click/standard/xiaxidinfo.hh>   XIAXIDInfo-XIAXIDInfo
+  EOF
+  	cat - /tmp/click-buildtool-standards.$$ | $awk "$awk_program"
+  	/bin/rm -f /tmp/click-buildtool-standards.$$
+diff -bcr click-2.0.1/config.h.in xia-core/click-2.0.1/config.h.in
+*** click-2.0.1/config.h.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/config.h.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 88,93 ****
+--- 88,97 ----
+  /* Define if IPv6 support is enabled. */
+  #undef HAVE_IP6
+
++ /* Define if XIA support is enabled. */
++ #define HAVE_XIA 1
++ //#undef HAVE_XIA
++
+  /* Define if IPsec support is enabled. */
+  #undef HAVE_IPSEC
+
+diff -bcr click-2.0.1/configure.in xia-core/click-2.0.1/configure.in
+*** click-2.0.1/configure.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/configure.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 316,321 ****
+--- 316,322 ----
+  ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
+  ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
+  ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
++ ELEMENTS_ARG_ENABLE(xia, [include XIA elements], yes)
+  ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
+  ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
+  ELEMENTS_ARG_ENABLE(ip6, [include IPv6 elements], NO, AC_DEFINE(HAVE_IP6))
+diff -bcr click-2.0.1/elements/userlevel/fromhost.cc xia-core/click-2.0.1/elements/userlevel/fromhost.cc
+*** click-2.0.1/elements/userlevel/fromhost.cc	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/elements/userlevel/fromhost.cc	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 61,66 ****
+--- 61,69 ----
+      if (Args(conf, this, errh)
+  	.read_mp("DEVNAME", _dev_name)
+  	.read_p("DST", IPPrefixArg(), _near, _mask)
++         .read("CLICK_XUDP_ADDR",_click_xudp_addr)
++         .read("CLICK_XTRANSPORT_ADDR",_click_xtransport_addr)
++
+  	.read("GATEWAY", _gw)
+  #if HAVE_IP6 && 0
+  	// XXX
+***************
+*** 176,181 ****
+--- 179,204 ----
+  	up = "";
+      }
+  #endif
++     if (_mtu_out) {
++ 	sa.clear();
++ 	sa << "/sbin/ifconfig " << _dev_name << " mtu " << _mtu_out  << " 2>/dev/null";
++ 	if (system(sa.c_str()) != 0)
++ 	    return errh->error("%s: %<%s%> failed", _dev_name.c_str(), sa.c_str());
++     }
++
++     if (_click_xudp_addr) {
++ 	sa.clear();
++ 	sa << "/usr/sbin/arp -s -i " << _dev_name << " " << _click_xudp_addr << " 00:00:00:01:00:00 "  << " 2>/dev/null";
++ 	if (system(sa.c_str()) != 0)
++ 	    return errh->error("%s: %<%s%> failed", _dev_name.c_str(), sa.c_str());
++     }
++
++     if (_click_xtransport_addr) {
++ 	sa.clear();
++ 	sa << "/usr/sbin/arp -s -i " << _dev_name << " " << _click_xtransport_addr << " 00:00:00:01:00:00 "  << " 2>/dev/null";
++ 	if (system(sa.c_str()) != 0)
++ 	    return errh->error("%s: %<%s%> failed", _dev_name.c_str(), sa.c_str());
++     }
+
+      // calculate maximum packet size needed to receive data from
+      // tun/tap.
+diff -bcr click-2.0.1/elements/userlevel/fromhost.hh xia-core/click-2.0.1/elements/userlevel/fromhost.hh
+*** click-2.0.1/elements/userlevel/fromhost.hh	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/elements/userlevel/fromhost.hh	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 126,131 ****
+--- 126,133 ----
+      int _mtu_in;
+      int _mtu_out;
+      String _dev_name;
++     String _click_xudp_addr;
++     String _click_xtransport_addr;
+
+      EtherAddress _macaddr;
+
+diff -bcr click-2.0.1/elements/userlevel/socket.cc xia-core/click-2.0.1/elements/userlevel/socket.cc
+*** click-2.0.1/elements/userlevel/socket.cc	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/elements/userlevel/socket.cc	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 380,385 ****
+--- 380,387 ----
+  	} else if (len > 0) {
+  	  memcpy(&_remote, &from, from_len);
+  	  _remote_len = from_len;
++       _rq->set_src_ip_anno(_remote.in.sin_addr);
++ 	  SET_SRC_PORT_ANNO(_rq, _remote.in.sin_port);
+  	}
+        }
+
+***************
+*** 429,434 ****
+--- 431,437 ----
+        // If the IP address specified when the element was created is 0.0.0.0,
+        // send the packet to its IP destination annotation address
+        _remote.in.sin_addr = p->dst_ip_anno();
++       _remote.in.sin_port = DST_PORT_ANNO(p);
+      }
+
+      // write segment
+diff -bcr click-2.0.1/include/click/confparse.hh xia-core/click-2.0.1/include/click/confparse.hh
+*** click-2.0.1/include/click/confparse.hh	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/include/click/confparse.hh	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 4,9 ****
+--- 4,11 ----
+  /// @cond never
+  #include <click/string.hh>
+  #include <click/vector.hh>
++ #include <clicknet/xia.h>
++ #include <click/xiapath.hh>
+  struct in_addr;
+  CLICK_DECLS
+  class ErrorHandler;
+***************
+*** 173,178 ****
+--- 175,189 ----
+  bool cp_ip_prefix(const String& str, unsigned char* result_addr, unsigned char* result_mask  CP_OPT_CONTEXT);
+  bool cp_ip_address_list(const String& str, Vector<IPAddress>* result  CP_OPT_CONTEXT);
+
++ bool cp_xid_type(const String& str, uint32_t* result);
++ class XID;
++ bool cp_xid(const String& str, struct click_xia_xid* xid  CP_OPT_CONTEXT);
++ bool cp_xid(const String& str, XID* xid  CP_OPT_CONTEXT);
++ class XIAPath;
++ bool cp_xia_path(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
++ bool cp_xia_path_dag(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
++ bool cp_xia_path_re(const String& str, XIAPath* xia_path  CP_OPT_CONTEXT);
++
+  #if HAVE_IP6
+  class IP6Address;
+  struct click_in6_addr;
+***************
+*** 273,278 ****
+--- 284,294 ----
+      cpTimeval,		///< Result storage struct timeval*, parsed by cp_time().
+      cpBandwidth,	///< Result storage uint32_t*, parsed by cp_bandwidth().
+      cpIPAddress,	///< Result storage IPAddress* or equivalent, parsed by cp_ip_address().
++     cpXIDType,      	///< Result storage int, parsed by cp_xid_type().
++     cpXID,      	///< Result storage struct click_xia_xid or equivalent, parsed by cp_xid().
++     cpXIAPath,      	///< Result storage XIAPath, parsed by XIAPath::parse().
++     cpXIAPathDAG,      	///< Result storage XIAPath, parsed by XIAPath::parse_dag().
++     cpXIAPathRE,      	///< Result storage XIAPath, parsed by XIAPath::parse_re().
+      cpIPPrefix,		///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
+      cpIPAddressOrPrefix,///< Result storage IPAddress* addr and IPAddress *mask, parsed by cp_ip_prefix().
+      cpIPAddressList,	///< Result storage Vector<IPAddress>*, parsed by cp_ip_address_list().
+***************
+*** 405,410 ****
+--- 421,428 ----
+  	double d;
+  #endif
+  	unsigned char address[16];
++ 	uint32_t xid_type;
++ 	struct click_xia_xid xid;
+  	int is[4];
+  #ifndef CLICK_TOOL
+  	Element *element;
+***************
+*** 413,418 ****
+--- 431,437 ----
+      } v, v2;
+      String v_string;
+      String v2_string;
++     XIAPath xia_path;
+  };
+
+  enum {
+diff -bcr click-2.0.1/include/click/nameinfo.hh xia-core/click-2.0.1/include/click/nameinfo.hh
+*** click-2.0.1/include/click/nameinfo.hh	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/include/click/nameinfo.hh	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 59,65 ****
+  	T_TCP_FIELDNAME = 0x04030006,	///< TCP field names database
+  	T_UDP_FIELDNAME = 0x04030011,	///< UDP field names database
+  	T_IP6_ADDR = 0x06000001,	///< IPv6 address names database
+! 	T_IP6_PREFIX = 0x06000002	///< IPv6 prefix names database
+      };
+
+      /** @brief Find or create a name database.
+--- 59,66 ----
+  	T_TCP_FIELDNAME = 0x04030006,	///< TCP field names database
+  	T_UDP_FIELDNAME = 0x04030011,	///< UDP field names database
+  	T_IP6_ADDR = 0x06000001,	///< IPv6 address names database
+! 	T_IP6_PREFIX = 0x06000002,	///< IPv6 prefix names database
+! 	T_XIA_XID = 0x08000001,	///< XID name database
+      };
+
+      /** @brief Find or create a name database.
+diff -bcr click-2.0.1/include/click/packet.hh xia-core/click-2.0.1/include/click/packet.hh
+*** click-2.0.1/include/click/packet.hh	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/include/click/packet.hh	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 4,9 ****
+--- 4,13 ----
+  #include <click/ipaddress.hh>
+  #include <click/glue.hh>
+  #include <click/timestamp.hh>
++ #if HAVE_XIA
++ #include <clicknet/xia.h>
++ #include <click/xid.hh>
++ #endif
+  #if CLICK_LINUXMODULE
+  # include <click/skbmgr.hh>
+  #else
+***************
+*** 18,23 ****
+--- 22,30 ----
+  #if (CLICK_USERLEVEL || CLICK_NS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS)
+  # define HAVE_CLICK_PACKET_POOL 1
+  #endif
++ #if HAVE_XIA
++ struct click_xia;
++ #endif
+  struct click_ether;
+  struct click_ip;
+  struct click_icmp;
+***************
+*** 287,292 ****
+--- 294,304 ----
+      inline void set_ip6_header(const click_ip6 *ip6h);
+      inline void set_ip6_header(const click_ip6 *ip6h, uint32_t len);
+
++ 	#if HAVE_XIA
++     inline void set_xia_header(const click_xia *xiah, uint32_t len);
++     inline const click_xia *xia_header() const;
++ 	#endif
++
+      inline const click_icmp *icmp_header() const;
+      inline const click_tcp *tcp_header() const;
+      inline const click_udp *udp_header() const;
+***************
+*** 309,315 ****
+      //@{
+
+      enum {
+! 	anno_size = 48			///< Size of annotation area.
+      };
+
+      /** @brief Return the timestamp annotation. */
+--- 321,331 ----
+      //@{
+
+      enum {
+! 	#if HAVE_XIA
+! 	anno_size = 92			///< Size of annotation area.
+! 	#else
+! 	anno_size = 56			///< Size of annotation area.
+! 	#endif
+      };
+
+      /** @brief Return the timestamp annotation. */
+***************
+*** 384,392 ****
+
+      enum {
+  	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
+! 	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16
+      };
+
+      /** @brief Return the destination IPv4 address annotation.
+       *
+       * The value is taken from the address annotation area. */
+--- 400,427 ----
+
+      enum {
+  	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
+!     dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
+! #if HAVE_XIA
+!     src_ip_anno_offset = 52, src_ip_anno_size = 4,
+! 	nexthop_neighbor_xid_anno_offset = 64, nexthop_neighbor_xid_anno_size = 24
+! #else
+! 	src_ip_anno_offset = 52, src_ip_anno_size = 4
+! #endif
+      };
+
++
++ #if HAVE_XIA
++     /** @brief Return the nexthop_neighbor_xid annotation.
++      *
++      * The value is taken from the address annotation area. */
++     inline XID nexthop_neighbor_xid_anno() const;
++
++     /** @brief Set the destination IPv4 address annotation.
++      *
++      * The value is stored in the address annotation area. */
++     inline void set_nexthop_neighbor_xid_anno(XID x);
++ #endif
++
+      /** @brief Return the destination IPv4 address annotation.
+       *
+       * The value is taken from the address annotation area. */
+***************
+*** 397,402 ****
+--- 432,447 ----
+       * The value is stored in the address annotation area. */
+      inline void set_dst_ip_anno(IPAddress addr);
+
++     /** @brief Return the source IPv4 address annotation.
++      *
++      * The value is taken from the address annotation area. */
++     inline IPAddress src_ip_anno() const;
++
++     /** @brief Set the source IPv4 address annotation.
++      *
++      * The value is stored in the address annotation area. */
++     inline void set_src_ip_anno(IPAddress addr);
++
+      /** @brief Return a pointer to the annotation area.
+       *
+       * The area is @link Packet::anno_size anno_size @endlink bytes long. */
+***************
+*** 751,756 ****
+--- 796,804 ----
+      inline click_ip *ip_header() const;
+      inline click_ip6 *ip6_header() const;
+      inline unsigned char *transport_header() const;
++ #if HAVE_XIA
++     inline click_xia *xia_header() const;
++ #endif
+      inline click_icmp *icmp_header() const;
+      inline click_tcp *tcp_header() const;
+      inline click_udp *udp_header() const;
+***************
+*** 1132,1137 ****
+--- 1180,1197 ----
+      return reinterpret_cast<const click_ether *>(mac_header());
+  }
+
++ #if HAVE_XIA
++ /** @brief Return the packet's network header pointer as XIA header.
++  * @invariant (void *) xia_header() == (void *) network_header()
++  * @warning Not useful if !has_network_header().
++  * @sa network_header */
++ inline const click_xia *
++ Packet::xia_header() const
++ {
++     return reinterpret_cast<const click_xia *>(network_header());
++ }
++ #endif
++
+  /** @brief Return the packet's network header pointer as IPv4.
+   * @invariant (void *) ip_header() == (void *) network_header()
+   * @warning Not useful if !has_network_header().
+***************
+*** 1696,1701 ****
+--- 1756,1788 ----
+  }
+  #endif
+
++ #if HAVE_XIA
++ inline XID
++ Packet::nexthop_neighbor_xid_anno() const
++ {
++     struct click_xia_xid xid;
++     xid.type = xanno()->u32[nexthop_neighbor_xid_anno_offset / 4];
++
++     for (size_t d = 0; d < sizeof(xid.id); d++) {
++     	xid.id[d] = xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d];
++     }
++     return XID ( xid );
++ }
++
++ inline void
++ Packet::set_nexthop_neighbor_xid_anno(XID x)
++ {
++     struct click_xia_xid xid_temp;
++     xid_temp = x.xid();
++
++     xanno()->u32[nexthop_neighbor_xid_anno_offset / 4] = xid_temp.type;
++
++     for (size_t d = 0; d < sizeof(xid_temp.id); d++) {
++     	xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d] = xid_temp.id[d];
++     }
++ }
++ #endif
++
+  inline IPAddress
+  Packet::dst_ip_anno() const
+  {
+***************
+*** 1708,1713 ****
+--- 1795,1812 ----
+      xanno()->u32[dst_ip_anno_offset / 4] = a.addr();
+  }
+
++ inline IPAddress
++ Packet::src_ip_anno() const
++ {
++     return IPAddress(xanno()->u32[src_ip_anno_offset / 4]);
++ }
++
++ inline void
++ Packet::set_src_ip_anno(IPAddress a)
++ {
++     xanno()->u32[src_ip_anno_offset / 4] = a.addr();
++ }
++
+  /** @brief Set the MAC header pointer.
+   * @param p new header pointer */
+  inline void
+***************
+*** 1844,1849 ****
+--- 1943,1962 ----
+  #endif
+  }
+
++ #if HAVE_XIA
++ /** @brief Set the network header pointer to an XIA header.
++  * @param xiah new XIA header pointer
++  * @param len new XIA header length in bytes
++  * @post (char *) network_header() == (char *) @a xiah
++  * @post network_header_length() == @a len
++  * @post (char *) transport_header() == (char *) @a xiah + @a len */
++ inline void
++ Packet::set_xia_header(const click_xia *xiah, uint32_t len)
++ {
++     set_network_header(reinterpret_cast<const unsigned char *>(xiah), len);
++ }
++ #endif
++
+  /** @brief Set the network header pointer to an IPv4 header.
+   * @param iph new IP header pointer
+   * @param len new IP header length in bytes
+***************
+*** 2353,2358 ****
+--- 2466,2479 ----
+      return const_cast<click_ip6 *>(Packet::ip6_header());
+  }
+
++ #if HAVE_XIA
++ inline click_xia *
++ WritablePacket::xia_header() const
++ {
++     return const_cast<click_xia *>(Packet::xia_header());
++ }
++ #endif
++
+  inline click_icmp *
+  WritablePacket::icmp_header() const
+  {
+diff -bcr click-2.0.1/include/click/packet_anno.hh xia-core/click-2.0.1/include/click/packet_anno.hh
+*** click-2.0.1/include/click/packet_anno.hh	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/include/click/packet_anno.hh	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 134,137 ****
+--- 134,179 ----
+  # endif
+  #endif
+
++ // bytes 48-51
++ #define SRC_IP_ANNO_OFFSET 48
++ #define SRC_IP_ANNO_SIZE 4
++
++ // bytes 52-53
++ #define SRC_PORT_ANNO_OFFSET 52
++ #define SRC_PORT_ANNO_SIZE 2
++ #define SRC_PORT_ANNO(p)        ((p)->anno_u16(SRC_PORT_ANNO_OFFSET))
++ #define SET_SRC_PORT_ANNO(p, v)        ((p)->set_anno_u16(SRC_PORT_ANNO_OFFSET, (v)))
++
++ // bytes 54-55
++ #define DST_PORT_ANNO_OFFSET 54
++ #define DST_PORT_ANNO_SIZE 2
++ #define DST_PORT_ANNO(p)        ((p)->anno_u16(DST_PORT_ANNO_OFFSET))
++ #define SET_DST_PORT_ANNO(p, v)        ((p)->set_anno_u16(DST_PORT_ANNO_OFFSET, (v)))
++
++ #if HAVE_XIA
++ // bytes 56-63
++ #define XIA_NEXT_PATH_ANNO_OFFSET      56
++ #define XIA_NEXT_PATH_ANNO_SIZE        8
++ #  define XIA_NEXT_PATH_ANNO(p)	((p)->anno_u8(XIA_NEXT_PATH_ANNO_OFFSET))
++ #  define SET_XIA_NEXT_PATH_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_PATH_ANNO_OFFSET, (v)))
++
++ // bytes 64-87
++ #define XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET      64
++ #define XIA_NEXT_HOP_NEIGHBOR_ANNO_SIZE        24
++ #define XIA_NEXT_HOP_NEIGHBOR_ANNO(p)	((click_xia_xid *) ((p)->anno_u8() + XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET ))
++ #define SET_XIA_NEXT_HOP_NEIGHBOR_ANNO(p, v) ((p)->set_anno_u8(XIA_NEXT_HOP_NEIGHBOR_ANNO_OFFSET, (v)))
++
++ // bytes 88-89
++ #define XIA_PAINT_ANNO_OFFSET   88
++ #define XIA_PAINT_ANNO_SIZE     2
++ #define XIA_PAINT_ANNO(p)			((p)->anno_s16(XIA_PAINT_ANNO_OFFSET))
++ #define SET_XIA_PAINT_ANNO(p, v)		((p)->set_anno_s16(XIA_PAINT_ANNO_OFFSET, (v)))
++
++ // bytes 90-91
++ #define XIA_TAIL_ANNO_OFFSET	90
++ #define XIA_TAIL_ANNO_SIZE		2
++ #define XIA_TAIL_ANNO(p)		((p)->anno_u16(XIA_TAIL_ANNO_OFFSET))
++ #define SET_XIA_TAIL_ANNO(p, v)	((p)->set_anno_u16(XIA_TAIL_ANNO_OFFSET, (v)))
++ #endif
++
+  #endif
+diff -bcr click-2.0.1/include/clicknet/ether.h xia-core/click-2.0.1/include/clicknet/ether.h
+*** click-2.0.1/include/clicknet/ether.h	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/include/clicknet/ether.h	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 29,34 ****
+--- 29,36 ----
+  #define ETHERTYPE_PPPOE_DISC	0x8863
+  #define ETHERTYPE_PPPOE_SESSION	0x8864
+  #define ETHERTYPE_GRID		0x7fff	/* wvlan_cs driver won't transmit frames with high bit of protocol number set */
++ #define ETHERTYPE_XARP		0x9990
++ #define ETHERTYPE_XIP		0xc0de
+
+  struct click_arp {		/* Offsets relative to ARP (Ethernet) header */
+      uint16_t	ar_hrd;		/* 0-1 (14-15)  hardware address format      */
+***************
+*** 59,64 ****
+--- 61,95 ----
+      uint8_t	arp_tpa[4];	/* 24-27 (38-41)  target protocol address    */
+  };
+
++ struct click_xarp {		/* Offsets relative to XARP (Ethernet) header */
++     uint16_t	ar_hrd;		/* 0-1 (14-15)  hardware address format      */
++ #define XARPHRD_ETHER    1	/*		  Ethernet 10Mbps	     */
++ #define XARPHRD_IEEE802	6	/*		  token ring     	     */
++ #define XARPHRD_ARCNET	7	/*		  Arcnet         	     */
++ #define XARPHRD_FRELAY	15	/*		  frame relay    	     */
++ #define XARPHRD_STRIP	23	/*		  Ricochet Starmode Radio    */
++ #define XARPHRD_IEEE1394	24	/*		  IEEE 1394 (FireWire)	     */
++ #define XARPHRD_80211    801	/*		  IEEE 802.11 (wifi)	     */
++     uint16_t	ar_pro;		/* 2-3 (16-17)  protocol address format      */
++     uint8_t	ar_hln;		/* 4   (18)     hardware address length      */
++     uint8_t	ar_pln;		/* 5   (19)     protocol address length      */
++     uint16_t	ar_op;		/* 6-7 (20-21)  opcode (command)	     */
++ #define XARPOP_REQUEST   1	/*		  XARP request		     */
++ #define XARPOP_REPLY	2	/*		  XARP reply		     */
++ #define XARPOP_REVREQUEST 3	/*		  reverse request: hw->proto */
++ #define XARPOP_REVREPLY	4	/*		  reverse reply		     */
++ #define XARPOP_INVREQUEST 8	/*		  peer identification req    */
++ #define XARPOP_INVREPLY	9	/*		  peer identification reply  */
++ };
++
++ struct click_ether_xarp {
++     struct click_xarp ea_hdr;	/* 0-7   (14-21)  fixed-size XARP header	     */
++     uint8_t	xarp_sha[6];	/* 8-13  (22-27)  sender hardware address    */
++     uint8_t	xarp_spa[24];	/* 14-17 (28-31)  sender protocol address    */
++     uint8_t	xarp_tha[6];	/* 18-23 (32-37)  target hardware address    */
++     uint8_t	xarp_tpa[24];	/* 24-27 (38-41)  target protocol address    */
++ };
++
+
+  /* Ethernet with VLAN (802.1q) */
+
+diff -bcr click-2.0.1/lib/confparse.cc xia-core/click-2.0.1/lib/confparse.cc
+*** click-2.0.1/lib/confparse.cc	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/lib/confparse.cc	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 31,36 ****
+--- 31,41 ----
+  #include <click/ipaddress.hh>
+  #include <click/etheraddress.hh>
+  #include <click/hashtable.hh>
++ #if HAVE_XIA
++ #include <click/xid.hh>
++ #include <click/standard/xiaxidinfo.hh>
++
++ #endif
+  #if HAVE_IP6
+  # include <click/ip6address.hh>
+  # include <click/ip6flowid.hh>
+***************
+*** 59,64 ****
+--- 64,71 ----
+  #else
+  # include <stdarg.h>
+  #endif
++
++  #include <click/xiautil.hh>
+  CLICK_DECLS
+
+  int cp_errno;
+***************
+*** 266,271 ****
+--- 273,293 ----
+    return len > 0;
+  }
+
++ #if HAVE_XIA
++ static int
++ xvalue(int x)
++ {
++     if (x >= '0' && x <= '9')
++         return x - '0';
++     else if (x >= 'A' && x <= 'F')
++         return x - 'A' + 10;
++     else if (x >= 'a' && x <= 'f')
++         return x - 'a' + 10;
++     else
++         return -1;
++ }
++ #endif
++
+  static const char *
+  skip_comment(const char *s, const char *end)
+  {
+***************
+*** 1607,1612 ****
+--- 1629,1760 ----
+  #endif
+  }
+
++ #if HAVE_XIA
++ bool
++ cp_xid_type(const String& str, uint32_t* result)
++ {
++     int r;
++
++     if (str.compare(String("UNDEF")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_UNDEF);
++     else if (str.compare(String("AD")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_AD);
++     else if (str.compare(String("CID")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_CID);
++     else if (str.compare(String("HID")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_HID);
++     else if (str.compare(String("SID")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_SID);
++     else if (str.compare(String("IP")) == 0)
++         *result = htonl(CLICK_XIA_XID_TYPE_IP);
++     else if ((r = XidMap::id(str)) >= 0)
++         *result = htonl(r);
++     else if (!cp_integer(str, result)) {      // TODO: apply htonl (also change xiarandomize.cc)
++         click_chatter("unrecognized XID type: %s\n", str.c_str());
++         return false;
++     }
++     return true;
++ }
++
++ bool
++ cp_xid(const String& str, XID* xid  CP_CONTEXT)
++ {
++     struct click_xia_xid xid_c;
++     if (!cp_xid(str, &xid_c  CP_PASS_CONTEXT))
++         return false;
++     *xid = xid_c;
++     return true;
++ }
++
++ bool
++ cp_xid(const String& str, struct click_xia_xid* xid  CP_CONTEXT)
++ {
++ #ifndef CLICK_TOOL
++     if (context)
++         if (XIAXIDInfo::query_xid(str, xid, context))
++             return true;
++ #endif
++
++     int delim = str.find_left(":", 0);
++     String type_str, xid_str;
++
++     if (delim == -1)
++     {
++         click_chatter("invalid XID format: %s\n", str.c_str());
++         return false;
++     }
++
++     type_str = str.substring(0, delim);
++     xid_str = str.substring(delim + 1);
++     //click_chatter("type %s. %s %d", type_str.c_str(), xid_str.c_str(), xid.type);
++
++     uint32_t xid_type;
++     if (!cp_xid_type(type_str, &xid_type))
++         return false;
++     xid->type = xid_type;
++
++     int len = xid_str.length();
++     int i = 0;
++     //click_chatter("size xid %d %s\n", sizeof(xid.xid), xid_str.c_str());
++
++     if(xid->type == htonl(CLICK_XIA_XID_TYPE_IP)) {
++         memset(xid->id,0,sizeof(xid->id));
++         xid->id[0] = 0x45;
++         xid->id[5] = 0x01;
++         xid->id[8] = 0xFA;
++         xid->id[9] = 0xFA;
++
++         IPAddress ip;
++         if (IPAddressArg().parse(xid_str,ip CP_PASS_CONTEXT)) {  // if we've already converted this 4ID to hex format, the IP parse will fail and we won't do it again
++         	uint32_t uintip = ip;
++
++         	xid->id[16] = *(((unsigned char*)&uintip)+0);
++         	xid->id[17] = *(((unsigned char*)&uintip)+1);
++         	xid->id[18] = *(((unsigned char*)&uintip)+2);
++         	xid->id[19] = *(((unsigned char*)&uintip)+3);
++         	return true;
++ 		}
++     }
++
++     for (size_t d = 0; d < sizeof(xid->id); d++) {
++         if (i < len - 1 && isxdigit(xid_str[i]) && isxdigit(xid_str[i + 1])) {
++            // can read two chars
++            xid->id[d] = xvalue(xid_str[i]) * 16 + xvalue(xid_str[i + 1]);
++            //click_chatter("i %d xid_str %c %c\n", i, xid_str[i], xid_str[i+1]);
++            i += 2;
++         } else {
++             xid->id[d] = 0;
++         }
++     }
++     if (static_cast<size_t>(len) < sizeof(xid->id) * 2)
++         click_chatter("too short xid: %s\n", str.c_str());
++     if (static_cast<size_t>(len) > sizeof(xid->id) * 2)
++         click_chatter("truncated xid: %s\n", str.c_str());
++     return true;
++ }
++
++ bool
++ cp_xia_path(const String& str, XIAPath* xia_path  CP_CONTEXT)
++ {
++     *xia_path = XIAPath();
++     return xia_path->parse(str  CP_PASS_CONTEXT);
++ }
++
++ bool
++ cp_xia_path_dag(const String& str, XIAPath* xia_path  CP_CONTEXT)
++ {
++     *xia_path = XIAPath();
++     return xia_path->parse_dag(str  CP_PASS_CONTEXT);
++ }
++
++ bool
++ cp_xia_path_re(const String& str, XIAPath* xia_path  CP_CONTEXT)
++ {
++     *xia_path = XIAPath();
++     return xia_path->parse_re(str  CP_PASS_CONTEXT);
++ }
++ #endif
++
+  bool
+  cp_ip_prefix(const String &str,
+  	     unsigned char *result_addr, unsigned char *result_mask,
+***************
+*** 2215,2220 ****
+--- 2363,2375 ----
+    cpTimeval		= "timeval",
+    cpBandwidth		= "bandwidth_Bps",
+    cpIPAddress		= "ip_addr",
++ #if HAVE_XIA
++   cpXIDType		 = "xid_type",
++   cpXID			= "xid",
++   cpXIAPath		= "xia_path",
++   cpXIAPathDAG		= "xia_path_dag",
++   cpXIAPathRE		= "xia_path_re",
++ #endif
+    cpIPPrefix		= "ip_prefix",
+    cpIPAddressOrPrefix	= "ip_addr_or_prefix",
+    cpIPAddressList	= "ip_addr_list",
+***************
+*** 2278,2283 ****
+--- 2433,2445 ----
+    cpiTimeval,
+    cpiBandwidth,
+    cpiIPAddress,
++ #if HAVE_XIA
++   cpiXIDType,
++   cpiXID,
++   cpiXIAPath,
++   cpiXIAPathDAG,
++   cpiXIAPathRE,
++ #endif
+    cpiIPPrefix,
+    cpiIPAddressOrPrefix,
+    cpiIPAddressList,
+***************
+*** 2608,2613 ****
+--- 2770,2802 ----
+        break;
+    }
+
++ #if HAVE_XIA
++    case cpiXIDType:
++     if (!cp_xid_type(arg, &v->v.xid_type))
++       goto type_mismatch;
++     break;
++
++    case cpiXID:
++     if (!cp_xid(arg, &v->v.xid CP_PASS_CONTEXT))
++       goto type_mismatch;
++     break;
++
++    case cpiXIAPath:
++     if (!cp_xia_path(arg, &v->xia_path CP_PASS_CONTEXT))
++       goto type_mismatch;
++     break;
++
++    case cpiXIAPathDAG:
++     if (!cp_xia_path_dag(arg, &v->xia_path CP_PASS_CONTEXT))
++       goto type_mismatch;
++     break;
++
++    case cpiXIAPathRE:
++     if (!cp_xia_path_re(arg, &v->xia_path CP_PASS_CONTEXT))
++       goto type_mismatch;
++     break;
++ #endif
++
+     case cpiIPAddress:
+      if (!cp_ip_address(arg, v->v.address CP_PASS_CONTEXT))
+        goto type_mismatch;
+***************
+*** 2863,2868 ****
+--- 3052,3079 ----
+       break;
+     }
+
++ #if HAVE_XIA
++    case cpiXIDType: {
++      uint32_t* xid_type_store = (uint32_t*)v->store;
++      *xid_type_store = v->v.xid_type;
++      break;
++    }
++
++    case cpiXID: {
++      struct click_xia_xid* xid_store = (struct click_xia_xid*)v->store;
++      *xid_store = v->v.xid;
++      break;
++    }
++
++    case cpiXIAPath:
++    case cpiXIAPathDAG:
++    case cpiXIAPathRE: {
++      XIAPath* xia_path_store = (XIAPath*)v->store;
++      *xia_path_store = v->xia_path;
++      break;
++    }
++ #endif
++
+     case cpiIPAddress:
+      helper = 4;
+      goto address;
+***************
+*** 4214,4219 ****
+--- 4425,4437 ----
+      cp_register_argtype(cpTimeval, "seconds since the epoch", 0, default_parsefunc, default_storefunc, cpiTimeval);
+      cp_register_argtype(cpBandwidth, "bandwidth", 0, default_parsefunc, default_storefunc, cpiBandwidth);
+      cp_register_argtype(cpIPAddress, "IP address", 0, default_parsefunc, default_storefunc, cpiIPAddress);
++ #if HAVE_XIA
++     cp_register_argtype(cpXIDType, "XID Type", 0, default_parsefunc, default_storefunc, cpiXIDType);
++     cp_register_argtype(cpXID, "XID", 0, default_parsefunc, default_storefunc, cpiXID);
++     cp_register_argtype(cpXIAPath, "XIA path", 0, default_parsefunc, default_storefunc, cpiXIAPath);
++     cp_register_argtype(cpXIAPathDAG, "XIA path in DAG", 0, default_parsefunc, default_storefunc, cpiXIAPathDAG);
++     cp_register_argtype(cpXIAPathRE, "XIA path in RE", 0, default_parsefunc, default_storefunc, cpiXIAPathRE);
++ #endif
+      cp_register_argtype(cpIPPrefix, "IP address prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPPrefix);
+      cp_register_argtype(cpIPAddressOrPrefix, "IP address or prefix", cpArgStore2, default_parsefunc, default_storefunc, cpiIPAddressOrPrefix);
+      cp_register_argtype(cpIPAddressList, "list of IP addresses", 0, default_parsefunc, default_storefunc, cpiIPAddressList);
+
+diff -bcr click-2.0.1/linuxmodule/Makefile.in xia-core/click-2.0.1/linuxmodule/Makefile.in
+*** click-2.0.1/linuxmodule/Makefile.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/linuxmodule/Makefile.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 25,30 ****
+--- 25,31 ----
+  	routerthread.o router.o master.o timerset.o handlercall.o notifier.o \
+  	integers.o iptable.o \
+  	driver.o ino.o \
++ 	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o  \
+  	$(EXTRA_DRIVER_OBJS)
+
+  EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+diff -bcr click-2.0.1/tools/lib/Makefile.in xia-core/click-2.0.1/tools/lib/Makefile.in
+*** click-2.0.1/tools/lib/Makefile.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/tools/lib/Makefile.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 76,82 ****
+  	elementt.o eclasst.o routert.o runparse.o variableenv.o \
+  	landmarkt.o lexert.o lexertinfo.o driver.o \
+  	confparse.o args.o archive.o processingt.o etraits.o elementmap.o \
+! 	userutils.o md5.o toolutils.o clp.o @LIBOBJS@ @EXTRA_TOOL_OBJS@
+  BUILDOBJS = $(patsubst %.o,%.bo,$(OBJS))
+
+  CPPFLAGS = @CPPFLAGS@ -DCLICK_TOOL
+--- 76,84 ----
+  	elementt.o eclasst.o routert.o runparse.o variableenv.o \
+  	landmarkt.o lexert.o lexertinfo.o driver.o \
+  	confparse.o args.o archive.o processingt.o etraits.o elementmap.o \
+! 	userutils.o md5.o toolutils.o clp.o \
+! 	xid.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o xiautil.o \
+! 	@LIBOBJS@ @EXTRA_TOOL_OBJS@
+  BUILDOBJS = $(patsubst %.o,%.bo,$(OBJS))
+
+  CPPFLAGS = @CPPFLAGS@ -DCLICK_TOOL
+diff -bcr click-2.0.1/userlevel/Makefile.in xia-core/click-2.0.1/userlevel/Makefile.in
+*** click-2.0.1/userlevel/Makefile.in	2011-09-24 15:23:36.000000000 -0400
+--- xia-core/click-2.0.1/userlevel/Makefile.in	2016-04-01 20:45:23.000000000 -0400
+***************
+*** 70,82 ****
+  	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
+  	integers.o md5.o crc32.o in_cksum.o iptable.o \
+  	archive.o userutils.o driver.o \
+  	$(EXTRA_DRIVER_OBJS)
+
+  EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+
+  LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
+  STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
+! 	errorelement.o portinfo.o scheduleinfo.o
+  OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
+
+  CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
+--- 70,86 ----
+  	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
+  	integers.o md5.o crc32.o in_cksum.o iptable.o \
+  	archive.o userutils.o driver.o \
++ 	xid.o xidpair.o xiapath.o xiaheader.o xiaextheader.o xiacontentheader.o xiatransportheader.o xiautil.o xia.pb.o \
++ 	xiasecurity.o \
++ 	error-syslog.o \
+  	$(EXTRA_DRIVER_OBJS)
+
+  EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
+
+  LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
+  STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
+! 	errorelement.o portinfo.o scheduleinfo.o \
+! 	xiaxidinfo.o
+  OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
+
+  CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
+***************
+*** 109,114 ****
+--- 113,121 ----
+
+  all: $(INSTALLPROGS) $(INSTALLLIBS)
+
++ xia.pb.cc: xia.proto
++ 	protoc --cpp_out=. --python_out=../../applications/web xia.proto
++
+  ifneq ($(MAKECMDGOALS),clean)
+  -include $(ELEMENTSCONF).mk
+  endif
+***************
+*** 134,139 ****
+--- 141,147 ----
+  $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(top_builddir)/click-buildtool
+  	$(call verbose_cmd,$(top_builddir)/click-buildtool elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
+  	@rm -f $(ELEMENTSCONF).d
++ 	echo '#include "xia.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
+
+  DEPFILES := $(wildcard *.d)
+  ifneq ($(DEPFILES),)
+***************
+*** 156,161 ****
+--- 164,170 ----
+
+    clean:
+  		rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a
++ 		rm -f xia.pb.h xia.pb.cc
+  	clean-lib:
+  		rm -f $(LIBOBJS) libclick.a
+  	distclean: clean

@@ -9,8 +9,7 @@ $HNAME :: XIAEndHost (RE $ADNAME $HID, $HID, 1500, 1501, 1502, 0, $MAC0);
 ######
 sock_server::Socket("UDP", 0.0.0.0, $PORT) -> [0]${HNAME}[0] -> socket_client::Socket("UDP", $SOCK_IP, $PORT);
 ######
-FromDevice($IFACE, METHOD LINUX) -> [0]${HNAME}[0] -> ToDevice($IFACE);
+FromDevice($IFACE, SNIFFER false) -> [0]${HNAME}[0] -> ToDevice($IFACE);
 ######
 
 	ControlSocket(tcp, 7777);
-

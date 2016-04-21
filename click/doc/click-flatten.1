@@ -1,0 +1,133 @@
+.\" -*- mode: nroff -*-
+.ds V 1.5.0
+.ds E " \-\- 
+.if t .ds E \(em
+.de Sp
+.if n .sp
+.if t .sp 0.4
+..
+.de Es
+.Sp
+.RS 5
+.nf
+..
+.de Ee
+.fi
+.RE
+.PP
+..
+.de Rs
+.RS
+.Sp
+..
+.de Re
+.Sp
+.RE
+..
+.de M
+.BR "\\$1" "(\\$2)\\$3"
+..
+.de RM
+.RB "\\$1" "\\$2" "(\\$3)\\$4"
+..
+.TH CLICK-FLATTEN 1 "21/May/2001" "Version \*V"
+.SH NAME
+click-flatten \- removes compound elements from a Click configuration
+'
+.SH SYNOPSIS
+.B click-flatten
+.RI \%[ options ]
+.RI \%[ param = value " ...]"
+.RI \%[ router\-file ]
+'
+.SH DESCRIPTION
+The
+.B click-flatten
+tool flattens a Click router configuration, compiling all its compound
+elements away, and writes the resulting configuration to the standard
+output. It can also output information about the file.
+'
+.SH "OPTIONS"
+'
+If any filename argument is a single dash "-",
+.B click-flatten
+will use the standard input or output instead, as appropriate.
+'
+.TP 5
+.BR \-c ", " \-\-classes
+.PD 0
+Output an alphabetical list of the element classes used by the flattened
+router file, one per line, instead of the usual configuration.
+'
+.Sp
+.TP 5
+.BR \-n ", " \-\-elements
+Output an alphabetical list of the element names in the flattened router
+file, one per line, instead of the usual configuration.
+'
+.Sp
+.TP 5
+.BR \-d ", " \-\-declaration
+Output the element declarations in the flattened router file, one per line,
+instead of the usual configuration.
+'
+.Sp
+.TP 5
+.BR \-f ", " \-\-file " \fIfile"
+Read the router configuration to flatten from
+.IR file .
+The default is the standard input.
+'
+.Sp
+.TP 5
+.BR \-e ", " \-\-expression " \fIexpr"
+Use
+.IR expr ,
+a string in the Click language, as the router configuration to flatten.
+'
+.Sp
+.TP
+.BR \-\-config
+Output flattened configuration only -- if the input was an archive, ignore
+other archive elements.
+'
+.Sp
+.TP
+.BR \-\-expand\-vars
+Expand global variables.  By default,
+.B click-flatten
+does not expand global variables into configuration strings, allowing later
+operations, such as
+.BR click-install ,
+to override their values.
+'
+.Sp
+.TP
+.BR \-o ", " \-\-output " \fIfile"
+Write the flattened router configuration to
+.IR file .
+The default is the standard output.
+'
+.Sp
+.TP 5
+.BI \-\-help
+Print usage information and exit.
+'
+.Sp
+.TP
+.BI \-\-version
+Print the version number and some quickie warranty information and exit.
+'
+.PD
+'
+.SH "SEE ALSO"
+.M click 5 ,
+.M click-check 1 ,
+.M click-xform 1
+'
+.SH AUTHOR
+.na
+Eddie Kohler, kohler@seas.harvard.edu
+.br
+http://www.pdos.lcs.mit.edu/click/
+'

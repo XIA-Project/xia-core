@@ -1,0 +1,655 @@
+.\" -*- mode: nroff -*-
+.ds V 1.5.0
+.ds E " \-\- 
+.if t .ds E \(em
+.de Sp
+.if n .sp
+.if t .sp 0.4
+..
+.de Es
+.Sp
+.RS 5
+.nf
+..
+.de Ee
+.fi
+.RE
+.PP
+..
+.de Rs
+.RS
+.Sp
+..
+.de Re
+.Sp
+.RE
+..
+.de M
+.BR "\\$1" "(\\$2)\\$3"
+..
+.de RM
+.RB "\\$1" "\\$2" "(\\$3)\\$4"
+..
+.TH CLICK-PRETTY 1 "4/Jan/2002" "Version \*V"
+.SH NAME
+click-pretty \- pretty-prints a Click configuration in HTML
+'
+.SH SYNOPSIS
+.B click-pretty
+.RI \%[ options ", " param = value " ...]"
+.RI \%[ routerfile ]
+.RI "> " output\fR.html
+.br
+.B click-pretty
+.B \-\-dot
+.RI \%[...]
+.RI \%[ routerfile \]
+.RB "| " "dot \fR\-Tpng"
+.RI "> " output\fR.png
+'
+.SH DESCRIPTION
+The
+.B click-pretty
+tool pretty-prints Click configurations into HTML files, including syntax
+highlighting and optional indexes; or, optionally, it can output a graph
+definition suitable for passing to
+.M dot 1 .
+.B Click-pretty
+reads a router configuration and, optionally, an HTML-like template file,
+replaces special tags in the template with HTML code derived from the
+configuration, and writes the result to the standard output.
+'
+.SH "HTML TEMPLATES"
+.BR Click-pretty 's
+output is based on a template file that contains special HTML-like tags
+that start with a tilde "~".  You can specify your own template or rely on
+a built-in default.  HTML output is created simply by expanding the
+template.  In
+.B \-\-dot
+mode, graph labels are created by expanding a (smaller) template once per
+element.
+'
+.SS "The config Tag"
+'
+.PP
+The
+.B <~config>
+tag expands to a pretty-printed version of the router configuration.
+Various features in the configuration are highlighted with HTML
+.B <span class=xxx>
+tags; the class differs from feature to feature, so you can affect the
+output with CSS. The classes are:
+.PP
+.TP 10
+.B c-cmt
+.PD 0
+Comments.
+.TP
+.B c-kw
+Keywords.
+.TP
+.B c-cfg
+Configuration strings.
+.TP
+.B c-cd
+Element class declarations.
+.TP
+.B c-ed
+Element declarations.
+.TP
+.B c-err
+Configuration errors.
+.PD
+.PP
+Other features of the output include:
+.TP 3
+\(bu
+'
+Anchors marking element declarations and element class declarations. For
+example, the tag
+.BR "<a name='e-X'>"
+encloses the declaration of an element named
+.BR X .
+'
+.TP
+\(bu
+'
+A
+.B span title
+attribute encloses every element reference, giving that element's
+declaration. Thus, a user can find out what class an element has by
+hovering their mouse over a reference to it.
+'
+.TP
+\(bu
+'
+Similarly,
+.BR "span title" s
+explain configuration errors in more detail.
+'
+.TP
+\(bu
+'
+Element class names are linked to element class declarations, for compound
+elements, or, optionally, to Web documentation, for primitive element
+classes. See the
+.B \-u
+option, below.
+'
+.SS "The elements Tag"
+'
+.PP
+The
+.B "<~elements>"
+tag expands to an alphabetical list of the elements and/or element classes
+used in the router configuration. The
+.B entry
+attribute determines how elements are rendered;
+.B typeentry
+does the same for classes. Inside these attributes, subtags like
+.BR <~name> ,
+.BR <~type> ,
+and
+.BR <~inputs>
+expand to information about the relevant element or type. For example, this
+.B <~elements>
+tag expands to a comma-separated list of the configuration's elements:
+.Es
+<~elements entry="<~name>" sep=", ">
+.Ee
+This one expands to an unordered list of declarations, with element names
+and type names linked to relevant declarations in the configuration:
+.Es
+<ul>
+<~elements entry="<li><~name link> :: <~type link></li>">
+</ul>
+.Ee
+'
+.SS "elements Tag Attributes"
+.TP 5
+.BR entry =\fItext
+Sets the text used for each element in the configuration. If this attribute
+is absent, the
+.B <~element>
+tag's expansion will not mention elements.
+'
+.TP 5
+.BR typeentry =\fItext
+Sets the text used for each element type used by the configuration. If this
+attribute is absent, the
+.B <~element>
+tag's expansion will not mention element types.
+'
+.TP 5
+.BR sep =\fItext
+Sets the text used to separate entries in the expansion.
+'
+.TP 5
+.BR column =\fIwhich\fR/\fIcount
+If present,
+.I count
+should be a number greater than 1, and
+.I which
+should be between 1 and
+.IR count .
+The
+.B <~element>
+tag is expanded, then broken into
+.I count
+columns at entry boundaries. Only the
+.IR which th
+column is printed.
+'
+.TP 5
+.BR configlink =\fItext
+See the
+.B <~configlink>
+subtag below.
+'
+.TP 5
+.BR typeref =\fItext
+See the
+.B <~typerefs>
+subtag below.
+'
+.TP 5
+.BR inputentry "=\fItext\fR, " noinputentry "=\fItext\fR"
+See the
+.B <~inputs>
+subtag below.
+'
+.TP 5
+.BR outputentry "=\fItext\fR, " nooutputentry "=\fItext\fR"
+See the
+.B <~outputs>
+subtag below.
+'
+.TP 5
+.BR inputconnection "=\fItext\fR, " noinputconnection "=\fItext\fR"
+See the
+.B <~inputconnections>
+subtag below.
+'
+.TP 5
+.BR outputconnection "=\fItext\fR, " nooutputconnection "=\fItext\fR"
+See the
+.B <~outputconnections>
+subtag below.
+'
+.PD
+'
+.SS "Element-Specific Tags"
+.PP
+In HTML mode, these tags apply within
+.B <~elements>
+entries and type entries.  In
+.B \-\-dot
+mode, only element-specific tags are meaningful, since the template is
+instantiated once per element.
+'
+.TP 5
+.BR "<~name [link" "=\fIlink\fR" "]>"
+Expands to the current element's name. When the
+.B link
+attribute is present, the name is contained in a link pointing at the
+declaration site within the router configuration or, when
+.I link
+equals "type", the element class's Web documentation.
+'
+.TP 5
+.BR "<~anonymous>"
+Expands to "yes" if the current element was originally anonymous, and to
+nothing if it was not.  Generally useful as a
+.B test
+attribute in
+.BR "<~if>" .
+'
+.TP 5
+.BR "<~type [link]>"
+Expands to the current element type's name, or the current element's
+type-name. When the
+.B link
+attribute is present, the name is contained in a link pointing at the
+the element class's Web documentation.
+'
+.TP 5
+.BR "<~config [limit" "=\fIlimit" "] [parens]>"
+Elements only. Expands to the current element's configuration string. The
+result contains at most \fIlimit\fR characters; if the configuration string
+was longer,
+.B click-pretty
+prints its first \fIlimit\fR characters, followed by an ellipsis. If
+.B parens
+was supplied, non-empty configuration strings are enclosed in parentheses.
+'
+.TP 5
+.BR "<~configlink [text" "=\fItext" "]>"
+Elements only. Expands to a link to the element's declaration in the router
+configuration. The
+.B text
+attribute gives the link text; it defaults to the
+.B <~elements>
+tag's
+.B configlink
+attribute.
+'
+.TP 5
+.BR "<~typerefs [entry" "=\fItext" "] [sep" "=\fIsep" "]>"
+Expands to an alphabetical list of elements in the configuration that have
+the current element type, separated by \fIsep\fR. The
+.B entry
+attribute specifies how to render each element; it defaults to the
+.B <~elements>
+tag's
+.B typeref
+attribute.
+'
+.TP 5
+.BR "<~ninputs [english]>"
+Elements only. Expands to the current element's number of input ports. If
+.B english
+was supplied, either "input" or "inputs" follows the number.
+'
+.TP 5
+.BR "<~outputs [english]>"
+Elements only. Expands to the current element's number of output ports. If
+.B english
+was supplied, either "input" or "inputs" follows the number.
+'
+.TP 5
+.BR "<~inputs [entry" "=\fItext" "] [noentry" "=\fItext" "] [sep" "=\fIsep" "]>"
+Elements only. Expands to a list of the element's input ports. The
+.B entry
+attribute specifies how to render each port; it defaults to the
+.B <~elements>
+tag's
+.B inputentry
+attribute. If the element has no input ports, the
+.B noentry
+attribute is used instead, which defaults to the
+.B <~elements>
+tag's
+.B noinputentry
+attribute.
+'
+.TP 5
+.BR "<~outputs [entry" "=\fItext" "] [noentry" "=\fItext" "] [sep" "=\fIsep" "]>"
+Elements only. Expands to a list of the element's output ports. The
+.B entry
+attribute specifies how to render each port; it defaults to the
+.B <~elements>
+tag's
+.B outputentry
+attribute. If the element has no output ports, the
+.B noentry
+attribute is used instead, which defaults to the
+.B <~elements>
+tag's
+.B nooutputentry
+attribute.
+.PD
+'
+.TP 5
+.BR "<~if test" "=\fItext" " [then" "=\fItext" "] [else" "=\fItext" "] [eq" "=\fItext" "]"
+.PD 0
+.TP
+.BR "     [ne" "=\fItext" "] [gt" "=\fItext" "] [lt" "=\fItext" "] [ge" "=\fItext" "] [le" "=\fItext" "]>"
+.PD
+Silently expands the
+.B test
+attribute, then makes a comparison. If that comparison is true, expands the
+.B then
+attribute; otherwise, expands the
+.B else
+attribute. The comparison depends on which of the other attributes is
+present. When
+.B eq
+is supplied, the comparison is true if
+.BR test 's
+expansion equals
+.BR eq 's
+expansion.
+.B ne
+checks for inequality.
+The
+.BR gt ,
+.BR lt ,
+.BR ge ,
+and
+.BR le
+attributes compare strings (or integers) in alphabetical (or numeric)
+sorting order. A
+.B gt
+comparison is true when
+.BR test 's
+expansion is greater than
+.BR gt 's
+expansion; similarly,
+.B lt
+checks for less than,
+.B ge
+for greater-than-or-equal-to, and
+.B le
+for less-than-or-equal-to. If none of these attributes are present, the
+test is true if
+.B test
+expands to a nonempty string.
+'
+.SS "Port-Specific Subtags"
+These subtags apply only within
+.B <~inputs>
+and
+.B <~outputs>
+entries.
+'
+.TP 5
+.BR "<~port>"
+Expands to the current port number.
+'
+.TP 5
+.BR "<~processing>"
+Expands to the current port's processing value: either "push", "pull", or
+(rarely) "agnostic".
+'
+.TP 5
+.BR "<~inputconnections [entry" "=\fItext" "] [noentry" "=\fItext" "] [sep" "=\fIsep\fR" "]>"
+Expands to a list of the output ports to which this input port is
+connected. List entries are separated by \fIsep\fR. The
+.B entry
+attribute specifies how to render each port; it defaults to the
+.B <~elements>
+tag's
+.B inputconnection
+attribute. If the port is not connected to anything, the
+.B noentry
+attribute is used instead, which defaults to the
+.B <~elements>
+tag's
+.B noinputconnection
+attribute.
+'
+.TP 5
+.BR "<~outputconnections [entry" "=\fItext" "] [noentry" "=\fItext" "] [sep" "=\fIsep\fR" "]>"
+Expands to a list of the input ports to which this output port is
+connected. List entries are separated by \fIsep\fR. The
+.B entry
+attribute specifies how to render each port; it defaults to the
+.B <~elements>
+tag's
+.B outputconnection
+attribute. If the port is not connected to anything, the
+.B noentry
+attribute is used instead, which defaults to the
+.B <~elements>
+tag's
+.B nooutputconnection
+attribute.
+.PD
+'
+.SS "Examples"
+.PP
+The default
+.B \-\-dot
+template is the following, which produces a string like "NAME :: TYPE" for
+named elements and a string like "TYPE" for anonymous elements:
+'
+.nf
+    <~if test="<~anonymous>" then="<~type>" else="<~name> :: <~type>">
+.fi
+'
+.PP
+To produce the name unconditionally, try the following template:
+'
+.nf
+    <~name> :: <~type>
+.fi
+'
+which you might specify using a
+.B \-\-template\-text
+option, as follows:
+'
+.nf
+    \fBclick-pretty\fR \fB\-\-dot\fR \fB\-T\fR "<~name> :: <~type>" ...
+.fi
+'
+.PP
+To produce just the name:
+'
+.nf
+    \fBclick-pretty\fR \fB\-\-dot\fR \fB\-T\fR "<~name>" ...
+.fi
+.PP
+To produce just the type:
+'
+.nf
+    \fBclick-pretty\fR \fB\-\-dot\fR \fB\-T\fR "<~type>" ...
+.fi
+'
+.SH "OPTIONS"
+'
+If any filename argument is a single dash "-",
+.B click-align
+will use the standard input or output instead, as appropriate.
+'
+.TP 5
+.BI \-f " file"
+.PD 0
+.TP
+.BI \-\-file " file"
+Read the router configuration from
+.IR file .
+The default is the standard input.
+'
+.Sp
+.TP
+.BI \-e " expr"
+.TP
+.BI \-\-expression " expr"
+Use
+.IR expr ,
+a string in the Click language, as the router configuration.
+'
+.Sp
+.TP
+.BI \-o " file"
+.TP
+.BI \-\-output " file"
+Write HTML output to
+.IR file .
+The default is the standard output.
+'
+.Sp
+.TP
+.BI \-t " file"
+.TP
+.BI \-\-template " file"
+Use
+.I file
+as the HTML template. If no template is specified,
+.B click-pretty
+will use a built-in default.
+'
+.Sp
+.TP
+.BI \-T " text"
+.TP
+.BI \-\-template\-text " text"
+Use
+.I text
+as the HTML (or graph) template. If no template is specified,
+.B click-pretty
+will use a built-in default.
+'
+.Sp
+.TP
+.BI \-d "name\fR=\fItext"
+.TP
+.BI \-\-define " name\fR=\fItext"
+Defines a new tag named
+.IR name .
+Occurrences of
+.BI <~ name >
+in the template will be replaced with the expansion of
+.IR text .
+'
+.Sp
+.TP
+.BR \-\-userlevel
+.TP
+.BR \-k ", " \-\-linuxmodule
+.TP
+.BR \-b ", " \-\-bsdmodule
+Specifies the driver for which the configuration was designed. This is
+necessary to discover whether ports are push or pull. Usually, you don't
+have to give any of these options;
+.B click-pretty
+will figure out the right answer by looking at the configuration.
+'
+.Sp
+.TP
+.BI \-u " url"
+.TP
+.BI \-\-class\-docs " url"
+Web documentation for primitive element classes is available at
+.IR url .
+The
+.I url
+may contain a single "%s", which is replaced with the element class's
+documentation name. (This is the same as its regular name, unless
+.B =title
+was specified in the documentation comment.) URLs specified in elementmap
+files with $webdoc take precedence over
+.BR \-u .
+'
+.Sp
+.TP
+.BI \-\-package\-docs " package\fR=\fIurl"
+Web documentation for primitive element classes in package
+.I package
+is available at
+.IR url .
+The
+.I url
+may contain a single "%s", which is replaced with the element class's
+documentation name. URLs specified in elementmap files take precedence over
+.BR \-\-package\-docs .
+'
+.Sp
+.TP
+.BI \-\-write\-template
+Output the template unmodified. This is useful for getting a look at the
+built-in default.
+'
+.Sp
+.TP
+.BI \-\-dot
+Rather than generating HTML, generate a graph definition suitable for input
+to the
+.M dot 1
+program (part of the
+.B graphviz
+suite originally from Bell Labs).  Using
+.BR \-\-dot ,
+you can automatically generate a PNG or PostScript graphic showing a
+picture of the Click configuration, as in "\fBclick-pretty\fR router.click
+| \fBdot\fR \-Tpng >routerpicture.png".
+'
+.Sp
+.TP
+.BI \-C " path"
+.TP
+.BI \-\-clickpath " path"
+Use
+.I path
+for CLICKPATH.
+'
+.Sp
+.TP 5
+.BI \-\-help
+Print usage information and exit.
+'
+.Sp
+.TP
+.BI \-\-version
+Print the version number and some quickie warranty information and exit.
+'
+.PD
+'
+.SH FILES
+.TP 5
+.B CLICKDIR/share/click/elementmap
+.B Click-pretty
+uses elementmap files to determine whether ports are push or pull. You can
+also add `$webdoc URL' lines to elementmap files;
+.B click-pretty
+will use that URL for element classes described in that elementmap. As with
+the
+.B \-u
+option, a $webdoc URL can contain `%s', which is replaced with the element
+class name.
+'
+.SH AUTHOR
+.na
+Eddie Kohler, kohler@seas.harvard.edu
+.br
+http://www.pdos.lcs.mit.edu/click/

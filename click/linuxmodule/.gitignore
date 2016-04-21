@@ -1,0 +1,11 @@
+*.d
+*.o
+.*.cmd
+Makefile
+Module.symvers
+elements.cc
+elements.conf
+elements.csmk
+elements.mk
+ksyms.c
+modules.order

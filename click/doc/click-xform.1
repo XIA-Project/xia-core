@@ -1,0 +1,310 @@
+.\" -*- mode: nroff -*-
+.ds V 1.0.3
+.ds E " \-\- 
+.if t .ds E \(em
+.de Sp
+.if n .sp
+.if t .sp 0.4
+..
+.de Es
+.Sp
+.RS 5
+.nf
+..
+.de Ee
+.fi
+.RE
+.PP
+..
+.de Rs
+.RS
+.Sp
+..
+.de Re
+.Sp
+.RE
+..
+.de M
+.BR "\\$1" "(\\$2)\\$3"
+..
+.de RM
+.RB "\\$1" "\\$2" "(\\$3)\\$4"
+..
+.TH CLICK-XFORM 1 "31/Mar/2000" "Version \*V"
+.SH NAME
+click-xform \- pattern-based Click configuration optimizer
+'
+.SH SYNOPSIS
+.B click-xform
+.RI \%[ options ]
+.RI \%[ param = value " ...]"
+.RI \%[ router\-file " [" pattern\-files ...]]
+'
+.SH DESCRIPTION
+The
+.B click-xform
+tool is a Click router configuration optimizer. It reads files giving Click
+configuration patterns and their replacements, and a router configuration
+file. Then it replaces pattern matches in the configuration until none
+remain and writes the new configuration to the standard output.
+.PP
+Pattern files use the Click language (see
+.M click 5 ).
+They contain pairs of `elementclass' definitions, where each pair consists
+of one pattern text and one replacement text. The replacement for a pattern
+named
+.RI ` X '
+must be named
+.RI ` X _Replacement'.
+This example pattern file replaces all Queues with Queue-Shaper
+combinations:
+.Rs
+.nf
+elementclass QueuePattern {
+  input -> Queue -> output;
+}
+elementclass QueuePattern_Replacement {
+  input -> Queue -> Shaper(200) -> output;
+}
+.fi
+.Re
+.PP
+A pattern text can contain an arbitrary number of elements, and an
+arbitrary number of input and output ports. Basically, a pattern matches a
+fragment of a router configuration when they have the same number of
+elements; their element classes match; all of the pattern's connections are
+duplicated in the fragment; and any connections into or out of the fragment
+correspond to connections to or from the pattern's input and output ports.
+The formal definition of matching is given below.
+.PP
+Any configuration strings in the pattern must match the configuration
+strings in the configuration subset. The pattern can use variables, which
+look like `$[letters, numbers and underscores]', to match a set of
+configuration strings; except for variables, the strings must match
+verbatim. A variable matches a single configuration argument. The same
+variable can be used multiple times in a pattern; if so, then it must match
+the same text on each occurrence. If a variable is used in the
+replacement's configuration strings, then when a replacement is made, the
+text that matched in the pattern will be inserted instead. For example,
+applying this pattern
+.Rs
+.nf
+elementclass Meters {
+  input -> Meter($a)
+        -> Shaper($b) -> output;
+}
+elementclass Meters_Replacement {
+  input -> Meter($b)
+        -> SlowShaper($a) -> output;
+}
+.fi
+.Re
+to this configuration
+.Rs
+.nf
+\&... -> Meter(1000) -> Shaper(2000) -> ...
+.fi
+.Re
+will create this result:
+.Rs
+.nf
+\&... -> Meter(2000) -> SlowShaper(1000) -> ...
+.fi
+.Re
+.PP
+The optimizer will not apply the same pattern to a configuration subset
+twice in succession. Specifically, every replacement element is marked with
+the pattern that generated it; a pattern will not match a configuration
+fragment if every element in that fragment came from that pattern. Thus, a
+pattern like the QueuePattern above won't cause an infinite loop. You can
+still cause an infinite loop, if you'd like, by having two patterns that
+match the same text:
+.Rs
+.nf
+elementclass Evil1 {
+  input -> Queue -> output;
+}
+elementclass Evil1_Replacement {
+  input -> Queue -> output;
+}
+elementclass Evil2 {
+  input -> Queue -> output;
+}
+elementclass Evil2_Replacement {
+  input -> Queue -> output;
+}
+.fi
+.Re
+This collection of patterns will make the optimizer run forever on any
+configuration that has a Queue.
+.PP
+The
+.B click-xform
+transformation can be reversed with the
+.B \-\-reverse
+option.
+'
+.SH "OPTIONS"
+'
+If any filename argument is a single dash "-",
+.B click-xform
+will use the standard input or output instead, as appropriate.
+'
+.TP 5
+.BI \-p " file"
+.PD 0
+.TP
+.BI \-\-patterns " file"
+Read patterns and replacements from
+.IR file .
+You can give any number of these options.
+'
+.Sp
+.TP
+.BI \-f " file"
+.TP
+.BI \-\-file " file"
+Read the router configuration to transform from
+.IR file .
+The default is the standard input.
+'
+.Sp
+.TP
+.BI \-e " expr"
+.TP
+.BI \-\-expression " expr"
+Use
+.IR expr ,
+a string in the Click language, as the router configuration to transform.
+'
+.Sp
+.TP
+.BI \-o " file"
+.TP
+.BI \-\-output " file"
+Write the output router configuration to
+.IR file .
+The default is the standard output.
+'
+.Sp
+.TP
+.BR \-r ", " \-\-reverse
+Apply the patterns in reverse. That is, replace occurrences of the
+replacement texts with the corresponding pattern texts.
+'
+.Sp
+.TP 5
+.BI \-\-help
+Print usage information and exit.
+'
+.Sp
+.TP
+.BI \-\-version
+Print the version number and some quickie warranty information and exit.
+'
+.PD
+'
+.SH "FORMAL DEFINITION OF MATCHING"
+'
+A pattern
+.I P
+matches a subset
+.I S
+of the configuration's elements if the following conditions hold:
+.TP 4
+\(bu
+There is a one-to-one mapping 
+.I map
+from
+.I P
+to
+.I S
+that respects element classes (that is, if an element
+.IR p " in " P
+has class
+.IR K ,
+then
+.RI map( p ") also has class " K ).
+.TP 4
+\(bu
+The configuration strings match, possibly by using a consistent variable
+assignment.
+.TP 4
+\(bu
+For every connection
+.RI ` p1 " [" x "] -> [" y "] " p2 '
+in the pattern
+.IR P ,
+there exists a connection
+.RI `map( p1 ") [" x "] -> [" y "] map(" p2 )'
+in the configuration subset
+.IR S .
+.TP 4
+\(bu
+For every connection
+.RI ` c1 " [" x "] -> [" y "] " c2 '
+in the configuration, one of four conditions hold:
+.RS
+.TP 3
+\(bu
+The connection is wholly outside the subset
+.IR S .
+(That is,
+.IR c1 " is not in " S
+and
+.IR c2 " is not in " S .)
+.TP 3
+\(bu
+The connection is inside the subset, and corresponds to a connection in the
+pattern. (That is,
+.IR c1 " is in " S ,
+.IR c2 " is in " S ,
+and
+.I P
+has a connection
+.RI "`map-1(" c1 ") [" x "] -> [" y "] map-1(" c2 ")'.)"
+.TP 3
+\(bu
+The connection goes into the subset, and corresponds to an input port in
+the pattern. (That is,
+.IR c1 " is not in " S
+but
+.IR c2 " is in " S ,
+and there exists an input port number
+.I i
+so that
+.I P
+has a connection
+.RI "`input [" i "] -> [" y "] map-1(" c2 ")',"
+and for every connection in the pattern
+.RI "`input [" i "] -> [" z "] " q ',
+there is a connection in the configuration
+.RI ` c1 " [" x "] -> [" z "] map(" q ")'.)"
+.TP 3
+\(bu
+The connection goes out of the subset, and corresponds to an output port in
+the pattern. (That is,
+.IR c1 " is in " S
+but
+.IR c2 " is not in " S ,
+and there exists an output port number
+.I o
+so that
+.I P
+has a connection
+.RI "`map-1(" c1 ") [" x "] -> [" o "] output',"
+and for every connection in the pattern
+.RI ` q " [" z "] -> [" o "] output',"
+there is a connection in the configuration
+.RI "`map(" q ") [" z "] -> [" y "] " c2 "'.)"
+.RE
+'
+.SH "SEE ALSO"
+.M click 5
+'
+.SH AUTHOR
+.na
+Eddie Kohler, kohler@seas.harvard.edu
+.br
+http://www.pdos.lcs.mit.edu/click/
+'

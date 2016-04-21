@@ -9,7 +9,7 @@ ${HNAME} :: XIARouter4Port(RE $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, 1500, 1
 ######
 sock_server${NUM}::Socket("UDP", 0.0.0.0, $PORT) -> [$NUM]${HNAME}[$NUM] -> sock_client${NUM}::Socket("UDP", $SOCK_IP, $PORT);
 ######
-FromDevice($IFACE, METHOD LINUX) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE)
+FromDevice($IFACE, SNIFFER false) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE)
 ######
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######
