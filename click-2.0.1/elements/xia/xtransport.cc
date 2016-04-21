@@ -8,7 +8,6 @@
 #include <click/packet.hh>
 #include <click/vector.hh>
 #include <click/xiacontentheader.hh>
-#include "xiatransport.hh"
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
@@ -2383,8 +2382,8 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
         digest, SHA_DIGEST_LENGTH);
 
-		String hash = "CID:";        
-		char hexBuf[3];        
+		String hash = "CID:";
+		char hexBuf[3];
 		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
 			hash.append(const_cast<char *>(hexBuf), 2);
@@ -2481,7 +2480,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		unsigned char digest[SHA_DIGEST_LENGTH];
         xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
             digest, SHA_DIGEST_LENGTH);
-    
+
         String hash = "CID:";
 		char hexBuf[3];
 		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
@@ -2673,10 +2672,10 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XREPLAY:
 		Xreplay(_sport, &xia_socket_msg);
-		break;		
+		break;
 	case xia::XNOTIFY:
 		Xnotify(_sport, &xia_socket_msg);
-		break;		
+		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -3210,7 +3209,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 
 // FIXME: does this block of code do anything??? I don't see the payload getting used
-// I think it's all happening in the syn handling above? 
+// I think it's all happening in the syn handling above?
 		WritablePacket *just_payload_part;
 		int payloadLength;
 		std::cout << "Xcachesock = " <<sk->xcacheSock << "\n";
@@ -4507,7 +4506,7 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
     unsigned char digest[SHA_DIGEST_LENGTH];
     xs_getSHA1Hash((const unsigned char *)pktPayload.c_str(), \
         pktPayload.length(), digest, SHA_DIGEST_LENGTH);
-    
+
     char hexBuf[3];
 	for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 		sprintf(hexBuf, "%02x", digest[i]);

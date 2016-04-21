@@ -216,12 +216,3 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags,
 
 	return len;
 }
-
-//FIXME: Dummy function to make python lib work
-ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags)
-{
-	(void)fd;
-	(void)msg;
-	(void)flags;
-	return 0;
-}
