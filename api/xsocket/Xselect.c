@@ -105,7 +105,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				struct sockaddr_in sin;
 				socklen_t slen = sizeof(sin);
 				(_f_getsockname)(ufds[i].fd, (struct sockaddr*)&sin, &slen);
-				//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
+				// LOGF("XSocket! sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
 
 				pfd->set_port(sin.sin_port);
 				s2p[i].fd = ufds[i].fd;
@@ -148,12 +148,9 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	// the rfds (Real fd) list has the fds flipped negative for the xsockets so they will be ignored
 	//  for the same reason
-	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating Xpoll socket: %s", strerror(errno));
-		rc = -1;
-		goto done;
-	}
-	allocSocketState(sock, SOCK_DGRAM);
+
+	sock = MakeApiSocket(SOCK_DGRAM);
+
 	click_send(sock, &xsm);
 
 	// now we need to do a real poll
@@ -375,12 +372,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		goto done;
 	}
 
-	// create an control socket
-	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("error creating Xpoll socket: %s", strerror(errno));
-		goto done;
-	}
-	allocSocketState(sock, SOCK_DGRAM);
+	sock = MakeApiSocket(SOCK_DGRAM);
 
 	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 	pollMsg->set_nfds(nx);

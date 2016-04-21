@@ -66,8 +66,8 @@ typedef int (*select_t)(int, fd_set*, fd_set*, fd_set*, struct timeval*);
 typedef ssize_t (*sendto_t)(int, const void*, size_t, int, const struct sockaddr*, socklen_t);
 typedef int (*poll_t)(struct pollfd*, nfds_t, int);
 typedef ssize_t (*recvfrom_t)(int, void*, size_t, int, struct sockaddr*, socklen_t*);
+typedef int (*fork_t)(void);
 
-extern void xapi_load_func_ptrs();
 extern socket_t _f_socket;
 extern bind_t _f_bind;
 extern getsockname_t _f_getsockname;
@@ -78,6 +78,10 @@ extern select_t _f_select;
 extern poll_t _f_poll;
 extern sendto_t _f_sendto;
 extern recvfrom_t _f_recvfrom;
+extern fork_t _f_fork;
+
+extern size_t api_mtu();
+
 }
 
 #endif

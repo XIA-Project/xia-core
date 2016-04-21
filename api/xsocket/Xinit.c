@@ -35,6 +35,7 @@
 #include <dlfcn.h> 
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include "state.h"
 
 #define LIBNAME	"libc.so.6"
 
@@ -52,14 +53,38 @@ select_t _f_select;
 poll_t _f_poll;
 sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
+fork_t _f_fork;
 
-size_t mtu_api;
+size_t mtu_internal = 0;
 size_t mtu_wire = 1500;
-
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
-void xapi_load_func_ptrs()
+
+
+size_t api_mtu()
+{
+	if (mtu_internal == 0) {
+		struct ifreq ifr;
+
+		int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
+
+		strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
+		ifr.ifr_addr.sa_family = AF_INET;
+		ioctl(sock, SIOCGIFMTU, &ifr);
+		(_f_close)(sock);
+
+		mtu_internal = ifr.ifr_mtu;
+		// LOGF("API MTU = %d\n", ifr.ifr_mtu);
+	}
+
+	return mtu_internal;
+}
+
+
+
+// Run at library load time to initialize function pointers
+void __attribute__ ((constructor)) api_init()
 {
 	void *handle = dlopen(LIBNAME, RTLD_LAZY);
 
@@ -89,22 +114,31 @@ void xapi_load_func_ptrs()
 		printf("can't find sendto!\n");
 	if(!(_f_recvfrom = (recvfrom_t)dlsym(handle, "recvfrom")))
 		printf("can't find recvfrom!\n");
+	if(!(_f_fork = (fork_t)dlsym(handle, "fork")))
+		printf("can't find fork!\n");
+
+    api_mtu();
+    get_conf();
+
+    // force creation of the socket map
+	SocketMap::getMap();
 }
 
-static size_t mtu()
+// Run at library unload time to close sockets left open by the app
+//  sadly will not be called if the app is terminated due to a signal
+void __attribute__ ((destructor)) api_destruct(void)
 {
-	struct ifreq ifr;
+	// loop through left open sockets and close them
+	SocketMap *socketmap = SocketMap::getMap();
+	SMap *sockets = socketmap->smap();
+	SMap::iterator it;
 
-	int sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0);
-
-	strncpy(ifr.ifr_name, "lo", IFNAMSIZ - 1);
-	ifr.ifr_addr.sa_family = AF_INET;
-	ioctl(sock, SIOCGIFMTU, &ifr);
-	(_f_close)(sock);
-
-	LOGF("API MTU = %d\n", ifr.ifr_mtu);
-	return ifr.ifr_mtu;
+	for (it = sockets->begin(); it != sockets->end(); it++) {
+		Xclose(it->first);
+	}
 }
+
+
 
 
 /*!
@@ -123,7 +157,6 @@ void set_conf(const char *filename, const char* sectionname)
 
 	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
     __InitXSocket::read_conf(filename, sectionname);
-    xapi_load_func_ptrs();
 	__XSocketConf::initialized=1;
 	pthread_mutex_unlock(&lock);
 }
@@ -183,8 +216,8 @@ __InitXSocket::__InitXSocket()
 	snprintf(__XSocketConf::master_conf, BUF_SIZE, "%s%s", XrootDir(root, BUF_SIZE), "/etc/xsockconf.ini");
 
 	if ((rc = readlink("/proc/self/exe", buf, sizeof(buf) - 1)) != -1) {
-		section_name = basename(buf);
 		buf[rc] = 0;
+		section_name = basename(buf);
 	}
 
 	const char * section_name_env  = getenv("XSOCKCONF_SECTION");
@@ -193,10 +226,6 @@ __InitXSocket::__InitXSocket()
 
 	// NOTE: unlikely, but what happens if section_name is NULL?
 	read_conf(inifile, section_name);
-
-    xapi_load_func_ptrs();
-
-    mtu_api = mtu();
 }
 
 /*!

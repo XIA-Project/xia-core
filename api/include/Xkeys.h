@@ -42,13 +42,13 @@ extern "C" {
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len);
 
 // Remove keys associated with the given SID
-int XremoveSID(const char *sid);
+extern int XremoveSID(const char *sid);
 
 // Create a key pair and return SID based on hash of pubkey
-int XmakeNewSID(char *randomSID, int randomSIDlen);
+extern int XmakeNewSID(char *randomSID, int randomSIDlen);
 
 // Check if keys matching the given SID exist
-int XexistsSID(const char *sid);
+extern int XexistsSID(const char *sid);
 
 #ifdef __cplusplus
 }

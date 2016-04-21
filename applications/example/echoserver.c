@@ -261,26 +261,21 @@ void echo_stream()
 		say ("Xsock %4d new session\n", sock);
 		say("peer:%s\n", g.dag_string().c_str()); 
 
-		pid_t pid = fork();
+		pid_t pid = Xfork();
 
 		if (pid == -1) {
 			die(-1, "FORK FAILED\n");
 
 		} else if (pid == 0) {
+			// close the parent's listening socket
+			Xclose(acceptor);
+
 			process(sock);
-			if(XremoveSID((const char *)sid_string)) {
-				say("Unable to remove keys for SID %s.\n", sid_string);
-			}else {
-				say("Removed keys for temporary SID %s.\n", sid_string);
-			}
 			exit(0);
 
 		} else {
-			// FIXME: we need to close the socket in the main process or the file
-			// descriptor limit will be hit. But if Xclose is called, the connection
-			// is torn down in click as well keeping the child process from using it.
-			// for now use a regular close to shut it here without affecting the child.
-			close(sock);
+			// close the child's socket
+			Xclose(sock);
 		}
 	}
 

@@ -31,8 +31,6 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
 
-	struct sockaddr_in my_addr;
-	socklen_t len;
 	int new_sockfd;
 
 	// if an addr buf is passed, we must also have a valid length pointer
@@ -66,34 +64,9 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 		return -1;
 	}
 
-	// Create new socket (this is a socket between API and Xtransport)
-	if ((new_sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		LOGF("Error creating new socket: %s", strerror(errno));
-		return -1;
-	}
 
-	allocSocketState(new_sockfd, SOCK_STREAM);
-	
-	// bind to an unused random port number
-	my_addr.sin_family = PF_INET;
-	my_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	my_addr.sin_port = 0;
-
-	if ((_f_bind)(new_sockfd, (const struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
-		(_f_close)(new_sockfd);
-
-		LOGF("Error binding new socket to local port: %s", strerror(errno));
-		return -1;
-	}
-
-
-
-	// Tell click what the new socket's port is (but we'll tell click
-	// over the old socket)
-	len = sizeof(my_addr);
-	if((_f_getsockname)(new_sockfd, (struct sockaddr *)&my_addr, &len) < 0) {
-		(_f_close)(new_sockfd);
-		LOGF("Error retrieving new socket's UDP port: %s", strerror(errno));
+	if ((new_sockfd = MakeApiSocket(SOCK_STREAM)) < 0) {
+		LOGF("Error createing new API socket: %s:", strerror(errno));
 		return -1;
 	}
 
@@ -103,7 +76,10 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 	xsm.set_sequence(seq);
 	
 	xia::X_Accept_Msg *x_accept_msg = xsm.mutable_x_accept();
-	x_accept_msg->set_new_port(((struct sockaddr_in)my_addr).sin_port);
+
+	// Tell click what the new socket's port is (but we'll tell click over the old socket)
+	x_accept_msg->set_new_port(getPort(new_sockfd));
+	
 	if (self_addr) {
 		x_accept_msg->set_sendmypath(true);
 	}

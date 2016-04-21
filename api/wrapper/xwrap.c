@@ -52,12 +52,16 @@
 #include <net/if.h>
 #include <limits.h>
 #include <ifaddrs.h>
+#include <unistd.h>
+#include <sched.h>
+#include <algorithm>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
 #include <algorithm>
+#include "minIni.h"
 #include <map>
 #include <vector>
 
@@ -71,27 +75,30 @@
 #define SID_SIZE 45						// (40 byte XID + 4 bytes SID: + null terminator)
 #define FORCE_XIA() (1)					// FIXME: get rid of this logic
 
+#define SID_FILE "/etc/sidmap.conf"
+
 // Logging Macros ***************************************************
-#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %s\n", __FUNCTION__);}
+#define TRACE()          {if (_log_trace)    fprintf(_log, "xwrap: %08x %s\n", getpid(), __FUNCTION__);}
 
-#define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
-#define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, xferFlags(f));}
-#define AI_FLAGS(f)      {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, aiFlags(f));}
-#define FCNTL_FLAGS(f)   {if (_log_info)     fprintf(_log, "xwrap: %s flags:%s\n", __FUNCTION__, fcntlFlags(f));}
-#define AF_VALUE(f)      {if (_log_info)     fprintf(_log, "xwrap: %s family:%s\n", __FUNCTION__, afValue(f));}
-#define OPT_VALUE(f)     {if (_log_info)     fprintf(_log, "xwrap: %s opt:%s\n", __FUNCTION__, optValue(f));}
-#define POLL_FLAGS(i, f) {if (_log_info)     fprintf(_log, "xwrap: %s socket:%u %s\n", __FUNCTION__, i, pollFlags(f));}
-#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %s redirected to XIA\n", __FUNCTION__);}
+#define MSG(...)         {if (_log_info)    {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define XFER_FLAGS(f)    {if (_log_info)     fprintf(_log, "xwrap: %08x %s flags:%s\n", getpid(), __FUNCTION__, xferFlags(f));}
+#define AI_FLAGS(f)      {if (_log_info)     fprintf(_log, "xwrap: %08x %s flags:%s\n", getpid(), __FUNCTION__, aiFlags(f));}
+#define FCNTL_FLAGS(f)   {if (_log_info)     fprintf(_log, "xwrap: %08x %s flags:%s\n", getpid(), __FUNCTION__, fcntlFlags(f));}
+#define FCNTL_CMD(f)     {if (_log_info)     fprintf(_log, "xwrap: %08x %s command:%s\n", getpid(), __FUNCTION__, fcntlCmd(f));}
+#define AF_VALUE(f)      {if (_log_info)     fprintf(_log, "xwrap: %08x %s family:%s\n", getpid(), __FUNCTION__, afValue(f));}
+#define OPT_VALUE(f)     {if (_log_info)     fprintf(_log, "xwrap: %08x %s opt:%s\n", getpid(), __FUNCTION__, optValue(f));}
+#define POLL_FLAGS(i, f) {if (_log_info)     fprintf(_log, "xwrap: %08x %s socket:%u %s\n", getpid(), __FUNCTION__, i, pollFlags(f));}
 
-//#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %s used normally\n", __FUNCTION__);}
+#define XIAIFY()         {if (_log_wrap)     fprintf(_log, "xwrap: %08x %s redirected to XIA\n", getpid(), __FUNCTION__);}
+//#define NOXIA()        {if (_log_wrap)     fprintf(_log, "xwrap: %08x %s used normally\n", getpid(), __FUNCTION__);}
 #define NOXIA()
-#define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %s not required/supported in XIA (no-op)\n", __FUNCTION__);}
+#define SKIP()           {if (_log_wrap)     fprintf(_log, "xwrap: %08x %s not required/supported in XIA (no-op)\n", getpid(), __FUNCTION__);}
 
-#define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: ALERT!!!, %s is not implemented in XIA!\n", __FUNCTION__);}
-#define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define ALERT()          {if (_log_warning)  fprintf(_log, "xwrap: %08x ALERT!!!, %s is not implemented in XIA!\n", getpid(), __FUNCTION__);}
+#define WARNING(...)     {if (_log_warning) {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 
 #ifdef DEBUG
-#define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %s ", __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
+#define DBG(...) {if (_log_warning) {fprintf(_log, "xwrap: %08x %s ", getpid(), __FUNCTION__); fprintf(_log, __VA_ARGS__);}}
 #else
 #define DBG(...)
 #endif
@@ -151,6 +158,7 @@ DECLARE(int, getpeername, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockname, int fd, struct sockaddr *addr, socklen_t *len);
 DECLARE(int, getsockopt, int fd, int level, int optname, void *optval, socklen_t *optlen);
 DECLARE(int, fcntl, int fd, int cmd, ...);
+DECLARE(pid_t, fork, void);
 DECLARE(int, listen, int fd, int n);
 DECLARE(int, poll, struct pollfd *fds, nfds_t nfds, int timeout);
 DECLARE(ssize_t, read, int fd, void *buf, size_t count);
@@ -180,6 +188,11 @@ DECLARE(int, getservbyport_r, int port, const char *proto, struct servent *resul
 DECLARE(ssize_t, recvmsg, int fd, struct msghdr *msg, int flags);
 DECLARE(ssize_t, sendmsg, int fd, const struct msghdr *msg, int flags);
 
+DECLARE(int, execve, const char *filename, char *const argv[], char *const envp[]);
+
+DECLARE(int, clone, int (*fn)(void *), void *child_stack,int flags, void *arg, ...);
+
+
 
 // local "IP" address **********************************************
 // When running in a local topology this means the client and server
@@ -200,6 +213,14 @@ typedef std::map<std::string, std::string> dag2id_t;
 static id2dag_t id2dag;
 static dag2id_t dag2id;
 
+// HACK to allow services with fixed ports always get the same SID
+// This will only work correctly for DATAGRAM sockets unless the SID
+// is generated cryptographically and keys are distributed to
+// all hosts that host the service
+typedef std::map<unsigned short, std::string> port2sid_t;
+
+static port2sid_t *port2sid;
+
 // Negative name lookups are saved here ****************************
 #define NEG_LOOKUP_LIFETIME	15	// duration in seconds of a negative lookup
 
@@ -211,6 +232,7 @@ static int _log_trace = 0;
 static int _log_warning = 0;
 static int _log_info = 0;
 static int _log_wrap = 0;
+static int _log_dump = 0;
 static FILE *_log = NULL;
 
 /********************************************************************
@@ -221,22 +243,6 @@ static FILE *_log = NULL;
 // call into the Xsockets API to see if the fd is associated with an Xsocket
 #define isXsocket(s)	 (getSocketType(s) != -1)
 #define shouldWrap(s)	 (isXsocket(s))
-
-
-// dump the contents of the pollfds
-static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
-{
-	MSG("%s\n", (in ? "PRE" : "POST"));
-	for(nfds_t i = 0; i < nfds; i++) {
-		if (in == 1 && fds[i].events != 0) {
-			POLL_FLAGS(fds[i].fd, fds[i].events);
-
-		} else if (fds[i].revents != 0) {
-			POLL_FLAGS(fds[i].fd, fds[i].revents);
-		}
-	}
-}
-
 
 
 // get a unique port number
@@ -255,6 +261,41 @@ static unsigned short _NewPort()
 		port = PROTECTED;
 	}
 	return htons(port);
+}
+
+// load the list of static port to SID mappings
+// the static mapping will only work if
+// a) it is used with a DATAGRAM socket
+// b) the SID was created crypographically and the associated
+//  key is resident on the server binding to the SID
+static void _LoadSIDs() 
+{
+	char conf[2048];
+	char p[64];
+	char s[64];
+	unsigned short port;
+
+	if (!XrootDir(conf, sizeof(conf))) {
+		conf[0] = 0;
+	}
+	strncat(conf, SID_FILE, sizeof(conf));
+
+	port2sid = new port2sid_t;
+
+	for (int i = 0; ini_getkey(NULL, i, p, sizeof(p), conf); i++) {
+		ini_gets(NULL, p, NULL, s, sizeof(s), conf);
+
+		port = strtol(p, NULL, 10);
+		std::string sid(s);
+		if (errno != ERANGE) {
+			MSG("Adding port<->SID mapping for %d : %s\n", port, sid.c_str());
+
+			port = htons(port);
+			port2sid->insert(std::pair<unsigned short, std::string>(port, sid));
+		} else {
+			WARNING("%s is not a valid port number\n", p);
+		}
+	}
 }
 
 
@@ -333,22 +374,26 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 
 
 // Generate a random SID
-static char *_NewSID(char *buf, unsigned len)
+static char *_NewSID(char *buf, unsigned len, unsigned short port)
 {
-	// FIXME: this is a stand-in function until we get certificate based names
-	//
+	MSG("newsid port = %d\n", port);
 	// note: buf must be at least 45 characters long
 	// (longer if the XID type gets longer than 3 characters)
 	if (len < SID_SIZE) {
 		WARNING("buf is only %d chars long, it needs to be %d. Truncating...\n", len, SID_SIZE);
 	}
 
-	if (XmakeNewSID(buf, len)) {
+	// lookup port, and if found use the static SID associated with it
+
+	port2sid_t::iterator it = port2sid->find(port);
+	if (it != port2sid->end()) {
+		std::string sid = it->second;
+		strncpy(buf, sid.c_str(), len);
+
+	} else if (XmakeNewSID(buf, len)) {
 		MSG("Unable to create a new SID\n");
 		return NULL;
 	}
-
-//	snprintf(buf, len, "SID:44444ff0000000000000000000000000%08x", rand());
 
 	return buf;
 }
@@ -434,22 +479,22 @@ static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 
 // create a dag with sid for this sockaddr and register it with
 // the xia name server. Also create a mapping to go from ip->xia and xia-ip
-static int _Register(const struct sockaddr *addr, socklen_t len)
+static int _Register(const struct sockaddr_in *sa)
 {
+	unsigned rc;
 	char id[ID_LEN];
 	char sid[SID_SIZE];
-	struct sockaddr_in sa;
 	struct addrinfo *ai;
 
-	// use our default ip address withe the caller's port
-	memcpy(&sa, &local_sa, len);
-	sa.sin_port = ((sockaddr_in *)addr)->sin_port;
-
 	// create a DAG for this host in the form of "(4ID) AD HID SID"
-	Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid)), NULL, &ai);
+	rc = Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid), sa->sin_port), NULL, &ai);
+
+	if (rc != 0) {
+		MSG("rc:%d err:%s\n", rc, strerror(rc));
+	}
 
 	// register it in the name server with the ip-port id
-	XregisterName(_IDstring(id, ID_LEN, &sa), (sockaddr_x*)ai->ai_addr);
+	XregisterName(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -580,14 +625,17 @@ static int _LookupStr(const char *id, unsigned short port, struct sockaddr *sa, 
 	int rc = 0;
 	struct sockaddr_in sin;
 
-	inet_pton(AF_INET, id, &sin.sin_addr);
-	sin.sin_port = port;
-	sin.sin_family = AF_INET;
+	bzero(&sin, sizeof(sin));
+	if (inet_pton(AF_INET, id, &sin.sin_addr) > 0) {
+		sin.sin_port = port;
+		sin.sin_family = AF_INET;
 
-	rc = _Lookup(&sin, sax);
-
-	if ((rc = _Lookup(&sin, sax)) == 0) {
-		memcpy(sa, &sin, sizeof(struct sockaddr));
+		if ((rc = _Lookup(&sin, sax)) == 0) {
+			memcpy(sa, &sin, sizeof(struct sockaddr));
+		}
+	} else {
+		MSG("Hostnames are not supported at this time\n");
+		rc = EAI_FAMILY;
 	}
 
 	return rc;
@@ -680,6 +728,62 @@ static int _GetLocalIPs()
 
 
 
+static void selectDump(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, int in)
+{
+//	if (!_log_dump)
+		return;
+
+	MSG("%s\n", (in ? "PRE" : "POST"));
+	for (int i = 0; i < nfds; i++) {
+		if (readfds && FD_ISSET(i, readfds)) {
+			MSG("%d = read\n", i);
+		}
+		if (writefds && FD_ISSET(i, writefds)) {
+			MSG("%d = write\n", i);
+		}
+		if (exceptfds && FD_ISSET(i, exceptfds)) {
+			MSG("%d = except\n", i);
+		}
+	}
+}
+
+
+
+// dump the contents of the pollfds
+static void pollDump(struct pollfd *fds, nfds_t nfds, int in)
+{
+//	if (!_log_dump)
+		return;
+
+	MSG("%s\n", (in ? "PRE" : "POST"));
+	for(nfds_t i = 0; i < nfds; i++) {
+		if (in == 1 && fds[i].events != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].events);
+
+		} else if (fds[i].revents != 0) {
+			POLL_FLAGS(fds[i].fd, fds[i].revents);
+		}
+	}
+}
+
+
+
+void bufferDump(int fd, int type, const void *buf, size_t len)
+{
+	if (!_log_dump)
+		return;
+	
+	MSG("%d: %s...\n", fd, (type == 0 ? "READING" : "WRITING"));
+
+	char *s = (char *)malloc(len + 10);
+	memcpy(s, buf, len);
+	s[len] = 0;
+	MSG("buf: (%s)\n", s);
+	free(s);
+}
+
+
+
 /********************************************************************
 **
 ** Called at library load time for initialization
@@ -695,13 +799,11 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	// roll the dice
 	srand(time(NULL));
 
-	// cause the Xsocket API to load the pointers to the real socket functions
-	// for it's own internal use
-	xapi_load_func_ptrs();
-
 	// enable logging
 	if (getenv("XWRAP_TRACE") != NULL)
 		_log_trace = 1;
+	if (getenv("XWRAP_DUMP") != NULL)
+		_log_dump = 1;
 	if (getenv("XWRAP_VERBOSE") != NULL)
 		_log_trace = _log_info = _log_wrap = _log_warning = 1;
 	if (getenv("XWRAP_INFO") != NULL)
@@ -723,6 +825,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(close);
 	GET_FCN(connect);
 	GET_FCN(fcntl);
+	GET_FCN(fork);
 	GET_FCN(freeaddrinfo);
 	GET_FCN(freeifaddrs);
 	GET_FCN(gai_strerror);
@@ -760,7 +863,11 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(recvmsg);
 	GET_FCN(sendmsg);
 
+	GET_FCN(execve);
+	GET_FCN(clone);
+
 	_GetLocalIPs();
+	_LoadSIDs();
 }
 
 
@@ -787,6 +894,12 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 
 		xlen = sizeof(sax);
 		rc = Xaccept(fd, addr, &xlen);
+
+		if (rc >= 0) {
+			errno = 0;
+		}
+
+		MSG("RC = %d errno = %d ===============================================\n", rc, errno);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -815,22 +928,26 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 	if (shouldWrap(fd) ) {
 		XIAIFY();
 
-		// swap in our local ip for whatever the caller used
-		memcpy(&sin, &local_sa, sizeof(sockaddr_in));
-		sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+		// swap in our local ip if the caller specified INADDR_ANY
+		if (memcmp("\0\0\0\0", &((sockaddr_in*)addr)->sin_addr, 4) != 0) {
+			MSG(" using supplied address\n");
+			memcpy(&sin, addr, sizeof(sockaddr_in));
+		} else {
+			MSG(" using default address\n");
+			memcpy(&sin, &local_sa, sizeof(sockaddr_in));
+			sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+		}
 
 		if (FORCE_XIA()) {
 			// create a mapping from IP/port to a dag and register it
-			_Register((struct sockaddr*)&sin, len);
+			_Register(&sin);
 
 			char id[ID_LEN];
 			_IDstring(id, ID_LEN, &sin);
 			MSG("id:%s\n", id);
 
 			// convert the sockaddr to a sockaddr_x
-			MSG("before\n");
 			_i2x(&sin, &sax);
-			MSG("after\n");
 		}
 
 		rc = Xbind(fd, (struct sockaddr *)&sax, len);
@@ -851,9 +968,10 @@ int close(int fd)
 	socklen_t len = sizeof(addr);
 	int rc;
 
-	TRACE();
+//	TRACE();
 	if (shouldWrap(fd)) {
 		XIAIFY();
+		MSG("closing %d\n", fd);
 
 		// clean up entries in the dag2id and id2dag maps
 		if (Xgetsockname(fd, (struct sockaddr *)&addr, &len) == 0) {
@@ -914,11 +1032,16 @@ extern "C" int fcntl (int fd, int cmd, ...)
 	va_list args;
 	fcn_fcntl f;
 
-	TRACE();
+//	TRACE();
 
-	if (isXsocket(fd)) {
+	bool xia = isXsocket(fd);
+
+	if (xia) {
 		XIAIFY();
 		f = Xfcntl;
+
+		MSG("socket:%d X:%d\n", fd, isXsocket(fd));
+		FCNTL_CMD(cmd);
 
 	} else {
 		NOXIA();
@@ -941,7 +1064,7 @@ extern "C" int fcntl (int fd, int cmd, ...)
 		{
 			int x = va_arg(args, int);
 
-			if (cmd == F_SETFL) {
+			if ((cmd == F_SETFL) && xia) {
 				FCNTL_FLAGS(x);
 			}
 
@@ -978,6 +1101,13 @@ extern "C" int fcntl (int fd, int cmd, ...)
 		MSG("rc = %d: %s\n", rc, strerror(errno));
 
 	return rc;
+}
+
+pid_t fork(void)
+{
+	TRACE();
+
+	return Xfork();
 }
 
 
@@ -1244,6 +1374,8 @@ int getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 	if (shouldWrap(fd)) {
 		XIAIFY();
 
+		MSG("size:%lu len:%u\n", sizeof(struct sockaddr), *len);
+
 		rc = Xgetsockname(fd, (struct sockaddr*)&sax, &slen);
 
 		if (_x2i(&sax, (struct sockaddr_in*)addr) < 0) {
@@ -1310,7 +1442,7 @@ int listen(int fd, int n)
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
 	int rc;
-	TRACE();
+//	TRACE();
 
 	// Let Xpoll do all the work of figuring out what fds we are handling
 	pollDump(fds, nfds, 1);
@@ -1319,7 +1451,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	if (rc > 0) {
 		pollDump(fds, nfds, 0);
 	} else if (rc == 0) {
-		MSG("timeout\n");
+//		MSG("timeout\n");
 	}
 
 	return rc;
@@ -1331,19 +1463,13 @@ ssize_t read(int fd, void *buf, size_t n)
 {
 	size_t rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
 
 		rc = Xrecv(fd, buf, n, 0);
-
-#ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
-#endif
+		bufferDump(fd, 0, buf, rc);
 
 	} else {
 		NOXIA();
@@ -1359,7 +1485,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
 	int rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1395,15 +1521,7 @@ ssize_t recv(int fd, void *buf, size_t n, int flags)
 		XIAIFY();
 		XFER_FLAGS(flags);
 		rc = Xrecv(fd, buf, n, flags);
-
-		MSG("fd:%d size:%zu returned:%d\n", fd, n, rc);
-
-#ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
-#endif
+		bufferDump(fd, 0, buf, rc);
 
 	} else {
 		NOXIA();
@@ -1460,7 +1578,7 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
 	struct msghdr mh;
 	sockaddr_x sax;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1496,25 +1614,15 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 	TRACE();
 
+	selectDump(nfds, readfds, writefds, exceptfds, 0);
+
 	// Let Xselect do all the work of figuring out what fds we are handling
 	rc = Xselect(nfds, readfds, writefds, exceptfds, timeout);
 
-#ifdef DEBUG
 	if (rc > 0) {
 		// we found at least one event
-		for (int i = 0; i < nfds; i++) {
-			if (readfds && FD_ISSET(i, readfds)) {
-				MSG("%d = read\n", i);
-			}
-			if (writefds && FD_ISSET(i, writefds)) {
-				MSG("%d = write\n", i);
-			}
-			if (exceptfds && FD_ISSET(i, exceptfds)) {
-				MSG("%d = except\n", i);
-			}
-		}
+		selectDump(nfds, readfds, writefds, exceptfds, 1);
 	}
-#endif
 
 	return rc;
 }
@@ -1530,13 +1638,8 @@ ssize_t send(int fd, const void *buf, size_t n, int flags)
 		XIAIFY();
 		XFER_FLAGS(flags);
 		MSG("sending:%zu\n", n);
+		bufferDump(fd, 1, buf, n);
 
-#ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
-#endif
 		rc = Xsend(fd, buf, n, flags);
 
 	} else {
@@ -1554,7 +1657,7 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
 	struct msghdr mh;
 	sockaddr_x sax;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
@@ -1643,6 +1746,7 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 					// handled by Xsetsockopt
 					break;
 
+				case SO_DONTROUTE:
 				case SO_REUSEADDR:
 				case SO_SNDTIMEO:
 				case SO_SNDBUF:
@@ -1655,7 +1759,6 @@ int setsockopt(int fd, int level, int optname, const void *optval, socklen_t opt
 					break;
 
 				case SO_TYPE:
-				case SO_DONTROUTE:
 				case SO_BROADCAST:
 				case SO_SNDBUFFORCE:
 				case SO_RCVBUFFORCE:
@@ -1777,18 +1880,12 @@ ssize_t write(int fd, const void *buf, size_t n)
 {
 	size_t rc;
 
-	TRACE();
+//	TRACE();
 
 	if (isXsocket(fd)) {
 		XIAIFY();
 
-#ifdef PRINTBUFS
-		char *s = (char *)malloc(n+1);
-		memcpy(s, buf, n);
-		s[n] = 0;
-		MSG("%s\n", s);
-#endif
-
+		bufferDump(fd, 1, buf, n);
 		rc = Xsend(fd, buf, n, 0);
 
 	} else {
@@ -1805,7 +1902,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
 	int rc;
 
-	TRACE();
+//	TRACE();
 	if (isXsocket(fd)) {
 		XIAIFY();
 
@@ -1877,7 +1974,15 @@ extern "C" ssize_t __recvfrom_chk (int __fd, void *__restrict __buf, size_t __n,
 	return recvfrom(__fd, __buf, __n, __flags, __addr, __addr_len);
 }
 
+int execve(const char *filename, char *const argv[], char *const envp[])
+{
+	int rc;
 
+	TRACE();
+
+	rc = __real_execve(filename, argv, envp);
+	return rc;
+}
 
 /********************************************************************
 ** INFO ONLY FUNCTION MAPPINGS
@@ -1908,6 +2013,7 @@ struct hostent *gethostbyname (const char *name)
 {
 	TRACE();
 	ALERT();
+	MSG("name=%s\n", name);
 
 	// There's no state to work with so we have to assume
 	// everything is for XIA
@@ -1922,6 +2028,7 @@ int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, si
 {
 	TRACE();
 	ALERT();
+	MSG("name=%s\n", name);
 
 	// FIXME: add code here to map between IPv4 and XIA
 	return __real_gethostbyname_r(name, result_buf, buf, buflen, result, h_errnop);
@@ -1970,4 +2077,13 @@ int getservbyport_r (int port, const char *proto, struct servent *result_buf, ch
 	TRACE();
 	ALERT();
 	return __real_getservbyport_r(port, proto, result_buf, buf, buflen, result);
+}
+
+int clone(int (*fn)(void *), void *child_stack,
+                 int flags, void *arg, ...
+                 /* pid_t *ptid, struct user_desc *tls, pid_t *ctid */ )
+{
+	TRACE();
+	ALERT();
+	return __real_clone(fn, child_stack, flags, arg);
 }

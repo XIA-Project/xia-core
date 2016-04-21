@@ -2,8 +2,9 @@ all:
 	make -C xnetcat
 	make -C xping
 	make -C xtraceroute
-#	make -C example
+	make -C xregister
 #	make -C demo
+	make -C example
 	make -C irc
 #	make -C multicast
 
@@ -13,6 +14,8 @@ clean:
 	make -C xnetcat clean
 	make -C xping clean
 	make -C xtraceroute clean
+	make -C xregister clean
+	make -C tinyhttpd clean
 	make -C example clean
 	make -C demo clean
 	make -C irc clean

@@ -127,6 +127,8 @@ extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
 extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
+extern int Xfork(void);
+extern int Xnotify(void);
 
 #if 0
 extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);

@@ -64,10 +64,6 @@ int Xsocket(int family, int transport_type, int protocol)
 	int sockfd;
 	int block = TRUE;
 
-	// force the system to init and load the socket function pointers
-	get_conf();
-
-
 	if (family != AF_XIA) {
 		LOG("error: the Xsockets API only supports the AF_XIA family");
 		errno = EAFNOSUPPORT;
@@ -98,12 +94,11 @@ int Xsocket(int family, int transport_type, int protocol)
 			return -1;
 	}
 
-	if ((sockfd = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+
+	if ((sockfd = MakeApiSocket(transport_type)) == -1) {
 		LOGF("error creating Xsocket: %s", strerror(errno));
 		return -1;
 	}
-
-	allocSocketState(sockfd, transport_type);
 
 	// protobuf message
 	xia::XSocketMsg xsm;

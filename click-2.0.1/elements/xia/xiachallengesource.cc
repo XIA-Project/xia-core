@@ -30,6 +30,7 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/hmac.h> // HMAC()
 
 
 CLICK_DECLS
@@ -223,7 +224,8 @@ XIAChallengeSource::verify_response(Packet *p_in)
 	// Verify HMAC: Check if the challenge message really originated from here
 	unsigned int hmac_len = 20;
 	unsigned char challenge_hmac[hmac_len];
-	HMAC(router_secret, router_secret_length, (unsigned char *)chalComponents.get_buffer(), chalComponents.size(), challenge_hmac, &hmac_len);
+	HMAC(EVP_sha1(), router_secret, router_secret_length, (unsigned char *)chalComponents.get_buffer(), chalComponents.size(), challenge_hmac, &hmac_len);
+
 	if(memcmp(hmac, challenge_hmac, hmac_len)) {
 		click_chatter("%s> Error: Invalid hmac returned with response", _name);
 		return;
@@ -305,7 +307,7 @@ XIAChallengeSource::send_challenge(Packet *p)
 	// HMAC computed on all abovementioned entries
 	unsigned char challenge_hmac[20];
 	unsigned int hmac_len = 20;
-	HMAC(router_secret, router_secret_length, (unsigned char *)buf.get_buffer(), buf.size(), challenge_hmac, &hmac_len);
+	HMAC(EVP_sha1(), router_secret, router_secret_length, (unsigned char *)buf.get_buffer(), buf.size(), challenge_hmac, &hmac_len);
 
 	// Build the challenge
 	XIASecurityBuffer challenge = XIASecurityBuffer(512);
@@ -359,3 +361,4 @@ XIAChallengeSource::push(int in_port, Packet *p_in)
 CLICK_ENDDECLS
 EXPORT_ELEMENT(XIAChallengeSource)
 ELEMENT_MT_SAFE(XIAChallengeSource)
+ELEMENT_LIBS(-lcrypto -lssl)

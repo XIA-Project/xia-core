@@ -167,7 +167,8 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a xcache.pb.h xcache.pb.cc xia.pb.h xia.pb.cc
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf libclick.a
+	rm -f xia.pb.h xia.pb.cc xcache.pb.h xcache.pb.cc
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean

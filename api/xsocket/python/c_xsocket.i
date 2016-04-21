@@ -2,6 +2,7 @@
 %{
 #include "Xsocket.h"
 #include "xia.h"
+#include "Xkeys.h"
 #include "dagaddr.hpp"
 %}
 
@@ -13,6 +14,8 @@
 {
     $1 = PyString_AsString($input);
 }
+
+
 
 /* The "out" map for recvfrom. It packages the data C put into rbuf and addr and
    returns them as a python tuple: (rbuf, addr string). Currently dlen is discarded. Since
@@ -46,12 +49,9 @@
     free($5);
 }
 
-
-
-
 /* The "in" map for the receive buffer of receive functions. It converts a single
    integer to the python function into two arguments to the C function:
-        $1 (rbuf): a buffuer of that length
+        $1 (rbuf): a buffer of that length
         $2 (len): the length itself */
 %typemap (in) (void * rbuf, size_t len)
 {
@@ -81,6 +81,48 @@
         return NULL;
     }
     $result = PyString_FromStringAndSize((const char *)$1, result);
+    free($1);
+}
+
+
+
+
+/* The "in" map for the receive buffer of receive functions. It converts a single
+   integer to the python function into two arguments to the C function:
+        $1 (randomSID): a buffer of that length
+        $2 (randomSIDlen): the length itself
+*/
+%typemap (in) (char *randomSID, int randomSIDlen)
+{
+    if (!PyInt_Check($input)) {
+        PyErr_SetString(PyExc_ValueError, "Expecting an integer");
+        return NULL;
+    }
+    $2 = PyInt_AsLong($input);
+    if ($2<0) {
+        PyErr_SetString(PyExc_ValueError, "Positive integer expected");
+        return NULL;
+    }
+    $1 = (char*)malloc($2);
+    memset($1, 0, $2);
+}
+
+
+/* The "out" map for XmakeNewSID. It takes the data C put in randomSID
+   and instead returns it as the Python function's return value. Since
+   this means the caller of the Python function no longer has access to
+   the C function's return value, the status code, we do an error check
+   here instead.
+*/
+%typemap(argout) (char *randomSID, int randomSIDlen)
+{
+    Py_XDECREF($result);
+    if (result < 0) {
+        free($1);
+        PyErr_SetFromErrno(PyExc_IOError);
+        return NULL;
+    }
+    $result = PyString_FromStringAndSize((const char *)$1, $2);
     free($1);
 }
 
@@ -375,6 +417,7 @@
    NOTE: It matters to swig where everything else in this file is
    with relation to this include, so don't move it. */
 %include "../../include/Xsocket.h"
+%include "../../include/Xkeys.h"
 %include "../../include/xia.h"
 
 %pythoncode %{
@@ -443,3 +486,16 @@ def Xsendto(sock, data, flags, dest_dag):
 %include "carrays.i"
 /* %array_class(ChunkStatus, ChunkStatusArray); */
 /*%array_class(ChunkInfo, ChunkInfoArray);*/
+
+
+/* ==== XremoveSID ==== */
+%pythoncode %{
+def XremoveSID(sid):
+    return _c_xsocket.XremoveSID(sid)
+%}
+
+/* ==== XmakeNewSID ==== */
+%pythoncode %{
+def XmakeNewSID():
+    return _c_xsocket.XmakeNewSID(64)
+%}
