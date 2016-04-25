@@ -36,6 +36,8 @@
 
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 
+#define MAX_BUF_SIZE 0x80000 // Limit test packets to 512k
+
 
 // FIXME: clean up globals and move into a structure or similar
 // global configuration options
@@ -105,7 +107,7 @@ void getConfig(int argc, char** argv)
 				// if 0, send random sized packets
 				pktSize = atoi(optarg);
 				if (pktSize < 0) pktSize = 0;
-				if (pktSize > XIA_MAXBUF) pktSize = XIA_MAXBUF;
+				 if (pktSize > MAX_BUF_SIZE) pktSize = MAX_BUF_SIZE;
 				break;
 			case 'r':
 				// close and reopen the connection every <reconnect> operations
@@ -198,32 +200,73 @@ char *randomString(char *buf, int size)
 int process(int sock)
 {
 	int size;
-	int sent, received, rc;
-	char buf1[XIA_MAXBUF + 1], buf2[XIA_MAXBUF + 1];
-
+	int sent = 0;
+	int received = 0;
+	int rc = 0;
+	char buf1[MAX_BUF_SIZE + 1], buf2[MAX_BUF_SIZE + 1], temp[MAX_BUF_SIZE + 1];
+	char *bufp = buf1;
 	if (pktSize == 0)
-		size = (rand() % XIA_MAXBUF) + 1;
+		size = (rand() % MAX_BUF_SIZE) + 1;
 	else
 		size = pktSize;
 	randomString(buf1, size);
+	printf("%d\n", (int)size);
+	int count = size;
+	if (count <= 51200)
+	{
+		sent = Xsend(sock, buf1, count, 0);
+		if (sent < 0)
+		{
+			die(-4, "Send error %d on socket %d\n", errno, sock);
+		}
+	} else {
+		while (count > 0) {
+			if (count > 51200)
+			{
+			printf("count %d\n",count);
 
-	if ((sent = Xsend(sock, buf1, size, 0)) < 0)
-		die(-4, "Send error %d on socket %d\n", errno, sock);
+				sent += Xsend(sock, bufp, 51200, 0);
+				bufp += 51200;
+				if (sent < 0)
+				{
+					die(-4, "Send error %d on socket %d\n", errno, sock);
+				}
+			} else {
+			printf("count %d\n",count);
+				sent += Xsend(sock, bufp, count, 0);
+								if (sent < 0)
+				{
+					die(-4, "Send error %d on socket %d\n", errno, sock);
+				}
+			}
+			count -= 51200;
+			printf("count %d\n",count);
+		}
+	}
+	
 
 	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
 	struct pollfd pfds[2];
 	pfds[0].fd = sock;
 	pfds[0].events = POLLIN;
-	if ((rc = Xpoll(pfds, 1, 5000)) <= 0) {
+	if ((rc = Xpoll(pfds, 1, 50000)) <= 0) {
 		die(-5, "Poll returned %d\n", rc);
 	}
 
 	memset(buf2, 0, sizeof(buf2));
-	if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
-		die(-5, "Receive error %d on socket %d\n", errno, sock);
+	memset(temp, 0, sizeof(temp));
+	count = 0;
+	while (sent != received && (count = Xrecv(sock, temp, sizeof(temp), 0)) > 0) {
+		say("%5d received %d bytes\n", sock, count);
+		received += count;
+		strncat(buf2, temp, count);
+		memset(temp, 0, sizeof(temp));
+	}
+	// if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
+	// 	die(-5, "Receive error %d on socket %d\n", errno, sock);
 
-	say("Xsock %4d received %d bytes\n", sock, received);
+	say("Xsock %4d received %d bytes in total\n", sock, received);
 
 	if (sent != received || strcmp(buf1, buf2) != 0)
 		warn("Xsock %4d received data different from sent data! (bytes sent/recv'd: %d/%d)\n",
