@@ -10,7 +10,6 @@
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
 #include <clicknet/xia.h>
-#include "xiacontentmodule.hh"
 #include "xiaxidroutetable.hh"
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
@@ -213,7 +212,7 @@ public:
 private:
     void set_state(const HandlerState s);
 
-	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
+	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, u_long *ts_val, u_long *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
@@ -227,7 +226,7 @@ private:
 	inline void print_tcpstats(WritablePacket *p, const char *label);
 	short tcp_state() const { return tp->t_state; }
 
-	
+
 	TCPFifo		_q_usr_input;
 	TCPQueue	_q_recv;
 	tcp_seq_t	so_recv_buffer_size;

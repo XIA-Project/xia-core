@@ -173,9 +173,6 @@ public:
 
     tcp_globals     _tcp_globals;
 	ErrorHandler    *_errhandler;
-			xcacheSock = false;
-
-		bool xcacheSock;
 
 public:
 	XIAXIDRouteTable *_routeTable;
@@ -449,6 +446,7 @@ class sock : public Element {
 		/* =========================
 		 * Chunk States
 		* ========================= */
+		bool xcacheSock;
 		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
 		HashTable<XID, Timestamp> XIDtoExpiryTime;
 		HashTable<XID, bool> XIDtoTimerOn;

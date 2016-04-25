@@ -81,6 +81,7 @@ sock::sock(
 	hlim = HLIM_DEFAULT;
 	nxt = CLICK_XIA_NXT_TRN;
 	refcount = 1;
+	xcacheSock = false;
 }
 
 sock::sock() {
@@ -125,6 +126,7 @@ sock::sock() {
 	migrate_pkt = NULL;
 	recv_pending = false;
 	refcount = 1;
+	xcacheSock = false;
 }
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
@@ -1506,7 +1508,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	}
 	unsigned short _dport = sk->port;
 
-	if (!sk->state == CONNECTED) {
+	if (!(sk->state == CONNECTED)) {
 		// This should never happen!
 		ERROR("socket is not connected\n");
 		return;
@@ -1655,7 +1657,7 @@ void XTRANSPORT::MigrateFailure(sock *sk)
 	}
 }
 
-XTRANSPORT::sock *XTRANSPORT::XID2Sock(XID dest_xid)
+sock *XTRANSPORT::XID2Sock(XID dest_xid)
 {
 	sock *sk = XIDtoSock.get(dest_xid);
 
@@ -1693,6 +1695,7 @@ XIAPath XTRANSPORT::alterCIDDstPath(XIAPath dstPath)
 	return dstPath;
 }
 
+#if 0
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
@@ -1849,7 +1852,7 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 	output(NETWORK_PORT).push(p);
 	INFO("Sent SYNACK from new socket\n");
 }
-
+#endif
 
 
 int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
@@ -3327,6 +3330,7 @@ void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_
 
 void XTRANSPORT::XsetXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	UNUSED(_sport);
 	xia::X_SetXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_setxcachesid();
 
 	_xcache_sid.parse(_msg->sid().c_str());

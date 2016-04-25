@@ -10,7 +10,6 @@
 #include <click/handlercall.hh>
 #include <click/xiapath.hh>
 #include <clicknet/xia.h>
-#include "xiacontentmodule.hh"
 #include "xiaxidroutetable.hh"
 #include <clicknet/udp.h>
 #include <click/string.hh>
@@ -46,7 +45,7 @@ using namespace xia;
 CLICK_DECLS
 
 
-class XIAContentModule;   
+class XIAContentModule;
 
 class XDatagram : public sock {
 
