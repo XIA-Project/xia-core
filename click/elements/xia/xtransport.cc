@@ -1225,7 +1225,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		click_tcp *tcph = (click_tcp *)thdr.header();
 		if (tcph->th_flags == TH_SYN) {
 			// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-			sock *sk = XIDtoSock.get(_destination_xid);
+			sock *sk = XID2Sock(_destination_xid);
 
 			if (!sk) {
 				// FIXME: we need to fix the state machine so this doesn't happen!
