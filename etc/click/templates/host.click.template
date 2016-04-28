@@ -14,3 +14,5 @@ FromDevice($IFACE, METHOD LINUX) -> [0]${HNAME}[0] -> ToDevice($IFACE);
 
 	ControlSocket(tcp, 7777);
 
+AlignmentInfo($HNAME/xrc/c 4 0, $HNAME/xlc/c 4 0, $HNAME/xlc/statsFilter 4 0);
+
