@@ -40,7 +40,7 @@ extern "C" {
 
 #include "wavedevice.hh"
 
-#define WSMP_MTU 1400 // in theory up to 4096 bytes given 12 bit length field
+#define WSMP_MTU 1024 // in theory up to 4096 bytes given 12 bit length field
                       // but arada only supports up to 1400 bytes at the moment
 
 
@@ -81,7 +81,7 @@ int WaveDevice::configure(Vector<String> &conf, ErrorHandler *errh){
     String roleStr;
     uint32_t psid = 5;
 	int txPower = 23;
-    double dataRate = 27;
+    double dataRate = 6;
     uint32_t  channel = 172;
     int userPrio = 1;
     int expiryTime = 0;
@@ -216,6 +216,8 @@ int WaveDevice::initialize(ErrorHandler *errh){
     // fields common to both provider and user
     _wmeReq.channel = _channel;
     _wmeReq.psid = _psid;
+    
+    _wmeReq.channelaccess = CHACCESS_CONTINUOUS;
 
     if (_role == WAVE_PROVIDER){ // provider role
 
@@ -235,7 +237,10 @@ strerror=%s", declaration().c_str(), strerror(errno));
         assert(_role == WAVE_USER); // no other option
 
         // user-specific fields
-        _wmeReq.userreqtype = USER_REQ_SCH_ACCESS_AUTO_UNCONDITIONAL;    
+        _wmeReq.userreqtype = USER_REQ_SCH_ACCESS_AUTO_UNCONDITIONAL;
+        _wmeReq.schaccess = 1; // immediate access
+        _wmeReq.schextaccess = 1; // extended access
+
 
         if (registerUser(_pid, &_wmeReq) < 0)
             return errh->error("%s, initialize(): registerUser(), strerror=%s",\
@@ -484,7 +489,8 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
         } else
             
 #ifdef DEBUG        
-            errh->debug("%s, sent WSM, %d byte payload", waveDeviceInst->declaration().c_str(), p->length());
+            errh->debug("%s, sent WSM, %d byte payload", \
+                waveDeviceInst->declaration().c_str(), p->length());
 #endif
             done = true;
         }
@@ -517,16 +523,18 @@ void* WaveDevice::receiver_thread(void *arg){
 
     // prepare wsm indication data structure
     WSMIndication rxPkt;
-    memset(&rxPkt, 0, sizeof(WSMIndication)); // playing it safe
 
     // infinite read loop
     int len;
-    while (1){
+    while (true){
+    
+        memset(&rxPkt, 0, sizeof(WSMIndication)); // playing it safe
 
         if ((len = rxWSMPacket(pid, &rxPkt)) > 0){ // got a packet, yay
         
 #ifdef DEBUG        
-            errh->debug("%s, received WSM, %d byte payload", waveDeviceInst->declaration().c_str(), rxPkt.data.length);
+            errh->debug("%s, received WSM, %d byte payload", \
+                waveDeviceInst->declaration().c_str(), rxPkt.data.length);
 #endif
 
             if (rxPkt.data.length <= 0)
