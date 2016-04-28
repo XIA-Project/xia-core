@@ -10,7 +10,7 @@ TARGETS=xftp_basic_server xftp_basic_client
 all: $(TARGETS)
 
 %: %.c
-	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGETS)
