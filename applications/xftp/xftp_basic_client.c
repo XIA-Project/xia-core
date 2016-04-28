@@ -96,7 +96,7 @@ void die(int ecode, const char *fmt, ...)
 }
 
 int sendCmd(int sock, const char *cmd)
-{ 
+{
 	int n;
  	warn("Sending Command: %s \n", cmd);
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
@@ -128,7 +128,7 @@ int getChunkCount(int sock, char *reply, int sz)
 
 
 
-int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid, int n_chunks)
+int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid)
 {
 	char *p = chunks;
 	char *next;
@@ -137,8 +137,8 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
     Node n_ad(Node::XID_TYPE_AD, strchr(p_ad, ':') + 1);
     Node n_hid(Node::XID_TYPE_HID, strchr(p_hid, ':') + 1);
 
-	
-	
+
+
 	// build the list of chunks to retrieve
 	while ((next = strchr(p, ' '))) {
 		*next = 0;
@@ -167,13 +167,8 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 	return n;
 }
 
-int getListedChunks(FILE *fd, char *url, int n_chunks)
+int getListedChunks(FILE *fd, char *url)
 {
-	sockaddr_x chunkAddresses[n_chunks];
-	char data[XIA_MAXCHUNK];
-	int len;
-	int status;
-	int n = -1;
 	char *saveptr, *token;
 
 	printf("Received url = %s\n", url);
@@ -208,9 +203,8 @@ int getListedChunks(FILE *fd, char *url, int n_chunks)
 //	This is used both to put files and to get files since in case of put I still have to request the file.
 //	Should be fixed with push implementation
 
-int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout)
+int getFile(int sock, const char *fin, const char *fout)
 {
-	int chunkSock;
 	int offset;
 	char cmd[5120];
 	char reply[5120];
@@ -247,7 +241,7 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 		}
 		offset += NUM_CHUNKS;
 		printf("reply4 = %s\n", &reply[4]);
-		if (getListedChunks(f, &reply[4], num) < 0) {
+		if (getListedChunks(f, &reply[4]) < 0) {
 			printf(" = %s\n", &reply[4]);
 			status= -1;
 			break;
@@ -265,13 +259,13 @@ int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout
 	return status;
 }
 
-void xcache_chunk_arrived(XcacheHandle *h, int event, sockaddr_x *addr, socklen_t addrlen)
+void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
 {
 	char buf[512];
 
 	printf("Received Chunk Arrived Event\n");
 
-	printf("XreadChunk returned %d\n", XreadChunk(h, addr, addrlen, buf, 512, 0));
+	printf("XreadChunk returned %d\n", XreadChunk(h, addr, addrlen, buf, sizeof(buf), 0));
 }
 
 int initializeClient(const char *name)
@@ -290,7 +284,7 @@ int initializeClient(const char *name)
 	XregisterNotif(XCE_CHUNKARRIVED, xcache_chunk_arrived);
 	XlaunchNotifThread(&h);
 
-    // lookup the xia service 
+    // lookup the xia service
 	daglen = sizeof(dag);
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
@@ -299,7 +293,7 @@ int initializeClient(const char *name)
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-    
+
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
@@ -313,7 +307,7 @@ int initializeClient(const char *name)
 	} else{
 		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
-	
+
 	// save the AD and HID for later. This seems hacky
 	// we need to find a better way to deal with this
 	Graph g(&dag);
@@ -323,11 +317,11 @@ int initializeClient(const char *name)
 	char *hids = strstr(sdag,"HID:");
 // 	i = sscanf(ads,"%s",s_ad );
 // 	i = sscanf(hids,"%s", s_hid);
-	
+
 	if(sscanf(ads,"%s",s_ad ) < 1 || strncmp(s_ad,"AD:", 3) !=0){
 		die(-1, "Unable to extract AD.");
 	}
-		
+
 	if(sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid,"HID:", 4) !=0 ){
 		die(-1, "Unable to extract AD.");
 	}
@@ -350,16 +344,16 @@ bool file_exists(const char * filename)
 }
 
 int main(int argc, char **argv)
-{	
+{
 
 	const char *name;
 	int sock = -1;
 	char fin[512], fout[512];
 	char cmd[512], reply[512];
 	int params = -1;
-	
+
 	say ("\n%s (%s): started\n", TITLE, VERSION);
-	
+
 	if( argc == 1){
 		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", NAME);
 		sock = initializeClient(NAME);
@@ -385,15 +379,15 @@ int main(int argc, char **argv)
 		} else{
 			die(-1, "xftp [--quick] [SID]");
 		}
-		
+
 	} else{
-		die(-1, "xftp [--quick] [SID]"); 
+		die(-1, "xftp [--quick] [SID]");
 	}
-	
+
 	int i = 0;
 
 
-	
+
 //		This is for quick testing with a couple of commands
 
 	while(i < NUM_PROMPTS){
@@ -402,7 +396,7 @@ int main(int argc, char **argv)
 		fin[0] = '\n';
 		fout[0] = '\n';
 		params = -1;
-		
+
 		if(quick){
 			if( i==0 )
 				strcpy(cmd, "put s.txt r.txt");
@@ -430,7 +424,7 @@ int main(int argc, char **argv)
 				warn("Since both applications write to the same folder (local case) the names should be different.\n");
 				continue;
 			}
-			getFile(sock, s_ad, s_hid, fin, fout);
+			getFile(sock, fin, fout);
 		}
 	}
 	return 1;
