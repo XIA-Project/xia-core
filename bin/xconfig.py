@@ -1,4 +1,4 @@
-#! /usr/bin/python #
+#! /usr/bin/env python2.7
 # script to generate click host and router config files
 
 import os
