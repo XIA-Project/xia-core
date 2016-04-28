@@ -1,13 +1,16 @@
 include ../../xia.mk
+
+.PHONY: clean
+
 CFLAGS+=-g -I../../../click/include/click
 LDFLAGS+=$(LIBS) -lpthread -lprotobuf
-all: server client
 
-server:
-	$(CC) $(CFLAGS) xftp_basic_server.c -o xftp_basic_server $(LDFLAGS)
+TARGETS=xftp_basic_server xftp_basic_client
 
-client:
-	$(CC) $(CFLAGS) xftp_basic_client.c -o xftp_basic_client $(LDFLAGS)
+all: $(TARGETS)
+
+%: %.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
 clean:
-	rm -f chunks_server chunks_client xftp_basic_client xftp_basic_server
+	rm -f $(TARGETS)
