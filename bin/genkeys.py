@@ -18,15 +18,26 @@ import sys
 import os
 import re
 import hashlib
+from subprocess import check_call
 from Crypto.PublicKey import RSA
 
 # Directory where all the keys will be dumped
 keydir = 'key'
 
 def generate_rsa_key():
-	private = RSA.generate(1024)
-	public = private.publickey()
-	return (private.exportKey(), public.exportKey())
+    private = None
+    public = None
+    check_call("openssl genrsa -out privatekey.txt 1024".split())
+    check_call("openssl rsa -pubout -in privatekey.txt -out publickey.txt".split())
+    with open("privatekey.txt") as privfd:
+        private = privfd.read()
+    with open("publickey.txt") as pubfd:
+        public = pubfd.read()
+    os.remove("privatekey.txt")
+    os.remove("publickey.txt")
+    assert private is not None
+    assert public is not None
+    return (private, public)
 
 def write_key_files(basename, privkey, pubkey):
 	if not os.path.exists(keydir):
@@ -34,9 +45,9 @@ def write_key_files(basename, privkey, pubkey):
 	privkeyfilename = os.path.join(keydir, basename)
 	pubkeyfilename = os.path.join(keydir, basename + '.pub')
 	with open(privkeyfilename, 'w') as privkeyfile:
-		privkeyfile.write(privkey + '\n')
+		privkeyfile.write(privkey)
 	with open(pubkeyfilename, 'w') as pubkeyfile:
-		pubkeyfile.write(pubkey + '\n')
+		pubkeyfile.write(pubkey)
 
 def remove_key_files(key):
 	os.remove(os.path.join(keydir, key))
@@ -68,7 +79,7 @@ def delete_HID(hid):
 def pubkey_hash(pubkey):
 	keylist = pubkey.split('\n')
 	# Strip the first and last line because they just contain text markers
-	key = ''.join(keylist[1:-1])
+	key = ''.join(keylist[1:-2])
 	return hashlib.sha1(key).hexdigest()
 
 if __name__ == "__main__":
