@@ -12,7 +12,7 @@ SANDBOXLIB=$SANDBOX/lib
 SANDBOXXIAAPILIB=$SANDBOX/$XIADIR/api/lib
 SANDBOXXIABIN=$SANDBOX/$XIADIR/bin
 
-TARBALL=$SANDBOX.tar.gz
+TARBALL=${SANDBOX}.tar.gz
 
 # Make sure we are running from xia-core
 CURRENTDIR=`pwd`
