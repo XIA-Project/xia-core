@@ -113,10 +113,7 @@ void *recvCmd(void *socketid)
 	char reply[XIA_MAXBUF];
 	int sock = *((int*)socketid);
 	char *fname;
-	char fin[512], fout[512];
-//  	char **params;
-	char ad[MAX_XID_SIZE];
-	char hid[MAX_XID_SIZE];
+//  char **params;
 	XcacheHandle xcache;
 
 	XcacheHandleInit(&xcache);
@@ -131,6 +128,9 @@ void *recvCmd(void *socketid)
 		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
 			break;
+		} else if (n == 0) {
+			warn("Peer closed the connection\n");
+ 			break;
 		}
 		//Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
@@ -288,23 +288,23 @@ void *blockingListener(void *socketid)
 	int acceptSock;
 	while (1) {
 		say("Waiting for a client connection\n");
-   		
+
 		if ((acceptSock = Xaccept(sock, NULL, NULL)) < 0)
 			die(-1, "accept failed\n");
 
 		say("connected\n");
-		
+
 		// handle the connection in a new thread
 		pthread_t client;
 		pthread_create(&client, NULL, recvCmd, (void *)&acceptSock);
 	}
-	
+
 	Xclose(sock); // we should never reach here!
 	return NULL;
 }
 
 int main()
-{	
+{
 	int sock = registerReceiver();
 
 	blockingListener((void *)&sock);
