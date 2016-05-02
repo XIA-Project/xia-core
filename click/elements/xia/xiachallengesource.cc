@@ -16,7 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <fcntl.h>
+#include <unistd.h>
 #include <click/config.h>
 #include "xiachallengesource.hh"
 #include <click/nameinfo.hh>
@@ -97,7 +98,12 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1; // error config
 
-	generate_secret();
+
+	if (!generate_secret()) {
+		errh->error("Unable to generate router_secret: %s\n", strerror(errno));
+		return -1;
+	}
+
 	local_hid_str = local_hid.unparse().c_str();
 
 	_name = new char [local_hid_str.length()+1];
@@ -112,15 +118,14 @@ XIAChallengeSource::initialize(ErrorHandler *)
     return 0;
 }
 
-void
+
+bool
 XIAChallengeSource::generate_secret()
 {
-    static const char characters[] =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    for (size_t i=0;i<router_secret_length;i++) {
-        router_secret[i] = characters[rand() % (sizeof(characters) - 1)];
-    }
-    router_secret[router_secret_length] = 0;
+	int r  = open("/dev/urandom", O_RDONLY);
+	int rc = read(r, router_secret, router_secret_length);
+	close(r);
+	return (rc == router_secret_length);
 }
 
 int

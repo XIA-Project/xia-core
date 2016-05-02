@@ -296,6 +296,11 @@ void process_data(int datasock)
 		syslog(LOG_INFO, "%s:%s", type, hex_string);
 	}
 	*/
+
+// make the warning go away for xiah->node[0]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+
 	// Starting at node at offset 0, verify it is an AD node
 	if(htonl(xiah->node[0].xid.type) != CLICK_XIA_XID_TYPE_AD) {
 		syslog(LOG_ERR, "First node in destination DAG is not an AD");
@@ -304,6 +309,10 @@ void process_data(int datasock)
 	// Walk the destination DAG to find HID
 	char hid_str[41];
 	sha1_hash_to_hex_string(xiah->node[xiah->node[0].edge[0].idx].xid.id, 20, hid_str, 41);
+
+// done disabling the warning
+#pragma GCC diagnostic pop
+
 	syslog(LOG_INFO, "DestHost = %s", hid_str);
 	Node hidNode("HID", hid_str);
 	syslog(LOG_INFO, "DestHostID = %s", hidNode.to_string().c_str());
@@ -481,4 +490,3 @@ int main(int argc, char *argv[]) {
 	return 0;
 
 }
-

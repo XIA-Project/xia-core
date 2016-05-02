@@ -78,28 +78,34 @@ void configure(int argc, char** argv)
 
 	if (!haveaddr && !havehost) {
 		die("you must specify a hostname or IP address\n");
-	
+
 	} if (haveaddr && havehost) {
 		die("you must specify either a hostname or IP address, not both\n");
-	
+
 	} else if (haveaddr && !haveport) {
 		die("you must specify a port number as awell as an IP address\n");
-	
+
 	} else if (haveport && !haveaddr && !havehost) {
 		die("you must specify an IP address or hostname in addition to a port number\n");
-	
+
 	} else if (optind == argc) {
 		// error no dag specified
 		die("no dag specified!\n");
 
 	}
-	
+
 	dag[0] = 0;
+	int len = sizeof(dag) - 1;	// account for null terminator
+
 	for (int i = optind; i < argc; i++) {
 		if (i != optind) {
-			strncat(dag, " ", sizeof(dag));
+			strncat(dag, " ", len);
+			len--;
 		}
-		strncat(dag, argv[i], sizeof(dag));
+		strncat(dag, argv[i], len);
+		len -= strlen(argv[i]);
+		if (len <= 0)
+			break;
 	};
 
 	if (haveport) {
