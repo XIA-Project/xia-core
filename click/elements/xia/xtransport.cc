@@ -27,15 +27,15 @@
 ** - see various FIXMEs in the code
 ** - get sk in ProcessAPIPacket instead of each individual handler
 ** - replace copy_packet with uniqueify. not needed for migration in reliable transport
-**     still needed for datagram and cid??
+**	 still needed for datagram and cid??
 */
 
 CLICK_DECLS
 
 sock::sock(
-    XTRANSPORT *trans,
-    unsigned short apiport,
-    int type) : hstate(CREATE) {
+	XTRANSPORT *trans,
+	unsigned short apiport,
+	int type) : hstate(CREATE) {
 	state = INACTIVE;
 	reap = false;
 	isBlocking = true;
@@ -149,15 +149,15 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	/* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
 
-	_tcp_globals.tcp_keepidle 	    = 120;
-	_tcp_globals.tcp_keepintvl 	    = 120;
-	_tcp_globals.tcp_maxidle   	    = 120;
-	_tcp_globals.tcp_now 		    = 0;
+	_tcp_globals.tcp_keepidle 		= 120;
+	_tcp_globals.tcp_keepintvl 		= 120;
+	_tcp_globals.tcp_maxidle   		= 120;
+	_tcp_globals.tcp_now 			= 0;
 	_tcp_globals.so_recv_buffer_size = 0x10000;
-	_tcp_globals.tcp_mssdflt	    = 1024;
-	_tcp_globals.tcp_rttdflt	    = TCPTV_SRTTDFLT / PR_SLOWHZ;
+	_tcp_globals.tcp_mssdflt		= 1024;
+	_tcp_globals.tcp_rttdflt		= TCPTV_SRTTDFLT / PR_SLOWHZ;
 	_tcp_globals.so_flags	   	 	= 0;
-	_tcp_globals.so_idletime	    = 0;
+	_tcp_globals.so_idletime		= 0;
 	_verbosity 						= VERB_ERRORS;
 
 	bool so_flags_array[32];
@@ -166,20 +166,20 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	memset(t_flags_array, 0, 10 * sizeof(bool));
 
 	assert (cp_va_kparse(conf, this, errh,
-	                     "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
-	                     "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
-	                     "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
-	                     "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
-	                     "IDLETIME", 0, cpUnsigned, &(_tcp_globals.so_idletime),
-	                     "MAXSEG", 	0, cpUnsignedShort, &(_tcp_globals.tcp_mssdflt),
-	                     "RCVBUF", 	0, cpUnsigned, &(_tcp_globals.so_recv_buffer_size),
-	                     "WINDOW_SCALING", 0, cpUnsigned, &(_tcp_globals.window_scale),
-	                     "USE_TIMESTAMPS", 0, cpBool, &(_tcp_globals.use_timestamp),
-	                     "FIN_AFTER_TCP_FIN",  0, cpBool, &(so_flags_array[8]),
-	                     "FIN_AFTER_TCP_IDLE", 0, cpBool, &(so_flags_array[9]),
-	                     "FIN_AFTER_UDP_IDLE", 0, cpBool, &(so_flags_array[10]),
-	                     "VERBOSITY", 0, cpUnsigned, &(_verbosity), // not sure we need this
-	                     cpEnd) >= 0);
+						 "LOCAL_ADDR", cpkP + cpkM, cpXIAPath, &local_addr,
+						 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
+						 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
+						 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
+						 "IDLETIME", 0, cpUnsigned, &(_tcp_globals.so_idletime),
+						 "MAXSEG", 	0, cpUnsignedShort, &(_tcp_globals.tcp_mssdflt),
+						 "RCVBUF", 	0, cpUnsigned, &(_tcp_globals.so_recv_buffer_size),
+						 "WINDOW_SCALING", 0, cpUnsigned, &(_tcp_globals.window_scale),
+						 "USE_TIMESTAMPS", 0, cpBool, &(_tcp_globals.use_timestamp),
+						 "FIN_AFTER_TCP_FIN",  0, cpBool, &(so_flags_array[8]),
+						 "FIN_AFTER_TCP_IDLE", 0, cpBool, &(so_flags_array[9]),
+						 "FIN_AFTER_UDP_IDLE", 0, cpBool, &(so_flags_array[10]),
+						 "VERBOSITY", 0, cpUnsigned, &(_verbosity), // not sure we need this
+						 cpEnd) >= 0);
 	// return -1;
 
 	for (int i = 0; i < 32; i++) {
@@ -419,7 +419,7 @@ const char *XTRANSPORT::SocketTypeStr(int stype)
 	switch (stype) {
 		case SOCK_STREAM: s = "STREAM"; break;
 		case SOCK_DGRAM:  s = "DGRAM";  break;
-		case SOCK_RAW:    s = "RAW";    break;
+		case SOCK_RAW:	s = "RAW";	break;
 		case SOCK_CHUNK:  s = "CHUNK";  break;
 	}
 	return s;
@@ -432,17 +432,17 @@ const char *XTRANSPORT::StateStr(SocketState state)
 	const char *s = "???";
 	switch(state) {
 		case INACTIVE:   s = "INACTIVE";   break;
-		case LISTEN:     s = "LISTEN";     break;
+		case LISTEN:	 s = "LISTEN";	 break;
 		case SYN_RCVD:   s = "SYN_RCVD";   break;
 		case SYN_SENT:   s = "SYN_SENT";   break;
 		case CONNECTED:  s = "CONNECTED";  break;
 		case FIN_WAIT1:  s = "FIN_WAIT1";  break;
 		case FIN_WAIT2:  s = "FIN_WAIT2";  break;
 		case TIME_WAIT:  s = "TIME_WAIT";  break;
-		case CLOSING:    s = "CLOSING";    break;
+		case CLOSING:	s = "CLOSING";	break;
 		case CLOSE_WAIT: s = "CLOSE_WAIT"; break;
 		case LAST_ACK:   s = "LAST_ACK";   break;
-		case CLOSED:     s = "CLOSED";     break;
+		case CLOSED:	 s = "CLOSED";	 break;
 	}
 	return s;
 }
@@ -718,7 +718,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 	if (timer == _fast_ticks) {
 		for (; i; i++) {
 			if (i->second->get_type() == SOCK_STREAM &&
-			        !i->second->reap)
+					!i->second->reap)
 			{
 				con = dynamic_cast<XStream *>(i->second);
 				con->fasttimo();
@@ -726,7 +726,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		}
 		for (; j; j++) {
 			if (j->second->get_type() == SOCK_STREAM &&
-			        !j->second->reap)
+					!j->second->reap)
 			{
 				con = dynamic_cast<XStream *>(j->second);
 				con->fasttimo();
@@ -736,7 +736,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 	} else if (timer == _slow_ticks) {
 		for (; i; i++) {
 			if (i->second->get_type() == SOCK_STREAM &&
-			        !i->second->reap)
+					!i->second->reap)
 			{
 				con = dynamic_cast<XStream *>(i->second);
 				con->slowtimo();
@@ -744,7 +744,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 		}
 		for (; j; j++) {
 			if (j->second->get_type() == SOCK_STREAM &&
-			        !j->second->reap)
+					!j->second->reap)
 			{
 				con = dynamic_cast<XStream *>(j->second);
 				con->slowtimo();
@@ -1721,7 +1721,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 		// compute the hash and verify it matches the CID
 		unsigned char digest[SHA_DIGEST_LENGTH];
 		xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
-        digest, SHA_DIGEST_LENGTH);
+			digest, SHA_DIGEST_LENGTH);
 
 		String hash = "CID:";
 		char hexBuf[3];
@@ -1819,10 +1819,10 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 
 		// compute the hash and verify it matches the CID
 		unsigned char digest[SHA_DIGEST_LENGTH];
-        xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
-            digest, SHA_DIGEST_LENGTH);
+		xs_getSHA1Hash((const unsigned char *)xiah.payload(), xiah.plen(), \
+			digest, SHA_DIGEST_LENGTH);
 
-        String hash = "CID:";
+		String hash = "CID:";
 		char hexBuf[3];
 		for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 			sprintf(hexBuf, "%02x", digest[i]);
@@ -3759,11 +3759,11 @@ void XTRANSPORT::XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	String src;
 
 	/* Computes SHA1 Hash if user does not supply it */
-    unsigned char digest[SHA_DIGEST_LENGTH];
-    xs_getSHA1Hash((const unsigned char *)pktPayload.c_str(), \
-        pktPayload.length(), digest, SHA_DIGEST_LENGTH);
+	unsigned char digest[SHA_DIGEST_LENGTH];
+	xs_getSHA1Hash((const unsigned char *)pktPayload.c_str(), \
+		pktPayload.length(), digest, SHA_DIGEST_LENGTH);
 
-    char hexBuf[3];
+	char hexBuf[3];
 	for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
 		sprintf(hexBuf, "%02x", digest[i]);
 		src.append(const_cast<char *>(hexBuf), 2);

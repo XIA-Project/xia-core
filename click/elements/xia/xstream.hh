@@ -34,8 +34,8 @@ using namespace xia;
 #endif
 
 // FIXME: put these in a std location that can be found by click and the API
-#define XOPT_HLIM 0x07001
-#define XOPT_NEXT_PROTO 0x07002
+#define XOPT_HLIM		0x07001
+#define XOPT_NEXT_PROTO	0x07002
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -44,16 +44,16 @@ using namespace xia;
 
 #define UNUSED(x) ((void)(x))
 
-#define ACK_DELAY           300
-#define TEARDOWN_DELAY      240000
-#define HLIM_DEFAULT        250
-#define LAST_NODE_DEFAULT   -1
-#define RANDOM_XID_FMT      "%s:30000ff0000000000000000000000000%08x"
-#define UDP_HEADER_SIZE     8
+#define ACK_DELAY			300
+#define TEARDOWN_DELAY		240000
+#define HLIM_DEFAULT		250
+#define LAST_NODE_DEFAULT	-1
+#define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
+#define UDP_HEADER_SIZE		8
 
-#define NETWORK_PORT    2
+#define NETWORK_PORT		2
 
-#define MAX_TCPOPTLEN 32
+#define MAX_TCPOPTLEN		32
 
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
@@ -66,17 +66,17 @@ using namespace xia;
  * segment. See definition of flags in xiatransportheader.hh
  */
 //static const uint8_t  tcp_outflags[TCP_NSTATES] = {
-//      TH_RST|TH_ACK,      /* 0, CLOSED */
-//      0,          /* 1, LISTEN */
-//      TH_SYN,         /* 2, SYN_SENT */
-//      TH_SYN|TH_ACK,      /* 3, SYN_RECEIVED */
-//      TH_ACK,         /* 4, ESTABLISHED */
-//      TH_ACK,         /* 5, CLOSE_WAIT */
-//      TH_FIN|TH_ACK,      /* 6, FIN_WAIT_1 */
-//      TH_FIN|TH_ACK,      /* 7, CLOSING */
-//      TH_FIN|TH_ACK,      /* 8, LAST_ACK */
-//      TH_ACK,         /* 9, FIN_WAIT_2 */
-//      TH_ACK,         /* 10, TIME_WAIT */
+//	  TH_RST|TH_ACK,	  /* 0, CLOSED */
+//	  0,		  /* 1, LISTEN */
+//	  TH_SYN,		 /* 2, SYN_SENT */
+//	  TH_SYN|TH_ACK,	  /* 3, SYN_RECEIVED */
+//	  TH_ACK,		 /* 4, ESTABLISHED */
+//	  TH_ACK,		 /* 5, CLOSE_WAIT */
+//	  TH_FIN|TH_ACK,	  /* 6, FIN_WAIT_1 */
+//	  TH_FIN|TH_ACK,	  /* 7, CLOSING */
+//	  TH_FIN|TH_ACK,	  /* 8, LAST_ACK */
+//	  TH_ACK,		 /* 9, FIN_WAIT_2 */
+//	  TH_ACK,		 /* 10, TIME_WAIT */
 //  };
 
 #define TCPOUTFLAGS
@@ -186,7 +186,7 @@ public:
 	void 	tcp_input(WritablePacket *p);
 	void 	tcp_output();
 	int		usrsend(WritablePacket *p);
-	void    usrclosed() ;
+	void	usrclosed() ;
 	void 	usropen();
 	void	tcp_timers(int timer);
 	void 	fasttimo();
@@ -200,11 +200,11 @@ public:
 	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
 	void print_state(StringAccum &sa);
 
-    // XTRANSPORT *get_transport() { return transport; }
+	// XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
 	sock *listening_sock;
 private:
-    void set_state(const HandlerState s);
+	void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, u_long *ts_val, u_long *ts_ecr);
