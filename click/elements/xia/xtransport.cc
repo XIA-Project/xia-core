@@ -295,6 +295,8 @@ enum {H_MOVE};
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
 	XTRANSPORT *f = static_cast<XTRANSPORT *>(e);
+	ErrorHandler *_errh = f->_errh;
+
 	switch (reinterpret_cast<intptr_t>(vparam)) {
 	case H_MOVE:
 	{
@@ -304,7 +306,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = local_addr;
-		click_chatter("Moved to %s", local_addr.unparse().c_str());
+		INFO("Moved to %s", local_addr.unparse().c_str());
 		f->_local_hid = local_addr.xid(local_addr.destination_node());
 
 	}
@@ -1499,7 +1501,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	}
 	unsigned short _dport = sk->port;
 
-	if (!sk->state == CONNECTED) {
+	if (sk->state != CONNECTED) {
 		// This should never happen!
 		ERROR("socket is not connected\n");
 		return;
@@ -2044,16 +2046,14 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	printf("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
+	DBG("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
 	sock *sk = NULL;
 	switch (sock_type) {
 	case SOCK_STREAM: {
-		cout << "\t\t\t\tThis is a stream socket\n";
 		sk = new XStream(this, _sport);
 		break;
 	}
 	case SOCK_DGRAM: {
-		cout << "\t\t\t\tThis is a datagram socket\n";
 		sk = new XDatagram(this, _sport);
 		break;
 	}
@@ -2164,7 +2164,6 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XBIND IS CALLED" << endl;
 	int rc = 0, ec = 0;
 
 	xia::X_Bind_Msg *x_bind_msg = xia_socket_msg->mutable_x_bind();
@@ -2363,7 +2362,6 @@ done:
 
 void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XCONNECT IS CALLED" << endl;
 	xia::X_Connect_Msg *x_connect_msg = xia_socket_msg->mutable_x_connect();
 	String dest(x_connect_msg->ddag().c_str());
 	XIAPath dst_path;
@@ -2445,7 +2443,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 
 void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XLISTEN IS CALLED" << endl;
 	// we just want to mark the socket as listenening and return right away.
 
 	// FIXME: we should make sure we are already bound to a DAG
@@ -2470,7 +2467,6 @@ void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XREADYTOACCEPT IS CALLED" << endl;
 	sock *sk = portToSock.get(_sport);
 
 	if (!sk->pending_connection_buf.empty()) {
@@ -2500,8 +2496,6 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XACCEPT IS CALLED" << endl;
-
 	int rc = 0, ec = 0;
 
 	// _sport is the *existing accept socket*
@@ -2696,8 +2690,6 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 // TODO: is it worth changing this to possibly return more than one event?
 void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 {
-	// cout << "ProcessPollEvent IS CALLED" <<endl;
-
 	// loop thru all the polls that are registered looking for the socket associated with _sport
 	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end(); it++) {
 		unsigned short pollport = it->first;
@@ -3166,8 +3158,6 @@ void XTRANSPORT::Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket
 
 void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
-	cout << "XSEND IS CALLED" << endl;
-
 	int rc = 0, ec = 0;
 
 	//Find socket state
@@ -3188,47 +3178,13 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	//Find DAG info for that stream
 	if (rc == 0 && sk->sock_type == SOCK_RAW) {
 		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
-		DBG("xiah->ver = %d", xiah->ver);
-		DBG("xiah->nxt = %d", xiah->nxt);
-		DBG("xiah->plen = %d", xiah->plen);
-		DBG("xiah->hlim = %d", xiah->hlim);
-		DBG("xiah->dnode = %d", xiah->dnode);
-		DBG("xiah->snode = %d", xiah->snode);
-		DBG("xiah->last = %d", xiah->last);
-/*
-		int total_nodes = xiah->dnode + xiah->snode;
-		for (int i = 0; i < total_nodes; i++) {
-			uint8_t id[20];
-			char hex_string[41];
-			bzero(hex_string, 41);
-			memcpy(id, xiah->node[i].xid.id, 20);
-			for (int j = 0; j < 20; j++) {
-				sprintf(&hex_string[2 * j], "%02x", (unsigned int)id[j]);
-			}
-			char type[10];
-			bzero(type, 10);
-			switch (htonl(xiah->node[i].xid.type)) {
-			case CLICK_XIA_XID_TYPE_AD:
-				strcpy(type, "AD");
-				break;
-			case CLICK_XIA_XID_TYPE_HID:
-				strcpy(type, "HID");
-				break;
-			case CLICK_XIA_XID_TYPE_SID:
-				strcpy(type, "SID");
-				break;
-			case CLICK_XIA_XID_TYPE_CID:
-				strcpy(type, "CID");
-				break;
-			case CLICK_XIA_XID_TYPE_IP:
-				strcpy(type, "4ID");
-				break;
-			default:
-				sprintf(type, "%d", xiah->node[i].xid.type);
-			};
-			INFO("%s:%s", type, hex_string);
-		}
-*/
+//		DBG("xiah->ver = %d", xiah->ver);
+//		DBG("xiah->nxt = %d", xiah->nxt);
+//		DBG("xiah->plen = %d", xiah->plen);
+//		DBG("xiah->hlim = %d", xiah->hlim);
+//		DBG("xiah->dnode = %d", xiah->dnode);
+//		DBG("xiah->snode = %d", xiah->snode);
+//		DBG("xiah->last = %d", xiah->last);
 
 		XIAHeader xiaheader(xiah);
 		XIAHeaderEncap xiahencap(xiaheader);
@@ -3310,7 +3266,6 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 
 void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
-	// cout << "XSENDTO IS CALLED" <<endl;
 	int rc = 0, ec = 0;
 
 	xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg->mutable_x_sendto();
@@ -3419,7 +3374,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 
 void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	cout << "XRECV IS CALLED" << endl;
 	sock *sk = portToSock.get(_sport);
 
 	if (sk->port != _sport) {

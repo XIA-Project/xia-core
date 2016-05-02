@@ -38,13 +38,14 @@ XDatagram::push(WritablePacket *p_in) {
 	}
 }
 
-bool 
+bool
 XDatagram::should_buffer_received_packet(WritablePacket *p) {
+	UNUSED(p);
 	if (recv_buffer_count < recv_buffer_size) return true;
 	else return false;
 }
 
-void 
+void
 XDatagram::add_packet_to_recv_buf(WritablePacket *p) {
 	int index = (dgram_buffer_end + 1) % recv_buffer_size;
 	dgram_buffer_end = index;

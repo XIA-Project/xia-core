@@ -19,13 +19,6 @@
 #include "xtransport.hh"
 #include "clicknet/tcp_fsm.h"
 
-
-static u_char	tcp_outflags[TCP_NSTATES] = {
-    TH_RST|TH_ACK, 0, TH_SYN, TH_SYN|TH_ACK,
-    TH_ACK, TH_ACK,
-    TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_FIN|TH_ACK, TH_ACK, TH_ACK,
-};
-
 #if CLICK_USERLEVEL
 #include <list>
 #include <stdio.h>
@@ -213,7 +206,7 @@ public:
 private:
     void set_state(const HandlerState s);
 
-	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags, 
+	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, u_long *ts_val, u_long *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
@@ -227,9 +220,9 @@ private:
 	inline void print_tcpstats(WritablePacket *p, const char *label);
 	short tcp_state() const { return tp->t_state; }
 
-	
-	TCPFifo		_q_usr_input;
+
 	TCPQueue	_q_recv;
+	TCPFifo		_q_usr_input;
 	tcp_seq_t	so_recv_buffer_size;
 	int			_so_state;
 

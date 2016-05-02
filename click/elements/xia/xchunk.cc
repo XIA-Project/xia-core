@@ -2484,8 +2484,6 @@ CTCPFifo::drop_until(tcp_seq_t offset)
 
 CLICK_ENDDECLS
 
-// EXPORT_ELEMENT(CTCPQueue)
-// EXPORT_ELEMENT(CTCPFifo)
 EXPORT_ELEMENT(XChunk)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_REQUIRES(XIAContentModule)
