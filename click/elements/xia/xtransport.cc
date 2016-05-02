@@ -14,7 +14,7 @@
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"
-#include "xchunk.hh"
+//#include "xchunk.hh"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 
 /*
@@ -295,7 +295,6 @@ enum {H_MOVE};
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
 	XTRANSPORT *f = static_cast<XTRANSPORT *>(e);
-	ErrorHandler *_errh = f->_errh;
 
 	switch (reinterpret_cast<intptr_t>(vparam)) {
 	case H_MOVE:
@@ -306,7 +305,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = local_addr;
-		INFO("Moved to %s", local_addr.unparse().c_str());
+		errh->message("Moved to %s", local_addr.unparse().c_str());
 		f->_local_hid = local_addr.xid(local_addr.destination_node());
 
 	}
@@ -2057,10 +2056,10 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		sk = new XDatagram(this, _sport);
 		break;
 	}
-	case SOCK_CHUNK: {
-		sk = new XChunk(this, _sport);
-		break;
-	}
+//	case SOCK_CHUNK: {
+//		sk = new XChunk(this, _sport);
+//		break;
+//	}
 	}
 
 	// Map the source port to sock
