@@ -246,7 +246,7 @@ XStream::tcp_set_state(short state) {
 	case TCPS_CLOSED:
 		set_state(CLOSE);
 		get_transport() -> ChangeState(this, CLOSED);
-		printf("\t\t\t\tchanged to be reaped\n");
+		//printf("\t\t\t\tchanged to be reaped\n");
 		reap = true;
 		break;
 	case TCPS_LISTEN:
