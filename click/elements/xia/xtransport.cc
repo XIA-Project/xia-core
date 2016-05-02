@@ -1562,7 +1562,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	}
 	unsigned short _dport = sk->port;
 
-	if (!sk->state == CONNECTED) {
+	if (sk->state != CONNECTED) {
 		// This should never happen!
 		ERROR("socket is not connected\n");
 		return;
