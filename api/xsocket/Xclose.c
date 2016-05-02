@@ -71,10 +71,7 @@ int Xclose(int sockfd)
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		goto done;
 	}
-#if 0
-	int ref = xcm->refcount();
-	 LOGF("%d refcount = %d\n", sockfd, ref);
-#endif
+
 	if (isTempSID(sockfd) && xcm->refcount() <= 0) {
 
 		if (xcm->delkeys()) {

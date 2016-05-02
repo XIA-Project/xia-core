@@ -213,7 +213,7 @@ void migrate(const char *name, const char *dag)
 
 int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
-	int rtype;
+	int rtype = NS_TYPE_RESPONSE_ERROR;
 
 	char pkt_out[NS_MAX_PACKET_SIZE];
 	char pkt_in[NS_MAX_PACKET_SIZE];
@@ -331,4 +331,3 @@ int main(int argc, char *argv[]) {
 	}
 	return 0;
 }
-

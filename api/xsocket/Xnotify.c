@@ -47,7 +47,7 @@ int Xnotify(void)
 	int sock = 0;
 
 	xia::XSocketMsg xsm;
-	xia::X_Notify_Msg *xnm;
+	//xia::X_Notify_Msg *xnm;
 	xsm.set_type(xia::XNOTIFY);
 	xsm.set_sequence(0);
 
