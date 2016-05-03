@@ -366,7 +366,7 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 
 	make_sandbox pynacl
 	pushd arada/sandbox-pynacl/
-	wget https://github.com/pyca/pynacl/archive/1.0.1.tar.gz
+	wget https://github.com/pyca/pynacl/archive/1.0.1.tar.gz &> pynacl_wget.log
 	if [ $? -ne 0 ]; then
 		echo "Failed to get source for PyNaCl."
 		exit -1
@@ -423,22 +423,24 @@ fi
 echo "Cross-compile toolchain setup complete."
 echo ""
 echo ""
-echo "Building XIA"
+echo "xia: Updating source from upstream repository"
 export PATH=$ORIGPATH:$BUILDROOTBIN
-git pull
+git pull &> xia_git_pull.log
 if [ $? -ne 0 ]; then
 	echo "Failed to git pull"
 	exit -1
 fi
 
-make clean
+echo "xia: preparing to build"
+make clean &> xia_make_clean.log
 tarch=mips ./configure
 if [ $? -ne 0 ]; then
 	echo "Failed to configure XIA"
 	exit -1
 fi
 
-make
+echo "xia: building"
+make &> xia_build.log
 if [ $? -ne 0 ]; then
 	echo "Failed to build XIA"
 	exit -1
@@ -449,6 +451,7 @@ if [ -z "$BUILDROOT" ]; then
 	exit -1
 fi
 
+echo "xia: installing"
 sudo mkdir -p $BUILDROOT/xia-core
 if [ $? -ne 0 ]; then
 	echo "Failed to create directory $BUILDROOT/xia-core"
