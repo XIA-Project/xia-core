@@ -94,5 +94,6 @@ cd ..
 echo "\nAll files successfully deployed on target."
 echo "\nRun these commands on target to setup environment to run XIA"
 echo "export LD_LIBRARY_PATH=/tmp/usb/lib/:/tmp/usb/xia-core/api/lib/"
-echo "export PATH=$PATH:/tmp/usb/bin"
-echo "echo 127.0.1.1 `hostname` >> /etc/hosts"
+echo "export PATH=\$PATH:/tmp/usb/bin"
+echo "echo 127.0.1.1 \`hostname\` >> /etc/hosts"
+echo "mkdir -p /tmp/usb/xia-core/key"
