@@ -11,6 +11,7 @@ BUILDROOTXIA=$BUILDROOT/$XIADIR
 SANDBOXBIN=$SANDBOX/bin
 SANDBOXLIB=$SANDBOX/lib
 SANDBOXXIA=$SANDBOX/$XIADIR
+ORIGDIR=`pwd`
 
 TARBALL=${SANDBOX}.tar.gz
 
@@ -62,7 +63,7 @@ if [ $? -ne 0 ]; then
 	echo "Failed to switch to $BUILDROOTBIN"
 	exit -1
 fi
-cp python* openssl tr bash $SANDBOXBIN
+cp python* openssl tr bash $ORIGDIR/$SANDBOXBIN
 if [ $? -ne 0 ]; then
 	echo "Failed copying binaries from $BUILDROOTBBIN"
 	exit -5
@@ -90,4 +91,7 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
-echo "All files successfully deployed on target."
+echo "\nAll files successfully deployed on target."
+echo "\nRun these commands on target to setup environment to run XIA"
+echo "export LD_LIBRARY_PATH=/tmp/usb/lib/:/tmp/usb/xia-core/api/lib/"
+echo "export PATH=$PATH:/tmp/usb/bin"
