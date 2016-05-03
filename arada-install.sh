@@ -159,6 +159,12 @@ if [ $? -ne 0 ]; then
     exit -1
 fi
 
+sudo apt-get -y install wget &> wget_install.log
+if [ $? -ne 0 ]; then
+	echo "Failed to install wget. Needed to download some dependencies"
+	exit -1
+fi
+
 if [ ! -f arada.tar.gz ]; then
     echo "ERROR: arada.tar.gz not in current directory. Aborting"
     exit -1
@@ -246,6 +252,10 @@ if exists_sandbox python2.7; then echo "Skipping python2.7 build"; else
 	# Now build for the mips target
 	echo "python2.7: enabling additional modules"
 	sed "s/if ext.name in sys.builtin_module_names:/if ext.name in ('__builtin__', '__main__', '_ast', '_codecs', '_sre', '_symtable', '_warnings', '_weakref', 'errno', 'exceptions', 'gc', 'imp', 'marshal', 'posix', 'pwd', 'signal', 'sys', 'thread', 'xxsubtype', 'zipimport'):/" setup.py > setup.py.new
+	if [ $? -ne 0 ]; then
+		echo "python2.7: ERROR Failed to apply patch to setup.py"
+		exit -1
+	fi
 	mv setup.py setup.py.orig
 	mv setup.py.new setup.py
 	echo "python2.7: Cross-compilation next"
@@ -255,7 +265,7 @@ if exists_sandbox python2.7; then echo "Skipping python2.7 build"; else
 	# Haven't figured out how to send this command to the 'build' function
 	make CFLAGS="-g0 -s -O2 -march=24kc -fomit-frame-pointer -fPIC -fdata-sections -ffunction-sections -pipe -L/opt/buildroot-2013.11/output/host/usr/lib/" &> python2.7_cross_build.log
 	if [ $? -ne 0 ]; then 
-		echo "Failed to build. Amorting."
+		echo "Failed to build. Aborting."
 		exit -1
 	fi
 	install_command="make install"
@@ -310,8 +320,16 @@ pushd arada/sandbox-python-cffi/python-cffi-*
 export PATH=$ORIGPATH:$BUILDROOTBIN
 
 mips-linux-gcc -pthread -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -fPIC -DUSE__THREAD -I/opt/buildroot-2013.11/output/host/usr/include -I/opt/buildroot-2013.11/output/host/usr/include/python2.7 -L/opt/buildroot-2013.11/output/host/usr/lib -c c/_cffi_backend.c -o build/temp.linux-x86_64-2.7/c/_cffi_backend.o
+if [ $? -ne 0 ]; then
+	echo "python-cffi: ERROR failed to build _cffi_backend.c"
+	exit -1
+fi
 
 mips-linux-gcc -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -fno-strict-aliasing -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -Wl,-Bsymbolic-functions -Wl,-z,relro -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -L/opt/buildroot-2013.11/output/host/usr/lib build/temp.linux-x86_64-2.7/c/_cffi_backend.o -lffi -o build/lib.linux-x86_64-2.7/_cffi_backend.so
+if [ $? -ne 0 ]; then
+	echo "python-cffi: ERROR failed to build _cffi_backend.so"
+	exit -1
+fi
 
 export PATH=$ORIGPATH
 popd
@@ -349,15 +367,31 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 	make_sandbox pynacl
 	pushd arada/sandbox-pynacl/
 	wget https://github.com/pyca/pynacl/archive/1.0.1.tar.gz
+	if [ $? -ne 0 ]; then
+		echo "Failed to get source for PyNaCl."
+		exit -1
+	fi
 	tar xzf *.tar.gz
-	popd
+	if [ $? -ne 0 ]; then
+		echo "Failed to unpack source archive for PyNaCl"
+		exit -1
+	fi
+	popd # arada/sandbox-pynacl
 	pushd arada/sandbox-pynacl/pynacl-*/
 
 	build_native_python pynacl
 
 	mips-linux-gcc -pthread -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -fPIC -I/opt/buildroot-2013.11/output/host/usr/include/python2.7 -I/opt/buildroot-2013.11/output/host/usr/include -c build/temp.linux-x86_64-2.7/_sodium.c -o build/temp.linux-x86_64-2.7/build/temp.linux-x86_64-2.7/_sodium.o
+	if [ $? -ne 0 ]; then
+		echo "Failed to compile _sodium.c needed by PyNaCl"
+		exit -1
+	fi
 
 	mips-linux-gcc -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -fno-strict-aliasing -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -Wl,-Bsymbolic-functions -Wl,-z,relro -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -L/opt/buildroot-2013.11/output/host/usr/lib build/temp.linux-x86_64-2.7/build/temp.linux-x86_64-2.7/_sodium.o -lsodium -o build/lib.linux-x86_64-2.7/nacl/_sodium.so
+	if [ $? -ne 0 ]; then
+		echo "Failed to build _sodium.so needed by PyNaCl"
+		exit -1
+	fi
 
 	popd # arada/sandbox-pynacl/pynacl-*
 	export PATH=$ORIGPATH
@@ -391,22 +425,35 @@ if [ $? -ne 0 ]; then
 	echo "Failed to git pull"
 	exit -1
 fi
+
 make clean
 tarch=mips ./configure
 if [ $? -ne 0 ]; then
 	echo "Failed to configure XIA"
 	exit -1
 fi
+
 make
 if [ $? -ne 0 ]; then
 	echo "Failed to build XIA"
 	exit -1
 fi
+
 if [ -z "$BUILDROOT" ]; then
 	echo "BUILDROOT variable not set. Aborting xia-core installation"
 	exit -1
 fi
+
 sudo mkdir -p $BUILDROOT/xia-core
+if [ $? -ne 0 ]; then
+	echo "Failed to create directory $BUILDROOT/xia-core"
+	exit -1
+fi
+
 sudo cp -ax api applications bin click click-2.0.1 daemons etc $BUILDROOT/xia-core
+if [ $? -ne 0 ]; then
+	echo "Failed to copy necessary click stuff to $BUILDROOT/xia-core"
+	exit -1
+fi
 export PATH=$ORIGPATH
 
