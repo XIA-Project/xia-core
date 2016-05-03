@@ -116,7 +116,7 @@ check_and_build () {
 
 build_native_python () {
 	pkgname=$1
-	python ./setup.py "build"
+	python ./setup.py "build" &> ${1}_native_python_build.log
 }
 
 check_and_build_python_native () {
