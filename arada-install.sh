@@ -366,6 +366,7 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 
 	make_sandbox pynacl
 	pushd arada/sandbox-pynacl/
+	echo "pynacl: retrieving source from github.com/pyca/pynacl"
 	wget https://github.com/pyca/pynacl/archive/1.0.1.tar.gz &> pynacl_wget.log
 	if [ $? -ne 0 ]; then
 		echo "Failed to get source for PyNaCl."
@@ -377,13 +378,15 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 		exit -1
 	fi
 	popd # arada/sandbox-pynacl
-	sudo apt-get -y build-dep python-nacl
+	echo "pynacl: preparing to build"
+	sudo apt-get -y build-dep python-nacl &> pynacl_build_dep.log
 	if [ $? -ne 0 ]; then
 		echo "Failed to install build dependencies for PyNaCl"
 		exit -1
 	fi
 	pushd arada/sandbox-pynacl/pynacl-*/
 
+	echo "pynacl: building"
 	build_native_python pynacl
 
 	mips-linux-gcc -pthread -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -fPIC -I/opt/buildroot-2013.11/output/host/usr/include/python2.7 -I/opt/buildroot-2013.11/output/host/usr/include -c build/temp.linux-x86_64-2.7/_sodium.c -o build/temp.linux-x86_64-2.7/build/temp.linux-x86_64-2.7/_sodium.o
@@ -402,6 +405,7 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 	export PATH=$ORIGPATH
 	unset SODIUM_INSTALL
 
+	echo "pynacl: installing"
 	install_python pynacl
 fi
 
