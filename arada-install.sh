@@ -202,7 +202,6 @@ else
     echo "Installing toolchain in /opt/buildroot-2013.11"
 
     # Install the toolchain
-    echo "Installing toolchain using sudo. Need your password:"
     sudo tar -Pjxvf LocoMate_tlcn_64bit.tar.bz2 &> locomate_unpack.log
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to unpack locomate toolchain"
