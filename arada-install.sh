@@ -377,6 +377,11 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 		exit -1
 	fi
 	popd # arada/sandbox-pynacl
+	sudo apt-get -y build-dep python-nacl
+	if [ $? -ne 0 ]; then
+		echo "Failed to install build dependencies for PyNaCl"
+		exit -1
+	fi
 	pushd arada/sandbox-pynacl/pynacl-*/
 
 	build_native_python pynacl
