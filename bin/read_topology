@@ -19,7 +19,6 @@ import os
 import re
 import hashlib
 import genkeys
-from Crypto.PublicKey import RSA
 
 DEFAULT_PORT=1500
 create_xia_address_click = False

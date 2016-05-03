@@ -19,7 +19,6 @@ import os
 import re
 import hashlib
 from subprocess import check_call
-from Crypto.PublicKey import RSA
 
 # Directory where all the keys will be dumped
 keydir = 'key'
