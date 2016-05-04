@@ -490,7 +490,7 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
             
 #ifdef DEBUG        
             errh->debug("%s, sent WSM, %d byte payload", \
-                waveDeviceInst->declaration().c_str(), p->length());
+                declaration().c_str(), p->length());
 #endif
             done = true;
         }
