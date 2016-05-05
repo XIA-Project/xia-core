@@ -288,8 +288,6 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 
 	if(chunkSize == 0)
 		chunkSize =  DEFAULT_CHUNK_SIZE;
-	else if (chunkSize > XIA_MAXBUF)
-		chunkSize = XIA_MAXBUF;
 
 	if(stat(fname, &fs) != 0)
 		return -1;
