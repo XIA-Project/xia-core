@@ -311,7 +311,6 @@ void WaveDevice::add_handlers(){
     add_task_handlers(&_task);
 }
 
-
 /**
  * Release all allocated resources in preparation for shutdown.
  */
@@ -458,11 +457,11 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
     const click_ether *ethHeader = p->ether_header();
     // source mac
     memcpy(&_wsmReq.srcmacaddr, &(ethHeader->ether_shost), IEEE80211_ADDR_LEN);
+
     // destination mac
     memcpy(&_wsmReq.macaddr, &(ethHeader->ether_dhost), IEEE80211_ADDR_LEN);
 
-    // set content
-    memset(&_wsmReq.data, 0, sizeof(WSMData)); // initialize to zeros
+    // set contents
     memcpy(&_wsmReq.data.contents, p->data(), p->length());
     _wsmReq.data.length = p->length();
 
