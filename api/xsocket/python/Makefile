@@ -4,8 +4,8 @@ include ../../../xia.mk
 
 XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
-LDFLAGS +=-lc -ldl `python-config --ldflags`
-PYTHON=`python-config --includes`
+LDFLAGS +=-lc -ldl $(PYLDFLAGS)
+PYTHON=$(PYINCLUDES)
 
 ifeq ($(wildcard $(XLIB)/libXsocket.a),)
 	PY_LIBS=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
