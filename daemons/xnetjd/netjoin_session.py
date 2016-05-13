@@ -187,6 +187,7 @@ class NetjoinSession(threading.Thread):
     def handle_handshake_two(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        self.disable_retransmission()
         logging.info("Got a handshake two message")
         netjoin_h2 = NetjoinHandshakeTwo(self)
         netjoin_h2.from_wire_handshake_two(message.handshake_two)
