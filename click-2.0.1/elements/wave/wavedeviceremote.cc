@@ -1,5 +1,5 @@
 /**
- * wavedevice.{cc,hh} -- wave device interface
+ * wavedeviceremote.{cc,hh} -- wave device remote interface
  * Rui Meireles {rui@cmu.edu}
  *
  * Copyright 2016 Carnegie Mellon University
@@ -30,75 +30,57 @@
 #include <cassert> /* assert() */
 #include <unistd.h> /* pipe() */
 #include <pthread.h> /* pthread_create, pthread_cancel, etc */
+#include <sys/types.h> /* connect() */
+#include <sys/socket.h> /* connect(), send(), recv() */
+#include <arpa/inet.h> /* htons(), htonl(), etc... */
+#include <netdb.h> /* getaddrinfo() */
 
 #include <sstream>
 #include <iomanip>
+#include <cstring> /* memcpy() */
 
-extern "C" {
-    #include <arada/wave.h> /* wave lib: txWSMPacket(), etc... */
-}
-
-
-#include "wavedevice.hh"
+#include "wavedeviceremote.hh"
 
 #define WSMP_MTU 1024 // in theory up to 4096 bytes given 12 bit length field
                       // but arada only supports up to 1400 bytes at the moment
 
-
 CLICK_DECLS
 
-// static members initialization
-// these guys are not declared in the header because then we'd need to include
-// wave.h in the header file and since, a linking error re. struct variable
-// named GETAvailableServiceInfo will arise. The include guards on wave.h
-// only work for code in the same compilation unit and click compiles 
-// wavedevice.cc and elements.cc (which includes all the element headers)
-// separately. It's just bad practice to declare variables in header files
-// but what can we do? We have to work with wave.h.
-static WMEApplicationRequest _wmeReq; // don't know why static but must
-static WSMRequest _wsmReq; // don't know why static but must
 
-
-enum {WAVE_PROVIDER, WAVE_USER}; // WAVE roles
-
-
-WaveDevice::WaveDevice() : _task(this),
-                           _wq(0),
-                           _rcvTid(0),
-                           _pid(0),
-                           _isWaveRegistered(false) {
-
+WaveDeviceRemote::WaveDeviceRemote() : _task(this),
+                                       _wq(0),
+                                       _rcvTid(0){
     _pipeFd[0] = 0;
     _pipeFd[1] = 0;
 }
 
 
-WaveDevice::~WaveDevice(){
+WaveDeviceRemote::~WaveDeviceRemote(){
 }
 
 
-int WaveDevice::configure(Vector<String> &conf, ErrorHandler *errh){
+int WaveDeviceRemote::configure(Vector<String> &conf, ErrorHandler *errh){
 
-    String roleStr;
+    String hostname;
+    int port = 45622;
     uint32_t psid = 5;
 	int txPower = 23;
     double dataRate = 6;
-    uint32_t channel = 172;
+    uint32_t  channel = 172;
     int userPrio = 1;
-    int expiryTime = 0;
-    int bufLen = 2048;
+    int bufLen = 4096;
     int headroom = Packet::default_headroom;
     int setTstamp = false;
 
 	int res;
     if ((res = Args(conf, this, errh)
-		 .read_m("ROLE", roleStr)
+		 .read_m("HOSTNAME", hostname)
+         .read("PORT", port)
          .read("PSID", psid)
 		 .read("CHANNEL", channel)
 		 .read("TXPOWER", txPower)
 		 .read("DATARATE", dataRate)
 		 .read("USERPRIORITY", userPrio)
-		 .read("EXPIRYTIME", expiryTime)
          .read("SETTSTAMP", setTstamp)
          .read("BUFLEN", bufLen)
          .read("HEADROOM", headroom)
@@ -108,18 +90,19 @@ int WaveDevice::configure(Vector<String> &conf, ErrorHandler *errh){
 
     int retval = 0;
 
-    // WAVE config
+    // check and set configuration parameters
 
-    // role
-    roleStr = roleStr.lower();
-    _role = WAVE_PROVIDER;
-    
-    if (roleStr == "user")
-        _role = WAVE_USER;
-    else if (roleStr != "provider"){
-        errh->error("%s, configure(): invalid WAVE role %s, please specify \
-one of {user, provider}.", declaration().c_str(), roleStr.c_str());
+    // hostname
+    _hostname = hostname; // no validation at this point
+
+    // port
+    if (port < 1024 or port > 65535){
+
+        errh->error("%s, configure(): invalid channel %d, please specify one of \
+{172, 174, 176, 178, 180, 182, 184}.", declaration().c_str(), channel);
         retval = -1;
+    } else{
+        _port = port;
     }
 
     // psid
@@ -158,7 +141,6 @@ in [1,23].", declaration().c_str(), txPower);
 of {3, 4.5, 6, 9, 12, 18, 24, 27}.", declaration().c_str(), dataRate);
         retval = -1;
     }
-        
     
     // user priority
     if (userPrio < 0 or userPrio > 7){
@@ -168,14 +150,6 @@ a priority in [0,7].", declaration().c_str(), userPrio);
     } else
         _userPrio = userPrio;
 
-    // expiry time
-    if (expiryTime < 0){
-        errh->error("%s, configure(): invalid expiry time %d, please specify a \
-non-negative value.", declaration().c_str(), expiryTime);
-        retval = -1;
-    } else
-        _expiryTime = expiryTime;
-    
     // set timestamp
     _setTstamp = setTstamp;
 
@@ -203,61 +177,68 @@ non-negative value.", declaration().c_str(), headroom);
  * Register WAVE device, register upstream notification (if there are inputs) 
  * and launch receiver thread (if there are outputs).
  */
-int WaveDevice::initialize(ErrorHandler *errh){
+int WaveDeviceRemote::initialize(ErrorHandler *errh){
 
-    _pid = getpid(); // save the process ID, required by the WAVE driver
-
-    if (invokeWAVEDevice(WAVEDEVICE_LOCAL, 255 /*blockflag*/) < 0)
-        return errh->error("%s, initialize(): invokeWAVEDevice(), strerror=%s",\
-            declaration().c_str(), strerror(errno));
-
-    // register provider or user depending
-    // start with a clean slate
-    memset(&_wmeReq, 0, sizeof(WMEApplicationRequest));
-
-    // fields common to both provider and user
-    _wmeReq.channel = _channel;
-    _wmeReq.psid = _psid;
+    struct addrinfo hints, *servinfo = NULL, *p;
     
-    _wmeReq.channelaccess = CHACCESS_CONTINUOUS;
+    // prepare the hints
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC; // don't care if IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
 
-    if (_role == WAVE_PROVIDER){ // provider role
 
-        // provider-specific fields
-        _wmeReq.priority = _userPrio;
-        _wmeReq.repeatrate = 50; // #msgs p/ 5 secs
-        _wmeReq.channelaccess = CHACCESS_CONTINUOUS;
-        _wmeReq.serviceport = 8888;
+    // attempt to connect to remote WAVE device
+    bool connectok = false;
 
-        // register
-        if (registerProvider(_pid, &_wmeReq) < 0)
-            return errh->error("%s, initialize(): registerProvider(), \
+    // try to connect to the server
+    for(int i = 0; i < 2; i++){
+
+        // loop through all the results and connect to the first we can
+        for(p = servinfo; p != NULL; p = p->ai_next) {
+            if ((_remoteSockFd = socket(p->ai_family, p->ai_socktype, 
+                p->ai_protocol)) == -1) {
+                
+                errh->error("%s, initialize(): socket() error trying address, \
+strerror=%s", declaration().c_str(), strerror(errno));
+                continue;
+            }
+			
+            if (connect(_remoteSockFd, p->ai_addr, p->ai_addrlen) == -1) {
+
+                errh->error("%s, initialize(): connect() error trying address, \
 strerror=%s", declaration().c_str(), strerror(errno));
 
-    } else { // user role
-    
-        assert(_role == WAVE_USER); // no other option
+                close(_remoteSockFd);
+                continue;
+            }
+                                
+            // if we get this far, we must have connected successfully
+            connectok = true;
+            break;
+        }
+            
+        // if already connected or on the last iteration, no need to go on
+        if (connectok or i == 1)
+            break;
 
-        // user-specific fields
-        _wmeReq.userreqtype = USER_REQ_SCH_ACCESS_AUTO_UNCONDITIONAL;
-        _wmeReq.schaccess = 1; // immediate access
-        _wmeReq.schextaccess = 1; // extended access
+        if (servinfo)
+            freeaddrinfo(servinfo);
 
-        if (registerUser(_pid, &_wmeReq) < 0)
-            return errh->error("%s, initialize(): registerUser(), strerror=%s",\
-                declaration().c_str(), strerror(errno));
+        String port(_port);
+        if (getaddrinfo(_hostname.c_str(), port.c_str(), &hints, &servinfo) \
+            != 0) {
+
+                errh->error("%s, initialize(): getaddrinfo() strerror=%s", \
+                    declaration().c_str(), strerror(errno));
+            break;
+        }
     }
-
-    _isWaveRegistered = true; // successful registration
-
-    // set up wsm request for WSM transmission
-    _wsmReq.version = 1;
-    _wsmReq.security = 0;
-    _wsmReq.chaninfo.channel = _channel;
-    _wsmReq.chaninfo.rate = _dataRateIndex;
-    _wsmReq.chaninfo.txpower = _txPower;
-    _wsmReq.psid = _psid;
-    _wsmReq.txpriority = _userPrio;
+    
+    if (!connectok){
+        return errh->error("%s, initialized failed to connect, check provided \
+hostname and port (and make sure the server is up).", declaration().c_str());
+    }
 
     // allocate memory for pipeBuf
     _pipeBuf = new uint8_t[_bufLen];
@@ -288,15 +269,14 @@ strerror=%s", declaration().c_str(), strerror(errno));
 
         int e = errno; // preserve errno
 
-        // unregister WAVE
-        if (_role == WAVE_PROVIDER)
-            removeProvider(_pid, &_wmeReq);
-        else{
-            removeUser(_pid, &_wmeReq);
-            assert(_role == WAVE_USER); // no other option
+        assert(_isConnected);
+        
+        if (close(_remoteSockFd) == -1){
+            errh->error("%s, initialize(): close(_remoteSockFd), strerror=%s", \
+                declaration().c_str(), strerror(errno));
+        } else{
+            _isConnected = false;
         }
-    
-        _isWaveRegistered = false;
 
         remove_select(_pipeFd[0], SELECT_READ | SELECT_WRITE);
 
@@ -308,26 +288,14 @@ strerror=%s", declaration().c_str(), strerror(errno));
 }
 
 
-void WaveDevice::add_handlers(){
+void WaveDeviceRemote::add_handlers(){
     add_task_handlers(&_task);
 }
 
 /**
  * Release all allocated resources in preparation for shutdown.
  */
-void WaveDevice::cleanup(CleanupStage){
-
-    // unregister WAVE provider/user
-    if (_isWaveRegistered){
-
-        if (_role == WAVE_PROVIDER)
-            removeProvider(_pid, &_wmeReq);
-        else{
-            removeUser(_pid, &_wmeReq);
-            assert(_role == WAVE_USER); // no other option
-        }
-    }
-    _isWaveRegistered = false;
+void WaveDeviceRemote::cleanup(CleanupStage){
 
     // clean read and write buffers
     if (_wq){
@@ -365,15 +333,24 @@ strerror=%s", declaration().c_str(), strerror(errno));
 
     // free pipe buffer
     delete[] _pipeBuf;
+    
+    // disconnect from WAVE device
+    if (_isConnected){
+        if (close(_remoteSockFd) == -1){
+            errh->error("%s, cleanup(): close(_remoteSockFd), strerror=%s", \
+                declaration().c_str(), strerror(errno));
+        }
+    }
+    _isConnected = false;    
 }
 
 
 /**
  * Process an input packet (push mode).
  */
-void WaveDevice::push(int, Packet *p) {
+void WaveDeviceRemote::push(int, Packet *p) {
 
-    assert(_isWaveRegistered); // because initialize runs before
+    assert(_isConnected); // because initialize runs before
 
     ErrorHandler *errh = ErrorHandler::default_handler();
 
@@ -395,9 +372,9 @@ void WaveDevice::push(int, Packet *p) {
 /**
  * Process an input packet (pull mode).
  */
-bool WaveDevice::run_task(Task*){
+bool WaveDeviceRemote::run_task(Task*){
 
-    assert(_isWaveRegistered); // because initialize runs before
+    assert(_isConnected); // because initialize runs before
 
     bool retval = false;
     assert(ninputs() and input_is_pull(0));
@@ -446,30 +423,72 @@ dropping", declaration().c_str(), strerror(err));
 
 
 /**
- * Write a packet to the WAVE device.
+ * Send a packet to the WAVE device.
  */
-int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
+int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
 
-    assert(_isWaveRegistered); // because initialize runs before
+    assert(_isConnected); // because initialize runs before
 
-    // set mac addresses, this is the part that assumes the received
+    // calculate packet length
+    // 6 (src mac) + 6 (dst mac) + 4 (psid) + 1 (channel) + 1 (txpower) +
+    // 1 (data rate index) + 1 (user priority) + content length =
+    // 20 + content length
+    const int pktLen = 20 + p->length();
+
+    // serialize everything
+    uint8_t pktBuf[_bufLen];
+    
+    int idx=0;
+    
+    // packet length
+    const uint16_t pktLenNet = htons((uint16_t) pktLen);
+    memcpy(&pktBuf[idx], &pktLenNet, 2);
+    idx += 0;
+
+    // source mac
+    // this code assumes the packet is an ethernet frame. so beware!
     // packet is an ethernet frame
     const click_ether *ethHeader = p->ether_header();
-    // source mac
-    memcpy(&_wsmReq.srcmacaddr, &(ethHeader->ether_shost), IEEE80211_ADDR_LEN);
+    memcpy(&pktBuf[idx], &(ethHeader->ether_shost), 6);
+    idx += 6;
 
     // destination mac
-    memcpy(&_wsmReq.macaddr, &(ethHeader->ether_dhost), IEEE80211_ADDR_LEN);
+    memcpy(&pktBuf[idx], &(ethHeader->ether_dhost), 6);
+    idx += 6;
 
-    // set contents
-    memcpy(&_wsmReq.data.contents, p->data(), p->length());
-    _wsmReq.data.length = p->length();
+    // psid
+    const uint32_t psid = htonl(_psid);
+    memcpy(&pktBuf[idx], &psid, 4);
+    idx += 4;
+    
+    // channel
+    memcpy(&pktBuf[idx], &_channel, 1);
+    idx += 1;
+    
+    // txpower
+    memcpy(&pktBuf[idx], &_txPower, 1);
+    idx += 1;
+    
+    // data rate index
+    memcpy(&pktBuf[idx], &_dataRateIndex, 1);
+    idx += 1;
+    
+    // user priority
+    memcpy(&pktBuf[idx], &_userPrio, 1);
+    idx += 1;
+
+    // packet contents
+    memcpy(&pktBuf[idx], p->data(), p->length());
+    idx += p->length();
+
+    
+    assert(pktLen == idx); // it's got to match
 
     bool done = false;
     while (not done){
 
         errno = 0;
-        if (txWSMPacket(_pid, &_wsmReq) < 0){ // error
+        if (send(_remoteSockFd, pktBuf, pktLen, 0 /*flags*/) < 0){ // error
 
             // out of memory or would block
             if (errno == ENOBUFS || errno == EAGAIN)
@@ -479,7 +498,7 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
             else if (errno == EINTR)
                 continue;
             
-            // connection probably terminated or other fatal error
+            // connection 1probably terminated or other fatal error
             else {
                 errh->error("%s, write_packet(): strerror=%s", \
                     declaration().c_str(), strerror(errno));
@@ -504,7 +523,7 @@ int WaveDevice::write_packet(Packet *p, ErrorHandler *errh){
  * A thread that blocks waiting for incoming packets.
  * It was the most elegant solution I found for the problem.
  */
-void* WaveDevice::receiver_thread(void *arg){
+void* WaveDeviceRemote::receiver_thread(void *arg){
 
     // this is an infinite-loop type thread
     // join() won't work so enable cancellation
@@ -514,56 +533,130 @@ void* WaveDevice::receiver_thread(void *arg){
     ErrorHandler *errh = ErrorHandler::default_handler();
 
     // get parameters from class instance
-    WaveDevice* waveDeviceInst = (WaveDevice*) arg;
-    const pid_t pid = waveDeviceInst->get_pid();
-    pthread_mutex_t* pipeMutex = waveDeviceInst->get_pipeMutex();
-    const int pipeFd = waveDeviceInst->get_pipefd(true);
-    const int bufLen = waveDeviceInst->get_bufLen();
+    WaveDeviceRemote* wdrInst = (WaveDeviceRemote*) arg;
+    assert(wdrInst->isConnected());
 
-    // prepare wsm indication data structure
-    WSMIndication rxPkt;
+    pthread_mutex_t* pipeMutex = wdrInst->get_pipeMutex();
+    const int pipeFd = wdrInst->get_pipefd(true);
+    const int bufLen = wdrInst->get_bufLen();
+    const int remoteSockFd = wdrInst->get_remoteSockFd();
+
+    uint8_t rcvBuf[bufLen];
+    uint8_t pktBuf[bufLen];
+    uint16_t pktLen=0, pktRcvd=0;
 
     // infinite read loop
-    int len;
+    // the packet format is 2 bytes for the packet length, and then the packet
+    // itself
+    int nrcvd;
     while (true){
-    
-        memset(&rxPkt, 0, sizeof(WSMIndication)); // playing it safe
 
-        if ((len = rxWSMPacket(pid, &rxPkt)) > 0){ // got a packet, yay
-        
-#ifdef DEBUG        
-            errh->debug("%s, received WSM, %d byte payload", \
-                waveDeviceInst->declaration().c_str(), rxPkt.data.length);
+        if ((nrcvd = recv(remoteSockFd, rcvBuf, bufLen, 0 /*flags*/)) > 0){ 
+    
+            // got something to work with
+#ifdef DEBUG
+            errh->debug("%s, received %d bytes", \
+                wdrInst->declaration().c_str(), nrcvd);
 #endif
 
-            if (rxPkt.data.length <= 0)
-                continue; // nothing to do if empty payload
+            int rcvIdx = 0;
+            int nLeft = nrcvd;
+            
+            while (nLeft > 0){ // meaning there is still stuff to consume
 
-            assert(rxPkt.data.length <= bufLen);
+                if (pktLen == 0) { // at the beginning of a packet
+    
+                    if ((pktRcvd + nLeft) >= 2){ // have enough to fill in pktLen
+                
+                        // copy to packet buffer
+                        assert(pktRcvd < 2);
+                        const int ncpy = 2-pktRcvd;
+                        memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy); 
 
-            if (pthread_mutex_lock(pipeMutex))
-                errh->error("%s, receiver_thread(): \
+                        // update state variables
+                        nLeft -= ncpy;
+                        rcvIdx += ncpy;
+                        pktRcvd += ncpy;
+                        assert(nLeft >= 0);
+                        assert(rcvIdx <= nrcvd);
+
+                        // now set packet length
+                        memcpy(&pktLen, pktBuf, 2); // copy to pktLen
+                        pktLen = ntohs(pktLen); // back to host order
+                    
+                    } else { // don't have enough to fill packet length
+                    
+                        assert(pktLen == 0 and nLeft == 1); // ensuring sanity
+                        assert(pktRcvd  == 0);
+
+                        // copy a single byte
+                        const int ncpy = nLeft;
+                        memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy); 
+                        pktRcvd += ncpy;
+                        rcvIdx += ncpy;
+                        nLeft -= ncpy;
+                        
+                        assert(nLeft == 0);
+                    }
+
+                } else { // in the middle of a packet
+
+                    assert(pktLen > 0); // the packet length is known
+
+                    // let us copy as much as we can
+                    const int nmissing = pktLen-pktRcvd;
+                    const int ncpy = nmissing < nLeft ? nmissing : nLeft;
+                    
+                    memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy);
+                    
+                    // update state variables
+                    nLeft -= ncpy;
+                    rcvIdx += ncpy;
+                    pktRcvd += ncpy;
+                    assert(nLeft >= 0);
+                    assert(rcvIdx <= nrcvd);
+
+                    if (nmissing == ncpy) { // got complete packet, send it out!
+                
+                        assert(pktRcvd == pktLen+2);
+
+#ifdef DEBUG
+                        errh->debug("%s, extracted a rcvd packet w/ %d bytes",\
+                            wdrInst->declaration().c_str(), pktLen);
+#endif
+
+                        if (pthread_mutex_lock(pipeMutex))
+                            errh->error("%s, receiver_thread(): \
 pthread_mutex_lock(pipeMutex), strerror=%s", 
-                    waveDeviceInst->declaration().c_str(), strerror(errno));
+                                wdrInst->declaration().c_str(), \
+                                strerror(errno));
 
-            // write the received data on the pipe
-            if (write(pipeFd, rxPkt.data.contents, rxPkt.data.length) != \
-                rxPkt.data.length)
-                errh->error("%s, receiver_thread(): write(pipeFd), \
-strerror=%s", waveDeviceInst->declaration().c_str(), strerror(errno));
+                        // write the received data on the pipe
+                        if (write(pipeFd, &pktBuf[2], pktLen) != pktLen)
+                            errh->error("%s, receiver_thread(): write(pipeFd), \
+strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
 
-        } else if (errno != EAGAIN)
+                        // reset the packet buffer state
+                        pktLen = 0;
+                        pktRcvd = 0;
+                    }
+                }
+            }
+
+        } else if (errno != EAGAIN){
             errh->error("recv: %s", strerror(errno));
+        }
     }
 
     return 0;
 }
 
+
 /**
  * This method is used to wake up the router when a new packet is received
  * by the receiver thread.
  */
-void WaveDevice::selected(int fd, int /*mask*/){
+void WaveDeviceRemote::selected(int fd, int /*mask*/){
 
     // basically read from the pipe that the receiver thread writes
     // to whenever it receives a packet.
@@ -603,17 +696,22 @@ void WaveDevice::selected(int fd, int /*mask*/){
 
 
 // getters useful for passing arguments to receiver thread
-pid_t WaveDevice::get_pid() const{
-    return _pid;
+bool WaveDeviceRemote::isConnected() const{
+    return _isConnected;
 }
 
 
-int WaveDevice::get_bufLen() const{
+int WaveDeviceRemote::get_bufLen() const{
     return _bufLen;
 }
 
 
-int WaveDevice::get_pipefd(const bool write) const{
+int WaveDeviceRemote::get_remoteSockFd() const{
+    return _remoteSockFd;
+}
+
+
+int WaveDeviceRemote::get_pipefd(const bool write) const{
 
     if (write)
         return _pipeFd[1]; // write on [1]
@@ -622,11 +720,11 @@ int WaveDevice::get_pipefd(const bool write) const{
 }
 
 
-pthread_mutex_t* WaveDevice::get_pipeMutex(){
+pthread_mutex_t* WaveDeviceRemote::get_pipeMutex(){
     return &_pipeMutex;
 }
 
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(WaveDevice)
-ELEMENT_LIBS(-lpthread -lwave)
+EXPORT_ELEMENT(WaveDeviceRemote)
+ELEMENT_LIBS(-lpthread)
