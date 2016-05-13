@@ -10,6 +10,7 @@
 #include "Xsocket.h"
 #include "xhcp.hh"
 #include "dagaddr.hpp"
+#include "xhcp_beacon.hh"
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xhcp_server"
@@ -73,9 +74,14 @@ int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
 	sockaddr_x ns_dag;
 	char pkt[XHCP_MAX_PACKET_SIZE];
-	char myAD[MAX_XID_SIZE];
-	char gw_router_hid[MAX_XID_SIZE];
+	char myDAG[MAX_DAG_SIZE];
 	char gw_router_4id[MAX_XID_SIZE];
+	bool rendezvous = false;
+
+	struct sockaddr_in xianetjoin_addr;
+	xianetjoin_addr.sin_family = AF_INET;
+	xianetjoin_addr.sin_addr.s_addr = INADDR_ANY;
+	xianetjoin_addr.sin_port = htons(XIANETJOIN_ELEMENT_PORT);
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -87,29 +93,35 @@ int main(int argc, char *argv[]) {
 		exit(-1);
 	}
 
-	// dag init
-	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
-	g.fill_sockaddr(&ddag);
+	// NetJoin socket
+	int netjoinfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (netjoinfd < 0) {
+		syslog(LOG_ERR, "Unable to create netjoin socket");
+		exit(-1);
+	}
 
-	// read the localhost AD and HID (currently, XHCP server running on gw router)
-	if ( XreadLocalHostAddr(sockfd, myAD, MAX_XID_SIZE, gw_router_hid, MAX_XID_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 ) {
+	// Read the localhost DAG and 4ID
+	if ( XreadLocalHostAddr(sockfd, myDAG, MAX_DAG_SIZE, gw_router_4id, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ERR, "unable to get local address");
 		exit(-1);
 	}
 
-	// set the default name server DAG
+	// Read the name server DAG from xia-core/etc/resolv.conf
 	char ns[XHCP_MAX_DAG_LENGTH];
-	sprintf(ns, "RE %s %s %s", AD0, HID0, SID_NS);
-
-	// read the name ser ver DAG from xia-core/etc/resolv.conf, if present
 	char root[BUF_SIZE];
+	int rc;
 	memset(root, 0, BUF_SIZE);
-	ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(XrootDir(root, BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "nameserver", ns, ns, XHCP_MAX_DAG_LENGTH, strcat(XrootDir(root, BUF_SIZE), RESOLV_CONF));
+	if(rc <= 0) {
+		syslog(LOG_ERR, "ERROR: nameserver not configured in resolv.conf");
+		exit(-1);
+	}
 
+	// TODO: Remove? Not used - Nitin
 	Graph gns(ns);
 	gns.fill_sockaddr(&ns_dag);
 
-	// tell click where the nameserver is so apps on the router can find it
+	// Tell click where the nameserver is so apps on the router can find it
 	int sk = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sk >= 0) {
 		XupdateNameServerDAG(sk, ns);
@@ -118,62 +130,41 @@ int main(int argc, char *argv[]) {
 		syslog(LOG_WARNING, "Unable to create socket: %s", strerror(sk));
 	}
 
-    uint32_t seqNum = 0;
+	// See if a rendezvous control address is configured
+	char rv_control_plane_dag[XIA_MAX_DAG_STR_SIZE];
+	if(XreadRVServerControlAddr(rv_control_plane_dag, XIA_MAX_DAG_STR_SIZE) == 0) {
+		rendezvous = true;
+	}
 
-	xhcp_pkt beacon_pkt;
-	beacon_pkt.seq_num = htonl(seqNum);
-	beacon_pkt.num_entries = htons(4);
-	xhcp_pkt_entry *ad_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(myAD)+1);
-	xhcp_pkt_entry *gw_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_hid)+1);
-	xhcp_pkt_entry *gw_entry_4id = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(gw_router_4id)+1);
-	xhcp_pkt_entry *ns_entry = (xhcp_pkt_entry*)malloc(sizeof(short)+strlen(ns)+1);
+	// Broadcast DAG to send beacons out
+	Graph g = Node() * Node(BHID) * Node(SID_XHCP);
+	g.fill_sockaddr(&ddag);
 
-	ad_entry->type = htons(XHCP_TYPE_AD);
-	gw_entry->type = htons(XHCP_TYPE_GATEWAY_ROUTER_HID);
-	gw_entry_4id->type = htons(XHCP_TYPE_GATEWAY_ROUTER_4ID);
-	ns_entry->type = htons(XHCP_TYPE_NAME_SERVER_DAG);
-	sprintf(ad_entry->data, "%s", myAD);
-	sprintf(gw_entry->data, "%s", gw_router_hid);
-	sprintf(gw_entry_4id->data, "%s", gw_router_4id);
-	sprintf(ns_entry->data, "%s", ns);
+	// Build the beacon to send out
+	XHCPBeacon beacon;
+	beacon.setRouterDAG(myDAG);
+	beacon.setRouter4ID(gw_router_4id);
+	beacon.setNameServerDAG(ns);
+	// Note: beacon will have "" or a complete rendezvous dag
+	if (rendezvous) {
+		beacon.setRendezvousControlDAG(rv_control_plane_dag);
+	}
 
 	while (1) {
 		int rc;
 
 		// construct packet
 		memset(pkt, 0, sizeof(pkt));
-		int offset = 0;
-		memcpy(pkt, &beacon_pkt, sizeof(beacon_pkt.seq_num)+sizeof(beacon_pkt.num_entries));
-		offset += sizeof(beacon_pkt.seq_num)+sizeof(beacon_pkt.num_entries);
-		memcpy(pkt+offset, &ad_entry->type, sizeof(ad_entry->type));
-		offset += sizeof(ad_entry->type);
-		memcpy(pkt+offset, ad_entry->data, strlen(ad_entry->data)+1);
-		offset += strlen(ad_entry->data)+1;
-		memcpy(pkt+offset, &gw_entry->type, sizeof(gw_entry->type));
-		offset += sizeof(gw_entry->type);
-		memcpy(pkt+offset, gw_entry->data, strlen(gw_entry->data)+1);
-		offset += strlen(gw_entry->data)+1;
-		memcpy(pkt+offset, &gw_entry_4id->type, sizeof(gw_entry_4id->type));
-		offset += sizeof(gw_entry_4id->type);
-		memcpy(pkt+offset, gw_entry_4id->data, strlen(gw_entry_4id->data)+1);
-		offset += strlen(gw_entry_4id->data)+1;
-		memcpy(pkt+offset, &ns_entry->type, sizeof(ns_entry->type));
-		offset += sizeof(ns_entry->type);
-		memcpy(pkt+offset, ns_entry->data, strlen(ns_entry->data)+1);
-		offset += strlen(ns_entry->data)+1;
+		strcpy(pkt, beacon.to_string().c_str());
+		int pktlen = beacon.to_string().size() + 1;
+
 		// send out packet
-		rc = Xsendto(sockfd, pkt, offset, 0, (struct sockaddr*)&ddag, sizeof(ddag));
+		//rc = Xsendto(sockfd, pkt, pktlen, 0, (struct sockaddr*)&ddag, sizeof(ddag));
+		rc = sendto(netjoinfd, pkt, pktlen, 0, (struct sockaddr*)&xianetjoin_addr, sizeof(xianetjoin_addr));
 		if (rc < 0)
 			syslog(LOG_WARNING, "Error sending beacon: %s", strerror(rc));
-		//fprintf(stderr, "XHCP beacon %ld\n", beacon_pkt.seq_num);
-        seqNum++;
-		beacon_pkt.seq_num = htonl(seqNum);
 		sleep(XHCP_SERVER_BEACON_INTERVAL);
 	}
-	free(ad_entry);
-	free(gw_entry);
-	free(gw_entry_4id);
-	free(ns_entry);
 
 	return 0;
 }

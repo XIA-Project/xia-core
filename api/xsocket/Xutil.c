@@ -21,6 +21,7 @@
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+#include <strings.h>
 
 // for printfing param values
 #include <fcntl.h>
@@ -228,6 +229,16 @@ char *XrootDir(char *buf, unsigned len) {
 		*pos = '\0';
 	}
 	return buf;
+}
+
+const char *XnetworkDAGIntentAD(const char *network_dag)
+{
+    // The last entry in the network_dag must be an AD
+    const char *last_ad = rindex(network_dag, ':') - 2;
+    if(strncmp("AD:", last_ad, 3) == 0) {
+        return last_ad;
+    }
+    return NULL;
 }
 
 int validateSocket(int sock, int stype, int err)

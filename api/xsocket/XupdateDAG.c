@@ -15,7 +15,7 @@
 ** limitations under the License.
 */
 /*!
- @file XupdateAD.c
+ @file XupdateDAG.c
  @brief Implements XreadLocalHostAddr()
 */
 #include <errno.h>
@@ -25,10 +25,10 @@
 
 #define MAX_RV_DAG_SIZE 1024
 
-int XupdateAD(int sockfd, char *newad, char *new4id) {
+int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   int rc;
 
-  if (!newad) {
+  if (!rdag) {
     LOG("new ad is NULL!");
     errno = EFAULT;
     return -1;
@@ -41,13 +41,14 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   }
 
   xia::XSocketMsg xsm;
-  xsm.set_type(xia::XCHANGEAD);
+  xsm.set_type(xia::XUPDATEDAG);
   unsigned seq = seqNo(sockfd);
   xsm.set_sequence(seq);
 
-  xia::X_Changead_Msg *x_changead_msg = xsm.mutable_x_changead();
-  x_changead_msg->set_ad(newad);
-  x_changead_msg->set_ip4id(new4id);
+  xia::X_Updatedag_Msg *x_updatedag_msg = xsm.mutable_x_updatedag();
+  x_updatedag_msg->set_interface(interface);
+  x_updatedag_msg->set_dag(rdag);
+  x_updatedag_msg->set_ip4id(r4id);
 
   if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
@@ -55,31 +56,35 @@ int XupdateAD(int sockfd, char *newad, char *new4id) {
   }
 
   // process the reply from click
-  if ((rc = click_status(sockfd, seq)) < 0) {
+  xia::XSocketMsg xsm1;
+  if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
     LOGF("Error getting status from Click: %s", strerror(errno));
     return -1;
+  }
+  if(xsm1.type() == xia::XUPDATEDAG) {
+	  xia::X_Updatedag_Msg *msg = xsm1.mutable_x_updatedag();
+	  std::string newDAG = msg->dag();
+	  printf("XupdateDAG: Click updated DAG: %s\n", newDAG.c_str());
+  } else {
+	  LOG("XupdateDAG: ERROR: Invalid response for XUPDATEDAG");
+	  return -1;
   }
 
   return 0;
 }
 
-int XupdateRV(int sockfd)
+int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
 {
 	int rc;
-	char rvdag[MAX_RV_DAG_SIZE];
-	if(XreadRVServerControlAddr(rvdag, MAX_RV_DAG_SIZE)) {
-		// Silently skip rendezvous server update if there is no RV DAG
-		//LOG("No rendezvous address, skipping update");
-		return 0;
-	}
-
-	LOGF("Rendezvous location:%s", rvdag);
 
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XUPDATERV);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
 	xia::X_Updaterv_Msg *x_updaterv_msg = xsm.mutable_x_updaterv();
-	x_updaterv_msg->set_rvdag(rvdag);
+	x_updaterv_msg->set_interface(interface);
+	x_updaterv_msg->set_rvdag(rv_control_dag);
 
 	if((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error asking Click transport to update RV: %s", strerror(errno));
@@ -89,23 +94,23 @@ int XupdateRV(int sockfd)
 }
 
 /*!
-** @brief retrieve the AD and HID associated with this socket.
+** @brief retrieve the DAG and 4ID associated with this socket.
 **
-** The HID and AD are assigned by the XIA stack. This call retrieves them
+** The DAG and 4ID assigned by the XIA stack. This call retrieves them
 ** so that they can be used for creating DAGs or for other purposes in user
 ** applications.
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
-** @param localhostAD buffer to receive the AD for this host
-** @param lenAD size of the localhostAD buffer
-** @param localhostHID buffer to receive the HID for this host
-** @param lenHID size of the localhostHID buffer
+** @param localhostDAG buffer to receive the default DAG for this host
+** @param lenDAG size of the localhostDAG buffer
+** @param local4ID buffer to receive 4ID for this host (if known)
+** @param len4ID size of the 4ID buffer
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
 **
 */
-int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID) {
+int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID) {
   	int rc;
 
  	if (getSocketType(sockfd) == XSOCK_INVALID) {
@@ -114,7 +119,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
   		return -1;
  	}
 
-	if (localhostAD == NULL || localhostHID == NULL || local4ID == NULL) {
+	if (localhostDAG == NULL || local4ID == NULL) {
 		LOG("NULL pointer!");
 		errno = EINVAL;
 		return -1;
@@ -137,14 +142,24 @@ int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *loca
 	}
 
 	if (xsm1.type() == xia::XREADLOCALHOSTADDR) {
+
 		xia::X_ReadLocalHostAddr_Msg *_msg = xsm1.mutable_x_readlocalhostaddr();
-		strncpy(localhostAD, (_msg->ad()).c_str(), lenAD);
-		strncpy(localhostHID, (_msg->hid()).c_str(), lenHID);
+
+		// Error out if user provided buffers are insufficient
+		// We used to return truncated entries; that can cause confusion
+		unsigned actualdaglen = _msg->dag().size() + 1;
+		unsigned actual4idlen = _msg->ip4id().size() + 1;
+
+		if(lenDAG < actualdaglen) {
+			LOGF("ERROR: DAG buffer too short: %u, needed: %u", lenDAG, actualdaglen);
+			return -1;
+		}
+		if(len4ID < actual4idlen) {
+			LOGF("ERROR: 4ID buffer too short: %u, needed: %u", len4ID, actual4idlen);
+			return -1;
+		}
+		strncpy(localhostDAG, (_msg->dag()).c_str(), lenDAG);
 		strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
-		// put in null terminators in case buffers were too short
-		localhostAD[lenAD - 1] = 0;
-		localhostHID[lenHID - 1] = 0;
-		local4ID[len4ID - 1] = 0;
 		rc = 0;
 	} else {
 		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");

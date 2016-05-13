@@ -21,8 +21,8 @@ map<std::string, std::string> name_to_dag_db_table; // map name to dag
 
 char *hostname = NULL;
 char *ident = NULL;
-char *datasid = NULL;
-char *controlsid = NULL;
+char data_plane_DAG[XIA_MAX_DAG_STR_SIZE];
+char control_plane_DAG[XIA_MAX_DAG_STR_SIZE];
 map<string, string> HIDtoAD;
 map<string, double> HIDtoTimestamp;
 map<string, double>::iterator HIDtoTimestampIterator;
@@ -40,37 +40,43 @@ void help(const char *name)
 	exit(0);
 }
 
-// Allocates memory and creates a new string containing SID in that space
-// Caller must free the returned pointer if not NULL
-char *createRandomSIDifNeeded(char *sidptr)
+int buildDAGStringFromSID(char *sid, char *dag, int daglen)
 {
-	char *sid;
-	// In future we can check if keys matching the SID exist
-	if(sidptr != NULL) {
-		return sidptr;
+	struct addrinfo *ai;
+	if (Xgetaddrinfo(NULL, sid, NULL, &ai)) {
+		syslog(LOG_ALERT, "Unable to get local address");
+		return -1;
 	}
-	syslog(LOG_INFO, "No SID provided. Creating a new one");
-	int sidlen = strlen("SID:") + XIA_SHA_DIGEST_STR_LEN;
-	sid = (char *)calloc(sidlen, 1);
-	if(!sid) {
-		syslog(LOG_ERR, "ERROR allocating memory for SID\n");
-		return NULL;
+	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
+	Graph g(sa);
+	if((int)g.dag_string().size() > daglen-1) {
+		syslog(LOG_ERR, "DAG longer than provided buffer");
+		return -1;
 	}
-	if(XmakeNewSID(sid, sidlen)) {
-		syslog(LOG_ERR, "ERROR autogenerating SID\n");
-		return NULL;
-	}
-	syslog(LOG_INFO, "New service ID:%s: created", sid);
-	return sid;
+	strcpy(dag, g.dag_string().c_str());
+	return 0;
 }
 
-#define MAX_RV_DAG_SIZE 2048
+int buildDAGFromRandomSID(char *dag, int daglen)
+{
+	char sid[XIA_XID_STR_SIZE];
+	if(XmakeNewSID(sid, XIA_XID_STR_SIZE)) {
+		syslog(LOG_ERR, "ERROR generating random SID");
+		return -1;
+	}
+	return buildDAGStringFromSID(sid, dag, daglen);
+}
+
 
 void config(int argc, char** argv)
 {
 	int c;
 	unsigned level = 3;
 	int verbose = 0;
+	char *datasid = NULL;
+	char *controlsid = NULL;
+	bool data_plane_dag_known = false;
+	bool control_plane_dag_known = false;
 
 	opterr = 0;
 
@@ -102,43 +108,55 @@ void config(int argc, char** argv)
 	if (!hostname)
 		hostname = strdup(DEFAULT_NAME);
 
-	// Read Data plane SID from resolv.conf, if needed
-	if(datasid == NULL) {
-		char data_plane_DAG[MAX_RV_DAG_SIZE];
-		if(XreadRVServerAddr(data_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
-			char *sid = strstr(data_plane_DAG, "SID:");
-			datasid = (char *)calloc(strlen(sid) + 1, 1);
-			if(!datasid) {
-				syslog(LOG_ERR, "ERROR allocating memory for SID\n");
-			} else {
-				strcpy(datasid, sid);
-				syslog(LOG_INFO, "Data plane: %s", datasid);
-			}
+	// Build data plane DAG if user provided SID for it
+	if(datasid) {
+		if(buildDAGStringFromSID(datasid, data_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
+			syslog(LOG_ERR, "Failed creating data addr for %s", datasid);
+			exit(1);
 		}
+		data_plane_dag_known = true;
 	}
 
-	// Read Control plane SID from resolv.conf, if needed
-	if(controlsid == NULL) {
-		char control_plane_DAG[MAX_RV_DAG_SIZE];
-		if(XreadRVServerControlAddr(control_plane_DAG, MAX_RV_DAG_SIZE) == 0) {
-			char *sid = strstr(control_plane_DAG, "SID:");
-			controlsid = (char *)calloc(strlen(sid) + 1, 1);
-			if(!controlsid) {
-				syslog(LOG_ERR, "ERROR allocating memory for SID\n");
-			} else {
-				strcpy(controlsid, sid);
-				syslog(LOG_INFO, "Control plane: %s", controlsid);
-			}
+	// Build control plane DAG if user provided SID for it
+	if(controlsid) {
+		if(buildDAGStringFromSID(controlsid, control_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
+			syslog(LOG_ERR, "Failed creating control addr for %s", controlsid);
+			exit(1);
 		}
+		control_plane_dag_known = true;
 	}
 
-	// Create random SIDs if not provided in resolv.conf or command line
-	datasid = createRandomSIDifNeeded(datasid);
-	controlsid = createRandomSIDifNeeded(controlsid);
+	if(!data_plane_dag_known) {
+		// Read Data plane DAG from resolv.conf
+		if(XreadRVServerAddr(data_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
+			syslog(LOG_INFO, "Data plane DAG: %s", data_plane_DAG);
+		} else {
+			// Build a DAG from scratch
+			if(buildDAGFromRandomSID(data_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
+				syslog(LOG_ERR, "Unable to build a dag from random SID");
+				exit(1);
+			}
+		}
+		data_plane_dag_known = true;
+	}
 
-	// Terminate, if we don't have SIDs for control and data plane
-	if(datasid == NULL || controlsid == NULL) {
-		syslog(LOG_ERR, "ERROR: Unable to generate new service IDs");
+	if(!control_plane_dag_known) {
+		// Read Data plane DAG from resolv.conf
+		if(XreadRVServerAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
+			syslog(LOG_INFO, "Data plane DAG: %s", control_plane_DAG);
+		} else {
+			// Build a DAG from scratch
+			if(buildDAGFromRandomSID(control_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
+				syslog(LOG_ERR, "Unable to build a dag from random SID");
+				exit(1);
+			}
+		}
+		control_plane_dag_known = true;
+	}
+
+	// Terminate, if we don't have DAGs for control and data plane
+	if(!data_plane_dag_known || !control_plane_dag_known) {
+		syslog(LOG_ERR, "ERROR: Data and Control addresses not found.");
 		exit(1);
 	}
 
@@ -152,26 +170,21 @@ void config(int argc, char** argv)
 	setlogmask(LOG_UPTO(level));
 }
 
-int getServerSocket(char *sid, int type)
+int getServerSocket(char *dag, int type)
 {
 	int sockfd = Xsocket(AF_XIA, type, 0);
 	if (sockfd < 0) {
-   		syslog(LOG_ALERT, "Unable to create a socket for %s", sid);
+		syslog(LOG_ALERT, "Unable to create a socket for %s", dag);
    		return -1;
 	}
 
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, sid, NULL, &ai) != 0) {
-   		syslog(LOG_ALERT, "unable to get local address");
-		return -2;
-	}
-
-	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
-	Graph g(sa);
+	sockaddr_x sa;
+	Graph g(dag);
+	g.fill_sockaddr(&sa);
 	syslog(LOG_INFO, "binding to local DAG: %s", g.dag_string().c_str());
 
 	// Data plane socket binding to the SID
-	if (Xbind(sockfd, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
+	if (Xbind(sockfd, (struct sockaddr*)&sa, sizeof(sockaddr_x)) < 0) {
    		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
    		return -3;
 	}
@@ -411,12 +424,9 @@ void process_control_message(int controlsock)
 	}
 
 	// Extract AD from DAG
-	int ADstringLength = strlen("AD:") + 40 + 1;
-	char ADstring[ADstringLength];
-	bzero(ADstring, ADstringLength);
-	strncpy(ADstring, strstr(dag, "AD:"), ADstringLength-1);
-	HIDtoAD[hid] = ADstring;
-	syslog(LOG_INFO, "Added %s:%s to table", hid, ADstring);
+	Graph hostaddr(dag);
+	HIDtoAD[hid] = hostaddr.intent_AD_str();
+	syslog(LOG_INFO, "Added %s:%s to table", hid, hostaddr.intent_AD_str().c_str());
 
 	// Registration message
 	// Extract HID, newAD, timestamp, Signature, Pubkey
@@ -443,8 +453,8 @@ int main(int argc, char *argv[]) {
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
 	// Data plane socket used to rendezvous clients with services
-	int datasock = getServerSocket(datasid, SOCK_RAW);
-	int controlsock = getServerSocket(controlsid, SOCK_DGRAM);
+	int datasock = getServerSocket(data_plane_DAG, SOCK_RAW);
+	int controlsock = getServerSocket(control_plane_DAG, SOCK_DGRAM);
 	if(datasock < 0 || controlsock < 0) {
 		syslog(LOG_ERR, "ERROR creating a server socket");
 		return 1;

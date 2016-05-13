@@ -28,9 +28,9 @@ SCRIPT=xia_local_topology.click
 
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
-XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
+ADDRCONF=$XIADIR/etc/address.conf
 
-ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xnetjd xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -303,16 +303,16 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xhcp_serverd -h $host $LOG_FLAGS &
+			./xnetjd --accesspoint --hostname $host &
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xrouted"
-			kill_service $host "xhcp_serverd"
+			kill_service $host "xnetjd"
 			;;
 		"check")
 			check_service $host "xrouted"
-			check_service $host "xhcp_serverd"
+			check_service $host "xnetjd"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -331,14 +331,14 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xhcp_clientd -h $host $LOG_FLAGS &
+			./xnetjd --client --hostname $host &
 			sleep 0.5
 			;;
 		"stop")
-			kill_service $host "xhcp_clientd"
+			kill_service $host "xnetjd"
 			;;
 		"check")
-			check_service $host "xhcp_clientd"
+			check_service $host "xnetjd"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -454,8 +454,8 @@ start_click()
 	fi
 
 	# create xsockconf.ini and nodes.conf from the click config file
-	echo "Reading topology and generating $XIAADDRCLICK"
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF $XIAADDRCLICK
+	echo "Reading topology and generating $XSOCKCONF and $NODECONF"
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly
@@ -481,6 +481,9 @@ start_click()
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 2
+
+	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
+	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
 }
 
 #
@@ -569,7 +572,6 @@ create_click_config()
 	esac
 
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
-	CONFPATH=$XIADIR/etc/click/templates
 
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		echo "Building configuration from template"

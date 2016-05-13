@@ -47,7 +47,6 @@ int
 XCMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (cp_va_kparse(conf, this, errh,
-                     "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
                      cpEnd) < 0)
         return -1;
 
@@ -60,6 +59,46 @@ XCMP::initialize(ErrorHandler *)
     return 0;
 }
 
+enum {DAG, HID};
+
+int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XCMP *f = static_cast<XCMP *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case DAG:
+    {
+        XIAPath dag;
+        if (cp_va_kparse(conf, f, errh,
+                         "DAG", cpkP + cpkM, cpXIAPath, &dag,
+                         cpEnd) < 0)
+            return -1;
+        f->_src_path = dag;
+        click_chatter("XCMP: DAG is now %s", f->_src_path.unparse().c_str());
+        break;
+
+    }
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, f, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        f->_hid = hid;
+        click_chatter("XCMP: HID assigned: %s", hid.unparse().c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+void XCMP::add_handlers()
+{
+    //add_write_handler("src_path", write_param, (void *)H_MOVE);
+    add_write_handler("dag", write_param, (void *)DAG);
+    add_write_handler("hid", write_param, (void *)HID);
+}
 
 // sends a packet up to the application layer
 void
@@ -142,6 +181,8 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
 
 
 // processes a data packet that should be been sent somewhere else
+//NITIN disable XCMP redirect messages
+/*
 void
 XCMP::processBadForwarding(Packet *p_in) {
     XIAHeader hdr(p_in);
@@ -169,6 +210,7 @@ XCMP::processBadForwarding(Packet *p_in) {
 
     return;
 }
+*/
 
 // processes a data packet that was undeliverable
 void
@@ -294,6 +336,8 @@ XCMP::gotUnreachable(Packet *p_in) {
 }
 
 // got redirect packet, send up
+//NITIN disable XCMP REDIRECT messages
+/*
 void
 XCMP::gotRedirect(Packet *p_in) {
     if(DEBUG)
@@ -352,6 +396,7 @@ XCMP::gotRedirect(Packet *p_in) {
 
     p_in->kill();
 }
+*/
 
 // process packet and send out proper xcmp message.
 // returns false if packet was not flagged as bad in any way.
@@ -359,10 +404,13 @@ bool
 XCMP::processPacket(Packet *p_in) {
     XIAHeader hdr(p_in);
 	// check if this packet is painted for redirection
+	//NITIN disable XCMP REDIRECT messages
+	/*
     if(XIA_PAINT_ANNO(p_in) <= -1*TOTAL_SPECIAL_CASES) { // need to send XCMP REDIRECT
 		processBadForwarding(p_in);
         return true;
     }
+	*/
 
 	// check to see if this packet can't make it to its destination
 	// we need to send a DESTINATION XID Unreachable message to the src
@@ -405,9 +453,12 @@ XCMP::gotXCMPPacket(Packet *p_in) {
         gotUnreachable(p_in);
 		break;
 		
+	//NITIN disable XCMP REDIRECT messages
+	/*
     case XCMP_REDIRECT: // redirect
         gotRedirect(p_in);
         break;
+		*/
 
     default:
         // BAD MESSAGE TYPE

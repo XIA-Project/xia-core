@@ -17,6 +17,7 @@
 import sys
 import os
 import re
+import stat
 import hashlib
 from subprocess import check_call
 
@@ -45,6 +46,8 @@ def write_key_files(basename, privkey, pubkey):
 	pubkeyfilename = os.path.join(keydir, basename + '.pub')
 	with open(privkeyfilename, 'w') as privkeyfile:
 		privkeyfile.write(privkey)
+	# Make the private key accessible only to owner
+	os.chmod(privkeyfilename, stat.S_IWRITE|stat.S_IREAD)
 	with open(pubkeyfilename, 'w') as pubkeyfile:
 		pubkeyfile.write(pubkey)
 
@@ -67,12 +70,19 @@ def create_new_AD():
 def create_new_HID():
 	return 'HID:' + create_new_address()
 
+def create_new_SID():
+	return 'SID:' + create_new_address()
+
 def delete_AD(ad):
 	adstr, xid = ad.split(':')
 	remove_key_files(xid)
 
 def delete_HID(hid):
 	hidstr, xid = hid.split(':')
+	remove_key_files(xid)
+
+def delete_SID(sid):
+	sidstr, xid = sid.split(':')
 	remove_key_files(xid)
 
 def pubkey_hash(pubkey):
