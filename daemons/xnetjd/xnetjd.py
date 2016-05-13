@@ -1,10 +1,15 @@
 #!/usr/bin/env python2.7
 #
 
+import os
 import sys
 import logging
 import argparse
 import threading
+
+# Include daemons/xnetjd in path so network joining py modules can be loaded
+srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+sys.path.append(os.path.join(srcdir, "daemons/xnetjd"))
 
 # Put XIA API in path
 from netjoin_xiaconf import NetjoinXIAConf
