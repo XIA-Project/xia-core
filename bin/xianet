@@ -46,7 +46,14 @@ RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
-HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
+
+# On Arada boxes, don't use -s because /etc/hosts has no entry for hostname
+MACHINE=`uname -m`
+if [ "$MACHINE" == "mips" ]; then
+	HOSTNAME=$(hostname | tr -C -d 'a-zA-Z0-9')
+else
+	HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
+fi
 
 # for debugging
 VALGRIND=""
