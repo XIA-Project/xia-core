@@ -228,6 +228,12 @@ check_and_build protobuf "$configure_command"
 export PATH=$ORIGPATH
 unset PROTOCPATH
 
+# Build python interface to protobuf and install it
+pushd arada/sandbox-protobuf/protobuf-*/python
+python ./setup.py build
+sudo cp -ax build/lib.linux-x86_64-2.7/* $BUILDROOTPYTHONLIB
+popd # arada/sandbox-protobuf/protobuf-*/python
+
 # Build openssl
 export PATH=$ORIGPATH:$BUILDROOT
 export CC=/opt/buildroot-2013.11/output/host/usr/bin/mips-linux-gcc
