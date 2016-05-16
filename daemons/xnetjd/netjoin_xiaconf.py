@@ -4,9 +4,11 @@ import re
 import socket
 import hashlib
 import binascii
+'''
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
 from Crypto.PublicKey import RSA
+'''
 from netjoin_message_pb2 import SignedMessage
 
 class NetjoinXIAConf(object):
@@ -19,6 +21,7 @@ class NetjoinXIAConf(object):
         self.addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
         self.resolvconfpattern = re.compile('nameserver=(RE.+)')
 
+	'''
     # Return serialized SignedMessage
     def sign(self, message):
         hid = self.get_hid()
@@ -67,6 +70,7 @@ class NetjoinXIAConf(object):
         pem_key = self.der_to_pem(der_key)
         return self.pem_key_hash_hex(pem_key)
 
+	'''
     def get_raw_hid(self):
         hid_hex_str = self.get_hid()
         return binascii.unhexlify(hid_hex_str)

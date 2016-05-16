@@ -28,7 +28,7 @@ class NetjoinHandshakeOne(object):
             return
 
         # Sign the challenge
-        signed_challenge = self.conf.sign(challenge)
+        #signed_challenge = self.conf.sign(challenge)
 
         # Now fill in handshake_one
         h1 = self.handshake_one.encrypted
@@ -39,9 +39,9 @@ class NetjoinHandshakeOne(object):
         raw_mac = struct.pack("6B", mymac[0], mymac[1], mymac[2], mymac[3], mymac[4], mymac[5])
         core.client_l2_req.CopyFrom(self.session.l2_handler.build_request(raw_mac))
         core.client_l3_req.xip.single.ClientHID = self.conf.get_raw_hid()
-        core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
+        #core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
-        core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
+        #core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
         core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
 
@@ -119,27 +119,27 @@ class NetjoinHandshakeOne(object):
             return False
 
         # Hash the pubkey
-        pubkey_hash = self.conf.pem_key_hash_hex_from_der(xip_l3_req.ClientAIPPubKey)
+        #pubkey_hash = self.conf.pem_key_hash_hex_from_der(xip_l3_req.ClientAIPPubKey)
 
         # Make sure it matches HID
         hex_hid = self.conf.raw_hid_to_hex(xip_l3_req.ClientHID)
-        if hex_hid != pubkey_hash:
-            logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash))
-            return False
+        #if hex_hid != pubkey_hash:
+        #    logging.error("HID:{}, pubkey hash:{}".format(hex_hid, pubkey_hash))
+        #    return False
 
         # Check signature
-        challenge_response = xip_l3_req.XIPChallengeResponse
-        der_pubkey = xip_l3_req.ClientAIPPubKey
-        if not self.conf.verify(challenge_response, der_pubkey):
-            logging.error("Challenge incorrectly signed")
-            return False
+        #challenge_response = xip_l3_req.XIPChallengeResponse
+        #der_pubkey = xip_l3_req.ClientAIPPubKey
+        #if not self.conf.verify(challenge_response, der_pubkey):
+        #    logging.error("Challenge incorrectly signed")
+        #    return False
 
         # See if the message that was signed matches a recent gw_nonce
-        signed_message = SignedMessage()
-        signed_message.ParseFromString(challenge_response)
-        if not self.session.auth.is_recent_challenge(signed_message.message):
-            logging.error("Response does not match a recent challenge")
-            return False
+        #signed_message = SignedMessage()
+        #signed_message.ParseFromString(challenge_response)
+        #if not self.session.auth.is_recent_challenge(signed_message.message):
+        #    logging.error("Response does not match a recent challenge")
+        #    return False
         return True
 
     def is_valid(self):
