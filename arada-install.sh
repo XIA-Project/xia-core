@@ -313,6 +313,14 @@ export PATH=$ORIGPATH
 check_and_build_python_native six
 install_python six
 
+# Build and install python-setuptools
+check_and_build_python_native python-setuptools
+install_python python-setuptools
+
+# Build and install python-networkx
+check_and_build_python_native python-networkx
+install_python python-networkx
+
 # Build python-cffi
 check_and_build_python_native python-cffi
 pushd arada/sandbox-python-cffi/python-cffi-*
