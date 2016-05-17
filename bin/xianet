@@ -227,9 +227,9 @@ get_pid()
 		# avoid false positives when editing a file with click in the name
 		[ $service == "click" ] && service="userlevel/click"
 
-		XPID=`ps aux | grep -v grep | grep $service | tr -s " " | cut -d\  -f2`
+		XPID=`ps -eo user,pid,args | grep -v grep | grep $service | tr -s " " | cut -d\  -f2`
 	else
-		XPID=`ps aux | grep -v grep | grep $1 | grep $2 | tr -s " " | cut -d\  -f2`
+		XPID=`ps -eo user,pid,args | grep -v grep | grep $1 | grep $2 | tr -s " " | cut -d\  -f2`
 	fi
 }
 
