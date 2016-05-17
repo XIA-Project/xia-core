@@ -2,6 +2,7 @@
 # script to generate click host and router config files
 
 import os
+import re
 import sys
 import uuid
 import getopt
@@ -18,6 +19,8 @@ hostclick = 'host.click'
 routerclick = 'router.click'
 dualhostclick = 'dual_stack_host.click'
 dualrouterclick = 'dual_stack_router.click'
+if os.uname()[-1] == 'mips':
+	ext = 'mips.template'
 
 # Find where we are running out of
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
@@ -118,6 +121,37 @@ def getOsxInterfaces(skip):
 
     return addrs
 
+def mac_to_int(mac_str):
+	return int(mac_str.replace(':', ''), 16)
+
+def mac_str_from_ifconfig_out(ifconfig_out):
+	match = re.search(r'([0-9A-F]{2}:){5}([0-9A-F]{2})', ifconfig_out, re.I)
+	if match:
+		return match.group()
+	return None
+
+def getAradaInterfaces(ignore_interfaces):
+	addrs = []
+	# Simply run ifconfig for wifi0
+	wifi0_out = subprocess.check_output('ifconfig wifi0'.split())
+	wifi0_mac_str = mac_str_from_ifconfig_out(wifi0_out)
+	wifi0_mac_int = mac_to_int(wifi0_mac_str)
+	addrs.append(['wifi0', wifi0_mac_str, '0.0.0.0'])
+
+	# Get mac address of wifi1 on router to compare with wifi0
+	try:
+		wifi1_out = subprocess.check_output('ifconfig wifi1'.split())
+		wifi1_mac_str = mac_str_from_ifconfig_out(wifi1_out)
+		wifi1_mac_int = mac_to_int(wifi1_mac_str)
+		if wifi1_mac_int < wifi0_mac_int:
+			# Replace wifi0 entry in addrs with wifi1
+			del addrs[:]
+			addrs.append(['wifi1', wifi1_mac_str, '0.0.0.0'])
+	except:
+		# No wifi1 found, so return
+		pass
+	return addrs
+
 #
 # get list of interfaces on Linux
 #
@@ -164,6 +198,10 @@ def getInterfaces(ignore_interfaces):
     if os.uname()[0] == "Darwin":
         addrs = getOsxInterfaces(ignore_interfaces)
         cmd = "netstat -nr | grep -v : | grep default | tr -s ' ' | cut -d\  -f2"
+    elif os.uname()[-1] == "mips":
+        addrs = getAradaInterfaces(ignore_interfaces)
+        cmd = "/sbin/route -n | grep ^0.0.0.0 | tr -s ' '  | cut -d ' ' -f2"
+
     else:
         addrs = getLinuxInterfaces(ignore_interfaces)
         cmd = "/sbin/route -n | grep ^0.0.0.0 | tr -s ' '  | cut -d ' ' -f2"
