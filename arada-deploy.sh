@@ -91,8 +91,10 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
-echo "\nAll files successfully deployed on target."
-echo "\nRun these commands on target to setup environment to run XIA"
+echo ""
+echo "All files successfully deployed on target."
+echo ""
+echo "Run these commands on target to setup environment to run XIA"
 echo "export LD_LIBRARY_PATH=/tmp/usb/lib/:/tmp/usb/xia-core/api/lib/"
 echo "export PATH=\$PATH:/tmp/usb/bin"
 echo "echo 127.0.1.1 \`hostname\` >> /etc/hosts"
