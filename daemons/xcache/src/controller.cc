@@ -136,9 +136,11 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		if(ret <= 0)
 			break;
 
+
 		std::string temp(buf + sizeof(struct cid_header), ret - sizeof(struct cid_header));
 
 		data += temp;
+		LOG_CTRL_INFO("RECV DONE - %d\n", data.length());
 	} while(1);
 
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
@@ -147,6 +149,15 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if(!context) {
 		LOG_CTRL_ERROR("Context Lookup Failed\n");
 		delete meta;
+		Xclose(sock);
+		return RET_FAILED;
+	}
+
+	if (meta->get_cid() != computed_cid) {
+		/*
+		 * CID Integrity Check Failed
+		 */
+		LOG_CTRL_ERROR("CID Integrity Check Failed.\n");
 		Xclose(sock);
 		return RET_FAILED;
 	}
@@ -564,6 +575,8 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		ret = Xsend(sock, buf, to_send + header_size, 0);
 		LOG_CTRL_INFO("Xsend was sending %d and returned %d\n",
 			      to_send + header_size, ret);
+
+		LOG_CTRL_INFO("SEND DONE - %d/%d\n", offset, offset + remaining);
 
 		offset += to_send;
 	}
