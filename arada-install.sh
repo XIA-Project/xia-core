@@ -167,6 +167,7 @@ fi
 
 if [ ! -f arada.tar.gz ]; then
     echo "ERROR: arada.tar.gz not in current directory. Aborting"
+    echo "Copy arada.tar.gz to xia-core dir where this script is located."
     exit -1
 else
     echo "Found arada tarball"
@@ -215,6 +216,12 @@ fi
 popd #arada/toolchain
 
 # Build protobuf
+sudo apt-get -y install protobuf-compiler libprotobuf-dev python-protobuf
+if [ $? -ne 0 ]; then
+	echo "Failed installing protobuf-compiler, libprotobuf-dev, python-protobuf"
+	exit -1
+fi
+
 if [ ! -f "/usr/bin/protoc" ]; then
     echo "Please install protubuf-compiler, libprotobuf-dev and python-protobuf"
     echo "ERROR: /usr/bin/protoc not found. Aborting"
@@ -228,11 +235,6 @@ check_and_build protobuf "$configure_command"
 export PATH=$ORIGPATH
 unset PROTOCPATH
 
-# Build python interface to protobuf and install it
-pushd arada/sandbox-protobuf/protobuf-*/python
-python ./setup.py build
-sudo cp -ax build/lib.linux-x86_64-2.7/* $BUILDROOTPYTHONLIB
-popd # arada/sandbox-protobuf/protobuf-*/python
 
 # Build openssl
 export PATH=$ORIGPATH:$BUILDROOT
@@ -279,6 +281,27 @@ if exists_sandbox python2.7; then echo "Skipping python2.7 build"; else
 	export PATH=$ORIGPATH
 	unset CFLAGS
 fi
+
+# Build python interface to protobuf and install it
+pushd arada/sandbox-protobuf/protobuf-*
+make distclean &> protobuf-distclean.log
+if [ $? -ne 0 ]; then
+	echo "Failed to cleanup protobuf sandbox build. Needed for python module"
+	exit -1
+fi
+popd # arada/sandbox-protobuf/protobuf-*
+pushd arada/sandbox-protobuf/protobuf-*/python
+python ./setup.py build &> python-protobuf-build.log
+if [ $? -ne 0 ]; then
+	echo "Failed to build python protobuf module"
+	exit -1
+fi
+sudo cp -ax build/lib.linux-x86_64-2.7/* $BUILDROOTPYTHONLIB
+if [ $? -ne 0 ]; then
+	echo "Failed to install python protobuf module to $BUILDROOTPYTHONLIB"
+	exit -1
+fi
+popd # arada/sandbox-protobuf/protobuf-*/python
 
 # coreutils
 if exists_sandbox coreutils; then echo "Skipping coreutils build"; else
