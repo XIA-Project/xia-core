@@ -126,6 +126,8 @@ XNetJ::push(int in_port, Packet *p_in)
 			}
 			break;
 	};
+	// p_in contents were copied to p_buf and sent out as needed
+	p_in->kill();
 }
 
 CLICK_ENDDECLS
