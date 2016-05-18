@@ -79,6 +79,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 			apiPacket->set_dst_ip_anno(IPAddress("127.0.0.1"));
 			SET_DST_PORT_ANNO(apiPacket, htons(APIPORT));
 			output(XIANETJOINAPIPORT).push(apiPacket);
+			p_in->kill();
 			}
 			break;
 		case XIANETJOINAPIPORT:
@@ -96,6 +97,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 					SET_XIA_PAINT_ANNO(q, i);
 					output(XIANETJOINDEVPORT).push(q);
 				}
+				p_in->kill();
 				return;
 			}
 
