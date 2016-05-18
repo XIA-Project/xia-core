@@ -136,9 +136,11 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		if(ret <= 0)
 			break;
 
+
 		std::string temp(buf + sizeof(struct cid_header), ret - sizeof(struct cid_header));
 
 		data += temp;
+		LOG_CTRL_INFO("RECV DONE - %d\n", data.length());
 	} while(1);
 
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
@@ -147,6 +149,15 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if(!context) {
 		LOG_CTRL_ERROR("Context Lookup Failed\n");
 		delete meta;
+		Xclose(sock);
+		return RET_FAILED;
+	}
+
+	if (meta->get_cid() != computed_cid) {
+		/*
+		 * CID Integrity Check Failed
+		 */
+		LOG_CTRL_ERROR("CID Integrity Check Failed.\n");
 		Xclose(sock);
 		return RET_FAILED;
 	}
@@ -162,6 +173,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		ret = RET_OKSENDRESP;
 	}
 
+	LOG_CTRL_ERROR("%s: Xclosing\n", __func__);
 	Xclose(sock);
 
 	return ret;
@@ -457,10 +469,23 @@ sockaddr_x xcache_controller::cid2addr(std::string cid)
 {
 	sockaddr_x addr;
 	std::string myCid("CID:");
+	int xcache_sock;
+	char AD[MAX_XID_SIZE];
+	char HID[MAX_XID_SIZE];
+	char FourID[MAX_XID_SIZE];
+
+	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		assert(0);
+
+	if(XreadLocalHostAddr(xcache_sock, AD, sizeof(AD), HID, sizeof(HID),
+			      FourID, sizeof(FourID)) < 0)
+		assert(0);
+
+	Xclose(xcache_sock);
 
 	myCid += cid;
 
-	dag_add_nodes(&addr, 3, myAD, myHID, myCid.c_str());
+	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
 	dag_set_intent(&addr, 2);
 	dag_add_path(&addr, 3, 0, 1, 2);
 
@@ -550,6 +575,8 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		ret = Xsend(sock, buf, to_send + header_size, 0);
 		LOG_CTRL_INFO("Xsend was sending %d and returned %d\n",
 			      to_send + header_size, ret);
+
+		LOG_CTRL_INFO("SEND DONE - %d/%d\n", offset, offset + remaining);
 
 		offset += to_send;
 	}
