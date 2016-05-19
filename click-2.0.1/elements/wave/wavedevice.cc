@@ -64,7 +64,7 @@ enum {WAVE_PROVIDER, WAVE_USER}; // WAVE roles
 
 WaveDevice::WaveDevice() : _task(this),
                            _wq(0),
-                           _rcvTid(0),
+                           _rcvrTid(0),
                            _pid(0),
                            _isWaveRegistered(false) {
 
@@ -281,8 +281,8 @@ strerror=%s", declaration().c_str(), strerror(errno));
      
             add_select(_pipeFd[0], SELECT_READ); // wake on data available
            
-            if (pthread_create(&_rcvTid, NULL, receiver_thread, (void *)this))
-                throw "pthread_create(&_rcvTid)";
+            if (pthread_create(&_rcvrTid, NULL, receiver_thread, (void *)this))
+                throw "pthread_create(&_rcvrTid)";
         }
     } catch (const char *str){
 
@@ -341,8 +341,8 @@ void WaveDevice::cleanup(CleanupStage){
     if (noutputs()){ // if receiving packets
 
         // cancel the receiver thread (not joined because infinite loop)
-        if(_rcvTid != 0 and pthread_cancel(_rcvTid))
-            errh->error("%s, cleanup(): pthread_cancel(_rcvTid), strerror=%s", \
+        if(_rcvrTid != 0 and pthread_cancel(_rcvrTid))
+            errh->error("%s, cleanup(): pthread_cancel(_rcvrTid), strerror=%s", \
                 declaration().c_str(), strerror(errno));
 
         // close reading side of pipe
@@ -572,7 +572,8 @@ void WaveDevice::selected(int fd, int /*mask*/){
     const ssize_t nbytesRead = read(_pipeFd[0], _pipeBuf, _bufLen);
 
     if (pthread_mutex_unlock(&_pipeMutex)){
-        click_chatter("%{element}: can't unlock pipe mutex", this);
+        ErrorHandler *errh = ErrorHandler::default_handler();
+        errh->error("%{element}: pipeFd unlock: %s", this, strerror(errno));
     }
 
     if (nbytesRead < 0){

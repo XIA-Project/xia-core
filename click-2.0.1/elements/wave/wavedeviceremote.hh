@@ -155,7 +155,7 @@ private:
     NotifierSignal _signal;	// packet is available to pull()
     Packet *_wq;			// queue to store pulled packet
 
-    pthread_t _rcvTid;      // receiver thread id
+    pthread_t _rcvrTid;     // receiver thread id
     bool _isConnected;
     int _remoteSockFd;
 

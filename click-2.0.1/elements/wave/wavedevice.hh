@@ -160,7 +160,7 @@ private:
 
     unsigned _headroom;     // headroom to build in
 
-    pthread_t _rcvTid;      // receiver thread id
+    pthread_t _rcvrTid;     // receiver thread id
     pid_t _pid;             // current process id
     bool _isWaveRegistered;
     

@@ -49,7 +49,7 @@ CLICK_DECLS
 
 WaveDeviceRemote::WaveDeviceRemote() : _task(this),
                                        _wq(0),
-                                       _rcvTid(0){
+                                       _rcvrTid(0){
     _pipeFd[0] = 0;
     _pipeFd[1] = 0;
 }
@@ -65,9 +65,9 @@ int WaveDeviceRemote::configure(Vector<String> &conf, ErrorHandler *errh){
     int port = 45622;
     uint32_t psid = 5;
 	int txPower = 23;
-    double dataRate = 6;
+    double dataRate = 3;
     uint32_t  channel = 172;
-    int userPrio = 1;
+    int userPrio = 7;
     int bufLen = 4096;
     int headroom = Packet::default_headroom;
     int setTstamp = false;
@@ -196,6 +196,7 @@ int WaveDeviceRemote::initialize(ErrorHandler *errh){
 
         // loop through all the results and connect to the first we can
         for(p = servinfo; p != NULL; p = p->ai_next) {
+
             if ((_remoteSockFd = socket(p->ai_family, p->ai_socktype, 
                 p->ai_protocol)) == -1) {
                 
@@ -203,7 +204,7 @@ int WaveDeviceRemote::initialize(ErrorHandler *errh){
 strerror=%s", declaration().c_str(), strerror(errno));
                 continue;
             }
-			
+
             if (connect(_remoteSockFd, p->ai_addr, p->ai_addrlen) == -1) {
 
                 errh->error("%s, initialize(): connect() error trying address, \
@@ -212,7 +213,7 @@ strerror=%s", declaration().c_str(), strerror(errno));
                 close(_remoteSockFd);
                 continue;
             }
-                                
+
             // if we get this far, we must have connected successfully
             connectok = true;
             break;
@@ -262,8 +263,8 @@ hostname and port (and make sure the server is up).", declaration().c_str());
      
             add_select(_pipeFd[0], SELECT_READ); // wake on data available
            
-            if (pthread_create(&_rcvTid, NULL, receiver_thread, (void *)this))
-                throw "pthread_create(&_rcvTid)";
+            if (pthread_create(&_rcvrTid, NULL, receiver_thread, (void *)this))
+                throw "pthread_create(&_rcvrTid)";
         }
     } catch (const char *str){
 
@@ -309,8 +310,8 @@ void WaveDeviceRemote::cleanup(CleanupStage){
     if (noutputs()){ // if receiving packets
 
         // cancel the receiver thread (not joined because infinite loop)
-        if(_rcvTid != 0 and pthread_cancel(_rcvTid))
-            errh->error("%s, cleanup(): pthread_cancel(_rcvTid), strerror=%s", \
+        if(_rcvrTid != 0 and pthread_cancel(_rcvrTid))
+            errh->error("%s, cleanup(): pthread_cancel(_rcvrTid), strerror=%s", \
                 declaration().c_str(), strerror(errno));
 
         // close reading side of pipe
@@ -430,10 +431,10 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     assert(_isConnected); // because initialize runs before
 
     // calculate packet length
-    // 6 (src mac) + 6 (dst mac) + 4 (psid) + 1 (channel) + 1 (txpower) +
-    // 1 (data rate index) + 1 (user priority) + content length =
+    // 2 (length) + 6 (src mac) + 6 (dst mac) + 4 (psid) + 1 (channel) + 
+    // 1 (txpower) + 1 (data rate index) + 1 (user priority) + content length =
     // 20 + content length
-    const int pktLen = 20 + p->length();
+    const int pktLen = 22 + p->length();
 
     // serialize everything
     uint8_t pktBuf[_bufLen];
@@ -443,7 +444,7 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     // packet length
     const uint16_t pktLenNet = htons((uint16_t) pktLen);
     memcpy(&pktBuf[idx], &pktLenNet, 2);
-    idx += 0;
+    idx += 2;
 
     // source mac
     // this code assumes the packet is an ethernet frame. so beware!
@@ -480,12 +481,16 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     // packet contents
     memcpy(&pktBuf[idx], p->data(), p->length());
     idx += p->length();
-
     
-    assert(pktLen == idx); // it's got to match
+    assert(pktLen == idx); // pktlen does not include the length field
 
     bool done = false;
     while (not done){
+
+#ifdef DEBUG        
+            errh->debug("%s, sending server %d bytes (%d byte payload)", \
+                declaration().c_str(), pktLen, p->length());
+#endif
 
         errno = 0;
         if (send(_remoteSockFd, pktBuf, pktLen, 0 /*flags*/) < 0){ // error
@@ -543,7 +548,7 @@ void* WaveDeviceRemote::receiver_thread(void *arg){
 
     uint8_t rcvBuf[bufLen];
     uint8_t pktBuf[bufLen];
-    uint16_t pktLen=0, pktRcvd=0;
+    uint16_t pktLen=0, pktBufIdx=0;
 
     // infinite read loop
     // the packet format is 2 bytes for the packet length, and then the packet
@@ -551,74 +556,73 @@ void* WaveDeviceRemote::receiver_thread(void *arg){
     int nrcvd;
     while (true){
 
-        if ((nrcvd = recv(remoteSockFd, rcvBuf, bufLen, 0 /*flags*/)) > 0){ 
-    
-            // got something to work with
-#ifdef DEBUG
-            errh->debug("%s, received %d bytes", \
-                wdrInst->declaration().c_str(), nrcvd);
-#endif
+        if ((nrcvd = recv(remoteSockFd, rcvBuf, bufLen, 0 /*flags*/)) > 0){
 
-            int rcvIdx = 0;
+            // got something to work with
+//#ifdef DEBUG
+//            errh->debug("%s, received %d bytes", \
+//                wdrInst->declaration().c_str(), nrcvd);
+//#endif
+
+            int rcvBufIdx = 0;
             int nLeft = nrcvd;
-            
+
             while (nLeft > 0){ // meaning there is still stuff to consume
 
                 if (pktLen == 0) { // at the beginning of a packet
     
-                    if ((pktRcvd + nLeft) >= 2){ // have enough to fill in pktLen
+                    if ((pktBufIdx + nLeft) >= 2){ // have enough to fill in pktLen
                 
                         // copy to packet buffer
-                        assert(pktRcvd < 2);
-                        const int ncpy = 2-pktRcvd;
-                        memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy); 
+                        assert(pktBufIdx < 2);
+                        const int ncpy = 2-pktBufIdx;
+                        memcpy(&pktBuf[pktBufIdx], &rcvBuf[rcvBufIdx], ncpy); 
 
                         // update state variables
                         nLeft -= ncpy;
-                        rcvIdx += ncpy;
-                        pktRcvd += ncpy;
+                        pktBufIdx += ncpy;
+                        rcvBufIdx += ncpy;
                         assert(nLeft >= 0);
-                        assert(rcvIdx <= nrcvd);
+                        assert(rcvBufIdx <= nrcvd);
 
                         // now set packet length
                         memcpy(&pktLen, pktBuf, 2); // copy to pktLen
                         pktLen = ntohs(pktLen); // back to host order
-                    
+
                     } else { // don't have enough to fill packet length
                     
                         assert(pktLen == 0 and nLeft == 1); // ensuring sanity
-                        assert(pktRcvd  == 0);
+                        assert(pktBufIdx == 0);
 
                         // copy a single byte
                         const int ncpy = nLeft;
-                        memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy); 
-                        pktRcvd += ncpy;
-                        rcvIdx += ncpy;
+                        memcpy(&pktBuf[pktBufIdx], &rcvBuf[rcvBufIdx], ncpy); 
+                        pktBufIdx += ncpy;
+                        rcvBufIdx += ncpy;
                         nLeft -= ncpy;
-                        
+
                         assert(nLeft == 0);
                     }
-
                 } else { // in the middle of a packet
 
                     assert(pktLen > 0); // the packet length is known
 
                     // let us copy as much as we can
-                    const int nmissing = pktLen-pktRcvd;
+                    const int nmissing = pktLen-pktBufIdx;
                     const int ncpy = nmissing < nLeft ? nmissing : nLeft;
                     
-                    memcpy(&pktBuf[pktRcvd], &rcvBuf[rcvIdx], ncpy);
+                    memcpy(&pktBuf[pktBufIdx], &rcvBuf[rcvBufIdx], ncpy);
                     
                     // update state variables
                     nLeft -= ncpy;
-                    rcvIdx += ncpy;
-                    pktRcvd += ncpy;
+                    pktBufIdx += ncpy;
+                    rcvBufIdx += ncpy;
                     assert(nLeft >= 0);
-                    assert(rcvIdx <= nrcvd);
+                    assert(rcvBufIdx <= nrcvd);
 
                     if (nmissing == ncpy) { // got complete packet, send it out!
-                
-                        assert(pktRcvd == pktLen+2);
+
+                        assert(pktBufIdx == pktLen);
 
 #ifdef DEBUG
                         errh->debug("%s, extracted a rcvd packet w/ %d bytes",\
@@ -632,19 +636,20 @@ pthread_mutex_lock(pipeMutex), strerror=%s",
                                 strerror(errno));
 
                         // write the received data on the pipe
-                        if (write(pipeFd, &pktBuf[2], pktLen) != pktLen)
+                        const int dataLen = pktLen-2;
+                        if (write(pipeFd, &pktBuf[2], dataLen) != dataLen)
                             errh->error("%s, receiver_thread(): write(pipeFd), \
 strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
 
                         // reset the packet buffer state
                         pktLen = 0;
-                        pktRcvd = 0;
+                        pktBufIdx = 0;
                     }
                 }
             }
 
         } else if (errno != EAGAIN){
-            errh->error("recv: %s", strerror(errno));
+//            errh->error("recv: %s", strerror(errno));
         }
     }
 
@@ -665,7 +670,8 @@ void WaveDeviceRemote::selected(int fd, int /*mask*/){
     const ssize_t nbytesRead = read(_pipeFd[0], _pipeBuf, _bufLen);
 
     if (pthread_mutex_unlock(&_pipeMutex)){
-        click_chatter("%{element}: can't unlock pipe mutex", this);
+        ErrorHandler *errh = ErrorHandler::default_handler();
+        errh->error("%{element}: pipeFd unlock: %s", this, strerror(errno));
     }
 
     if (nbytesRead < 0){
