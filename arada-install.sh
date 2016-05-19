@@ -24,15 +24,15 @@ popd () {
 
 make_sandbox () {
 	echo "$1: creating sandbox"
-	mkdir -p arada/sandbox-$1
+	mkdir -p .arada/sandbox-$1
 	if [ $? -ne 0 ]; then
-		echo "$1: Failed creating arada/sandbox-$1. Aborting."
+		echo "$1: Failed creating .arada/sandbox-$1. Aborting."
 		exit -1
 	fi
 }
 
 get_source () {
-	pushd arada/sandbox-$1
+	pushd .arada/sandbox-$1
 
 	echo "$1: retrieving source from distro"
 	apt-get source $1 &> ${1}_source.log
@@ -87,7 +87,7 @@ configure_build_and_install () {
 	pkgname=$1
 	configure_command=$2
 	echo "$pkgname: preparing to build"
-	pushd arada/sandbox-$1/$1-*
+	pushd .arada/sandbox-$1/$1-*
 	configure $pkgname "$2"
 	echo "$pkgname: building"
 	build $pkgname
@@ -98,7 +98,7 @@ configure_build_and_install () {
 
 
 exists_sandbox () {
-	if [ -d arada/sandbox-$1 ]; then
+	if [ -d .arada/sandbox-$1 ]; then
 		echo "$1: sandbox exists."
 		return 0
 	else
@@ -123,14 +123,14 @@ check_and_build_python_native () {
 	if exists_sandbox $1; then echo "Skipping $1 build"; else
 		make_sandbox $1
 		get_source $1
-		pushd arada/sandbox-$1/$1-*
+		pushd .arada/sandbox-$1/$1-*
 		build_native_python $1
 		popd
 	fi
 }
 
 install_python () {
-	pushd arada/sandbox-$1/$1-*
+	pushd .arada/sandbox-$1/$1-*
 	sudo cp -ax build/lib.linux-x86_64-2.7/* $BUILDROOTPYTHONLIB
 	popd
 }
@@ -174,20 +174,27 @@ else
 fi
 
 # Unpack the arada tarball
-if [ -d arada ]; then
-    echo "arada directory exists. Skipped unpacking arada.tar.gz"
+if [ -d .arada ]; then
+    echo ".arada directory exists. Skipped unpacking arada.tar.gz"
 else
-    tar xzf arada.tar.gz
+    mkdir .arada
+    if [ $? -ne 0 ]; then
+        echo "Failed to create .arada directory. Aborting"
+        exit -1
+    fi
+    pushd .arada
+    tar xzf ../arada.tar.gz --strip 1
     if [ $? -ne 0 ]; then
         echo "ERROR: Unable to unpack arada.tar.gz. Aborting"
         exit -2
     else
         echo "Unpacked arada tarball"
     fi
+    popd # .arada
 fi
 
 # Verify we have the toolchain tarball
-pushd arada/toolchain
+pushd .arada/toolchain
 
 if [ ! -f LocoMate_tlcn_64bit.tar.bz2 ]; then
     echo "ERROR: toolchain tarball missing: LocoMate_tlcn_64bit.tar.bz2"
@@ -213,7 +220,7 @@ else
 fi
 
 # Return to the directory we started from
-popd #arada/toolchain
+popd #.arada/toolchain
 
 # Build protobuf
 sudo apt-get -y install protobuf-compiler libprotobuf-dev python-protobuf
@@ -248,7 +255,7 @@ export PATH=$ORIGPATH
 if exists_sandbox python2.7; then echo "Skipping python2.7 build"; else
 	make_sandbox python2.7
 	get_source python2.7
-	pushd arada/sandbox-python2.7/python2.7-*
+	pushd .arada/sandbox-python2.7/python2.7-*
 	echo "python2.7: Native build first"
 	# Build for native host first
 	configure python2.7 "./configure"
@@ -277,20 +284,20 @@ if exists_sandbox python2.7; then echo "Skipping python2.7 build"; else
 	fi
 	install_command="make install"
 	make_install python2.7 "$install_command"
-	popd # arada/sandbox-python2.7/python2.7-*
+	popd # .arada/sandbox-python2.7/python2.7-*
 	export PATH=$ORIGPATH
 	unset CFLAGS
 fi
 
 # Build python interface to protobuf and install it
-pushd arada/sandbox-protobuf/protobuf-*
+pushd .arada/sandbox-protobuf/protobuf-*
 make distclean &> protobuf-distclean.log
 if [ $? -ne 0 ]; then
 	echo "Failed to cleanup protobuf sandbox build. Needed for python module"
 	exit -1
 fi
-popd # arada/sandbox-protobuf/protobuf-*
-pushd arada/sandbox-protobuf/protobuf-*/python
+popd # .arada/sandbox-protobuf/protobuf-*
+pushd .arada/sandbox-protobuf/protobuf-*/python
 python ./setup.py build &> python-protobuf-build.log
 if [ $? -ne 0 ]; then
 	echo "Failed to build python protobuf module"
@@ -301,14 +308,14 @@ if [ $? -ne 0 ]; then
 	echo "Failed to install python protobuf module to $BUILDROOTPYTHONLIB"
 	exit -1
 fi
-popd # arada/sandbox-protobuf/protobuf-*/python
+popd # .arada/sandbox-protobuf/protobuf-*/python
 
 # coreutils
 if exists_sandbox coreutils; then echo "Skipping coreutils build"; else
 	make_sandbox coreutils
 	get_source coreutils
 	echo "coreutils: preparing to build"
-	pushd arada/sandbox-coreutils/coreutils-*
+	pushd .arada/sandbox-coreutils/coreutils-*
 	export PATH=$ORIGPATH:$BUILDROOTBIN
 	configure_command="./configure --host=mips-linux --prefix=/opt/buildroot-2013.11/output/host/usr/"
 	configure coreutils "$configure_command"
@@ -323,7 +330,7 @@ if exists_sandbox coreutils; then echo "Skipping coreutils build"; else
 	echo "coreutils: installing"
 	make_install coreutils "make install"
 	export PATH=$ORIGPATH
-	popd # arada/sandbox-coreutils/coreutils-*
+	popd # .arada/sandbox-coreutils/coreutils-*
 fi
 
 # Build libffi needed by python-cffi, needed by PyNaCl
@@ -352,7 +359,7 @@ install_python python-networkx
 
 # Build python-cffi
 check_and_build_python_native python-cffi
-pushd arada/sandbox-python-cffi/python-cffi-*
+pushd .arada/sandbox-python-cffi/python-cffi-*
 export PATH=$ORIGPATH:$BUILDROOTBIN
 
 mips-linux-gcc -pthread -DNDEBUG -g -fwrapv -O2 -Wall -Wstrict-prototypes -fno-strict-aliasing -D_FORTIFY_SOURCE=2 -g -Wformat -Werror=format-security -fPIC -DUSE__THREAD -I/opt/buildroot-2013.11/output/host/usr/include -I/opt/buildroot-2013.11/output/host/usr/include/python2.7 -L/opt/buildroot-2013.11/output/host/usr/lib -c c/_cffi_backend.c -o build/temp.linux-x86_64-2.7/c/_cffi_backend.o
@@ -379,7 +386,7 @@ if exists_sandbox libsodium; then echo "Skipping libsodium build"; else
 	export PATH=$ORIGPATH:$BUILDROOTBIN
 	pkgname=libsodium
 	echo "$pkgname: preparing to build"
-	pushd arada/sandbox-$pkgname/$pkgname-*
+	pushd .arada/sandbox-$pkgname/$pkgname-*
 	./autogen.sh &> libsodium_autogen.log
 	if [ $? -ne 0 ]; then
 		echo "Failed to run autogen for $pkgname. Aborting"
@@ -391,7 +398,7 @@ if exists_sandbox libsodium; then echo "Skipping libsodium build"; else
 	build $pkgname
 	echo "$pkgname: installing"
 	make_install $pkgname "make install"
-	popd # arada/sandbox-libsodium/libsodium-*
+	popd # .arada/sandbox-libsodium/libsodium-*
 	export PATH=$ORIGPATH
 fi
 
@@ -401,7 +408,7 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 	export SODIUM_INSTALL=system
 
 	make_sandbox pynacl
-	pushd arada/sandbox-pynacl/
+	pushd .arada/sandbox-pynacl/
 	echo "pynacl: retrieving source from github.com/pyca/pynacl"
 	wget https://github.com/pyca/pynacl/archive/1.0.1.tar.gz &> pynacl_wget.log
 	if [ $? -ne 0 ]; then
@@ -413,14 +420,14 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 		echo "Failed to unpack source archive for PyNaCl"
 		exit -1
 	fi
-	popd # arada/sandbox-pynacl
+	popd # .arada/sandbox-pynacl
 	echo "pynacl: preparing to build"
 	sudo apt-get -y build-dep python-nacl &> pynacl_build_dep.log
 	if [ $? -ne 0 ]; then
 		echo "Failed to install build dependencies for PyNaCl"
 		exit -1
 	fi
-	pushd arada/sandbox-pynacl/pynacl-*/
+	pushd .arada/sandbox-pynacl/pynacl-*/
 
 	echo "pynacl: building"
 	build_native_python pynacl
@@ -437,7 +444,7 @@ if exists_sandbox pynacl; then echo "Skipping pynacl build"; else
 		exit -1
 	fi
 
-	popd # arada/sandbox-pynacl/pynacl-*
+	popd # .arada/sandbox-pynacl/pynacl-*
 	export PATH=$ORIGPATH
 	unset SODIUM_INSTALL
 
@@ -447,14 +454,14 @@ fi
 
 # Copy arada libraries and headers to buildroot
 echo "Copying Arada wave headers to /opt/buildroot"
-sudo cp -ax arada/code/include /opt/buildroot-2013.11/output/host/usr/include/arada
+sudo cp -ax .arada/code/include /opt/buildroot-2013.11/output/host/usr/include/arada
 if [ $? -ne 0 ]; then
     echo "ERROR: copying Arada headers to /opt/buildroot.../usr/include/arada"
     exit -20
 fi
 
 echo "Copying Arada wave libraries to /opt/buildroot"
-sudo cp -ax arada/code/mips/lib/* /opt/buildroot-2013.11/output/host/usr/lib/
+sudo cp -ax .arada/code/mips/lib/* /opt/buildroot-2013.11/output/host/usr/lib/
 if [ $? -ne 0 ]; then
     echo "ERROR: copying Arada libs to /opt/buildroot.../usr/lib/"
     exit -21
