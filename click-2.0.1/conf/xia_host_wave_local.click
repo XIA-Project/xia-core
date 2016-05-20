@@ -6,7 +6,7 @@ log::XLog(VERBOSE 0, LEVEL 7);
 // host instantiation
 mg :: XIAEndHost (RE AD_INIT HID:493ae895f207c591dcaeb0a849a7f9d441d4ff5e, HID:493ae895f207c591dcaeb0a849a7f9d441d4ff5e, 1500, 0, 00:26:AD:01:ED:7C);
 
-waveDevice :: WaveDevice(ROLE user, CHANNEL 172);
+waveDevice :: WaveDeviceLocal(ROLE user, CHANNEL 172);
 
 waveDevice -> [0]mg[0] -> waveDevice;
 

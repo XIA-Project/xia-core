@@ -1,5 +1,5 @@
 /**
- * wavedeviceremote.{cc,hh} -- wave device remote interface
+ * wavedevicelocal.{cc,hh} -- wave device interface
  * Rui Meireles {rui@cmu.edu}
  *
  * Copyright 2016 Carnegie Mellon University
@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-#ifndef CLICK_WAVEDEVICEREMOTE_HH
-#define CLICK_WAVEDEVICEREMOTE_HH
+#ifndef CLICK_WAVEDEVICELOCAL_HH
+#define CLICK_WAVEDEVICELOCAL_HH
 
 #include <click/element.hh>
 #include <click/vector.hh> /* Vector */
@@ -27,39 +27,36 @@
 #include <click/notifier.hh> /* SignalNotifier */
 #include <click/task.hh> /* Task */
 
-#include <stdint.h> /* uint*_t */
+#include <stdint.h> /* uint8_t */
 #include <pthread.h> /* pthread_mutex_t */
-
+#include <unistd.h> /* pid_t */
 
 
 CLICK_DECLS
 
 /*
  * =c
- * WaveDeviceRemote()
+ * WaveDeviceLocal()
  * =s local
- * Provides a device interface to a remote WAVE device (WSMP protocol portion),
- * that we connect to through TCP.
+ * Provides a device interface to the WAVE device driver 
+ * (WSMP protocol portion), for both sending and receiving packets.
  *
  * =d
  *
  * If an input port is specified (either push or pull), incoming packets get
- * passed to the WAVE device. Packets arriving on the input port are expected
- * to begin with an ethernet header, which is used to set the source and
- * destination MAC addresses on the WSM request.
+ * passed to the WAVE device driver. Packets arriving on the input port are 
+ * expected to start with an ethernet header, which is used to set the source
+ * and destination MAC addresses on the WSM request.
  *
  * If an output port is specified (always of the push variety), packets that 
- * coming from the WAVE device are pushed through it.
+ * arrive at the WAVE device from the air interface are pushed through it.
  *
  * =over 8
  *
- * =item HOSTNAME
+ * =item ROLE
  *
- * Remote hostname (string). This is a mandatory argument.
- *
- * =item PORT
- *
- * Remote port the WAVE device server is listening on. Default is 34569.
+ * Role played by the device in the DSRC network, must be either PROVIDER or 
+ * USER. This is a mandatory argument.
  *
  * =item PSID
  *
@@ -86,9 +83,17 @@ CLICK_DECLS
  * WAVE user priority. Between 0 and 7. 
  * Higher value means higher priority. The default is 1.
  *
+ * =item EXPIRYTIME
+ *
+ * WAVE packet expiration time. The default is 0 (no expiration).
+ *
+ * =item EXPIRYTIME
+ *
+ * WAVE packet expiration time. The default is 0 (no expiration).
+ *
  * =item BUFLEN
  *
- * Send/receive buffer length in bytes. Default is 4096.
+ * Send/receive buffer length. Default is 2048.
  *
  * =item HEADROOM
  *
@@ -99,17 +104,17 @@ CLICK_DECLS
  * =e
  * This is a typical input processing sequence:
  *
- * ... -> WaveDeviceRemote() -> ...
+ * ... -> WaveDevice() -> ...
  *
- * =a WaveDevice
+ * =a FromDevice.u, ToDevice.u
  */
 
-class WaveDeviceRemote : public Element { public:
+class WaveDeviceLocal : public Element { public:
 
-    WaveDeviceRemote();
-    ~WaveDeviceRemote();
+    WaveDeviceLocal();
+    ~WaveDeviceLocal();
 
-    const char *class_name() const	{ return "WaveDeviceRemote"; }
+    const char *class_name() const	{ return "WaveDeviceLocal"; }
     const char *port_count() const	{ return "-/0-1"; }
     const char *processing() const	{ return "a/h"; }
     /* x/y says the packets going out are not the same as the ones going in */
@@ -126,11 +131,10 @@ class WaveDeviceRemote : public Element { public:
     void push(int, Packet *p);
 
     int write_packet(Packet*, ErrorHandler *errh);
-
-    bool isConnected() const;
+    
+    pid_t get_pid() const;
     int get_pipefd(const bool write) const;
     int get_bufLen() const;
-    int get_remoteSockFd() const;
     pthread_mutex_t* get_pipeMutex();
 
 protected:
@@ -140,27 +144,28 @@ private:
 
     static void* receiver_thread(void *arg);
 
-    String _hostname;
-    int _port;
-    uint32_t _psid;
-    uint8_t _channel;
-    int8_t _txPower;
-    uint8_t _dataRateIndex;
-    uint8_t _userPrio;
+    int _role;
+    int _txPower;
+    int _dataRateIndex;
+    int _channel;
+    int _userPrio;
+    int _psid;
+    int _expiryTime;
 
     bool _setTstamp;
     int _bufLen;
-    unsigned _headroom;     // headroom to build in
 
     NotifierSignal _signal;	// packet is available to pull()
     Packet *_wq;			// queue to store pulled packet
 
-    pthread_t _rcvrTid;     // receiver thread id
-    bool _isConnected;
-    int _remoteSockFd;
+    unsigned _headroom;     // headroom to build in
 
+    pthread_t _rcvrTid;     // receiver thread id
+    pid_t _pid;             // current process id
+    bool _isWaveRegistered;
+    
     int _pipeFd[2];         // pipe file descriptors
-    uint8_t* _pipeBuf; // buffer for reading from the pipe
+    uint8_t* _pipeBuf;      // buffer for reading from the pipe
     pthread_mutex_t _pipeMutex;
 };
 

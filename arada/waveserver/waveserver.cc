@@ -118,11 +118,6 @@ void* receiver_thread(void */*arg*/){
 
         if (rxWSMPacket(_pid, &rxPkt) > 0){ // got a packet, yay
 
-//#ifdef DEBUG
-//            std::cout << "received a " << rxPkt.data.length << \
-//                " byte WSM" << std::endl;
-//#endif
-
             // if payload and there is someone listening
             if (rxPkt.data.length > 0 and _cliSockFd > 0){
 
@@ -180,12 +175,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     // destination mac
     memcpy(&wsmReq.macaddr, &pktBuf[idx], IEEE80211_ADDR_LEN);
     idx += IEEE80211_ADDR_LEN;
- 
-    // psid
-    memcpy(&wsmReq.psid, &pktBuf[idx], 4);
-    idx += 4;
-    wsmReq.psid = ntohl(wsmReq.psid);
-    
+     
     // channel
     memcpy(&wsmReq.chaninfo.channel, &pktBuf[idx], 1);
     idx += 1;
@@ -203,7 +193,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     idx += 1;
 
     // packet contents
-    const int conLen = pktLen-22;
+    const int conLen = pktLen-18;
     assert(conLen > 0);
     assert(conLen < FOURK);
     wsmReq.data.length = conLen;
@@ -212,12 +202,11 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     assert(idx == pktLen);
 
 #ifdef DEBUG
-    std::cerr << "Sending WSM: psid=" << wsmReq.psid << ", channel=" << \
-        (uint16_t) wsmReq.chaninfo.channel << ", txpower=" << \
-        (uint16_t) wsmReq.chaninfo.txpower << ", data rate index=" << \
-        (uint16_t) wsmReq.chaninfo.rate << ", priority=" << \
-        (uint16_t) wsmReq.txpriority << ", content length=" << \
-        conLen << std::endl;
+    std::cerr << "Sending WSM: channel=" << (uint16_t) wsmReq.chaninfo.channel \
+        << ", txpower=" << (uint16_t) wsmReq.chaninfo.txpower << \
+        ", data rate index=" << (uint16_t) wsmReq.chaninfo.rate << \
+        ", priority=" << (uint16_t) wsmReq.txpriority << \
+        ", content length=" << conLen << std::endl;
 #endif
 
     // the packet is now fully assembled and ready to be sent
@@ -246,11 +235,6 @@ void handleClient(){
         if((nrcvd = recv(_cliSockFd, rcvBuf, FOURK, 0 /*flags*/)) > 0){
         
             // got something to work with
-//#ifdef DEBUG
-//            std::cout << "server received " << nrcvd << " bytes from client" \
-//                << std::endl;
-//#endif
-
             int rcvBufIdx = 0;
             int nLeft = nrcvd;
             
@@ -399,7 +383,7 @@ int main(int argc, char *argv[]){
 	}
 
     // psid
-	unsigned int pPsid = 32;
+	unsigned int pPsid = 5;
 	try{
 		pPsid = (unsigned int) std::atol(conf.Value("wave", "psid").c_str());
 
@@ -463,7 +447,7 @@ int main(int argc, char *argv[]){
         }
 
         if (_waveRole == WAVE_PROVIDER){ // provider role
-        
+
             _wmeReq.repeatrate = 50; // #msgs p/ 5 secs
             _wmeReq.channelaccess = CHACCESS_CONTINUOUS;
             _wmeReq.serviceport = 8888;
@@ -473,6 +457,7 @@ int main(int argc, char *argv[]){
                 ss << "registerProvider(): " << std::strerror(errno);
                 throw ss.str();
             }
+
         }
         else { // user role
 
@@ -486,13 +471,13 @@ int main(int argc, char *argv[]){
             if (registerUser(_pid, &_wmeReq) < 0){
                 std::ostringstream ss;
                 ss << "registerUser(): " << std::strerror(errno);
-                throw ss.str();        
+                throw ss.str();    
             }
         }
 
         _waveReg = true; // provider now registered
 
-    } catch (const char *str){
+    } catch (const std::string &str){
 
         std::cerr << "Error setting up WAVE: " << str << ". Aborting." << \
             std::endl;

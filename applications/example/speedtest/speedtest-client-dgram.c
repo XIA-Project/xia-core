@@ -28,14 +28,16 @@
 #include "dagaddr.hpp"
 
 #define VERSION "v1.0"
-#define TITLE "XIA Speed Test Client"
+#define TITLE "XIA Speed Test Client (UDP)"
 
-#define STREAM_NAME "www_s.stream_echo.aaa.xia"
+#define DGRAM_NAME "www_s.dgram_echo.aaa.xia"
 
 // global configuration options
 uint8_t verbose = 0;	// display all messages
 unsigned int pktSize = 1024;	// default pkt size (bytes)
 uint8_t terminate = 0;  // set to 1 when it's time to quit
+useconds_t sleepTime = 0;
+
 
 struct addrinfo *ai;
 sockaddr_x *sa;
@@ -50,9 +52,11 @@ void help(const char *name){
 	printf("where:\n");
 	printf(" -v : verbose mode\n");
 	printf(" -s size : set packet size to <size>, default %u bytes\n", pktSize);
+	printf(" -i interval : between sends, default %u microsecs \n", sleepTime);
 	printf("\n");
 	exit(0);
 }
+
 
 /**
  * configure the app
@@ -63,7 +67,7 @@ void getConfig(int argc, char** argv){
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hvs:")) != -1) {
+	while ((c = getopt(argc, argv, "hvs:i:")) != -1) {
 		switch (c) {
 			case '?':
 			case 'h':
@@ -71,7 +75,7 @@ void getConfig(int argc, char** argv){
 				help(basename(argv[0]));
 				break;
 			case 'v':
-				// turn off info messages
+				// turn on info messages
 				verbose = 1;
 				break;
 			case 's':
@@ -81,12 +85,18 @@ void getConfig(int argc, char** argv){
 				if (pktSize < 1) pktSize = 1;
 				if (pktSize > XIA_MAXBUF) pktSize = XIA_MAXBUF;
 				break;
+			case 'i':
+				// interval sleep time
+				// if 0, send random sized packets
+				sleepTime = atoi(optarg);
+				break;
 			default:
 				help(basename(argv[0]));
 				break;
 		}
 	}
 }
+
 
 /**
  * write the message to stdout, and exit the app
@@ -136,7 +146,7 @@ void *mainLoopThread(void * /*arg*/){
 
 	int ssock;
 
-    if ((ssock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0){
+    if ((ssock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0){
 		die(-2, "unable to create the server socket\n");
 	}
     
@@ -167,6 +177,7 @@ void *mainLoopThread(void * /*arg*/){
             printf("Xsock %4d sent %d of %d bytes\n", ssock, nsntBytes, \
                 pktSize);
         }
+        usleep(sleepTime);
 	}
     
 	Xclose(ssock);
@@ -202,8 +213,8 @@ int main(int argc, char **argv){
 	}
 
 
-	if (Xgetaddrinfo(STREAM_NAME, NULL, NULL, &ai)){
-		die(-1, "unable to lookup name %s\n", STREAM_NAME);
+	if (Xgetaddrinfo(DGRAM_NAME, NULL, NULL, &ai)){
+		die(-1, "unable to lookup name %s\n", DGRAM_NAME);
     }
     
 	sa = (sockaddr_x*)ai->ai_addr;

@@ -31,7 +31,7 @@ all: $(ALL)
 	$(CPP) $(CPPFLAGS) $(INCS) -c $< -o $@
 
 waveserver: waveserver.o configfile.o
-	$(CPP) $(CPPFLAGS) -g $(LDFLAGS) $^ -o $@
+	$(CPP) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
 
 clean:
 	rm -f *.o

@@ -57,6 +57,7 @@ void help(const char *name){
 	exit(0);
 }
 
+
 /**
  * configure the app
  */
@@ -103,6 +104,7 @@ void getConfig(int argc, char** argv){
 		}
 	}
 }
+
 
 /**
  * write the message to stdout, and exit the app
@@ -189,8 +191,7 @@ void *mainLoopThread(void * /*arg*/){
         }
 
         if (verbose){
-            printf("sock %4d sent %d of %d bytes\n", ssock, nsntBytes, \
-                pktSize);
+            printf("sock %4d sent %d of %d bytes\n", ssock, nsntBytes, pktSize);
         }
 	}
     

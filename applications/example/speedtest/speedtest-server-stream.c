@@ -104,20 +104,20 @@ void processClient(int sock){
 	fd_set fds;
 	FD_ZERO(&fds);
 	FD_SET(sock, &fds);
-/*
+
 #ifdef USE_SELECT
 	struct timeval tv;
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 #endif
-*/
+
     memset(buf, 0, sizeof(buf));
     unsigned long long ntotalBytes = 0;
     time_t startTime = time(NULL);
 
    	while (1) {
 
-/*
+
 #ifdef USE_SELECT
 		tv.tv_sec = WAIT_FOR_DATA;
 		tv.tv_usec = 0;
@@ -134,7 +134,7 @@ void processClient(int sock){
 			 die(-4, "something is really wrong, exiting\n");
 		 }
 #endif
-*/
+
 		if ((nrcvdBytes = Xrecv(sock, buf, sizeof(buf), 0)) < 0) {
 			printf("Recv error on socket %d, closing connection\n", pid);
 			break;
@@ -154,7 +154,7 @@ void processClient(int sock){
     const time_t deltat = endTime-startTime;
     const double throughput = ((double)ntotalBytes)/(deltat)/1e6;
     printf("Test complete: %us @ %.2f MB/s\n", (unsigned int)deltat, \
-            throughput);
+        throughput);
 
 	Xclose(sock);
 }
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]){
     }
 
     // wait for them clients
-	int acceptor, sock;
+	int acceptorfd, sockfd;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
 	if (signal(SIGCHLD, reaper) == SIG_ERR){
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]){
         printf("Stream service started\n");
     }
 
-	if ((acceptor = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
+	if ((acceptorfd = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
 		die(-2, "unable to create the stream socket\n");
     }
 
@@ -221,29 +221,29 @@ int main(int argc, char *argv[]){
         printf("registered name: \n%s\n", STREAM_NAME);
     }
 
-	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0){
+	if (Xbind(acceptorfd, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0){
 		die(-3, "unable to bind to the dag\n");
 	}
 
-	Xlisten(acceptor, 5);
+	Xlisten(acceptorfd, 5);
 
 	while (1) {
 
         if (verbose){
-            printf("Xsock %4d waiting for a new connection.\n", acceptor);
+            printf("Xsock %4d waiting for a new connection.\n", acceptorfd);
         }
         
 		sockaddr_x sa;
 		socklen_t sz = sizeof(sa);
 
-		if ((sock = Xaccept(acceptor, (sockaddr*)&sa, &sz)) < 0){
-			printf("Xsock %d accept failure! error = %d\n", acceptor, errno);
+		if ((sockfd = Xaccept(acceptorfd, (sockaddr*)&sa, &sz)) < 0){
+			printf("Xsock %d accept failure! error = %d\n", acceptorfd, errno);
 			// FIXME: should we die here instead or try and recover?
 			continue;
 		}
 
 		Graph g(&sa);
-        printf("Xsock %4d new session\npeer:%s\n", sock, \
+        printf("Xsock %4d new session\npeer:%s\n", sockfd, \
             g.dag_string().c_str());
         
 
@@ -254,18 +254,18 @@ int main(int argc, char *argv[]){
 
 		} else if (pid == 0) {
 			// close the parent's listening socket
-			Xclose(acceptor);
+			Xclose(acceptorfd);
 
-			processClient(sock);
+			processClient(sockfd);
 			exit(0);
 
 		} else {
 			// close the child's socket
-			Xclose(sock);
+			Xclose(sockfd);
 		}
 	}
 
-	Xclose(acceptor);
+	Xclose(acceptorfd);
 
 	return 0;
 }
