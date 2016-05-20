@@ -13,8 +13,6 @@ SANDBOXLIB=$SANDBOX/lib
 SANDBOXXIA=$SANDBOX/$XIADIR
 ORIGDIR=`pwd`
 
-TARBALL=${SANDBOX}.tar.gz
-
 # Make sure we are running from xia-core
 CURRENTDIR=`pwd`
 CURRENTDIRNAME=`basename $CURRENTDIR`
