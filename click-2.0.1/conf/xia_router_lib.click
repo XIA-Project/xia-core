@@ -158,7 +158,7 @@ elementclass XIALineCard {
 	
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
-	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> Align(4, 0) -> c;
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> c;
    
 	// Received a network joining packet
 	c[3] -> xnetj :: XNetJ($mac) -> toNet;
@@ -296,7 +296,7 @@ elementclass XIARoutingCore {
 	input -> [0]n;
 
 	srcTypeClassifier :: XIAXIDTypeClassifier(src CID, -);
-	n[1] -> Align(4, 0) -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
+	n[1] -> c[1] -> srcTypeClassifier[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
 	srcTypeClassifier[0] -> Discard;	// do not send CID responses directly to RPC;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
 	

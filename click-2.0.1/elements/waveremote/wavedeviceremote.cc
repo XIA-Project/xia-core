@@ -35,8 +35,7 @@
 #include <arpa/inet.h> /* htons(), htonl(), etc... */
 #include <netdb.h> /* getaddrinfo() */
 
-#include <sstream>
-#include <iomanip>
+#include <iomanip> // std::hex, etc
 #include <cstring> /* memcpy() */
 
 #include "wavedeviceremote.hh"
@@ -471,7 +470,7 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     // packet contents
     memcpy(&pktBuf[idx], p->data(), p->length());
     idx += p->length();
-    
+
     assert(pktLen == idx); // pktlen does not include the length field
 
     bool done = false;
@@ -481,9 +480,6 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
             errh->debug("%s, sending server %d bytes (%d byte payload)", \
                 declaration().c_str(), pktLen, p->length());
 #endif
-
-        click_chatter("waveremote device sending %d bytes", p->length());
-
 
         errno = 0;
         if (send(_remoteSockFd, pktBuf, pktLen, 0 /*flags*/) < 0){ // error
@@ -496,7 +492,7 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
             else if (errno == EINTR)
                 continue;
             
-            // connection 1probably terminated or other fatal error
+            // connection probably terminated or other fatal error
             else {
                 errh->error("%s, write_packet(): strerror=%s", \
                     declaration().c_str(), strerror(errno));
@@ -552,20 +548,15 @@ void* WaveDeviceRemote::receiver_thread(void *arg){
         if ((nrcvd = recv(remoteSockFd, rcvBuf, bufLen, 0 /*flags*/)) > 0){
 
             // got something to work with
-//#ifdef DEBUG
-//            errh->debug("%s, received %d bytes", \
-//                wdrInst->declaration().c_str(), nrcvd);
-//#endif
-
             int rcvBufIdx = 0;
             int nLeft = nrcvd;
 
             while (nLeft > 0){ // meaning there is still stuff to consume
 
                 if (pktLen == 0) { // at the beginning of a packet
-    
-                    if ((pktBufIdx + nLeft) >= 2){ // have enough to fill in pktLen
-                
+
+                    if ((pktBufIdx + nLeft) >= 2){ // have enough to fill pktLen
+
                         // copy to packet buffer
                         assert(pktBufIdx < 2);
                         const int ncpy = 2-pktBufIdx;
@@ -583,7 +574,7 @@ void* WaveDeviceRemote::receiver_thread(void *arg){
                         pktLen = ntohs(pktLen); // back to host order
 
                     } else { // don't have enough to fill packet length
-                    
+
                         assert(pktLen == 0 and nLeft == 1); // ensuring sanity
                         assert(pktBufIdx == 0);
 
@@ -677,8 +668,6 @@ void WaveDeviceRemote::selected(int fd, int /*mask*/){
                                       _pipeBuf, /* data */
                                       nbytesRead, /* length */
                                       0 /* tailroom */);
-
-    click_chatter("waveremote device receiving %d bytes", nbytesRead);
 
     if (rq){ // non zero means success, I believe
 

@@ -131,11 +131,19 @@ void* receiver_thread(void */*arg*/){
                 // copy data contents 
                 memcpy(&rcvBuf[2], &rxPkt.data.contents, rxPkt.data.length);
 
-//    std::cerr << "Received wsm w/ " << rxPkt.data.length << " bytes" << std::endl;
-
 #ifdef DEBUG
-            std::cout << "going to send a " << totalPktLen << \
-                " byte packet to the client" << std::endl;
+                std::cout << "Received wsm, " << rxPkt.data.length << \
+                    " bytes, from mac: ";
+
+                for (int i=0; i < IEEE80211_ADDR_LEN; i++){
+                    const uint8_t byte = rxPkt.macaddr[i];
+                    std::cout << std::hex << std::setfill('0') << \
+                    std::setw(2) << static_cast<unsigned>(byte);
+                    if (i < (IEEE80211_ADDR_LEN-1)){
+                        std::cout << ":";
+                    }
+                }
+                std::cout << std::endl;
 #endif
 
                 if (write(_cliSockFd, rcvBuf, totalPktLen) < 0){
@@ -163,7 +171,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
 
     int idx=0;
     // deserialize
-    
+
     // packet length
     uint16_t plen;
     memcpy(&plen, &pktBuf[idx], 2);
@@ -178,7 +186,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     // destination mac
     memcpy(&wsmReq.macaddr, &pktBuf[idx], IEEE80211_ADDR_LEN);
     idx += IEEE80211_ADDR_LEN;
-     
+
     // channel
     memcpy(&wsmReq.chaninfo.channel, &pktBuf[idx], 1);
     idx += 1;
@@ -205,17 +213,31 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     assert(idx == pktLen);
 
 #ifdef DEBUG
-    std::cerr << "Sending WSM: channel=" << (uint16_t) wsmReq.chaninfo.channel \
-        << ", txpower=" << (uint16_t) wsmReq.chaninfo.txpower << \
-        ", data rate index=" << (uint16_t) wsmReq.chaninfo.rate << \
-        ", priority=" << (uint16_t) wsmReq.txpriority << \
-        ", content length=" << conLen << std::endl;
+    std::cout << "Sending wsm, " << conLen << " bytes, from mac: ";
+
+    for (int i=0; i < IEEE80211_ADDR_LEN; i++){
+        const uint8_t byte = wsmReq.srcmacaddr[i];
+        std::cout << std::hex << std::setfill('0') << \
+        std::setw(2) << static_cast<unsigned>(byte);
+        if (i < (IEEE80211_ADDR_LEN-1)){
+            std::cout << ":";
+        }
+    }
+
+    std::cout << ", to mac: ";
+    for (int i=0; i < IEEE80211_ADDR_LEN; i++){
+        const uint8_t byte = wsmReq.macaddr[i];
+        std::cout << std::hex << std::setfill('0') << \
+        std::setw(2) << static_cast<unsigned>(byte);
+        if (i < (IEEE80211_ADDR_LEN-1)){
+            std::cout << ":";
+        }
+    }
+    std::cout << std::endl;
 #endif
 
-//    std::cerr << "Sending wsm w/ " << conLen << " bytes" << std::endl;
-
     // the packet is now fully assembled and ready to be sent
-    
+
     // send WSM
     if (txWSMPacket(_pid, &wsmReq) < 0){
         std::cerr << "handleClient(), txWSMPacket(): " << strerror(errno) << \
@@ -246,9 +268,9 @@ void handleClient(){
             while (nLeft > 0){ // meaning there is still stuff to consume
 
                 if (pktLen == 0) { // at the beginning of a packet
-    
-                    if ((pktBufIdx + nLeft) >= 2){ // have enough to fill in pktLen
-                
+
+                    if ((pktBufIdx + nLeft) >= 2){ // have enough to fill pktLen
+
                         // copy to packet buffer
                         assert(pktBufIdx < 2);
                         const int ncpy = 2-pktBufIdx;
@@ -264,9 +286,9 @@ void handleClient(){
                         // now set packet length
                         memcpy(&pktLen, pktBuf, 2); // copy to pktLen
                         pktLen = ntohs(pktLen); // back to host order
-                    
+
                     } else { // don't have enough to fill packet length
-                    
+
                         assert(pktLen == 0 and nLeft == 1); // ensuring sanity
                         assert(pktBufIdx == 0);
 
@@ -287,7 +309,7 @@ void handleClient(){
                     // let us copy as much as we can
                     const int nmissing = pktLen-pktBufIdx;
                     const int ncpy = nmissing < nLeft ? nmissing : nLeft;
-                    
+
                     memcpy(&pktBuf[pktBufIdx], &rcvBuf[rcvBufIdx], ncpy);
 
                     // update state variables
@@ -299,11 +321,6 @@ void handleClient(){
 
                     if (nmissing == ncpy) { // got complete packet, send it out!
                         assert(pktBufIdx == pktLen);
-
-#ifdef DEBUG
-                        std::cout << "server extracted a rcvd packet (" << \
-                            pktLen << " bytes)" << std::endl;
-#endif
 
                         // parse and send it out the air interface
                         parseAndSendWSM(pktBuf, pktLen);
@@ -567,7 +584,7 @@ int main(int argc, char *argv[]){
         } else{ // success!
 
 #ifdef DEBUG
-            std::cout << "got a client from " << \
+            std::cout << "Got a client from " << \
                 inet_ntoa(clientAddr.sin_addr) << " on port " << \
                 htons(clientAddr.sin_port) << std::endl;
 #endif
