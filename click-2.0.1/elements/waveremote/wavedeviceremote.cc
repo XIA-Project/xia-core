@@ -482,6 +482,9 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
                 declaration().c_str(), pktLen, p->length());
 #endif
 
+        click_chatter("waveremote device sending %d bytes", p->length());
+
+
         errno = 0;
         if (send(_remoteSockFd, pktBuf, pktLen, 0 /*flags*/) < 0){ // error
 
@@ -639,7 +642,7 @@ strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
             }
 
         } else if (errno != EAGAIN){
-//            errh->error("recv: %s", strerror(errno));
+            errh->error("recv: %s", strerror(errno));
         }
     }
 
@@ -674,6 +677,8 @@ void WaveDeviceRemote::selected(int fd, int /*mask*/){
                                       _pipeBuf, /* data */
                                       nbytesRead, /* length */
                                       0 /* tailroom */);
+
+    click_chatter("waveremote device receiving %d bytes", nbytesRead);
 
     if (rq){ // non zero means success, I believe
 

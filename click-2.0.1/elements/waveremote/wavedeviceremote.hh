@@ -155,7 +155,7 @@ private:
     int _remoteSockFd;
 
     int _pipeFd[2];         // pipe file descriptors
-    uint8_t* _pipeBuf; // buffer for reading from the pipe
+    uint8_t* _pipeBuf;      // buffer for reading from the pipe
     pthread_mutex_t _pipeMutex;
 };
 

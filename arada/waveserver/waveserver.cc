@@ -47,7 +47,7 @@ int _waveRole = WAVE_PROVIDER;
 pid_t _pid=0;
 pthread_t _rcvrTid=0;
 int _servSockFd=0, _cliSockFd=0;
-
+uint32_t _pPsid = 5;
 
 static WMEApplicationRequest _wmeReq;
 
@@ -131,6 +131,8 @@ void* receiver_thread(void */*arg*/){
                 // copy data contents 
                 memcpy(&rcvBuf[2], &rxPkt.data.contents, rxPkt.data.length);
 
+//    std::cerr << "Received wsm w/ " << rxPkt.data.length << " bytes" << std::endl;
+
 #ifdef DEBUG
             std::cout << "going to send a " << totalPktLen << \
                 " byte packet to the client" << std::endl;
@@ -157,6 +159,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     static WSMRequest wsmReq; // has to be static for unknown reasons!
     wsmReq.version = 1;
     wsmReq.security = 0;
+    wsmReq.psid = _pPsid; // mandatory, must match registration
 
     int idx=0;
     // deserialize
@@ -208,6 +211,8 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
         ", priority=" << (uint16_t) wsmReq.txpriority << \
         ", content length=" << conLen << std::endl;
 #endif
+
+//    std::cerr << "Sending wsm w/ " << conLen << " bytes" << std::endl;
 
     // the packet is now fully assembled and ready to be sent
     
@@ -383,13 +388,12 @@ int main(int argc, char *argv[]){
 	}
 
     // psid
-	unsigned int pPsid = 5;
 	try{
-		pPsid = (unsigned int) std::atol(conf.Value("wave", "psid").c_str());
+		_pPsid = (uint32_t) std::atol(conf.Value("wave", "psid").c_str());
 
 	} catch (char const *str) {
 		std::cerr << "Config error: section=wave, value=psid (" << str \
-            << "), using default value " << pPsid << "." << std::endl;
+            << "), using default value " << _pPsid << "." << std::endl;
 	}
     
     // priority
@@ -432,7 +436,7 @@ int main(int argc, char *argv[]){
     // build PST entry
     memset(&_wmeReq, 0, sizeof(WMEApplicationRequest)); // clean slate
     _wmeReq.channel = pChannel;
-    _wmeReq.psid = pPsid;
+    _wmeReq.psid = _pPsid;
     _wmeReq.priority = pPriority;
 
     _pid = getpid();
