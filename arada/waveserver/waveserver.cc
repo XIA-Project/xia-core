@@ -179,14 +179,6 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     plen = ntohs(plen);
     assert(plen == pktLen); // otherwise something's very wrong!
     
-    // source mac
-    memcpy(&wsmReq.srcmacaddr, &pktBuf[idx], IEEE80211_ADDR_LEN);
-    idx += IEEE80211_ADDR_LEN;
-    
-    // destination mac
-    memcpy(&wsmReq.macaddr, &pktBuf[idx], IEEE80211_ADDR_LEN);
-    idx += IEEE80211_ADDR_LEN;
-
     // channel
     memcpy(&wsmReq.chaninfo.channel, &pktBuf[idx], 1);
     idx += 1;
@@ -211,6 +203,14 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     memcpy(&wsmReq.data.contents, &pktBuf[idx], conLen);
     idx += conLen;
     assert(idx == pktLen);
+    
+    // destination mac is bytes 0-5 of the packet contents
+    memcpy(&wsmReq.macaddr, &wsmReq.data.contents[0], IEEE80211_ADDR_LEN);
+
+    // source mac is bytes 6-11 of the packet contents
+    memcpy(&wsmReq.srcmacaddr, &wsmReq.data.contents[IEEE80211_ADDR_LEN], \
+        IEEE80211_ADDR_LEN);
+    
 
 #ifdef DEBUG
     std::cout << "Sending wsm, " << conLen << " bytes, from mac: ";

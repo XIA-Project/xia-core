@@ -425,10 +425,9 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     assert(_isConnected); // because initialize runs before
 
     // calculate packet length
-    // 2 (length) + 6 (src mac) + 6 (dst mac) + 1 (channel) + 1 (txpower) +
-    // 1 (data rate index) + 1 (user priority) + content length =
-    // 18 + content length
-    const int pktLen = 18 + p->length();
+    // 2 (length) + 1 (channel) + 1 (txpower) + 1 (data rate index) + 
+    // 1 (user priority) + content length = 6 + content length
+    const int pktLen = 6 + p->length();
 
     // serialize everything
     uint8_t pktBuf[_bufLen];
@@ -439,17 +438,6 @@ int WaveDeviceRemote::write_packet(Packet *p, ErrorHandler *errh){
     const uint16_t pktLenNet = htons((uint16_t) pktLen);
     memcpy(&pktBuf[idx], &pktLenNet, 2);
     idx += 2;
-
-    // source mac
-    // this code assumes the packet is an ethernet frame. so beware!
-    // packet is an ethernet frame
-    const click_ether *ethHeader = p->ether_header();
-    memcpy(&pktBuf[idx], &(ethHeader->ether_shost), 6);
-    idx += 6;
-
-    // destination mac
-    memcpy(&pktBuf[idx], &(ethHeader->ether_dhost), 6);
-    idx += 6;
     
     // channel
     memcpy(&pktBuf[idx], &_channel, 1);
