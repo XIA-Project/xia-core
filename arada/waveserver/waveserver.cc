@@ -132,8 +132,8 @@ void* receiver_thread(void */*arg*/){
                 memcpy(&rcvBuf[2], &rxPkt.data.contents, rxPkt.data.length);
 
 #ifdef DEBUG
-                std::cout << "Received wsm, " << rxPkt.data.length << \
-                    " bytes, from mac: ";
+                std::cout << "Received wsm, " << std::dec << rxPkt.data.length \
+                << " bytes, from mac: ";
 
                 for (int i=0; i < IEEE80211_ADDR_LEN; i++){
                     const uint8_t byte = rxPkt.macaddr[i];
@@ -196,7 +196,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     idx += 1;
 
     // packet contents
-    const int conLen = pktLen-18;
+    const int conLen = pktLen-6;
     assert(conLen > 0);
     assert(conLen < FOURK);
     wsmReq.data.length = conLen;
@@ -213,7 +213,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     
 
 #ifdef DEBUG
-    std::cout << "Sending wsm, " << conLen << " bytes, from mac: ";
+    std::cout << "Sending wsm, " << std::dec << conLen << " bytes, from mac: ";
 
     for (int i=0; i < IEEE80211_ADDR_LEN; i++){
         const uint8_t byte = wsmReq.srcmacaddr[i];
