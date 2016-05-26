@@ -1,6 +1,8 @@
 #ifndef CLICK_XSTREAM_HH
 #define CLICK_XSTREAM_HH
 
+#define CLICK_XIA
+
 #include <click/element.hh>
 #include <clicknet/xia.h>
 #include <click/xid.hh>

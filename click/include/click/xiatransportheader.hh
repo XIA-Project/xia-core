@@ -15,45 +15,38 @@ CLICK_DECLS
 class TransportHeaderEncap;
 
 class TransportHeader : public XIAGenericExtHeader { public:
-    TransportHeader(const struct click_xia_ext* hdr) :XIAGenericExtHeader(hdr) {};
-    TransportHeader(const Packet* p):XIAGenericExtHeader(p) {};
+    TransportHeader(const struct click_xia_ext* hdr) :XIAGenericExtHeader(hdr) {
+		_tcphdr = (struct click_tcp*)(hdr + sizeof(struct click_xia_ext));
+	};
 
-    //uint8_t opcode() { if (!exists(OPCODE)) return 0 ; return *(const uint8_t*)_map[OPCODE].data();};  
-    uint8_t type() { if (!exists(TYPE)) return 0 ; return *(const uint8_t*)_map[TYPE].data();}; 
-    
-    void* header() {
-        if (!exists(HEADER)) return NULL;
-        return (void *)(_map[HEADER].data());
-    }
+	TransportHeader(const Packet* p):XIAGenericExtHeader(p) {
+		_tcphdr = (struct click_tcp*)(_hdr + sizeof(struct click_xia_ext));
+	};
 
-    u_char* tcpopt() {
-        if (!exists(TCPOPT)) return NULL;
-        return (u_char *)(_map[TCPOPT].data());
-    }
+    uint8_t type() { return _type; };
+    const void* header() {return _tcphdr; };
+    u_char* tcpopt() { return (u_char*)_tcphdr + sizeof(struct click_tcp); };
+	uint32_t seq_num() { return _tcphdr->th_seq; };
+	uint32_t ack_num() {  return _tcphdr->th_ack; };
+	uint32_t recv_window() { return _tcphdr->th_win; };
 
-    bool exists(uint8_t key) { return (_map.find(key)!=_map.end()); }
-    
-    uint8_t pkt_info() { if (!exists(PKT_INFO)) return 0 ; return *(const uint8_t*)_map[PKT_INFO].data();}; 
-    //XID src_xid() { if (!exists(SRC_XID)) return 0; return *(const XID*)_map[SRC_XID].data();};  
-    //XID dst_xid() { if (!exists(DST_XID)) return 0; return *(const XID*)_map[DST_XID].data();};  
-    uint32_t seq_num() { if (!exists(SEQ_NUM)) return 0; return *(const uint32_t*)_map[SEQ_NUM].data();};  
-    uint32_t ack_num() { if (!exists(ACK_NUM)) return 0; return *(const uint32_t*)_map[ACK_NUM].data();};  
-    uint16_t length() { if (!exists(LENGTH)) return 0; return *(const uint16_t*)_map[LENGTH].data();};  
-	uint32_t recv_window() { if (!exists(RECV_WINDOW)) return 0; return *(const uint32_t*)_map[RECV_WINDOW].data();};
-    
-    //uint16_t offset() { if (!exists(OFFSET)) return 0; return *(const uint16_t*)_map[OFFSET].data();};  
-    //uint32_t chunk_offset() { if (!exists(CHUNK_OFFSET)) return 0; return *(const uint32_t*)_map[CHUNK_OFFSET].data();};  
-    //uint16_t length() { if (!exists(LENGTH)) return 0; return *(const uint16_t*)_map[LENGTH].data();};  
-    //uint32_t chunk_length() { if (!exists(CHUNK_LENGTH)) return 0; return *(const uint32_t*)_map[CHUNK_LENGTH].data();};  
-    
+	// FIXME: not needed?
+	// uint16_t length() { return _length; };
+	// uint8_t pkt_info() { return _pktinfo; };
+	// uint8_t opcode() { if (!exists(OPCODE)) return 0 ; return *(const uint8_t*)_map[OPCODE].data();};
 
-    enum { TYPE, HEADER, TCPOPT, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW}; 
-    enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
-    enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
+//    enum { TYPE, HEADER, TCPOPT, PKT_INFO, SRC_XID, DST_XID, SEQ_NUM, ACK_NUM, LENGTH, RECV_WINDOW};
+	enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
+
+//    enum { XSOCK_STREAM=1, XSOCK_DGRAM, XSOCK_RAW, XSOCK_CHUNK};
 
     static const char *TypeStr(char type);
-    
-    //enum { OP_REQUEST=1, OP_RESPONSE, OP_LOCAL_PUTCID, OP_REDUNDANT_REQUEST};
+
+private:
+	struct click_tcp *_tcphdr;
+	uint8_t _type;
+	// uint16_t _length;
+	// uint8_t _pktinfo;
 };
 
 class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
@@ -62,56 +55,84 @@ class TransportHeaderEncap : public XIAGenericExtHeaderEncap { public:
     //TransportHeaderEncap(uint16_t offset, uint32_t chunk_offset, uint16_t length, uint32_t chunk_length, char opcode= TransportHeader::OP_RESPONSE);
 
     //TransportHeaderEncap(char type, char pkt_info, XID src_xid, XID dst_xid, uint32_t seq_num, uint32_t ack_num, uint16_t length);
-    TransportHeaderEncap(char type, char pkt_info, uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window);
+//    TransportHeaderEncap(char type, char pkt_info, uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window);
 
     //static TransportHeaderEncap* MakeRequestHeader() { return new TransportHeaderEncap(TransportHeader::OP_REQUEST,0,0); };
     //static TransportHeaderEncap* MakeRPTRequestHeader() { return new TransportHeaderEncap(TransportHeader::OP_REDUNDANT_REQUEST,0,0); };
     TransportHeaderEncap(char type);
-    
+
     static TransportHeaderEncap* MakeTCPHeader(click_tcp *tcph) {
-    TransportHeaderEncap* hdr = new TransportHeaderEncap(TransportHeader::XSOCK_STREAM);
-    hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
-    hdr -> update();
-     return hdr;
+    	TransportHeaderEncap* hdr = new TransportHeaderEncap(SOCK_STREAM);
+
+		assert(tcph != NULL);
+		memcpy(&hdr->_tcphdr, tcph, sizeof(struct click_tcp));
+    	hdr->update();
+     	return hdr;
     }
 
     static TransportHeaderEncap* MakeTCPHeader(click_tcp *tcph, u_char *opt, unsigned optlen) {
-    TransportHeaderEncap* hdr = new TransportHeaderEncap(TransportHeader::XSOCK_STREAM);
-    hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
-    hdr->map()[TransportHeader::TCPOPT] = String((const char*)opt, optlen);
-    hdr -> update();
-     return hdr;
+		assert(tcph != NULL);
+
+    	TransportHeaderEncap* hdr = new TransportHeaderEncap(SOCK_STREAM);
+
+		memcpy(&hdr->_tcphdr, tcph, sizeof(struct click_tcp));
+		hdr->_options = (u_char*)malloc(optlen);
+		memcpy(hdr->_options, opt, optlen);
+		hdr->_optlen = optlen;
+
+    	// hdr->map()[TransportHeader::HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
+    	// hdr->map()[TransportHeader::TCPOPT] = String((const char*)opt, optlen);
+    	hdr->update();
+     	return hdr;
     }
 
-    static TransportHeaderEncap* MakeSYNHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
+	static TransportHeaderEncap* MakeDGRAMHeader(uint16_t /* length */) {
+		TransportHeaderEncap* hdr = new TransportHeaderEncap(SOCK_DGRAM);
+		return hdr;
+	}
+
+	~TransportHeaderEncap() {
+		delete _tcphdr;
+		delete _options;
+		_tcphdr = NULL;
+		_options = NULL;
+	}
+
+	void update();
+
+private:
+	uint8_t _type;
+	struct click_tcp *_tcphdr;
+	u_char *_options;
+	unsigned _optlen;
+
+/*
+    static TransportHeaderEncap* MakeSYNHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::SYN, seq_num, ack_num, length, recv_window); };
 
-    static TransportHeaderEncap* MakeSYNACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
-                        { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::SYNACK, seq_num, ack_num, length, recv_window); }; 
+    static TransportHeaderEncap* MakeSYNACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
+                        { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::SYNACK, seq_num, ack_num, length, recv_window); };
 
-    static TransportHeaderEncap* MakeDATAHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
-                        { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::DATA, seq_num, ack_num, length, recv_window); }; 
+    static TransportHeaderEncap* MakeDATAHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
+                        { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::DATA, seq_num, ack_num, length, recv_window); };
 
-    static TransportHeaderEncap* MakeACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
+    static TransportHeaderEncap* MakeACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::ACK, seq_num, ack_num, length, recv_window); };
 
-    static TransportHeaderEncap* MakeFINHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
+    static TransportHeaderEncap* MakeFINHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::FIN, seq_num, ack_num, length, recv_window); };
 
-    static TransportHeaderEncap* MakeFINACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window ) 
+    static TransportHeaderEncap* MakeFINACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::FINACK, seq_num, ack_num, length, recv_window); };
 
     static TransportHeaderEncap* MakeRSTHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::RST, seq_num, ack_num, length, recv_window); };
-
     static TransportHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::MIGRATE, seq_num, ack_num, length, recv_window); };
 
     static TransportHeaderEncap* MakeMIGRATEACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
                         { return new TransportHeaderEncap(TransportHeader::XSOCK_STREAM, TransportHeader::MIGRATEACK, seq_num, ack_num, length, recv_window); };
-
-    static TransportHeaderEncap* MakeDGRAMHeader( uint16_t length ) 
-                        { return new TransportHeaderEncap(TransportHeader::XSOCK_DGRAM, TransportHeader::DATA, -1, -1, length, -1); }; 
+*/
 };
 
 

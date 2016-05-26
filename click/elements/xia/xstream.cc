@@ -106,6 +106,8 @@ XStream::tcp_input(WritablePacket *p)
 	//printf("\t\t\ttcpinput data length is %d\n", (int)ti.ti_len);
 	/*205 packet should be sane, skip tests */
 	off = ti.ti_off << 2;
+
+	// DRB: why is this test disabled???
 	if (0&&off < sizeof(click_tcp)) {
 		get_transport()->_tcpstat.tcps_rcvbadoff++;
 		p->kill();
@@ -2022,7 +2024,7 @@ XStream::tcp_newtcpcb()
 
 
 XStream::XStream(XTRANSPORT *transport, const unsigned short port)
-	: sock(transport, port, TransportHeader::XSOCK_STREAM), _q_recv(this), _q_usr_input(this)
+	: sock(transport, port, SOCK_STREAM), _q_recv(this), _q_usr_input(this)
 {
 
 	tp = tcp_newtcpcb();

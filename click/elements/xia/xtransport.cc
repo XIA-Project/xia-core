@@ -483,6 +483,7 @@ void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah)
 
 WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 {
+#if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
 
@@ -498,6 +499,8 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 	delete new_thdr;
 
 	return copy;
+#endif
+	return NULL;
 }
 
 
@@ -655,7 +658,7 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now)
 {
 	bool rc = false;
-
+#if 0
 	if (sk->num_migrate_tries <= MAX_RETRANSMIT_TRIES) {
 		DBG("Socket %d MIGRATE retransmit\n", _sport);
 
@@ -674,7 +677,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &n
 		sk->migrateack_waiting = false;
 		rc = true;
 	}
-
+#endif
 	return rc;
 }
 
@@ -1147,11 +1150,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	}
 
 	switch(thdr.type()) {
-		case TransportHeader::XSOCK_STREAM:
+		case SOCK_STREAM:
 			ProcessStreamPacket(p_in);
 			break;
 
-		case TransportHeader::XSOCK_DGRAM:
+		case SOCK_DGRAM:
 			ProcessDatagramPacket(p_in);
 			break;
 
@@ -1299,6 +1302,7 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 // pass all as params?
 void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 {
+#if 0
 	XIAHeader xiah(p_in->xia_header());
 
 	XIAPath dst_path = xiah.dst_path();
@@ -1473,6 +1477,7 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 
 	// 6. Notify the api of MIGRATE reception
 	//   Do we need to? -Nitin
+#endif
 }
 
 
@@ -2605,6 +2610,7 @@ Xaccept_done:
 
 void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+#if 0
 	sock *sk = portToSock.get(_sport);
 
 	// Retrieve rendezvous service DAG from user provided argument
@@ -2680,6 +2686,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	delete thdr;
 
 	output(NETWORK_PORT).push(p);
+#endif
 }
 
 
@@ -2929,7 +2936,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	}
 	NOTICE("new address is - %s", new_local_addr.c_str());
 	_local_addr.parse(new_local_addr);
-
+#if 0
 	// Inform all active stream connections about this change
 	for (HashTable<unsigned short, sock*>::iterator iter = portToSock.begin(); iter != portToSock.end(); ++iter ) {
 		unsigned short _migrateport = iter->first;
@@ -3056,7 +3063,7 @@ void XTRANSPORT::Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 		}
 		output(NETWORK_PORT).push(p);
 	}
-
+#endif
 	ReturnResult(_sport, xia_socket_msg);
 
 

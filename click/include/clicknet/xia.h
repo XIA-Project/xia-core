@@ -4,8 +4,9 @@
 
 /*
  * <clicknet/xia.h> -- XIA packet header, only works in user-level click
- * 
+ *
  */
+
 
 #define CLICK_XIA_XID_TYPE_UNDEF    (0)
 #define CLICK_XIA_XID_TYPE_AD       (0x10)
@@ -72,7 +73,7 @@ struct click_xia {
 
 // XIA extension header
 #pragma pack(push)
-#pragma pack(1)    
+#pragma pack(1)
 struct click_xia_ext {
     uint8_t nxt;			/* next header */
     uint8_t hlen;			/* header length (not payload length) */
