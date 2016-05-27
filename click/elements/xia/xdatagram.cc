@@ -40,6 +40,7 @@ XDatagram::push(WritablePacket *p_in) {
 
 bool
 XDatagram::should_buffer_received_packet(WritablePacket *p) {
+	UNUSED(p);
 	if (recv_buffer_count < recv_buffer_size) return true;
 	else return false;
 }

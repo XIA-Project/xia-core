@@ -14,7 +14,7 @@ CLICK_DECLS
 class XIAGenericExtHeader { public:
     XIAGenericExtHeader(const XIAGenericExtHeader& r); // copy constructor
 
-    XIAGenericExtHeader(const struct click_xia_ext* hdr); 
+    XIAGenericExtHeader(const struct click_xia_ext* hdr);
     XIAGenericExtHeader(const Packet* p);  // read from packet p->network_header() should point to XIA header
 
     inline const struct click_xia_ext* hdr() const;
@@ -23,17 +23,17 @@ class XIAGenericExtHeader { public:
 
     inline const uint8_t& hlen() const;     // header length
 
-    inline const HashTable<uint8_t, String>& map() const;  // return key-value map
+    //inline const HashTable<uint8_t, String>& map() const;  // return key-value map
 
     inline const uint8_t* payload() const;  // payload
 
 protected:
-    void populate_map();
+    //void populate_map();
 
 protected:
     const struct click_xia_ext* _hdr;
 
-    HashTable<uint8_t, String> _map;        // parsed key-value map
+    //HashTable<uint8_t, String> _map;        // parsed key-value map
 
     inline XIAGenericExtHeader() : _hdr(NULL) { }  // for helping WritableXIAGenericExtHeader hide dangerous construction
 
@@ -79,16 +79,16 @@ class XIAGenericExtHeaderEncap { public:
 
     void set_nxt(uint8_t nxt);                  // set next header type
 
-    inline HashTable<uint8_t, String>& map();   // settable key-value map
+    //inline HashTable<uint8_t, String>& map();   // settable key-value map
 
-    void update();                              // update internel header structure
+    //void update();                              // update internel header structure
 
     // encapsulate the given packet with an XIA extension header. (need to manually call update() first)
     WritablePacket* encap(Packet* p_in) const;
 
-private:
+protected:
     struct click_xia_ext* _hdr;
-    HashTable<uint8_t, String> _map;            // current key-value map
+    //HashTable<uint8_t, String> _map;            // current key-value map
 };
 
 
@@ -110,11 +110,11 @@ XIAGenericExtHeader::hlen() const
     return _hdr->hlen;
 }
 
-inline const HashTable<uint8_t, String>&
-XIAGenericExtHeader::map() const
-{
-    return _map;
-}
+//inline const HashTable<uint8_t, String>&
+//XIAGenericExtHeader::map() const
+//{
+//    return _map;
+//}
 
 inline const uint8_t*
 XIAGenericExtHeader::payload() const
@@ -140,11 +140,11 @@ WritableXIAGenericExtHeader::payload()
     return const_cast<uint8_t*>(this->XIAGenericExtHeader::payload());
 }
 
-inline HashTable<uint8_t, String>&
-XIAGenericExtHeaderEncap::map()
-{
-    return _map;
-}
+//inline HashTable<uint8_t, String>&
+//XIAGenericExtHeaderEncap::map()
+//{
+//    return _map;
+//}
 
 CLICK_ENDDECLS
 #endif

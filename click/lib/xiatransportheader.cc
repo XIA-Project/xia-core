@@ -12,29 +12,70 @@
 #endif
 CLICK_DECLS
 
-TransportHeaderEncap::TransportHeaderEncap(char type){
-    this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
- //    this->map()[HEADER] = String((const char*)tcph, sizeof(struct click_tcp));
- //    // this->map()[TransportHeader::SRC_XID]= String((const char*)&src_xid, sizeof(src_xid));
- // //    //this->map()[TransportHeader::DST_XID]= String((const char*)&dst_xid, sizeof(dst_xid));
- // //    this->map()[TransportHeader::SEQ_NUM]= String((const char*)&seq_num, sizeof(seq_num));
- // //    this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));        
- // //    this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
-    // // this->map()[TransportHeader::RECV_WINDOW]= String((const char*)&recv_window, sizeof(recv_window));
- //    this->update();
-    this->update();
+TransportHeaderEncap::TransportHeaderEncap(char type)
+{
+	memset(&_tcphdr, 0, sizeof(struct click_tcp));
+	_type = type;
+	_options = NULL;
+	_optlen = 0;
+
+    //this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
+    update();
 }
 
-TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window) {
-    this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
-    this->map()[TransportHeader::PKT_INFO]= String((const char*)&pkt_info, sizeof(pkt_info));
-    //this->map()[TransportHeader::SRC_XID]= String((const char*)&src_xid, sizeof(src_xid));
-    //this->map()[TransportHeader::DST_XID]= String((const char*)&dst_xid, sizeof(dst_xid));
-    this->map()[TransportHeader::SEQ_NUM]= String((const char*)&seq_num, sizeof(seq_num));
-    this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));
-    this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
-	this->map()[TransportHeader::RECV_WINDOW]= String((const char*)&recv_window, sizeof(recv_window));
+#if 0
+TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window)
+{
+	memset(&_tcphdr, 0, sizeof(tcphdr));
+	_type = type;
+	_pktinfo = pkt_info;
+	_tcphdr.th_seq = seq_num;
+	_tcphdr.th_ack = ack_num;
+	_tcphdr.th_win = recv_window;
+	_length = length;
+
+
+//	this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
+//	this->map()[TransportHeader::PKT_INFO]= String((const char*)&pkt_info, sizeof(pkt_info));
+//	this->map()[TransportHeader::SEQ_NUM]= String((const char*)&seq_num, sizeof(seq_num));
+//	this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));
+//	this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
+//	this->map()[TransportHeader::RECV_WINDOW]= String((const char*)&recv_window, sizeof(recv_window));
     this->update();
+}
+#endif
+
+void
+TransportHeaderEncap::update()
+{
+	size_t padding = 0;
+    size_t size = sizeof(struct click_xia_ext);
+
+	size += sizeof(struct click_tcp);
+	size += _optlen;
+
+	if ((size & 3) != 0) {
+        padding = 4 - (size & 3);
+        size += padding;
+    }
+
+    click_xia_ext* new_hdr = reinterpret_cast<struct click_xia_ext*>(new uint8_t[size]);
+
+	struct click_tcp *t = (struct click_tcp*)(new_hdr + sizeof(struct click_xia_ext));
+	u_char *o = (u_char*)(t + sizeof(struct click_tcp));
+
+    memcpy(new_hdr, _hdr, sizeof(struct click_xia_ext));
+	memcpy(t, _tcphdr, sizeof(struct click_tcp));
+	memcpy(o, _options, _optlen);
+
+	if (padding) {
+		memset(o + _optlen, 0, padding);
+	}
+
+    new_hdr->hlen = size;
+
+    delete [] reinterpret_cast<uint8_t*>(_hdr);
+    _hdr = new_hdr;
 }
 
 const char *TransportHeader::TypeStr(char type)
@@ -55,14 +96,5 @@ const char *TransportHeader::TypeStr(char type)
     }
     return t;
 }
-/*
-TransportHeaderEncap::TransportHeaderEncap(uint8_t opcode, uint32_t chunk_offset, uint16_t length)
-{
-    this->map()[TransportHeader::CHUNK_OFFSET]= String((const char*)&chunk_offset, sizeof(chunk_offset));
-    this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
-    this->map()[TransportHeader::OPCODE]= String((const char*)&opcode, sizeof(uint8_t));
-    this->update();
-}
-*/
 
 CLICK_ENDDECLS
