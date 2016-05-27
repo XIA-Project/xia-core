@@ -101,19 +101,17 @@ void xcache_controller::status(void)
 
 int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *resp, xcache_cmd *cmd, int flags)
 {
-	int ret, sock;
+	int to_recv, recvd, ret, sock;
 	Graph g(addr);
 
 	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
 
-	LOG_CTRL_INFO("Trying Xsocket\n");
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
 		LOG_CTRL_INFO("Can't create socket\n");
 		return RET_FAILED;
 	}
 
-	LOG_CTRL_INFO("Trying Xconnect\n");
 	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
 		LOG_CTRL_INFO("Errno = %d\n", errno);
 		return RET_FAILED;
@@ -123,23 +121,48 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	std::string data;
 	char buf[XIA_MAXBUF] = {0};
+	struct cid_header header;
+	size_t remaining;
+	size_t offset;
 
 	Node expected_cid(g.get_final_intent());
 	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
 
 	meta->set_FETCHING();
 
-	do {
-		LOG_CTRL_INFO("Waiting XRECV\n");
-		ret = Xrecv(sock, buf, XIA_MAXBUF, 0);
-		LOG_CTRL_INFO("Xrecv returned %d\n", ret);
-		if(ret <= 0)
-			break;
+	remaining = sizeof(cid_header);
+	offset = 0;
 
-		std::string temp(buf + sizeof(struct cid_header), ret - sizeof(struct cid_header));
+	while (remaining > 0) {
+		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
+		if (recvd <= 0) {
+			LOG_CTRL_ERROR("Sender Closed the connection - Header"
+				       ".\n");
+			assert(0);
+			Xclose(sock);
+		}
+		remaining -= recvd;
+		offset += recvd;
+	}
+
+	remaining = ntohl(header.length);
+
+	while (remaining > 0) {
+		to_recv = remaining > XIA_MAXBUF ? XIA_MAXBUF : remaining;
+
+		recvd = Xrecv(sock, buf, to_recv, 0);
+		if (recvd <= 0) {
+			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
+				       ".\n");
+			assert(0);
+			Xclose(sock);
+		}
+
+		remaining -= recvd;
+		std::string temp(buf, recvd);
 
 		data += temp;
-	} while(1);
+	}
 
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
 	struct xcache_context *context = lookup_context(cmd->context_id());
@@ -516,42 +539,49 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
 	xcache_cmd resp;
-	int ret;
 
 	LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
 
-	if(fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)) {
+	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)) {
 		LOG_CTRL_ERROR("This should not happen.\n");
+		assert(0);
 	}
 
-	size_t remaining = resp.data().length();
-	size_t offset = 0;
+	struct cid_header header;
+	size_t remaining;
+	size_t offset;
+	size_t sent;
 
-	while(remaining > 0) {
-		char buf[XIA_MAXBUF];
-		size_t to_send = MIN(XIA_MAXBUF, remaining);
-		struct cid_header header;
-		size_t header_size = sizeof(header);
+	header.length = htonl(resp.data().length());
+	remaining = sizeof(header);
+	offset = 0;
 
-		if(to_send + header_size > XIA_MAXBUF)
-			to_send -= header_size;
+	while (remaining > 0) {
+		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
+		if (sent <= 0) {
+			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
+				       ".\n");
+			assert(0);
+			Xclose(sock);
+		}
+		remaining -= sent;
+		offset += sent;
+	}
 
-		header.offset = offset;
-		header.length = to_send;
-		header.total_length = resp.data().length();
-		strcpy(header.cid, cid.id_string().c_str());
+	remaining = resp.data().length();
+	offset = 0;
 
-		memcpy(buf, &header, header_size);
-		memcpy(buf + header_size, resp.data().c_str() + offset, to_send);
-
-		remaining -= to_send;
-
-		LOG_CTRL_INFO("Calling Xsend\n");
-		ret = Xsend(sock, buf, to_send + header_size, 0);
-		LOG_CTRL_INFO("Xsend was sending %d and returned %d\n",
-			      to_send + header_size, ret);
-
-		offset += to_send;
+	while (remaining > 0) {
+		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
+			     remaining, 0);
+		if (sent == 0) {
+			LOG_CTRL_ERROR("Receiver Closed the connection - Data"
+				       ".\n");
+			assert(0);
+			Xclose(sock);
+		}
+		remaining -= sent;
+		offset += sent;
 	}
 }
 
@@ -604,7 +634,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	std::string temp_cid("CID:");
 
 	temp_cid += meta->get_cid();
-	
+
 	LOG_CTRL_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
 	LOG_CTRL_DEBUG("Route Setting Returned %d\n", rv);
