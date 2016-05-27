@@ -65,6 +65,10 @@ nameserver_hid = "HID_NAMESERVER"
 ip_override_addr = None
 interface_filter = None
 interface = None
+remoteexec = False
+dsrc_mac_addr = None
+waveserver_ip = None
+waveserver_port = None
 socket_ips_ports = None
 
 #
@@ -129,6 +133,12 @@ def mac_str_from_ifconfig_out(ifconfig_out):
 	if match:
 		return match.group()
 	return None
+
+def getRemoteInterfaces(ignore_interfaces):
+    addrs = []
+    # TODO: verify mac address is in correct format
+    addrs.append(['wave0', dsrc_mac_addr, '0.0.0.0'])
+    return addrs
 
 def getAradaInterfaces(ignore_interfaces):
 	addrs = []
@@ -200,6 +210,10 @@ def getInterfaces(ignore_interfaces):
         cmd = "netstat -nr | grep -v : | grep default | tr -s ' ' | cut -d\  -f2"
     elif os.uname()[-1] == "mips":
         addrs = getAradaInterfaces(ignore_interfaces)
+        cmd = "/sbin/route -n | grep ^0.0.0.0 | tr -s ' '  | cut -d ' ' -f2"
+
+    elif remoteexec == True:
+        addrs = getRemoteInterfaces(ignore_interfaces)
         cmd = "/sbin/route -n | grep ^0.0.0.0 | tr -s ' '  | cut -d ' ' -f2"
 
     else:
@@ -378,6 +392,9 @@ def makeGenericRouterConfig(num_ports, socket_ip_port_list, xia_interfaces, ip_i
 
     xchg = {}
     xchg['HNAME'] = getHostname()
+    if remoteexec:
+        xchg['RIPADDR'] = waveserver_ip
+        xchg['RPORT'] = waveserver_port
 
     if len(ip_interfaces) > 0:
         xchg['EXTERNAL_IP'] = ip_interfaces[0][4]
@@ -643,11 +660,20 @@ def getOptions():
     global ip_override_addr
     global interface_filter
     global interface
+    global remoteexec
+    global dsrc_mac_addr
+    global waveserver_ip
+    global waveserver_port
+    global ext
+    global hostclick
+    global routerclick
+    global hosttemplate
+    global routertemplate
     global socket_ips_ports
     try:
-        shortopt = "hr4ni:a:m:f:I:tP:"
+        shortopt = "hr4ni:a:m:f:I:W:tP:"
         opts, args = getopt.getopt(sys.argv[1:], shortopt,
-            ["help", "router", "host", "dual-stack", "nameserver", "manual-address=", "interface-filter=", "host-interface=", "socket-ports="])
+            ["help", "router", "host", "dual-stack", "nameserver", "manual-address=", "interface-filter=", "host-interface=", "waveserver=", "socket-ports="])
     except getopt.GetoptError, err:
         # print     help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -671,6 +697,13 @@ def getOptions():
             interface_filter = a
         elif o in ("-I", "--host-interface"):
             interface = a
+        elif o in ("-W", "--waveserver"):
+            remoteexec = True
+            ext = 'remote.template'
+            hosttemplate = get_template_path(hostclick)
+            routertemplate = get_template_path(routerclick)
+            dsrc_mac_addr, waveserver_addr = a.split(',')
+            waveserver_ip, waveserver_port = waveserver_addr.split(':')
         elif o in ("-P", "--socket-ports"):
             socket_ips_ports = a
         elif o in ("-n", "--nameserver"):
@@ -683,7 +716,7 @@ def getOptions():
 #
 def help():
     print """
-usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface]
+usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface] [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
 where:
   -h            : get help
   --help
@@ -711,6 +744,9 @@ where:
 
   -I            : the network interface a host should use, if it has multiple
   --host-interface=<interface>
+
+  -W            : DSRC Interface mac addr, addr:port of waveserver on Arada box
+  --waveserver=<dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>
 """
     sys.exit()
 
