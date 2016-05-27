@@ -7,7 +7,7 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-#include <click/xiacontentheader.hh>
+//#include <click/xiacontentheader.hh>
 #include "xtransport.hh"
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
@@ -275,10 +275,10 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			p_in->kill();
 			break;
 
-		case CACHE_PORT:	//Packet from cache
-			ProcessCachePacket(p_in);
-			p_in->kill();
-			break;
+//		case CACHE_PORT:	//Packet from cache
+//			ProcessCachePacket(p_in);
+//			p_in->kill();
+//			break;
 
 		case XHCP_PORT:		//Packet with DHCP information
 			ProcessXhcpPacket(p_in);
@@ -514,6 +514,7 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 
 WritablePacket *XTRANSPORT::copy_cid_req_packet(Packet *p, sock *sk)
 {
+#if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
 	copy_common(sk, xiahdr, xiah);
@@ -528,11 +529,15 @@ WritablePacket *XTRANSPORT::copy_cid_req_packet(Packet *p, sock *sk)
 	xiah.set_plen(xiahdr.plen());
 
 	return copy;
+#endif
+	return NULL;
 }
+
 
 
 WritablePacket *XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk)
 {
+#if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
 	copy_common(sk, xiahdr, xiah);
@@ -548,6 +553,8 @@ WritablePacket *XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk)
 	xiah.set_plen(xiahdr.plen());
 
 	return copy;
+#endif
+	return NULL;
 }
 
 
@@ -1917,6 +1924,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 // for response pkt, verify it, clear the reqPkt entry in the socket, send it to upper layer if read_cid_req is true, or if store it in XIDtoCIDresponsePkt
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
+#if 0
 	DBG("Got packet from cache");
 
 	//Extract the SID/CID
@@ -2108,6 +2116,7 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 	{
 		WARN("Packet to unknown %s, src_cid %s\n", destination_sid.unparse().c_str(), source_cid.unparse().c_str());
 	}
+#endif
 }
 
 
@@ -2186,6 +2195,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XRECVFROM:
 		Xrecvfrom(_sport, &xia_socket_msg);
 		break;
+#if 0
 	case xia::XREQUESTCHUNK:
 		XrequestChunk(_sport, &xia_socket_msg, p_in);
 		break;
@@ -2201,6 +2211,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XPUTCHUNK:
 		XputChunk(_sport, &xia_socket_msg);
 		break;
+#endif
 	case xia::XGETPEERNAME:
 		Xgetpeername(_sport, &xia_socket_msg);
 		break;
@@ -2210,12 +2221,14 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XPOLL:
 		Xpoll(_sport, &xia_socket_msg);
 		break;
+#if 0
 	case xia::XPUSHCHUNKTO:
 		XpushChunkto(_sport, &xia_socket_msg, p_in);
 		break;
 	case xia::XBINDPUSH:
 		XbindPush(_sport, &xia_socket_msg);
 		break;
+#endif
 	case xia::XUPDATERV:
 		Xupdaterv(_sport, &xia_socket_msg);
 		break;
@@ -2475,7 +2488,7 @@ void XTRANSPORT::Xnotify(unsigned short _sport, xia::XSocketMsg * /*xia_socket_m
 }
 
 
-
+#if 0
 // FIXME: This way of doing things is a bit hacky.
 void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2526,7 +2539,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 	// (for Ack purpose) Reply with a packet with the destination port=source port
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
-
+#endif
 
 
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
@@ -3695,7 +3708,7 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 }
 
 
-
+#if 0
 void XTRANSPORT::XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
 	xia::X_Requestchunk_Msg *x_requestchunk_msg = xia_socket_msg->mutable_x_requestchunk();
@@ -4191,6 +4204,7 @@ void XTRANSPORT::XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket
 	output(NETWORK_PORT).push(p);
 	ReturnResult(_sport, xia_socket_msg, 0, 0);
 }
+#endif
 
 CLICK_ENDDECLS
 
