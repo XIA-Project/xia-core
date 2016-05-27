@@ -14,40 +14,18 @@ CLICK_DECLS
 
 TransportHeaderEncap::TransportHeaderEncap(char type)
 {
-	memset(&_tcphdr, 0, sizeof(struct click_tcp));
-	_type = type;
+	_hdr->type = type;
+	_tcphdr = NULL;
 	_options = NULL;
 	_optlen = 0;
-
-    //this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
-    update();
 }
-
-#if 0
-TransportHeaderEncap::TransportHeaderEncap(char type, char pkt_info, uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window)
-{
-	memset(&_tcphdr, 0, sizeof(tcphdr));
-	_type = type;
-	_pktinfo = pkt_info;
-	_tcphdr.th_seq = seq_num;
-	_tcphdr.th_ack = ack_num;
-	_tcphdr.th_win = recv_window;
-	_length = length;
-
-
-//	this->map()[TransportHeader::TYPE]= String((const char*)&type, sizeof(type));
-//	this->map()[TransportHeader::PKT_INFO]= String((const char*)&pkt_info, sizeof(pkt_info));
-//	this->map()[TransportHeader::SEQ_NUM]= String((const char*)&seq_num, sizeof(seq_num));
-//	this->map()[TransportHeader::ACK_NUM]= String((const char*)&ack_num, sizeof(ack_num));
-//	this->map()[TransportHeader::LENGTH]= String((const char*)&length, sizeof(length));
-//	this->map()[TransportHeader::RECV_WINDOW]= String((const char*)&recv_window, sizeof(recv_window));
-    this->update();
-}
-#endif
 
 void
 TransportHeaderEncap::update()
 {
+	if (_hdr->type != SOCK_STREAM)
+		return;
+
 	size_t padding = 0;
     size_t size = sizeof(struct click_xia_ext);
 
@@ -59,14 +37,21 @@ TransportHeaderEncap::update()
         size += padding;
     }
 
-    click_xia_ext* new_hdr = reinterpret_cast<struct click_xia_ext*>(new uint8_t[size]);
+	u_char *p = new uint8_t[size];
+    click_xia_ext* new_hdr = reinterpret_cast<struct click_xia_ext*>(p);
 
-	struct click_tcp *t = (struct click_tcp*)(new_hdr + sizeof(struct click_xia_ext));
-	u_char *o = (u_char*)(t + sizeof(struct click_tcp));
+	struct click_tcp *t = reinterpret_cast<struct click_tcp*>(p + sizeof(struct click_xia_ext));
+	u_char *o = p + sizeof(struct click_xia_ext) + sizeof(struct click_tcp);
 
     memcpy(new_hdr, _hdr, sizeof(struct click_xia_ext));
-	memcpy(t, _tcphdr, sizeof(struct click_tcp));
-	memcpy(o, _options, _optlen);
+
+	if (_tcphdr) {
+		memcpy(t, _tcphdr, sizeof(struct click_tcp));
+	}
+
+	if (_optlen) {
+		memcpy(o, _options, _optlen);
+	}
 
 	if (padding) {
 		memset(o + _optlen, 0, padding);

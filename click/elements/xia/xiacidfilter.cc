@@ -35,7 +35,10 @@ void XIACidFilter::handleXtransportPacket(Packet *p)
 	XIAHeader xiah(pIn->xia_header());
 	TransportHeader thdr(pIn);
 
-	if(thdr.pkt_info() != TransportHeader::DATA)
+// FIXME: IS IT SAFE TO ASSUME IF NO FLAGS ARE SET IT"S JUST DATA
+// THIS TRANSPORT MAY ROLL ACKs UP WITH DATA?
+//	if(thdr.pkt_info() != TransportHeader::DATA)
+	if (thdr.flags() != 0)
 		return;
 
 	WritablePacket *pReply = WritablePacket::make(0, thdr.payload(), xiah.plen() - thdr.hlen(), 0);
@@ -43,7 +46,7 @@ void XIACidFilter::handleXtransportPacket(Packet *p)
 	checked_output_push(PORT_OUT_XCACHE, pReply);
 }
 
-void XIACidFilter::handleXcachePacket(Packet *p)
+void XIACidFilter::handleXcachePacket(Packet * /* p */)
 {
 	std::cout << "CID FILTER Packet received from xcache\n";
 }
