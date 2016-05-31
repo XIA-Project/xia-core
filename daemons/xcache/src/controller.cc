@@ -134,12 +134,15 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	offset = 0;
 
 	while (remaining > 0) {
+		LOG_CTRL_ERROR("1 Remaining = %d\n", remaining);
 		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
-		if (recvd <= 0) {
+		if (recvd < 0) {
 			LOG_CTRL_ERROR("Sender Closed the connection - Header"
 				       ".\n");
 			assert(0);
 			Xclose(sock);
+		} else if (recvd == 0) {
+			break;
 		}
 		remaining -= recvd;
 		offset += recvd;
@@ -150,12 +153,16 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	while (remaining > 0) {
 		to_recv = remaining > XIA_MAXBUF ? XIA_MAXBUF : remaining;
 
+		LOG_CTRL_ERROR("2 Remaining = %d\n", remaining);
+
 		recvd = Xrecv(sock, buf, to_recv, 0);
-		if (recvd <= 0) {
+		if (recvd < 0) {
 			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
 				       ".\n");
 			assert(0);
 			Xclose(sock);
+		} else if (recvd == 0) {
+			break;
 		}
 
 		remaining -= recvd;
@@ -174,6 +181,15 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
+	if (meta->get_cid() != computed_cid) {
+		/*
+		 * CID Integrity Check Failed
+		 */
+		LOG_CTRL_ERROR("CID Integrity Check Failed.\n");
+		Xclose(sock);
+		return RET_FAILED;
+	}
+
 	if(!(flags & XCF_SKIPCACHE))
 		__store(context, meta, (const std::string *)&data);
 
@@ -185,6 +201,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		ret = RET_OKSENDRESP;
 	}
 
+	LOG_CTRL_ERROR("%s: Xclosing\n", __func__);
 	Xclose(sock);
 
 	return ret;
@@ -480,10 +497,23 @@ sockaddr_x xcache_controller::cid2addr(std::string cid)
 {
 	sockaddr_x addr;
 	std::string myCid("CID:");
+	int xcache_sock;
+	char AD[MAX_XID_SIZE];
+	char HID[MAX_XID_SIZE];
+	char FourID[MAX_XID_SIZE];
+
+	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+		assert(0);
+
+	if(XreadLocalHostAddr(xcache_sock, AD, sizeof(AD), HID, sizeof(HID),
+			      FourID, sizeof(FourID)) < 0)
+		assert(0);
+
+	Xclose(xcache_sock);
 
 	myCid += cid;
 
-	dag_add_nodes(&addr, 3, myAD, myHID, myCid.c_str());
+	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
 	dag_set_intent(&addr, 2);
 	dag_add_path(&addr, 3, 0, 1, 2);
 
@@ -558,7 +588,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
-		if (sent <= 0) {
+		if (sent < 0) {
 			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
 				       ".\n");
 			assert(0);
@@ -574,7 +604,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
-		if (sent == 0) {
+		if (sent < 0) {
 			LOG_CTRL_ERROR("Receiver Closed the connection - Data"
 				       ".\n");
 			assert(0);
