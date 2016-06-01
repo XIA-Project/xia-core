@@ -38,13 +38,12 @@ void XIACidFilter::handleXtransportPacket(Packet *p)
 	if(thdr.pkt_info() != TransportHeader::DATA)
 		return;
 
-	WritablePacket *pReply = WritablePacket::make(0, thdr.payload(), xiah.plen() - thdr.hlen(), 0);
-
-	checked_output_push(PORT_OUT_XCACHE, pReply);
+	checked_output_push(PORT_OUT_XCACHE, pIn);
 }
 
 void XIACidFilter::handleXcachePacket(Packet *p)
 {
+	(void)p;
 	std::cout << "CID FILTER Packet received from xcache\n";
 }
 
