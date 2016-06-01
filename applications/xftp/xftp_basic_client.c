@@ -187,8 +187,9 @@ int getListedChunks(FILE *fd, char *url)
 		g.print_graph();
 		printf("------------------------\n");
 
-		if((ret = XfetchChunk(&h, buf, 1024 * 1024, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
-		 	die(-1, "XcacheGetChunk Failed\n");
+		if ((ret = XfetchChunk(&h, buf, 1024 * 1024, XCF_BLOCK, &addr,
+				       sizeof(addr))) < 0) {
+		 	die(-1, "XfetchChunk Failed\n");
 		}
 
 		printf("Got Chunk\n");

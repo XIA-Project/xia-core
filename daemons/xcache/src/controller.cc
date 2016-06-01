@@ -29,10 +29,11 @@
 
 enum {
 	RET_FAILED = -1,
-	RET_OKSENDRESP = 0,
-	RET_OKNORESP = 1,
-	RET_REMOVEFD = 2,
-	RET_ENQUEUE = 3,
+	RET_OK,
+	RET_SENDRESP,
+	RET_NORESP,
+	RET_REMOVEFD,
+	RET_ENQUEUE,
 };
 
 DEFINE_LOG_MACROS(CTRL)
@@ -99,12 +100,15 @@ void xcache_controller::status(void)
 	LOG_CTRL_INFO("[Status]\n");
 }
 
-int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *resp, xcache_cmd *cmd, int flags)
+int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
+					    xcache_cmd *resp, xcache_cmd *cmd,
+					    int flags)
 {
-	int to_recv, recvd, ret, sock;
+	int to_recv, recvd, sock;
 	Graph g(addr);
 
-	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n", g.dag_string().c_str());
+	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n",
+		      g.dag_string().c_str());
 
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
@@ -193,18 +197,15 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if(!(flags & XCF_SKIPCACHE))
 		__store(context, meta, (const std::string *)&data);
 
-	ret = RET_OKNORESP;
-
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
-		ret = RET_OKSENDRESP;
 	}
 
 	LOG_CTRL_ERROR("%s: Xclosing\n", __func__);
 	Xclose(sock);
 
-	return ret;
+	return RET_OK;
 }
 
 int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
@@ -216,7 +217,6 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	Graph g(addr);
 	Node expected_cid(g.get_final_intent());
 	std::string cid(expected_cid.id_string());
-	int ret;
 
 	IGNORE_PARAM(flags);
 	IGNORE_PARAM(addrlen);
@@ -243,12 +243,9 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	LOG_CTRL_INFO("Getting data by calling meta->get()\n");
 	data = meta->get();
 
-	ret = RET_OKNORESP;
-
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
-		ret = RET_OKSENDRESP;
 	}
 
 	LOG_CTRL_INFO("Releasing meta\n");
@@ -257,7 +254,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 
 	LOG_CTRL_INFO("Fetching content from local DONE\n");
 
-	return ret;
+	return RET_OK;
 }
 
 int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,
@@ -289,7 +286,6 @@ void *xcache_controller::__fetch_content(void *__args)
 	struct __fetch_content_args *args = (struct __fetch_content_args *)__args;
 	sockaddr_x addr;
 	size_t daglen;
-	int dirty_try;
 
 	daglen = args->cmd->dag().length();
 	memcpy(&addr, args->cmd->dag().c_str(), args->cmd->dag().length());
@@ -298,20 +294,20 @@ void *xcache_controller::__fetch_content(void *__args)
 					      args->cmd, args->flags);
 
 	if(ret == RET_FAILED) {
-		dirty_try = 5;
-retry_fetch:
 		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp,
 						       args->cmd, args->flags);
-		dirty_try--;
-		if (ret == RET_FAILED && dirty_try > 0) {
-			LOG_CTRL_INFO("fetch_content_remote returned %d\n", ret);
-			goto retry_fetch;
+		if (ret == RET_FAILED) {
+			LOG_CTRL_INFO("Remote content fetch failed: %d\n", ret);
+			args->resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 		}
-
 	}
 
 	args->ret = ret;
+
 	if(!(args->flags & XCF_BLOCK)) {
+		/*
+		 * FIXME: In case of error must notify the error
+		 */
 		struct xcache_context *c = args->ctrl->lookup_context(args->cmd->context_id());
 
 		if(c)
@@ -320,15 +316,16 @@ retry_fetch:
 		delete args->cmd;
 		delete args;
 	}
+
 	return NULL;
 }
 
 int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 					    int flags)
 {
-	int ret = RET_OKNORESP;
+	int ret;
 
-	if(flags & XCF_BLOCK) {
+	if (flags & XCF_BLOCK) {
 		struct __fetch_content_args args;
 
 		args.ctrl = this;
@@ -337,7 +334,7 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 		args.ret = ret;
 		args.flags = flags;
 		__fetch_content(&args);
-		ret = args.ret;
+		ret = RET_SENDRESP;
 	} else {
 		/* FIXME: Add to worker queue */
 		struct __fetch_content_args *args =
@@ -351,6 +348,7 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 		args->resp = NULL;
 		args->cmd = new xcache_cmd(*cmd);
 		pthread_create(&fetch_thread, NULL, __fetch_content, args);
+		ret = RET_NORESP;
 	}
 
 	return ret;
@@ -372,7 +370,7 @@ int xcache_controller::chunk_read(xcache_cmd *resp, xcache_cmd *cmd)
 	if(!meta) {
 		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 		resp->set_msg("Invalid address\n");
-		return RET_OKSENDRESP;
+		return RET_SENDRESP;
 	}
 
 	data = meta->get(cmd->readoffset(), cmd->readlen());
@@ -380,12 +378,12 @@ int xcache_controller::chunk_read(xcache_cmd *resp, xcache_cmd *cmd)
 	resp->set_data(data);
 
 	release_meta(meta);
-	return RET_OKSENDRESP;
+	return RET_SENDRESP;
 }
 
 int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cmd)
 {
-	int ret = RET_OKNORESP;
+	int ret = RET_NORESP;
 	xcache_cmd response;
 	struct xcache_context *c;
 
@@ -394,14 +392,17 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 		LOG_CTRL_INFO("Received ALLOC_CONTEXTID\n");
 		ret = alloc_context(resp, cmd);
 		break;
+
 	case xcache_cmd::XCACHE_FLAG_DATASOCKET:
 		c = lookup_context(cmd->context_id());
-		if(!c) {
+
+		if (!c)
 			LOG_CTRL_ERROR("Should Not Happen.\n");
-		} else {
+		else
 			c->xcacheSock = fd;
-		}
+
 		break;
+
 	case xcache_cmd::XCACHE_FLAG_NOTIFSOCK:
 		c = lookup_context(cmd->context_id());
 		if(!c) {
@@ -411,14 +412,13 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 			ret = RET_REMOVEFD;
 		}
 		break;
+
 	case xcache_cmd::XCACHE_STORE:
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 	case xcache_cmd::XCACHE_READ:
-//		ret = store(resp, cmd);
-//		ret = xcache_fetch_content(resp, cmd, cmd->flags());
-//		ret = chunk_read(resp, cmd);
 		ret = RET_ENQUEUE;
 		break;
+
 	default:
 		LOG_CTRL_ERROR("Unknown message received\n");
 	}
@@ -454,7 +454,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 	context_map[context_id] = c;
 	LOG_CTRL_INFO("Allocated Context %d\n", resp->context_id());
 
-	return RET_OKSENDRESP;
+	return RET_SENDRESP;
 }
 
 int xcache_controller::__store_policy(xcache_meta *meta)
@@ -490,7 +490,7 @@ int xcache_controller::__store(struct xcache_context *context, xcache_meta *meta
 	meta->unlock();
 	unlock_meta_map();
 
-	return RET_OKSENDRESP;
+	return RET_SENDRESP;
 }
 
 sockaddr_x xcache_controller::cid2addr(std::string cid)
@@ -560,7 +560,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 
 	LOG_CTRL_INFO("Store Finished\n");
 
-	return RET_OKSENDRESP;
+	return RET_SENDRESP;
 }
 
 
@@ -701,12 +701,12 @@ void xcache_controller::process_req(xcache_req *req)
 	int ret;
 	std::string buffer;
 
-	ret = RET_OKNORESP;
+	ret = RET_NORESP;
 
 	switch(req->type) {
 	case xcache_cmd::XCACHE_STORE:
 		ret = store(&resp, (xcache_cmd *)req->data);
-		if(ret == RET_OKSENDRESP) {
+		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
@@ -715,7 +715,7 @@ void xcache_controller::process_req(xcache_req *req)
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
 		LOG_CTRL_INFO("xcache_fetch_content returned %d\n", ret);
-		if(ret == RET_OKSENDRESP) {
+		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
@@ -723,7 +723,7 @@ void xcache_controller::process_req(xcache_req *req)
 	case xcache_cmd::XCACHE_READ:
 		cmd = (xcache_cmd *)req->data;
 		ret = chunk_read(&resp, cmd);
-		if(ret == RET_OKSENDRESP) {
+		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
@@ -902,7 +902,7 @@ repeat:
 		 */
 		ret = fast_process_req(*iter, &resp, &cmd);
 
-		if(ret == RET_OKSENDRESP) {
+		if(ret == RET_SENDRESP) {
 			/*
 			 * Send response back to the client
 			 */

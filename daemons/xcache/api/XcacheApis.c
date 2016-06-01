@@ -104,7 +104,7 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 	int ret;
 	uint32_t msg_length, remaining;
 
-	if(read(xcache_sock, &msg_length, 4) != 4) {
+	if (read(xcache_sock, &msg_length, 4) != 4) {
 		fprintf(stderr, "%s: Error\n", __func__);
 		return -1;
 	}
@@ -113,7 +113,7 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 	fprintf(stderr, "Lib received msg of length %d\n", remaining);
 	ret = read_bytes_to_buffer(xcache_sock, buffer, remaining);
 
-	if(ret == 0) {
+	if (ret == 0) {
 		cmd->set_cmd(xcache_cmd::XCACHE_ERROR);
 		return -1;
 	}
@@ -170,7 +170,7 @@ int XcacheHandleInit(XcacheHandle *h)
 	cmd.set_cmd(xcache_cmd::XCACHE_ALLOC_CONTEXT);
 	send_command(h->xcacheSock, &cmd);
 
-	if(get_response_blocking(h->xcacheSock, &cmd) >= 0) {
+	if (get_response_blocking(h->xcacheSock, &cmd) >= 0) {
 		fprintf(stderr, "Msg type = %d\n", cmd.cmd());
 		fprintf(stderr, "Library received context id = %d\n", cmd.context_id());
 
@@ -417,8 +417,13 @@ int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x
 	if(flags & XCF_BLOCK) {
 		size_t to_copy;
 
-		if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		if (get_response_blocking(h->xcacheSock, &cmd) < 0) {
 			fprintf(stderr, "Did not get a valid response from xcache\n");
+			return -1;
+		}
+
+		if (cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+			fprintf(stderr, "Chunk fetch failed\n");
 			return -1;
 		}
 

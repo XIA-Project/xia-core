@@ -46,7 +46,6 @@ void XIACidFilter::handleXtransportPacket(Packet *p)
 
 void XIACidFilter::handleXcachePacket(Packet * /* p */)
 {
-	(void)p;
 	std::cout << "CID FILTER Packet received from xcache\n";
 }
 
