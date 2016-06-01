@@ -14,26 +14,18 @@ CLICK_DECLS
 class XIAGenericExtHeader { public:
     XIAGenericExtHeader(const XIAGenericExtHeader& r); // copy constructor
 
-    XIAGenericExtHeader(const struct click_xia_ext* hdr); 
+    XIAGenericExtHeader(const struct click_xia_ext* hdr);
     XIAGenericExtHeader(const Packet* p);  // read from packet p->network_header() should point to XIA header
 
     inline const struct click_xia_ext* hdr() const;
 
     inline const uint8_t& nxt() const;      // next header type
-
     inline const uint8_t& hlen() const;     // header length
-
-    inline const HashTable<uint8_t, String>& map() const;  // return key-value map
-
+	inline const uint8_t& type() const;		// FIXME: TEMPORARY! transport type
     inline const uint8_t* payload() const;  // payload
 
 protected:
-    void populate_map();
-
-protected:
     const struct click_xia_ext* _hdr;
-
-    HashTable<uint8_t, String> _map;        // parsed key-value map
 
     inline XIAGenericExtHeader() : _hdr(NULL) { }  // for helping WritableXIAGenericExtHeader hide dangerous construction
 
@@ -53,7 +45,7 @@ class WritableXIAGenericExtHeader : public XIAGenericExtHeader { public:
     inline struct click_xia_ext* hdr();
 
     inline void set_nxt(uint8_t nxt);       // set next header type
-
+	inline void set_type(uint8_t type);		// FIXME: TEMPORARY!
     inline uint8_t* payload();              // settable payload
 
 private:
@@ -75,20 +67,15 @@ class XIAGenericExtHeaderEncap { public:
     const struct click_xia_ext* hdr() const;
     struct click_xia_ext* hdr();
 
-    const uint8_t& hlen() const;                // header length (need to manually call update() first)
-
-    void set_nxt(uint8_t nxt);                  // set next header type
-
-    inline HashTable<uint8_t, String>& map();   // settable key-value map
-
-    void update();                              // update internel header structure
+    const uint8_t& hlen() const;	// header length (need to manually call update() first)
+    void set_nxt(uint8_t nxt);		// set next header type
+	void set_type(uint8_t type);	// FIXME: TEMPORARY!
 
     // encapsulate the given packet with an XIA extension header. (need to manually call update() first)
     WritablePacket* encap(Packet* p_in) const;
 
-private:
+protected:
     struct click_xia_ext* _hdr;
-    HashTable<uint8_t, String> _map;            // current key-value map
 };
 
 
@@ -110,10 +97,10 @@ XIAGenericExtHeader::hlen() const
     return _hdr->hlen;
 }
 
-inline const HashTable<uint8_t, String>&
-XIAGenericExtHeader::map() const
+inline const uint8_t&
+XIAGenericExtHeader::type() const
 {
-    return _map;
+    return _hdr->type;
 }
 
 inline const uint8_t*
@@ -134,16 +121,16 @@ WritableXIAGenericExtHeader::set_nxt(uint8_t nxt)
     const_cast<struct click_xia_ext*>(_hdr)->nxt = nxt;
 }
 
+inline void
+WritableXIAGenericExtHeader::set_type(uint8_t type)
+{
+    const_cast<struct click_xia_ext*>(_hdr)->type = type;
+}
+
 inline uint8_t*
 WritableXIAGenericExtHeader::payload()
 {
     return const_cast<uint8_t*>(this->XIAGenericExtHeader::payload());
-}
-
-inline HashTable<uint8_t, String>&
-XIAGenericExtHeaderEncap::map()
-{
-    return _map;
 }
 
 CLICK_ENDDECLS

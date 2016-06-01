@@ -41,7 +41,6 @@ int Xclose(int sockfd)
 {
 	int rc = -1;
 	int sock = 0;
-	int ref;
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
 	{
@@ -72,10 +71,7 @@ int Xclose(int sockfd)
 		LOGF("Error getting status from Click: %s", strerror(errno));
 		goto done;
 	}
-#if 0
-	ref = xcm->refcount();
-	 LOGF("%d refcount = %d\n", sockfd, ref);
-#endif
+
 	if (isTempSID(sockfd) && xcm->refcount() <= 0) {
 
 		if (xcm->delkeys()) {

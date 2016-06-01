@@ -7,7 +7,7 @@
 #include <click/packet.hh>
 #include <click/vector.hh>
 
-#include <click/xiacontentheader.hh>
+//#include <click/xiacontentheader.hh>
 #include "xdatagram.hh"
 #include "xtransport.hh"
 
@@ -17,7 +17,7 @@
 CLICK_DECLS
 
 XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port)
-	: sock(transport, port, TransportHeader::XSOCK_DGRAM) {
+	: sock(transport, port, SOCK_DGRAM) {
 		// cout << "\t\tCreatign a " << port << endl;
 		memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));
@@ -40,6 +40,7 @@ XDatagram::push(WritablePacket *p_in) {
 
 bool
 XDatagram::should_buffer_received_packet(WritablePacket *p) {
+	UNUSED(p);
 	if (recv_buffer_count < recv_buffer_size) return true;
 	else return false;
 }

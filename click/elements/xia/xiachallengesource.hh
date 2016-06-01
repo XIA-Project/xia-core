@@ -57,7 +57,7 @@ class XIAChallengeSource : public Element { public:
     void push(int, Packet *);
 
 private:
-	void generate_secret();
+	bool generate_secret();
     void send_challenge(Packet *);
 	void verify_response(Packet *);
 	bool is_verified(Packet *);
