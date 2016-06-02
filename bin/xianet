@@ -68,7 +68,7 @@ Start or stop the XIA network services.
 
 usage: $NAME [-cvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
-			 [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
+             [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
 where:
   -c only start click
