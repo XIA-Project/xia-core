@@ -34,6 +34,7 @@ class NetjoinSession(threading.Thread):
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
         self.state = self.START
+        self.start_time = time.time()
         self.hostname = hostname
         self.shutdown_event = shutdown_event
         self.auth = auth
@@ -318,6 +319,8 @@ class NetjoinSession(threading.Thread):
             logging.error("Gateway had trouble setting up routes to us")
             return
         logging.info("Valid handshake four: We are on this network now")
+        total_joining_time = time.time() - self.start_time
+        logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
 
     # Note: we forget the last message on disabling retransmission
     # If in future we need enable_retransmission() then use a separate flag
