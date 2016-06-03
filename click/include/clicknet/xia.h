@@ -68,7 +68,7 @@ struct click_xia {
 };
 
 #define CLICK_XIA_NXT_CID       12  /* CID-source specific key-value list */
-#define CLICK_XIA_NXT_STREAM    13
+#define CLICK_XIA_NXT_XTCP      13
 #define CLICK_XIA_NXT_DGRAM     14
 #define CLICK_XIA_NXT_XCMP      61  /*  XCMP header */
 #define CLICK_XIA_NXT_HDR_MAX   (CLICK_XIA_NXT_NO-1)  /* maximum non-upper-layer nxt value */

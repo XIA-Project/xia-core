@@ -15,10 +15,10 @@
 #include "xiaxidroutetable.hh"
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
+#include <click/xiastreamheader.hh>
 #include <click/xiatransportheader.hh>
-#include <clicknet/tcp.h>
 #include "xtransport.hh"
-#include "clicknet/tcp_fsm.h"
+#include <clicknet/tcp_fsm.h>
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -207,7 +207,7 @@ public:
 private:
 	void set_state(const HandlerState s);
 
-	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
+	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, u_long *ts_val, u_long *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
