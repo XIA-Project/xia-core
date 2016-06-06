@@ -85,6 +85,7 @@ XStream::tcp_input(WritablePacket *p)
 	if (tcph == NULL)
 	{
 		click_chatter("Invalid header\n");
+		return;
 	}
 	//printf("Tcp input with state %d\n", tp->t_state);
 	get_transport()->_tcpstat.tcps_rcvtotal++;
@@ -93,7 +94,7 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_seq = ntohl(tcph->th_seq);
 	ti.ti_ack = ntohl(tcph->th_ack);
 	ti.ti_off = tcph->th_off;
-	ti.ti_flags = tcph->th_flags;
+	ti.ti_flags = ntohs(tcph->th_flags);
 	ti.ti_win = ntohs(tcph->th_win);
 	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 
@@ -1206,12 +1207,12 @@ send:
 	//printf("1121+++++++%d\n",optlen);
 	if (optlen) {
 		// printf("1123\n");
-		// memcpy((&ti + 1), opt, optlen);
+		//memcpy(reinterpret_cast<uint8_t*>(&ti) + sizeof(xtcp), opt, optlen);
 		// printf("1125\n");
 		ti.th_off = (sizeof(xtcp) + optlen) >> 2;
 	}
 
-	ti.th_flags = flags;
+	ti.th_flags = htons(flags);
 
 	/*370*/
 	/* receiver window calculations */
@@ -1336,8 +1337,8 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	th.th_seq =   htonl(seq+1);
 	th.th_ack =   htonl(ack);
-	th.th_flags = flags;
-	th.th_off = (sizeof(xtcp)) >> 2;
+	th.th_flags = htons(flags);
+	th.th_off = sizeof(xtcp) >> 2;
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
@@ -1774,7 +1775,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 			optlen = 1;
 		else {
 			if (cnt < 2){
-				printf("opt NOP\n");
+				//printf("opt NOP\n");
 				break;
 			}
 			optlen = cp[1];
@@ -1783,12 +1784,12 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				break;
 			}
 		}
-		//debug_output(VERB_DEBUG, "[%s] doopts: Entering options switch stmt, optlen [%x]", SPKRNAME, optlen);
+		//click_chatter("[Xstream] doopts: Entering options switch stmt, optlen [%x]", optlen);
 		switch (opt) {
 			case TCPOPT_MAXSEG:
-					//printf("[%s] doopts: case MAXSEG","XStream");
+				//printf("[%s] doopts: case MAXSEG","XStream");
 				if (optlen != TCPOLEN_MAXSEG) {
-					printf("[%s] doopts: optlen: [%x] maxseg: [%x]", "XStream", optlen, TCPOLEN_MAXSEG);
+					//printf("[%s] doopts: optlen: [%x] maxseg: [%x]", "XStream", optlen, TCPOLEN_MAXSEG);
 					continue;
 				}
 				if (!(th_flags & XTH_SYN)) {

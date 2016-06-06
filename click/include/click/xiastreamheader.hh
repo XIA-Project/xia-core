@@ -20,6 +20,8 @@
 
 #define XTCP_OPTIONS_MAX	256	// maximum size of the options block
 
+// IMPORTANT!!! If accessing the header fields directly make sure to use the appropriate htonx and ntohx functions!
+// the header fields should always be in network byte order
 #pragma pack(push)
 #pragma pack(1)
 struct xtcp {
@@ -64,11 +66,11 @@ public:
 
     inline const struct xtcp* header() const { return _hdr; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
-	inline uint16_t hlen() const          { return _hdr->th_off << 2; };
-	inline uint32_t seq_num() const       { return _hdr->th_seq; };
-	inline uint32_t ack_num() const       { return _hdr->th_ack; };
-	inline uint32_t recv_window() const   { return _hdr->th_win; };
-	inline uint8_t flags() const          { return _hdr->th_flags; };
+	inline uint8_t hlen() const           { return _hdr->th_off << 2; };
+	inline uint32_t seq_num() const       { return ntohl(_hdr->th_seq); };
+	inline uint32_t ack_num() const       { return ntohl(_hdr->th_ack); };
+	inline uint32_t recv_window() const   { return ntohl(_hdr->th_win); };
+	inline uint16_t flags() const         { return ntohs(_hdr->th_flags); };
 	inline const u_char* tcpopt() const   { return reinterpret_cast<const uint8_t*>(_hdr) + sizeof(struct xtcp); };
 	inline const uint8_t* payload() const { return reinterpret_cast<const uint8_t*>(_hdr) + hlen(); };
 
@@ -89,7 +91,7 @@ public:
 
     	StreamHeaderEncap* h = new StreamHeaderEncap();
 		// if th_off is non 0 copy the options too
-		memcpy(h->_hdr, tcph, (tcph->th_off << 2));
+		memcpy(h->_hdr, tcph, tcph->th_off << 2);
      	return h;
     }
 
@@ -99,7 +101,7 @@ public:
     	StreamHeaderEncap* h = new StreamHeaderEncap();
 
 		memcpy(h->_hdr, tcph, sizeof(struct xtcp));
-		u_char *o = reinterpret_cast<u_char*>(h->_hdr + sizeof(struct xtcp));
+		u_char *o = reinterpret_cast<u_char*>(h->_hdr) + sizeof(struct xtcp);
 		memcpy(o, opt, optlen);
 		h->_hdr->th_off = (sizeof(struct xtcp) + optlen) >> 2;
      	return h;
@@ -115,7 +117,6 @@ public:
 	WritablePacket* encap(Packet* p_in) const
 	{
 	    size_t len = hlen();
-		printf("Stream Encap length = %lu\n", len);
 	    WritablePacket* p = p_in->push(len);
 	    if (!p)
 	        return NULL;
@@ -124,7 +125,7 @@ public:
 	    return p;
 	}
 
-	size_t hlen() const { return  _hdr->th_off << 2; };
+	size_t hlen() const { return _hdr->th_off << 2; };
 
 protected:
 	struct xtcp *_hdr;

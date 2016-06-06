@@ -1189,7 +1189,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
-	std::cout << "Recevied a STREAM packet from network\n";
+	//std::cout << "Recevied a STREAM packet from network\n";
 
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
@@ -1208,7 +1208,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 	StreamHeader thdr(p_in);
 
-printf("process stream: flags = %08x\n", thdr.flags());
+	// printf("process stream: flags = %08x\n", thdr.flags());
 
 	sock *handler;
 	if ((handler = XIDpairToSock.get(xid_pair)) != NULL)
