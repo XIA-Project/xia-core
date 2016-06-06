@@ -464,17 +464,13 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 	return 0;
 }
 
-int xcache_controller::__store(struct xcache_context *context, xcache_meta *meta, const std::string *data)
+int xcache_controller::__store(struct xcache_context *context,
+			       xcache_meta *meta, const std::string *data)
 {
 	lock_meta_map();
 	meta->lock();
 
 	meta_map[meta->get_cid()] = meta;
-
-	if(!context) {
-		LOG_CTRL_ERROR("NULL context provided.\n");
-		return -1;
-	}
 
 	if(__store_policy(meta) < 0) {
 		LOG_CTRL_ERROR("Context store failed\n");

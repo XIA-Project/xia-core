@@ -82,6 +82,7 @@ struct click_xia_ext {
     uint8_t nxt;     /* next header */
     uint8_t hlen;     /* header length (not payload length) */
     uint8_t type;     /* type of packet (TEMPORARY HACK!) */
+//    uint8_t padding;  /* Padding to make the EXT header 32 bytes */
     uint8_t data[0];  /* extension data */
 };
 

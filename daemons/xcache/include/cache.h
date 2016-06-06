@@ -2,7 +2,7 @@
 #define __CACHE_H__
 
 #include "controller.h"
-
+#include "cid.h"
 /**
  * Opportunistic caching.
  */
@@ -19,10 +19,16 @@ struct cache_args {
 	int cache_out_port;
 };
 
+struct cache_download {
+	std::string cid;
+	struct cid_header header;
+	char *data;
+};
+
 class xcache_cache {
 private:
 	static xcache_controller *ctrl;
-	std::map<std::string, std::string *> ongoing_downloads;
+	std::map<std::string, struct cache_download *> ongoing_downloads;
 
 public:
 	/**
