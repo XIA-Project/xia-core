@@ -101,10 +101,14 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	// process the reply from click
-	if ((rc = click_status(sockfd, seq)) < 0) {
-		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
+	// FIXME: what should we do if the stack couldn't send the data
+	// loop and try again? or return 0?
+	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
+		if (errno == EWOULDBLOCK || errno == EAGAIN) {
+			len = 0;
+		} else {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
 	}
 
 	return len;
