@@ -1022,8 +1022,8 @@ again:
 	off = tp->snd_nxt - tp->snd_una;
 	win = min(tp->snd_wnd, tp->snd_cwnd);
 	flags = tcp_outflags[tp->t_state];
-	// printf("flags: %d\n", flags);
-	// printf("t_state %d\n", tp->t_state);
+	printf("flags: %08x\n", flags);
+	printf("t_state %d\n", tp->t_state);
 	/*80*/
 	if (tp->t_force) {
 		if (win == 0) {
@@ -1288,7 +1288,7 @@ send:
 	} else {
 		payload_length = p -> length();
 	}
-	//printf("\t\t\ttcpoutput with payload_length %d\n", payload_length);
+	printf("tcpoutput with payload_length %d\n", payload_length);
 	tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
@@ -1690,7 +1690,7 @@ XStream::usrsend(WritablePacket *p)
 void
 XStream::usrclosed()
 {
-	//printf("usrclosed is called \n");
+	printf("usrclosed is called \n");
 	switch (tp->t_state) {
 		case TCPS_CLOSED:
 		case TCPS_LISTEN:
@@ -1747,6 +1747,8 @@ XStream::set_state(const HandlerState new_state) {
 	HandlerState old_state = get_state();
 
 	sock::set_state(new_state);
+
+printf("o:%d n:%d sd:%d es:%d\n", old_state, new_state, SHUTDOWN, TCPS_ESTABLISHED);
 
 
 	if ((old_state == CREATE) && new_state == (INITIALIZE))
