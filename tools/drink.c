@@ -34,7 +34,7 @@ typedef struct {
 char *name;
 fhConfig fhc;
 int verbose = 0;
-int pktSize = 0;
+int pktSize = PKTSIZE;
 int numPkts = 0;
 int delay = 0;
 int sock = -1;
@@ -50,9 +50,9 @@ void help(const char *name)
 	printf(" -r <usec>: tell firehose to wait for usecs between sends\n");
 	printf("            default is no delay\n");
 	printf(" -p <n>   : tell firehose to send n packets\n");
-	printf("            default is nonstop\n");         
+	printf("            default is nonstop\n");
 	printf(" -s <n>   : tell firehose to send packets of size n\n");
-	printf("            default is 4096\n");         
+	printf("            default is 4096\n");
 	printf(" -v       : be verbose\n");
 	exit(-1);
 }
@@ -160,6 +160,8 @@ int main(int argc, char **argv)
 		die("Unable to connect to %s\n", NAME);
 	}
 
+	// FIXME: i occasionally see the data go before the server is ready
+	sleep(1);
 	// tell firehose how many packets we expect
 	if (Xsend(sock, &fhc, sizeof(fhc), 0) < 0) {
 		Xclose(sock);
@@ -176,7 +178,7 @@ int main(int argc, char **argv)
 		FD_SET(sock, &fds);
 
 		struct timeval tv;
-		tv.tv_sec = 2;
+		tv.tv_sec = 5;
 		tv.tv_usec = 0;
 
 		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
@@ -192,26 +194,41 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		int rc = Xrecv(sock, buf, sizeof(buf), 0);
-		if (rc < 0)
-			die("Receive failure\n");
+		int received = 0;
+		char *bp = buf;
+		int sz = ntohl(fhc.pktSize);
+
+		while (received < sz) {
+			int rc = Xrecv(sock, bp, sz - received, 0);
+			if (rc < 0)
+				die("Receive failure\n");
+			else if(rc == 0) {
+				printf("Peer closed the connection\n");
+				goto done;
+			}
+			received += rc;
+			bp += received;
+		}
 		memcpy(&seq, buf, sizeof(int));
 
+
 		say("expecting %d, got %d", count, seq);
-		if (count == seq)
+		if (count == seq) {
 			say("\n");
-		else
+}
+		else {
 			say(" lost %d\n", seq - count);
+		}
 		count++;
 		if (count == numPkts)
 			break;
 		if (delay)
 			usleep(delay);
 	}
-
+done:
 	seq++;
 	if (count != seq)
-		printf("lost %d packets, received %d, expected %d\n", seq - count, count, seq); 
+		printf("lost %d packets, received %d, expected %d\n", seq - count, count, seq);
 	else
 		printf("success!\n");
 	Xclose(sock);
