@@ -2537,6 +2537,8 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	int control_port = _sport;
+	int ref;
+	bool should_delete;
 
 	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
 	_sport = xcm->port();
@@ -2547,14 +2549,18 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
-		goto done;
+		ReturnResult(control_port, xia_socket_msg, -1, EBADF);
+		return;
 	}
 
 	assert(sk->refcount != 0);
 
-	if (--sk->refcount == 0) {
+	should_delete = sk->isAcceptedSocket;
+	ref = --sk->refcount;
 
-		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), sk->refcount);
+	if (ref == 0) {
+
+		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), ref);
 
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
@@ -2573,12 +2579,12 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	} else {
 		// the app was forked and not everyone has closed the socket yet
-		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), sk->refcount);
+		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), ref);
 	}
 
 done:
-	xcm->set_refcount(sk->refcount);
-	xcm->set_delkeys(sk->isAcceptedSocket == false);
+	xcm->set_refcount(ref);
+	xcm->set_delkeys(should_delete);
 	ReturnResult(control_port, xia_socket_msg);
 }
 
@@ -2651,7 +2657,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		addRoute(source_xid);
 		tcp_conn->usropen();
 		ChangeState(tcp_conn, SYN_SENT);
-		std::cout << "SYN-SENT\n";
+		//std::cout << "SYN-SENT\n";
 		ChangeState(sk, SYN_SENT);
 
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
@@ -2700,7 +2706,6 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 	if (!sk->pending_connection_buf.empty()) {
 		// If there is already a pending connection, return true now
-		std::cout << "Pending connection is not empty\n";
 		INFO("Pending connection is not empty\n");
 
 		ReturnResult(_sport, xia_socket_msg);
@@ -2709,7 +2714,6 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
-		std::cout << sk->port << " Pending connection is empty\n";
 		INFO("Pending connection is empty\n");
 
 		// xia_socket_msg is on the stack; allocate a copy on the heap
@@ -3491,12 +3495,21 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 		if (sk -> get_type() == SOCK_STREAM)
 		{
-			dynamic_cast<XStream *>(sk)->usrsend(payload);
+			INFO("sending %d bytes\n", pktPayloadSize);
+			int tcp_rc = dynamic_cast<XStream *>(sk)->usrsend(payload);
+			// FIXME: hack until the transport waits to return
+			if (tcp_rc != 0) {
+				rc = -1;
+				ec = EWOULDBLOCK;
+				// FIXME: what should ec be in this case?
+				INFO("error sending packet(s)\n");
+			}
 		} else if (sk -> get_type() == SOCK_DGRAM)
 		{
 			/* code */
 		}
 
+		// FIXME: what is this for?
 		portToSock.set(_sport, sk);
 		if (_sport != sk->port) {
 			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);

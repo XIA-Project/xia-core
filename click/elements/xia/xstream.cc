@@ -1049,7 +1049,6 @@ again:
 	}
 
 	if (_q_usr_input.pkts_to_send(off,win) > 1) { sendalot = 1; }
-
 	if (len > tp->t_maxseg) { len = tp->t_maxseg; }
 
 	win = so_recv_buffer_space();
@@ -1680,7 +1679,10 @@ XStream::usrsend(WritablePacket *p)
 
 	//  These are the states where we expect to recieve packets
 	//	if ( (tp->t_state == TCPS_ESTABLISHED) || ( tp->t_state == TCPS_CLOSE_WAIT ))
-	tcp_output();
+	click_chatter("sending the bytes now rc = %d\n", retval);
+	if (retval == 0)
+		tcp_output();
+	click_chatter("the bytes have been sent\n");
 	return retval;
 }
 
@@ -1928,21 +1930,26 @@ int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	int bytes_returned = 0;
 	char buf[1024*1024]; // TODO: pick a buf size
 	memset(buf, 0, 1024*1024);
-	while (has_pullable_data()) {
+click_chatter("rfrb asked for %d\n", bytes_requested);
 
+	while (has_pullable_data()) {
+click_chatter("pulling data\n");
 		if (bytes_returned >= bytes_requested) break;
 
 		WritablePacket *p = _q_recv.pull_front();
 
 		size_t data_size = p -> length();
-
+click_chatter("p->len = %d\n", p->length());
 		memcpy((void*)(&buf[bytes_returned]), (const void*)p -> data(), data_size);
 		bytes_returned += data_size;
+click_chatter("returned = %d\n", bytes_returned);
 
 		p->kill();
 
 //		printf("	port %u grabbing index %d, seqnum %d\n", tcp_conn->port, i%tcp_conn->recv_buffer_size, i);
 	}
+	click_chatter("returned final = %d\n", bytes_returned);
+
 	x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
 	x_recv_msg->set_bytes_returned(bytes_returned);
 
@@ -2363,15 +2370,16 @@ TCPFifo::~TCPFifo()
 int
 TCPFifo::push(WritablePacket *p)
 {
-	//click_chatter("tcpfifo::push pushing [%x]", p);
+	click_chatter("tcpfifo::push pushing [%x]", p);
 	if ((_head + 1) % FIFO_SIZE == _tail) {
 		p->kill();
-		//click_chatter("tcpfifo::push had to kill packet");
+		click_chatter("tcpfifo::push had to kill packet");
 		return -1 ;
 	}
 	_q[_head] = p;
 	_bytes += p->length();
 	_head = (_head + 1) % FIFO_SIZE;
+	click_chatter("tcpfifo contains %d bytes\n", _bytes);
 	return 0;
 }
 
