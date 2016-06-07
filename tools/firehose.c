@@ -152,6 +152,7 @@ done:
 	say("done\n");
 	if (buf)
 		free(buf);
+	sleep(1);
 	Xclose(peer);
 }
 
