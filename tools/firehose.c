@@ -80,6 +80,7 @@ void process(int peer)
 	char *buf = NULL;
 	uint32_t count = 0;
 	int n;
+	int rc;
 
 	signal(SIGINT, handler);
 
@@ -95,17 +96,16 @@ void process(int peer)
 	if (n < 0) {
 		printf("select failed\n");
 		goto done;
-	
+
 	} else if (n == 0) {
 		printf("recv timeout\n");
 		goto done;
-	
+
 	} else if (!FD_ISSET(peer, &fds)) {
 		// this shouldn't happen!
 		printf("something is really wrong, exiting\n");
 		goto done;
 	}
-
 	if (Xrecv(peer, &fhc, sizeof(fhc), 0) < 0) {
 		printf("Unable to get configuration block\n");
 		goto done;
@@ -128,21 +128,31 @@ void process(int peer)
 		printf("Memory error\n");
 		goto done;
 	}
-		
+
 	while (!timetodie) {
 		if (fhc.numPkts > 0 && count == fhc.numPkts)
 			break;
-		printf("sending packet %d\n", count);
 		data(count, buf, sizeof(buf));
-		Xsend(peer, buf, sizeof(buf), 0);
+again:
+		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
+			Xclose(peer);
+			die("Lost connection to the client\n");
+		} else if (rc == 0) {
+			// FIXME: Temporary hack to deal with send overflow in click
+			say("xsend returned 0\n");
+			goto again;
+		}
+		say("rc = %d\n", rc);
 		count++;
-		if (fhc.delay != 0)
+		if (fhc.delay != 0) {
 			usleep(fhc.delay);
+		}
 	}
 done:
 	say("done\n");
-	if (buf) 
+	if (buf)
 		free(buf);
+	sleep(1);
 	Xclose(peer);
 }
 
@@ -232,17 +242,16 @@ int main(int argc, char **argv)
 		if ((rc = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
 			printf("select failed\n");
 			break;
-	
+
 		} else if (rc == 0) {
 			// timed out, try again
 			continue;
-	
+
 		} else if (!FD_ISSET(sock, &fds)) {
 			// this shouldn't happen!
 			printf("something is really wrong, exiting\n");
 			break;
 		}
-
 		peer = Xaccept(sock, NULL, NULL);
 		if (peer < 0) {
 			printf("Xaccept failed\n");
@@ -252,17 +261,17 @@ int main(int argc, char **argv)
 		say("peer connected...\n");
 		pid_t pid = fork();
 
-		if (pid == -1) { 
+		if (pid == -1) {
 			printf("fork failed\n");
 			break;
 		}
 		else if (pid == 0) {
+			Xclose(sock);
 			process(peer);
 			exit(0);
 		}
 		else {
-			// use regular close so we don't rip out the Xsocket state from under the child
-			close(peer);
+			//Xclose(peer);
 		}
 	}
 

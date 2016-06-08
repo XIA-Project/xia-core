@@ -33,10 +33,6 @@ class TransportHeader : public XIAGenericExtHeader { public:
 	uint32_t recv_window() { return _tcphdr->th_win; };
 	uint8_t flags() {return _tcphdr->th_flags; };
 
-	enum { SYN=1, SYNACK, DATA, ACK, FIN, FINACK, MIGRATE, MIGRATEACK, RST};
-
-    static const char *TypeStr(char type);
-
 private:
 	struct click_tcp *_tcphdr;
 };
