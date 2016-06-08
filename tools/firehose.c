@@ -133,6 +133,7 @@ void process(int peer)
 		if (fhc.numPkts > 0 && count == fhc.numPkts)
 			break;
 		data(count, buf, sizeof(buf));
+		// FIXME: rip this loop out once we fix the overflow issue with the xmit buffer in click
 again:
 		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
 			Xclose(peer);
@@ -152,7 +153,6 @@ done:
 	say("done\n");
 	if (buf)
 		free(buf);
-	sleep(1);
 	Xclose(peer);
 }
 
