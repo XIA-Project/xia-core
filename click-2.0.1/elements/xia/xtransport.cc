@@ -2833,7 +2833,8 @@ int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
 {
 	XIAPath interface_dag = sidPath;
 	//TODO: check dest node in sidPath is an SID
-	if(interface_dag.remove_node(interface_dag.destination_node())) {
+	if(interface_dag.remove_node(interface_dag.destination_node()) != true) {
+		// TODO: XIAPath::remove_node always returns true. Remove this check
 		click_chatter("Xtransport::IfaceFromSIDPath couldn't remove node");
 		return -1;
 	}
@@ -3099,6 +3100,8 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	int iface;
 	if((iface = IfaceFromSIDPath(sk->src_path)) != -1) {
 		sk->outgoing_iface = iface;
+	} else {
+		click_chatter("Xconnect: WARNING: could not determine outgoing iface for %s", sk->src_path.unparse().c_str());
 	}
 
 	XID source_xid = sk->src_path.xid(sk->src_path.destination_node());
@@ -3779,6 +3782,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 		if(sk->outgoing_iface != interface) {
 			INFO("skipping migration for unchanged interface");
 			INFO("src_path:%s:", sk->src_path.unparse().c_str());
+			INFO("out_iface:%d:change_iface:%d", sk->outgoing_iface, interface);
 			continue;
 		}
 
@@ -3787,11 +3791,13 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 
 		// Append SID to the new dag
 		XIAPath new_sid_dag = new_dag;
+		click_chatter("Xtransport::Xupdatedag new iface dag:%s", new_sid_dag.unparse().c_str());
+		click_chatter("Xtransport::Xupdatedag appending:%s", sid.unparse().c_str());
 		XIAPath::handle_t hid_handle = new_sid_dag.destination_node();
 		XIAPath::handle_t sid_handle = new_sid_dag.add_node(sid);
-		if(!new_sid_dag.add_edge(hid_handle, sid_handle)) {
-			INFO("Failed adding edge from HID to SID in new_dag");
-		}
+		new_sid_dag.add_edge(hid_handle, sid_handle);
+		new_sid_dag.set_destination_node(sid_handle);
+		click_chatter("Xtransport::Xupdatedag new SID DAG:%s", new_sid_dag.unparse().c_str());
 		INFO("Updating %s to %s in sk", sk->src_path.unparse().c_str(), new_sid_dag.unparse().c_str());
 		sk->src_path = new_sid_dag;
 
