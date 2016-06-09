@@ -38,13 +38,14 @@ class NetjoinReceiver(threading.Thread):
         logging.debug("Got a beacon")
 
         message = message_tuple[0]
+        iface = message_tuple[1]
         # Convert network descriptor to a beacon
         serialized_net_descriptor = message.net_descriptor.SerializeToString()
         beacon = NetjoinBeacon()
         beacon.from_serialized_net_descriptor(serialized_net_descriptor)
 
         # Ask the policy module if we should join this network
-        if not self.policy.join_sender_of_beacon(beacon):
+        if not self.policy.join_sender_of_beacon(beacon, iface):
             logging.debug("Policy action: ignore beacon")
             return
 
