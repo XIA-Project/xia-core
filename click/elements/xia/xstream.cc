@@ -2414,7 +2414,6 @@ TCPFifo::push(WritablePacket *p)
 {
 	// no room in the output queue
 	if ((_head + 1) % FIFO_SIZE == _tail) {
-		//printf("queue full!\n");
 		return EWOULDBLOCK;
 	}
 

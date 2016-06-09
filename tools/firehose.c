@@ -28,31 +28,6 @@ void handler(int)
 	timetodie = 1;
 }
 
-char *data(int seq, char *buf, int size)
-{
-	int i;
-	static int refresh = 1;
-	int total = size = sizeof(seq) - 1;
-
-	if (!(--refresh)) {
-		// refresh rand every now and then so it doesn't degenerate too much
-		//  use a prime number to keep it interesting
-		srand(time(NULL));
-		refresh = 997;
-	}
-
-	// put the sequence at the front of the buffer
-	*(int*)buf = seq;
-
-	// fill the remaining buffer with random data
-	for (i = sizeof(seq); i < total; i ++) {
-		buf[i] = (char)(rand() % 256);
-	}
-	buf[size - 1] = 0;
-
-	return buf;
-}
-
 void say(const char *fmt, ...)
 {
 	if (verbose) {
@@ -80,33 +55,10 @@ void process(int peer)
 	fhConfig fhc;
 	char *buf = NULL;
 	uint32_t count = 0;
-	int n;
 	int rc;
 
 	signal(SIGINT, handler);
 
-	fd_set fds;
-	FD_ZERO(&fds);
-	FD_SET(peer, &fds);
-
-	struct timeval tv;
-	tv.tv_sec = 5;
-	tv.tv_usec = 0;
-
-	n = Xselect(peer + 1, &fds, NULL, NULL, &tv);
-	if (n < 0) {
-		printf("select failed\n");
-		goto done;
-
-	} else if (n == 0) {
-		printf("recv timeout\n");
-		goto done;
-
-	} else if (!FD_ISSET(peer, &fds)) {
-		// this shouldn't happen!
-		printf("something is really wrong, exiting\n");
-		goto done;
-	}
 	if (Xrecv(peer, &fhc, sizeof(fhc), 0) < 0) {
 		printf("Unable to get configuration block\n");
 		goto done;
@@ -116,7 +68,7 @@ void process(int peer)
 	fhc.delay   = ntohl(fhc.delay);
 	fhc.pktSize = ntohl(fhc.pktSize);
 	// need to have at least enough room for the sequence #
-	fhc.pktSize = MAX(fhc.pktSize, sizeof(unsigned));
+	fhc.pktSize = MAX(fhc.pktSize, sizeof(uint32_t));
 	if (fhc.numPkts == 0)
 		say("packet count = non-stop\n");
 	else
@@ -124,8 +76,7 @@ void process(int peer)
 	say("packet size = %d\n", fhc.pktSize);
 	say("inter-packet delay = %d\n", fhc.delay);
 
-
-	if (!(buf = (char *)malloc(fhc.pktSize))) {
+	if (!(buf = (char *)calloc(fhc.pktSize, 1))) {
 		printf("Memory error\n");
 		goto done;
 	}
@@ -133,9 +84,11 @@ void process(int peer)
 	while (!timetodie) {
 		if (fhc.numPkts > 0 && count == fhc.numPkts)
 			break;
-		data(count, buf, sizeof(buf));
-		// FIXME: rip this loop out once we fix the overflow issue with the xmit buffer in click
-		//
+
+		// stick the count value at the front of the packet so we can tell if any get Lost
+		// the rest of the packet will be 0's
+		*(uint32_t*)buf = count;
+
 		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
 			Xclose(peer);
 			die("Lost connection to the client: %s\n", strerror(errno));
@@ -143,14 +96,14 @@ void process(int peer)
 			Xclose(peer);
 			die("xsend returned 0, this shouldn't happen!\n");
 		}
-		say("%d: sent %d\n", count, rc);
+
 		count++;
 		if (fhc.delay != 0) {
 			usleep(fhc.delay);
 		}
 	}
 done:
-	say("done\n");
+	say("done: sent %u packets\n", count - 1);
 	if (buf)
 		free(buf);
 	Xclose(peer);
@@ -196,9 +149,8 @@ int main(int argc, char **argv)
 	struct addrinfo hints, *ai;
 	char sid[50];
 
-// FIXME: put signal handlers back into code once Xselect is working
-//	signal(SIGINT, handler);
-//	signal(SIGTERM, handler);
+	signal(SIGINT, handler);
+	signal(SIGTERM, handler);
 
 	configure(argc, argv);
 	say("XIA firehose listening on %s\n", name);
@@ -236,16 +188,9 @@ int main(int argc, char **argv)
 		FD_ZERO(&fds);
 		FD_SET(sock, &fds);
 
-		struct timeval tv;
-		tv.tv_sec = 2;
-		tv.tv_usec = 0;
-		if ((rc = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+		if ((rc = Xselect(sock + 1, &fds, NULL, NULL, NULL)) < 0) {
 			printf("select failed\n");
 			break;
-
-		} else if (rc == 0) {
-			// timed out, try again
-			continue;
 
 		} else if (!FD_ISSET(sock, &fds)) {
 			// this shouldn't happen!
@@ -258,8 +203,8 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		say("peer connected...\n");
-		pid_t pid = fork();
+		say("drinker connected...\n");
+		pid_t pid = Xfork();
 
 		if (pid == -1) {
 			printf("fork failed\n");
@@ -271,7 +216,7 @@ int main(int argc, char **argv)
 			exit(0);
 		}
 		else {
-			//Xclose(peer);
+			Xclose(peer);
 		}
 	}
 
