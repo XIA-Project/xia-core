@@ -3492,6 +3492,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			XStream *st = dynamic_cast<XStream *>(sk);
 
 			int tcp_rc = st->usrsend(payload);
+			//INFO("usrsend reurned %d\n", tcp_rc);
 			if (tcp_rc != 0) {
 				if (tcp_rc == EPIPE) {
 					// the socket is closing
