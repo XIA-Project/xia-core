@@ -160,8 +160,6 @@ int main(int argc, char **argv)
 		die("Unable to connect to %s\n", NAME);
 	}
 
-	// FIXME: i occasionally see the data go before the server is ready
-	sleep(1);
 	// tell firehose how many packets we expect
 	if (Xsend(sock, &fhc, sizeof(fhc), 0) < 0) {
 		Xclose(sock);
@@ -178,7 +176,7 @@ int main(int argc, char **argv)
 		FD_SET(sock, &fds);
 
 		struct timeval tv;
-		tv.tv_sec = 5;
+		tv.tv_sec = 2;
 		tv.tv_usec = 0;
 
 		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {

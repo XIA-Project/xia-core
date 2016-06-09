@@ -3,6 +3,7 @@
 #include <time.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <errno.h>
 #include "Xsocket.h"
 #include "Xkeys.h"
 
@@ -134,16 +135,15 @@ void process(int peer)
 			break;
 		data(count, buf, sizeof(buf));
 		// FIXME: rip this loop out once we fix the overflow issue with the xmit buffer in click
-again:
+		//
 		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
 			Xclose(peer);
-			die("Lost connection to the client\n");
+			die("Lost connection to the client: %s\n", strerror(errno));
 		} else if (rc == 0) {
-			// FIXME: Temporary hack to deal with send overflow in click
-			say("xsend returned 0\n");
-			goto again;
+			Xclose(peer);
+			die("xsend returned 0, this shouldn't happen!\n");
 		}
-		say("rc = %d\n", rc);
+		say("%d: sent %d\n", count, rc);
 		count++;
 		if (fhc.delay != 0) {
 			usleep(fhc.delay);
