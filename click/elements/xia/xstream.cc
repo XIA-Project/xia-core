@@ -102,6 +102,7 @@ XStream::tcp_input(WritablePacket *p)
 	//printf("\t\t\ttcpinput seq is %d\n", (ti.ti_seq));
 	//printf("\t\t\ttcpinput ack is %d\n", (ti.ti_ack));
 	//printf("\t\t\ttcpinput data length is %d\n", (int)ti.ti_len);
+	//printf("received %d bytes\n", (int)ti.ti_len);
 	/*205 packet should be sane, skip tests */
 	off = ti.ti_off << 2;
 
@@ -644,6 +645,7 @@ XStream::tcp_input(WritablePacket *p)
 		if (SEQ_LEQ(ti.ti_ack, tp->snd_una)) {
 			if (ti.ti_len == 0 && tiwin == tp->snd_wnd) {
 				get_transport()->_tcpstat.tcps_rcvdupack++;
+				//printf("retransmit\n");
 				/*
 				 * If we have outstanding data (other than
 				 * a window probe), this is a completely
@@ -1014,6 +1016,11 @@ XStream::tcp_output()
 	//								  {	  off	  }
 	// 		   			{  _q_usr_input.byte_length() }
 
+	// FIXME: WHERE SHOULD THIS LOGIC GO?????
+	if (staged) {
+		unstage_data();
+	}
+
 again:
 	sendalot = 0;
 	/*71*/
@@ -1022,8 +1029,6 @@ again:
 	off = tp->snd_nxt - tp->snd_una;
 	win = min(tp->snd_wnd, tp->snd_cwnd);
 	flags = tcp_outflags[tp->t_state];
-	printf("flags: %08x\n", flags);
-	printf("t_state %d\n", tp->t_state);
 	/*80*/
 	if (tp->t_force) {
 		if (win == 0) {
@@ -1052,6 +1057,11 @@ again:
 	if (len > tp->t_maxseg) { len = tp->t_maxseg; }
 
 	win = so_recv_buffer_space();
+
+	// don't send FIN yet if we still have data queued
+	if (! _q_usr_input.is_empty()) {
+		flags &= ~TH_FIN;
+	}
 
 	/*131 Silly window avoidance */
 	if (len) {
@@ -1288,7 +1298,7 @@ send:
 	} else {
 		payload_length = p -> length();
 	}
-	printf("tcpoutput with payload_length %d\n", payload_length);
+	//printf("emitting %d bytes\n", payload_length);
 	tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
@@ -1627,12 +1637,11 @@ XStream::tcp_mss(u_int offer) {
 int
 XStream::usrsend(WritablePacket *p)
 {
-	//printf("usrsend: I wanna send\n");
 	// Sanity Check: We should never recieve a packet after our tcp state is
 	// beyond CLOSE_WAIT.
 	if (tp->t_state > TCPS_CLOSE_WAIT) {
 		p->kill();
-		return -3;
+		return EPIPE;	// what's the right result in this case?
 	}
 
 	if (tp->so_flags & SO_FIN_AFTER_UDP_IDLE) {
@@ -1641,8 +1650,7 @@ XStream::usrsend(WritablePacket *p)
 		tp->t_timer[TCPT_IDLE] = get_transport()->globals()->so_idletime;
 	}
 
-	// the stateless tcp flags field from the recieved stateless packet
-	int retval = 0 ;
+	int retval = 0;
 
 	// If we were closed or listening, we will have to send a SYN
 	if ((tp->t_state == TCPS_CLOSED) || (tp->t_state == TCPS_LISTEN)) {
@@ -1679,10 +1687,8 @@ XStream::usrsend(WritablePacket *p)
 
 	//  These are the states where we expect to recieve packets
 	//	if ( (tp->t_state == TCPS_ESTABLISHED) || ( tp->t_state == TCPS_CLOSE_WAIT ))
-	click_chatter("sending the bytes now rc = %d\n", retval);
 	if (retval == 0)
 		tcp_output();
-	click_chatter("the bytes have been sent\n");
 	return retval;
 }
 
@@ -1690,7 +1696,7 @@ XStream::usrsend(WritablePacket *p)
 void
 XStream::usrclosed()
 {
-	printf("usrclosed is called \n");
+	//printf("usrclosed is called \n");
 	switch (tp->t_state) {
 		case TCPS_CLOSED:
 		case TCPS_LISTEN:
@@ -1747,9 +1753,6 @@ XStream::set_state(const HandlerState new_state) {
 	HandlerState old_state = get_state();
 
 	sock::set_state(new_state);
-
-printf("o:%d n:%d sd:%d es:%d\n", old_state, new_state, SHUTDOWN, TCPS_ESTABLISHED);
-
 
 	if ((old_state == CREATE) && new_state == (INITIALIZE))
 		usropen();
@@ -1932,25 +1935,22 @@ int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	int bytes_returned = 0;
 	char buf[1024*1024]; // TODO: pick a buf size
 	memset(buf, 0, 1024*1024);
-click_chatter("rfrb asked for %d\n", bytes_requested);
+	//printf("rfrb asked for %d\n", bytes_requested);
 
 	while (has_pullable_data()) {
-click_chatter("pulling data\n");
 		if (bytes_returned >= bytes_requested) break;
 
 		WritablePacket *p = _q_recv.pull_front();
 
 		size_t data_size = p -> length();
-click_chatter("p->len = %d\n", p->length());
 		memcpy((void*)(&buf[bytes_returned]), (const void*)p -> data(), data_size);
 		bytes_returned += data_size;
-click_chatter("returned = %d\n", bytes_returned);
 
 		p->kill();
 
 //		printf("	port %u grabbing index %d, seqnum %d\n", tcp_conn->port, i%tcp_conn->recv_buffer_size, i);
 	}
-	click_chatter("returned final = %d\n", bytes_returned);
+	//printf("rfrb returned %d\n", bytes_returned);
 
 	x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
 	x_recv_msg->set_bytes_returned(bytes_returned);
@@ -2003,6 +2003,9 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 
 	_so_state = 0;
 
+	staged = NULL;
+	staged_seq = 0;
+
 	/*
 	if (tp->so_flags & SO_FIN_AFTER_IDLE) {
 	tp->idle_timeout = new Timer(TCPget_transport::_tcp_timer_close, this);
@@ -2024,6 +2027,43 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 	// StringAccum sa;
 	// sa << *(flowid());
 	// //debug_output(VERB_STATES, "[%s] new connection %s %s", SPKRNAME, sa.c_str(), tcpstates[tp->t_state]);
+}
+
+
+bool XStream::stage_data(WritablePacket *p, unsigned seq)
+{
+	//printf("staging seq #%d\n", seq);
+	if (staged == NULL) {
+		staged = p;
+		staged_seq = seq;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+WritablePacket *XStream::unstage_data()
+{
+	// if there's data, try to put it into the queue
+	if (staged && (_q_usr_input.push(staged) == 0)) {
+
+		WritablePacket *p = staged;
+		//printf("unstaging seq#%d\n", staged_seq);
+
+		// tell the API we let it go into the buffer
+		xia::XSocketMsg xsm;
+		xsm.set_type(xia::XRESULT);
+		xsm.set_sequence(staged_seq);
+		get_transport()->ReturnResult(port, &xsm, p->length());
+
+		staged = NULL;
+		staged_seq = 0;
+
+		return p;
+
+	} else {
+		return NULL;
+	}
 }
 
 
@@ -2372,16 +2412,16 @@ TCPFifo::~TCPFifo()
 int
 TCPFifo::push(WritablePacket *p)
 {
-	click_chatter("tcpfifo::push pushing [%x]", p);
+	// no room in the output queue
 	if ((_head + 1) % FIFO_SIZE == _tail) {
-		p->kill();
-		click_chatter("tcpfifo::push had to kill packet");
-		return -1 ;
+		//printf("queue full!\n");
+		return EWOULDBLOCK;
 	}
+
 	_q[_head] = p;
 	_bytes += p->length();
 	_head = (_head + 1) % FIFO_SIZE;
-	click_chatter("tcpfifo contains %d bytes\n", _bytes);
+	//printf("tcpfifo contains %d bytes\n", _bytes);
 	return 0;
 }
 

@@ -135,6 +135,8 @@ sock::sock() {
 	refcount = 1;
 	xcacheSock = false;
 }
+
+
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -2582,7 +2584,6 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), ref);
 	}
 
-done:
 	xcm->set_refcount(ref);
 	xcm->set_delkeys(should_delete);
 	ReturnResult(control_port, xia_socket_msg);
@@ -3422,19 +3423,14 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
 	int pktPayloadSize = x_send_msg->payload().size();
 
-	char payload[65536];
-	memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
-
 	//Find DAG info for that stream
 	if (rc == 0 && sk->sock_type == SOCK_RAW) {
+		char payload[65536];
+		memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
+
+		// FIXME: we should check to see that the packet isn't too big here
+		//
 		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
-//		DBG("xiah->ver = %d", xiah->ver);
-//		DBG("xiah->nxt = %d", xiah->nxt);
-//		DBG("xiah->plen = %d", xiah->plen);
-//		DBG("xiah->hlim = %d", xiah->hlim);
-//		DBG("xiah->dnode = %d", xiah->dnode);
-//		DBG("xiah->snode = %d", xiah->snode);
-//		DBG("xiah->last = %d", xiah->last);
 
 		XIAHeader xiaheader(xiah);
 		XIAHeaderEncap xiahencap(xiaheader);
@@ -3489,32 +3485,44 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			sk->src_path.parse_re(str_local_addr);
 		}
 
-		DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 		//Add XIA headers
-
 		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
-		if (sk -> get_type() == SOCK_STREAM)
-		{
-			INFO("sending %d bytes\n", pktPayloadSize);
-			int tcp_rc = dynamic_cast<XStream *>(sk)->usrsend(payload);
-			// FIXME: hack until the transport waits to return
+
+		if (sk -> get_type() == SOCK_STREAM) {	// why do we need this test, we should always be a stream socket here
+			XStream *st = dynamic_cast<XStream *>(sk);
+
+			int tcp_rc = st->usrsend(payload);
 			if (tcp_rc != 0) {
-				rc = -1;
-				ec = EWOULDBLOCK;
-				// FIXME: what should ec be in this case?
-				INFO("error sending packet(s)\n");
+				if (tcp_rc == EPIPE) {
+					// the socket is closing
+					ec = rc; // ? is this right???? if so should we signal from the API?/
+					rc = -1;
+
+				} else if (!xia_socket_msg->blocking()) {
+					rc = -1;
+					ec = EWOULDBLOCK;
+
+				} else if (st->stage_data(payload, xia_socket_msg->sequence()) != false) {
+					// transmit queue is full. Saving the data and not returning
+					// until later when it has be added to the queue
+					DBG("Transmit buffer full, saving and blocking\n");
+					return;
+				} else {
+					// in theory this should never happen
+					rc = -1;
+					ec = ENOBUFS;
+				}
+
+			} else {
+//				DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 			}
-		} else if (sk -> get_type() == SOCK_DGRAM)
-		{
-			/* code */
-		}
 
-		// FIXME: what is this for?
-		portToSock.set(_sport, sk);
-		if (_sport != sk->port) {
-			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
+//			// FIXME: what is this for? we should already be in the table
+//			portToSock.set(_sport, sk);
+//			if (_sport != sk->port) {
+//				ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
+//			}
 		}
-
 	}
 
 	x_send_msg->clear_payload(); // clear payload before returning result

@@ -370,7 +370,6 @@ class sock : public Element {
     XIDpair get_key() {return key;}
     void set_key(XIDpair k) {key = k;}
 
-
     XTRANSPORT *get_transport() { return transport; }
 	sock(XTRANSPORT *transport, unsigned short port, int type);
 	sock();

@@ -48,7 +48,7 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_
 int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
 	#define fmsg  "%s is not currently supported, clearing...\n"
-	int rc;
+	int rc = 0;
 
 	if (flags) {
 		LOGF("flags:%s\n", xferFlags(flags));
@@ -101,17 +101,13 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	// FIXME: what should we do if the stack couldn't send the data
-	// loop and try again? or return 0?
-	if ((rc = click_reply(sockfd, seq, &xsm)) < 0) {
-		if (errno == EWOULDBLOCK || errno == EAGAIN) {
-			len = 0;
-		} else {
+	if ((rc = click_status(sockfd, seq)) < 0) {
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
 			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
 		}
 	}
 
-	return len;
+	return rc;
 }
 
 /*!
