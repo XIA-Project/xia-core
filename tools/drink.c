@@ -34,11 +34,12 @@ typedef struct {
 char *name;
 fhConfig fhc;
 int verbose = 0;
-int pktSize = PKTSIZE;
-int numPkts = 0;
-int delay = 0;
 int sock = -1;
 int timetodie = 0;
+uint32_t pktSize = PKTSIZE;
+uint32_t numPkts = 0;
+uint32_t delay = 0;
+
 
 void help(const char *name)
 {
@@ -140,7 +141,7 @@ int main(int argc, char **argv)
 {
 	struct addrinfo *ai;
 	sockaddr_x *sa;
-	int seq = 0;
+	uint32_t seq = 0;
 
 // FIXME: put signal handlers back into code once Xselect is working
 //	signal(SIGINT, handler);
@@ -160,37 +161,38 @@ int main(int argc, char **argv)
 		die("Unable to connect to %s\n", NAME);
 	}
 
+	say("sending request\n");
 	// tell firehose how many packets we expect
 	if (Xsend(sock, &fhc, sizeof(fhc), 0) < 0) {
 		Xclose(sock);
 		die("Unable to send config information to the firehose\n");
 	}
 
-	int count = 0;
+	uint32_t count = 0;
 	char  *buf = (char *)malloc(pktSize);
 
 	while (!timetodie) {
-		int n;
-		fd_set fds;
-		FD_ZERO(&fds);
-		FD_SET(sock, &fds);
-
-		struct timeval tv;
-		tv.tv_sec = 2;
-		tv.tv_usec = 0;
-
-		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
-			printf("select failed\n");
-			break;
-
-		} else if (n == 0) {
-			printf("recv timeout\n");
-			break;
-		} else if (!FD_ISSET(sock, &fds)) {
-			// this shouldn't happen!
-			printf("something is really wrong, exiting\n");
-			break;
-		}
+//		int n;
+//		fd_set fds;
+//		FD_ZERO(&fds);
+//		FD_SET(sock, &fds);
+//
+//		struct timeval tv;
+//		tv.tv_sec = 200;
+//		tv.tv_usec = 0;
+//
+//		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
+//			printf("select failed\n");
+//			break;
+//
+//		} else if (n == 0) {
+//			printf("recv timeout\n");
+//			break;
+//		} else if (!FD_ISSET(sock, &fds)) {
+//			// this shouldn't happen!
+//			printf("something is really wrong, exiting\n");
+//			break;
+//		}
 
 		int received = 0;
 		char *bp = buf;
@@ -207,10 +209,9 @@ int main(int argc, char **argv)
 			received += rc;
 			bp += received;
 		}
-		memcpy(&seq, buf, sizeof(int));
+		seq = *(uint32_t*)buf;
 
-
-		say("expecting %d, got %d", count, seq);
+		say("expecting %u, got %u", count, seq);
 		if (count == seq) {
 			say("\n");
 }
