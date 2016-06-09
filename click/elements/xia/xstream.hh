@@ -197,6 +197,10 @@ public:
 #define SO_STATE_HASDATA	0x01
 #define SO_STATE_ISCHOKED   0x10
 
+	// holding area for one data packet if the send buffer is full
+	bool stage_data(WritablePacket *p, unsigned seq);
+	WritablePacket *unstage_data();
+
 	// short state() const { return tp->t_state; }
 	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
 	void print_state(StringAccum &sa);
@@ -227,7 +231,9 @@ private:
 	tcp_seq_t	so_recv_buffer_size;
 	int			_so_state;
 
-} ;
+	WritablePacket *staged;		// holding location for when xmit buffer is full and we are blocking
+	unsigned staged_seq;
+};
 
 /* THE method where we register, and handle any TCP State Updates */
 inline void

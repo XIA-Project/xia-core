@@ -1016,6 +1016,11 @@ XStream::tcp_output()
 	//								  {	  off	  }
 	// 		   			{  _q_usr_input.byte_length() }
 
+	// FIXME: WHERE SHOULD THIS LOGIC GO?????
+	if (staged) {
+		unstage_data();
+	}
+
 again:
 	sendalot = 0;
 	/*71*/
@@ -1053,7 +1058,7 @@ again:
 
 	win = so_recv_buffer_space();
 
-	// don't send fin yet if we still have data
+	// don't send FIN yet if we still have data queued
 	if (! _q_usr_input.is_empty()) {
 		flags &= ~TH_FIN;
 	}
@@ -1632,12 +1637,11 @@ XStream::tcp_mss(u_int offer) {
 int
 XStream::usrsend(WritablePacket *p)
 {
-	//printf("usrsend: I wanna send\n");
 	// Sanity Check: We should never recieve a packet after our tcp state is
 	// beyond CLOSE_WAIT.
 	if (tp->t_state > TCPS_CLOSE_WAIT) {
 		p->kill();
-		return -3;
+		return EPIPE;	// what's the right result in this case?
 	}
 
 	if (tp->so_flags & SO_FIN_AFTER_UDP_IDLE) {
@@ -1646,8 +1650,7 @@ XStream::usrsend(WritablePacket *p)
 		tp->t_timer[TCPT_IDLE] = get_transport()->globals()->so_idletime;
 	}
 
-	// the stateless tcp flags field from the recieved stateless packet
-	int retval = 0 ;
+	int retval = 0;
 
 	// If we were closed or listening, we will have to send a SYN
 	if ((tp->t_state == TCPS_CLOSED) || (tp->t_state == TCPS_LISTEN)) {
@@ -2000,6 +2003,9 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 
 	_so_state = 0;
 
+	staged = NULL;
+	staged_seq = 0;
+
 	/*
 	if (tp->so_flags & SO_FIN_AFTER_IDLE) {
 	tp->idle_timeout = new Timer(TCPget_transport::_tcp_timer_close, this);
@@ -2021,6 +2027,43 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 	// StringAccum sa;
 	// sa << *(flowid());
 	// //debug_output(VERB_STATES, "[%s] new connection %s %s", SPKRNAME, sa.c_str(), tcpstates[tp->t_state]);
+}
+
+
+bool XStream::stage_data(WritablePacket *p, unsigned seq)
+{
+	//printf("staging seq #%d\n", seq);
+	if (staged == NULL) {
+		staged = p;
+		staged_seq = seq;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+WritablePacket *XStream::unstage_data()
+{
+	// if there's data, try to put it into the queue
+	if (staged && (_q_usr_input.push(staged) == 0)) {
+
+		WritablePacket *p = staged;
+		//printf("unstaging seq#%d\n", staged_seq);
+
+		// tell the API we let it go into the buffer
+		xia::XSocketMsg xsm;
+		xsm.set_type(xia::XRESULT);
+		xsm.set_sequence(staged_seq);
+		get_transport()->ReturnResult(port, &xsm, p->length());
+
+		staged = NULL;
+		staged_seq = 0;
+
+		return p;
+
+	} else {
+		return NULL;
+	}
 }
 
 
@@ -2369,11 +2412,12 @@ TCPFifo::~TCPFifo()
 int
 TCPFifo::push(WritablePacket *p)
 {
+	// no room in the output queue
 	if ((_head + 1) % FIFO_SIZE == _tail) {
-		p->kill();
-		printf("tcpfifo::push had to kill packet");
-		return -1 ;
+		//printf("queue full!\n");
+		return EWOULDBLOCK;
 	}
+
 	_q[_head] = p;
 	_bytes += p->length();
 	_head = (_head + 1) % FIFO_SIZE;
