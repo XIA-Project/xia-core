@@ -7,7 +7,7 @@
 #include "Xsocket.h"
 #include "Xkeys.h"
 
-#define VERSION "v1.0"
+#define VERSION "v1.1"
 #define TITLE "XIA Firehose"
 #define NAME "firehose.xia"
 #define PKTSIZE 4096
@@ -20,12 +20,30 @@ typedef struct {
 
 int timetodie = 0;
 
+struct sigaction sa_new;
+struct sigaction sa_term;
+struct sigaction sa_int;
+
 char *name;
 int verbose = 0;
 
-void handler(int)
+void handler(int sig)
 {
 	timetodie = 1;
+
+	// chain to the old handler if it exists
+	switch (sig) {
+		case SIGTERM:
+			if (sa_term.sa_handler)
+				(sa_term.sa_handler)(sig);
+			break;
+		case SIGINT:
+			if (sa_int.sa_handler)
+				(sa_int.sa_handler)(sig);
+			break;
+		default:
+			break;
+	}
 }
 
 void say(const char *fmt, ...)
@@ -56,8 +74,6 @@ void process(int peer)
 	char *buf = NULL;
 	uint32_t count = 0;
 	int rc;
-
-	signal(SIGINT, handler);
 
 	if (Xrecv(peer, &fhc, sizeof(fhc), 0) < 0) {
 		printf("Unable to get configuration block\n");
@@ -91,7 +107,11 @@ void process(int peer)
 
 		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
 			Xclose(peer);
-			die("Lost connection to the client: %s\n", strerror(errno));
+			if (timetodie) {
+				die("session terminated\n");
+			} else {
+				die("Lost connection to the client\n");
+			}
 		} else if (rc == 0) {
 			Xclose(peer);
 			die("xsend returned 0, this shouldn't happen!\n");
@@ -103,7 +123,7 @@ void process(int peer)
 		}
 	}
 done:
-	say("done: sent %u packets\n", count - 1);
+	say("done: sent %u packets\n", count);
 	if (buf)
 		free(buf);
 	Xclose(peer);
@@ -148,9 +168,21 @@ int main(int argc, char **argv)
 	int peer = -1;
 	struct addrinfo hints, *ai;
 	char sid[50];
+	pid_t pid;
 
-	signal(SIGINT, handler);
-	signal(SIGTERM, handler);
+	memset (&sa_new, 0, sizeof (struct sigaction));
+	sigemptyset (&sa_new.sa_mask);
+	sa_new.sa_handler = handler;
+	sa_new.sa_flags = 0;
+
+	sigaction (SIGINT, NULL, &sa_int);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGINT, &sa_new, &sa_int);
+	}
+	sigaction (SIGTERM, NULL, &sa_term);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGTERM, &sa_new, &sa_term);
+	}
 
 	configure(argc, argv);
 	say("XIA firehose listening on %s\n", name);
@@ -183,20 +215,6 @@ int main(int argc, char **argv)
 	}
 
 	while (!timetodie) {
-
-		fd_set fds;
-		FD_ZERO(&fds);
-		FD_SET(sock, &fds);
-
-		if ((rc = Xselect(sock + 1, &fds, NULL, NULL, NULL)) < 0) {
-			printf("select failed\n");
-			break;
-
-		} else if (!FD_ISSET(sock, &fds)) {
-			// this shouldn't happen!
-			printf("something is really wrong, exiting\n");
-			break;
-		}
 		peer = Xaccept(sock, NULL, NULL);
 		if (peer < 0) {
 			printf("Xaccept failed\n");
@@ -204,7 +222,7 @@ int main(int argc, char **argv)
 		}
 
 		say("drinker connected...\n");
-		pid_t pid = Xfork();
+		pid = Xfork();
 
 		if (pid == -1) {
 			printf("fork failed\n");
@@ -220,7 +238,9 @@ int main(int argc, char **argv)
 		}
 	}
 
-	say("firehose exiting\n");
-	Xclose(sock);
+	if (pid != 0) {
+		say("firehose server exiting\n");
+		Xclose(sock);
+	}
 	return 0;
 }
