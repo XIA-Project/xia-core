@@ -20,7 +20,7 @@
 #include <signal.h>
 #include <libgen.h>
 
-#define VERSION "v1.0"
+#define VERSION "v1.1"
 #define TITLE "XIA Firehose Drinker"
 #define NAME "firehose.xia"
 #define PKTSIZE 4096
@@ -39,6 +39,11 @@ int numPkts = 0;
 int delay = 0;
 int sock = -1;
 int timetodie = 0;
+
+struct sigaction sa_new;
+struct sigaction sa_term;
+struct sigaction sa_int;
+
 
 void help(const char *name)
 {
@@ -127,12 +132,23 @@ void die(const char *fmt, ...)
 	exit(-1);
 }
 
-void handler(int)
+void handler(int sig)
 {
 	timetodie = 1;
-	if (sock > 0)
-		Xclose(sock);
-	sock = -1;
+
+	// chain to the old handler if it exists
+	switch (sig) {
+		case SIGTERM:
+			if (sa_term.sa_handler)
+				(sa_term.sa_handler)(sig);
+			break;
+		case SIGINT:
+			if (sa_int.sa_handler)
+				(sa_int.sa_handler)(sig);
+			break;
+		default:
+			break;
+	}
 }
 
 
@@ -142,9 +158,20 @@ int main(int argc, char **argv)
 	sockaddr_x *sa;
 	int seq = 0;
 
-// FIXME: put signal handlers back into code once Xselect is working
-//	signal(SIGINT, handler);
-//	signal(SIGTERM, handler);
+	memset (&sa_new, 0, sizeof (struct sigaction));
+	sigemptyset (&sa_new.sa_mask);
+	sa_new.sa_handler = handler;
+	sa_new.sa_flags = 0;
+
+	sigaction (SIGINT, NULL, &sa_int);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGINT, &sa_new, &sa_int);
+	}
+	sigaction (SIGTERM, NULL, &sa_term);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGTERM, &sa_new, &sa_term);
+	}
+
 	getConfig(argc, argv);
 
 	if (Xgetaddrinfo(NAME, NULL, NULL, &ai) < 0)
@@ -167,31 +194,10 @@ int main(int argc, char **argv)
 	}
 
 	int count = 0;
+	int lost = 0;
 	char  *buf = (char *)malloc(pktSize);
 
 	while (!timetodie) {
-		int n;
-		fd_set fds;
-		FD_ZERO(&fds);
-		FD_SET(sock, &fds);
-
-		struct timeval tv;
-		tv.tv_sec = 2;
-		tv.tv_usec = 0;
-
-		if ((n = Xselect(sock + 1, &fds, NULL, NULL, &tv)) < 0) {
-			printf("select failed\n");
-			break;
-
-		} else if (n == 0) {
-			printf("recv timeout\n");
-			break;
-		} else if (!FD_ISSET(sock, &fds)) {
-			// this shouldn't happen!
-			printf("something is really wrong, exiting\n");
-			break;
-		}
-
 		int received = 0;
 		char *bp = buf;
 		int sz = ntohl(fhc.pktSize);
@@ -205,7 +211,7 @@ int main(int argc, char **argv)
 				goto done;
 			}
 			received += rc;
-			bp += received;
+			bp += rc;
 		}
 		memcpy(&seq, buf, sizeof(int));
 
@@ -215,7 +221,9 @@ int main(int argc, char **argv)
 			say("\n");
 }
 		else {
-			say(" lost %d\n", seq - count);
+			say(" lost packet\n");
+			count = seq;
+			lost += seq - count;
 		}
 		count++;
 		if (count == numPkts)
@@ -226,8 +234,8 @@ int main(int argc, char **argv)
 done:
 	seq++;
 	if (count != seq)
-		printf("lost %d packets, received %d, expected %d\n", seq - count, count, seq);
+		printf("lost %d packets, received %d, expected %d\n", lost, count, seq);
 	else
-		printf("success!\n");
+		printf("success! received %d packets\n", count);
 	Xclose(sock);
 }
