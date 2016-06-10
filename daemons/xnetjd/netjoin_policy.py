@@ -28,7 +28,8 @@ class NetjoinPolicy:
     def keep_known_beacon_id(self, beacon_ID, iface, state):
 
         # Invalidate old beacon for the given interface, if one exists
-        for (identifier, interface) in self.known_beacons.keys():
+        for key in self.known_beacons.keys():
+            identifier, interface = key
             if interface == iface:
                 # TODO: decide if we should keep UNJOINABLE beacons
                 msg = "Removed beacon:{} iface:{}".format(identifier, interface)
@@ -171,11 +172,11 @@ class NetjoinPolicy:
         return join_network
 
     # Notification that network advertized by beacon_id has been joined
-    def join_complete(self, beacon_id):
-        if beacon_id not in self.known_beacons:
+    def join_complete(self, beacon_id, iface):
+        if (beacon_id, iface) not in self.known_beacons:
             logging.error("Join complete called for unknown beacon")
             return
-        self.known_beacons[beacon_id] = self.JOINED
+        self.known_beacons[(beacon_id, iface)] = self.JOINED
         logging.info("Joined network announced by beacon {}".format(beacon_id))
 
 # Unit test this module when run by itself

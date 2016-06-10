@@ -26,6 +26,7 @@ class NetjoinReceiver(threading.Thread):
         self.announcer = announcer    # None, unless running as access point
         self.client_sessions = {}
         self.server_sessions = {}
+        self.cleanup_sessions = []
 
         logging.debug("Receiver initialized")
 
@@ -51,6 +52,7 @@ class NetjoinReceiver(threading.Thread):
 
         # Initiate a NetjoinSession thread to join the network
         session = NetjoinSession(self.hostname, self.shutdown,
+                receiver=self,
                 beacon_id=beacon.get_ID(), policy=self.policy)
         session.daemon = True
         session.start()
@@ -66,7 +68,8 @@ class NetjoinReceiver(threading.Thread):
         # TODO: Avoid copying announcer's auth because that copies private key
         # Copy the auth session from announcer to bootstrap a new session
         authsession = copy.copy(self.announcer.auth)
-        session = NetjoinSession(self.hostname, self.shutdown, auth=authsession)
+        session = NetjoinSession(self.hostname, self.shutdown,
+                auth=authsession, receiver=self)
         session.daemon = True
         session.start()
 
@@ -118,6 +121,19 @@ class NetjoinReceiver(threading.Thread):
         client_session = self.client_sessions[client_session_id]
         client_session.push(message_tuple)
 
+    def session_done(self, session_id):
+        # Find the session and remove it from client/server_sessions
+        if session_id in self.client_sessions:
+            session = self.client_sessions[session_id]
+            del self.client_sessions[session_id]
+        elif session_id in self.server_sessions:
+            session = self.server_sessions[session_id]
+            del self.client_sessions[session_id]
+        else:
+            logging.error("Completed session not known to receiver")
+            return
+        self.cleanup_sessions.append(session)
+
     # Main loop, receives incoming NetjoinMessage(s)
     def run(self):
         while not self.shutdown.is_set():
@@ -168,7 +184,13 @@ class NetjoinReceiver(threading.Thread):
                 self.handle_handshake_four(message_tuple)
 
             else:
-                logging.warning("Unknown message type: {}".format(message_type))
+                logging.warning("Unknown msg type: {}".format(message_type))
+
+            # Join any exited session threads
+            if len(self.cleanup_sessions) > 0:
+                session = self.cleanup_sessions.pop()
+                if session.is_alive():
+                    session.join(timeout=1.0)
 
 # Unit test this module when run by itself
 if __name__ == "__main__":

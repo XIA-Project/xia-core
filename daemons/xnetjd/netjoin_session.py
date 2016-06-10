@@ -27,6 +27,7 @@ class NetjoinSession(threading.Thread):
     # beacon_id is set only on client side
     # policy is set only on client side
     def __init__(self, hostname, shutdown_event,
+            receiver=None,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
         (self.START, self.HS_2_WAIT, self.HS_3_WAIT, self.HS_4_WAIT) = range(4)
@@ -37,6 +38,7 @@ class NetjoinSession(threading.Thread):
         self.start_time = time.time()
         self.hostname = hostname
         self.shutdown_event = shutdown_event
+        self.receiver = receiver
         self.auth = auth
         self.beacon_id = beacon_id
         self.policy = policy
@@ -67,18 +69,25 @@ class NetjoinSession(threading.Thread):
     def push(self, message_tuple):
         self.q.put(message_tuple)
 
-    # Send a message out to a specific recipient
+    # Send a message out to a specific recipient, return True on success
     def send_netjoin_message(self, message, interface, theirmac,
             retransmitting=False):
+
+        msgtype = type(message)
 
         # If we are retransmitting a message, decrement remaining iterations
         if retransmitting:
             self.last_message_remaining_iterations -= 1
             if self.last_message_remaining_iterations <= 0:
-                logging.error("retransmit {} timeout".format(type(message)))
-                return
+                self.disable_retransmission()
+                logging.error("retransmit {} timeout".format(msgtype))
+                return False
+            else:
+                logging.info("retransmitting {}".format(msgtype))
         else:
             # Otherwise, allow a new set of iterations for a new message
+            logging.info("sending {} with {} retries".format(msgtype,
+                self.retransmit_iterations))
             self.last_message_remaining_iterations = self.retransmit_iterations
 
         # Update nonce every time we send a message
@@ -96,7 +105,7 @@ class NetjoinSession(threading.Thread):
             netj_msg.handshake_four.CopyFrom(message.handshake_four)
         else:
             logging.error("{} message not supported".format(type(message)))
-            return
+            return False
 
         # Header contains outgoing interface and destination mac address
         netj_header = struct.pack("H6B", interface, theirmac[0], theirmac[1],
@@ -108,6 +117,8 @@ class NetjoinSession(threading.Thread):
 
         # Remember this message in case we need to resend it
         self.last_message_tuple = (message, interface, theirmac)
+
+        return True
 
     def create_l2_handler(self, l2_type):
         l2_handler = None
@@ -237,7 +248,7 @@ class NetjoinSession(threading.Thread):
         if self.policy is None:
             logging.error("Policy module not known for joined network")
             return
-        self.policy.join_complete(self.beacon_id)
+        self.policy.join_complete(self.beacon_id, interface)
 
         # Now we are waiting for handshake 4 confirmation message
         self.state = self.HS_4_WAIT
@@ -311,15 +322,16 @@ class NetjoinSession(threading.Thread):
         # Verify the client_session_id matches the encrypted one
         if not netjoin_h4.valid_client_session_id():
             logging.error("Invalid client session ID")
-            return
+            return False
 
         # Ensure that client acknowledged our l2 and l3 replies
         if not netjoin_h4.replies_acked():
             logging.error("Gateway had trouble setting up routes to us")
-            return
+            return False
         logging.info("Valid handshake four: We are on this network now")
         total_joining_time = time.time() - self.start_time
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
+        return True
 
     # Note: we forget the last message on disabling retransmission
     # If in future we need enable_retransmission() then use a separate flag
@@ -340,7 +352,7 @@ class NetjoinSession(threading.Thread):
             #       and finally close the session on reaching 0
             return
         message, interface, theirmac = self.last_message_tuple
-        self.send_netjoin_message(message, interface, theirmac,
+        return self.send_netjoin_message(message, interface, theirmac,
                 retransmitting=True)
 
     # Main thread handles all messages based on state of joining session
@@ -355,7 +367,9 @@ class NetjoinSession(threading.Thread):
                 message = message_tuple[0]
             except (Queue.Empty):
                 if self.state != self.START:
-                    self.retransmit_last_message()
+                    if self.retransmit_last_message() == False:
+                        logging.error("Timed out trying to send a message")
+                        break
                 continue
 
             # We got a message, determine if we are waiting for it
@@ -389,11 +403,17 @@ class NetjoinSession(threading.Thread):
 
             if self.state == self.HS_4_WAIT:
                 if message_type == "handshake_four":
-                    self.handle_handshake_four(message_tuple)
+                    if self.handle_handshake_four(message_tuple) == True:
+                        break
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake four.")
                 continue
+
+        if self.receiver is not None:
+            self.receiver.session_done(self.get_ID())
+        else:
+            logging.error("Receiver not found. OK during unit test.")
 
         logging.debug("Shutting down session ID: {}".format(self.session_ID))
 
