@@ -16,6 +16,7 @@ class NetjoinPolicy:
         logging.debug("Policy module initialized")
 
         # Beacons seen before. One set for each policy instance
+        # (beacon_ID, iface) = <current state>
         self.known_beacons = {}
 
         #TODO Load list of available auth providers from config file
@@ -24,14 +25,25 @@ class NetjoinPolicy:
     def print_known_beacons(self):
         print self.known_beacons.keys()
 
-    def keep_known_beacon_id(self, beacon_ID, state):
-        if beacon_ID in self.known_beacons:
-            logging.debug("Overwriting beacon ID: %s" % beacon_ID)
-        self.known_beacons[beacon_ID] = state
+    def keep_known_beacon_id(self, beacon_ID, iface, state):
 
-    def remove_known_beacon_id(self, beacon_ID):
-        if beacon_ID in self.known_beacons:
-            del self.known_beacons[beacon_ID]
+        # Invalidate old beacon for the given interface, if one exists
+        for key in self.known_beacons.keys():
+            identifier, interface = key
+            if interface == iface:
+                # TODO: decide if we should keep UNJOINABLE beacons
+                msg = "Removed beacon:{} iface:{}".format(identifier, interface)
+                logging.debug(msg)
+                self.remove_known_beacon_id(identifier, interface)
+
+        # Now, keep the new beacon identifier for the interface
+        if (beacon_ID, iface) in self.known_beacons:
+            logging.debug("Replace beacon:{} iface:{}".format(beacon_ID, iface))
+        self.known_beacons[(beacon_ID, iface)] = state
+
+    def remove_known_beacon_id(self, beacon_ID, iface):
+        if (beacon_ID, iface) in self.known_beacons:
+            del self.known_beacons[(beacon_ID, iface)]
         else:
             logging.error("Removing non-existing beacon: %s" % beacon_ID)
 
@@ -120,13 +132,13 @@ class NetjoinPolicy:
         return path
 
     # Check given beacon ID against list of known beacons
-    def is_known_beacon_id(self, beacon_id):
-        if beacon_id in self.known_beacons:
+    def is_known_beacon_id(self, beacon_id, iface):
+        if (beacon_id, iface) in self.known_beacons:
             return True
         return False
 
     # Main entry point for the policy module
-    def join_sender_of_beacon(self, beacon):
+    def join_sender_of_beacon(self, beacon, iface):
         join_network = False
 
         # Convert beacon to an object we can look into
@@ -138,7 +150,7 @@ class NetjoinPolicy:
         beacon_ID = beacon.get_ID()
 
         # If this beacon has been processed before, drop it
-        if self.is_known_beacon_id(beacon_ID):
+        if self.is_known_beacon_id(beacon_ID, iface):
             return False
 
         # Try to find a set of steps we can take to join a desirable network
@@ -155,20 +167,21 @@ class NetjoinPolicy:
             join_network = False
 
         # We processed this beacon, so record our decision
-        self.keep_known_beacon_id(beacon_ID, joining_state)
+        self.keep_known_beacon_id(beacon_ID, iface, joining_state)
 
         return join_network
 
     # Notification that network advertized by beacon_id has been joined
-    def join_complete(self, beacon_id):
-        if beacon_id not in self.known_beacons:
+    def join_complete(self, beacon_id, iface):
+        if (beacon_id, iface) not in self.known_beacons:
             logging.error("Join complete called for unknown beacon")
             return
-        self.known_beacons[beacon_id] = self.JOINED
+        self.known_beacons[(beacon_id, iface)] = self.JOINED
         logging.info("Joined network announced by beacon {}".format(beacon_id))
 
 # Unit test this module when run by itself
 if __name__ == "__main__":
+    iface = 0
     policy = NetjoinPolicy()
     beacon = NetjoinBeacon()
     beacon.initialize() # A default beacon announcing this network
@@ -176,7 +189,7 @@ if __name__ == "__main__":
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)
     beacon_ID = test_beacon.get_ID()
-    policy.keep_known_beacon_id(beacon_ID, NetjoinPolicy.JOINING)
+    policy.keep_known_beacon_id(beacon_ID, iface, NetjoinPolicy.JOINING)
     policy.print_known_beacons()
-    policy.remove_known_beacon_id(beacon_ID)
+    policy.remove_known_beacon_id(beacon_ID, iface)
     policy.print_known_beacons()
