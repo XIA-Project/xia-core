@@ -114,7 +114,6 @@ WritablePacket*
 XIAGenericExtHeaderEncap::encap(Packet* p_in) const
 {
     size_t len = hlen();    // this call also set _hdr->hlen
-//	printf("Generic Encap length = %d\n", len);
     WritablePacket* p = p_in->push(len);
     if (!p)
         return NULL;

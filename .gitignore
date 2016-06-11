@@ -30,6 +30,7 @@ xia.mk
 .DS_Store
 *.dSYM
 .fuse*
+*.gch
 
 # directories
 key

@@ -15,10 +15,10 @@
 #include "xiaxidroutetable.hh"
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
+#include <click/xiastreamheader.hh>
 #include <click/xiatransportheader.hh>
-#include <clicknet/tcp.h>
 #include "xtransport.hh"
-#include "clicknet/tcp_fsm.h"
+#include <clicknet/tcp_fsm.h>
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -197,6 +197,10 @@ public:
 #define SO_STATE_HASDATA	0x01
 #define SO_STATE_ISCHOKED   0x10
 
+	// holding area for one data packet if the send buffer is full
+	bool stage_data(WritablePacket *p, unsigned seq);
+	WritablePacket *unstage_data();
+
 	// short state() const { return tp->t_state; }
 	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }
 	void print_state(StringAccum &sa);
@@ -207,7 +211,7 @@ public:
 private:
 	void set_state(const HandlerState s);
 
-	void 		_tcp_dooptions(u_char *cp, int cnt, uint8_t th_flags,
+	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, u_long *ts_val, u_long *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
@@ -227,7 +231,9 @@ private:
 	tcp_seq_t	so_recv_buffer_size;
 	int			_so_state;
 
-} ;
+	WritablePacket *staged;		// holding location for when xmit buffer is full and we are blocking
+	unsigned staged_seq;
+};
 
 /* THE method where we register, and handle any TCP State Updates */
 inline void

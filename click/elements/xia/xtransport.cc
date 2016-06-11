@@ -9,6 +9,7 @@
 #include <click/vector.hh>
 //#include <click/xiacontentheader.hh>
 #include "xtransport.hh"
+#include <click/xiastreamheader.hh>
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 #include "xdatagram.hh"
@@ -47,7 +48,10 @@ sock::sock(
 	timer_on = false;
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
-	nxt_xport = CLICK_XIA_NXT_TRN;
+	if (type == SOCK_STREAM)
+		nxt_xport = CLICK_XIA_NXT_XTCP;
+	else
+		nxt_xport = CLICK_XIA_NXT_TRN;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -79,7 +83,10 @@ sock::sock(
 	sock_type = type;
 	_errh = transport -> error_handler();
 	hlim = HLIM_DEFAULT;
-	nxt = CLICK_XIA_NXT_TRN;
+	if (type == SOCK_STREAM)
+		nxt = CLICK_XIA_NXT_XTCP;
+	else
+		nxt = CLICK_XIA_NXT_TRN;
 	refcount = 1;
 	xcacheSock = false;
 }
@@ -98,7 +105,7 @@ sock::sock() {
 	timer_on = false;
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
-	nxt_xport = CLICK_XIA_NXT_TRN;
+	nxt_xport = CLICK_XIA_NXT_NO;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -128,6 +135,8 @@ sock::sock() {
 	refcount = 1;
 	xcacheSock = false;
 }
+
+
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -490,6 +499,8 @@ void XTRANSPORT::copy_common(sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah)
 
 WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 {
+	UNUSED(p);
+	UNUSED(sk);
 #if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
@@ -514,6 +525,8 @@ WritablePacket *XTRANSPORT::copy_packet(Packet *p, sock *sk)
 
 WritablePacket *XTRANSPORT::copy_cid_req_packet(Packet *p, sock *sk)
 {
+	UNUSED(p);
+	UNUSED(sk);
 #if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
@@ -537,6 +550,8 @@ WritablePacket *XTRANSPORT::copy_cid_req_packet(Packet *p, sock *sk)
 
 WritablePacket *XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk)
 {
+	UNUSED(p);
+	UNUSED(sk);
 #if 0
 	XIAHeader xiahdr(p);
 	XIAHeaderEncap xiah;
@@ -671,6 +686,9 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 
 bool XTRANSPORT::RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now)
 {
+	UNUSED(sk);
+	UNUSED(_sport);
+	UNUSED(now);
 	bool rc = false;
 #if 0
 	if (sk->num_migrate_tries <= MAX_RETRANSMIT_TRIES) {
@@ -820,7 +838,7 @@ bool XTRANSPORT::should_buffer_received_packet(WritablePacket *p, sock *sk)
 	if (sk->sock_type == SOCK_STREAM) {
 		// check if received_seqnum is within our current recv window
 		// TODO: if we switch to a byte-based, buf size, this needs to change
-		TransportHeader thdr(p);
+		StreamHeader thdr(p);
 		unsigned received_seqnum = thdr.seq_num();
 		if (received_seqnum >= sk->next_recv_seqnum &&
 			received_seqnum < sk->next_recv_seqnum + sk->recv_buffer_size) {
@@ -854,7 +872,7 @@ void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk)
 {
 	int index = -1;
 	if (sk->sock_type == SOCK_STREAM) {
-		TransportHeader thdr(p);
+		StreamHeader thdr(p);
 		int received_seqnum = thdr.seq_num();
 		index = received_seqnum % sk->recv_buffer_size;
 
@@ -885,40 +903,6 @@ void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk)
 	}
 }
 
-/**
-* @brief Returns the next expected sequence number.
-*
-* Beginning with sk->recv_base, this function checks consecutive slots
-* in the receive buffer and returns the first missing sequence number.
-* (This function only applies to STREAM sockets.)
-*
-* @param sk
-*/
-uint32_t XTRANSPORT::next_missing_seqnum(sock *sk)
-{
-	uint32_t next_missing = sk->recv_base;
-	for (uint32_t i = 0; i < sk->recv_buffer_size; i++) {
-
-		// checking if we have the next consecutive packet
-		uint32_t seqnum_to_check = sk->recv_base + i;
-		uint32_t index_to_check = seqnum_to_check % sk->recv_buffer_size;
-
-		next_missing = seqnum_to_check;
-
-		if (sk->recv_buffer[index_to_check]) {
-			TransportHeader thdr(sk->recv_buffer[index_to_check]);
-			if (thdr.seq_num() != seqnum_to_check) {
-				break; // found packet, but its seqnum isn't right, so break and return next_missing
-			}
-		} else {
-			break; // no packet here, so break and return next_missing
-		}
-	}
-
-	return next_missing;
-}
-
-
 
 void XTRANSPORT::resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end)
 {
@@ -936,7 +920,7 @@ void XTRANSPORT::resize_buffer(WritablePacket* buf[], int max, int type, uint32_
 	int new_index = -1;
 	for (unsigned i = 0; i < old_size; i++) {
 		if (type == SOCK_STREAM) {
-			TransportHeader thdr(buf[i]);
+			StreamHeader thdr(buf[i]);
 			new_index = thdr.seq_num() % new_size;
 		} else if (type == SOCK_DGRAM) {
 			new_index = (i + *dgram_start) % old_size;
@@ -1011,7 +995,7 @@ int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
 
 			WritablePacket *p = sk->recv_buffer[i % sk->recv_buffer_size];
 			XIAHeader xiah(p->xia_header());
-			TransportHeader thdr(p);
+			StreamHeader thdr(p);
 			size_t data_size = xiah.plen() - thdr.hlen();
 
 			const char *payload = (char *)thdr.payload();
@@ -1150,24 +1134,29 @@ void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
 
 
 /*************************************************************
-** DATAGRAM PACKET HANDLER
+** NETWORK PACKET HANDLER
 *************************************************************/
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
-	TransportHeader thdr(p_in);
 
-	if (xiah.nxt() == CLICK_XIA_NXT_XCMP) {
-		// pass the packet to all sockets that registered for XMCP packets
-		ProcessXcmpPacket(p_in);
-		return;
+	switch(xiah.nxt()) {
+		case CLICK_XIA_NXT_XCMP:
+			// pass the packet to all sockets that registered for XMCP packets
+			ProcessXcmpPacket(p_in);
+			return;
+
+		case CLICK_XIA_NXT_XTCP:
+			ProcessStreamPacket(p_in);
+			return;
+
+		default:
+			break;
 	}
 
-	switch(thdr.type()) {
-		case SOCK_STREAM:
-			ProcessStreamPacket(p_in);
-			break;
+	TransportHeader thdr(p_in);
 
+	switch(thdr.type()) {
 		case SOCK_DGRAM:
 			ProcessDatagramPacket(p_in);
 			break;
@@ -1202,7 +1191,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
-	std::cout << "Recevied a STREAM packet from network\n";
+	//std::cout << "Recevied a STREAM packet from network\n";
 
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
@@ -1219,22 +1208,22 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	XIDpair xid_pair;
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
-	TransportHeader thdr(p_in);
+	StreamHeader thdr(p_in);
 
-	sock *handler = XIDpairToSock.get(xid_pair);
-	sock *handler2 = XIDpairToConnectPending.get(xid_pair);
-	if (handler != NULL)
+	// printf("process stream: flags = %08x\n", thdr.flags());
+
+	sock *handler;
+	if ((handler = XIDpairToSock.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the normal case");
 		((XStream *)handler) -> push(p_in);
-	} else if (handler2 != NULL)
+	} else if ((handler = XIDpairToConnectPending.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the second case");
-		((XStream *)handler2) -> push(p_in);
+		((XStream *)handler) -> push(p_in);
 	}
 	else {
-		click_tcp *tcph = (click_tcp *)thdr.header();
-		if (tcph->th_flags == TH_SYN) {
+		if (thdr.flags() & XTH_SYN) {
 			// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
 			sock *sk = XID2Sock(_destination_xid);
 
@@ -1318,6 +1307,7 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 // pass all as params?
 void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 {
+	UNUSED(p_in);
 #if 0
 	XIAHeader xiah(p_in->xia_header());
 
@@ -1500,6 +1490,8 @@ void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 {
+	UNUSED(p_in);
+/*
 	XIAHeader xiah(p_in->xia_header());
 
 	XIAPath dst_path = xiah.dst_path();
@@ -1610,6 +1602,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	if (_dport != sk->port) {
 		INFO("MIGRATEACK: ERROR _dport %d, sk->port %d", _dport, sk->port);
 	}
+*/
 }
 
 
@@ -1878,7 +1871,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
-	TransportHeader thdr(p_in);
+	StreamHeader thdr(p_in);
 
 	XIDpair xid_pair;
 	xid_pair.set_src(_destination_xid);
@@ -1924,6 +1917,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 // for response pkt, verify it, clear the reqPkt entry in the socket, send it to upper layer if read_cid_req is true, or if store it in XIDtoCIDresponsePkt
 void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 {
+	UNUSED(p_in);
 #if 0
 	DBG("Got packet from cache");
 
@@ -2545,6 +2539,8 @@ void XTRANSPORT::XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_ms
 void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	int control_port = _sport;
+	int ref;
+	bool should_delete;
 
 	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
 	_sport = xcm->port();
@@ -2555,14 +2551,18 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	if (!sk) {
 		// this shouldn't happen!
 		ERROR("Invalid socket %d\n", _sport);
-		goto done;
+		ReturnResult(control_port, xia_socket_msg, -1, EBADF);
+		return;
 	}
 
 	assert(sk->refcount != 0);
 
-	if (--sk->refcount == 0) {
+	should_delete = sk->isAcceptedSocket;
+	ref = --sk->refcount;
 
-		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), sk->refcount);
+	if (ref == 0) {
+
+		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), ref);
 
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
@@ -2581,12 +2581,11 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	} else {
 		// the app was forked and not everyone has closed the socket yet
-		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), sk->refcount);
+		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), ref);
 	}
 
-done:
-	xcm->set_refcount(sk->refcount);
-	xcm->set_delkeys(sk->isAcceptedSocket == false);
+	xcm->set_refcount(ref);
+	xcm->set_delkeys(should_delete);
 	ReturnResult(control_port, xia_socket_msg);
 }
 
@@ -2659,7 +2658,7 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 		addRoute(source_xid);
 		tcp_conn->usropen();
 		ChangeState(tcp_conn, SYN_SENT);
-		std::cout << "SYN-SENT\n";
+		//std::cout << "SYN-SENT\n";
 		ChangeState(sk, SYN_SENT);
 
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
@@ -2708,7 +2707,6 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 
 	if (!sk->pending_connection_buf.empty()) {
 		// If there is already a pending connection, return true now
-		std::cout << "Pending connection is not empty\n";
 		INFO("Pending connection is not empty\n");
 
 		ReturnResult(_sport, xia_socket_msg);
@@ -2717,7 +2715,6 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
-		std::cout << sk->port << " Pending connection is empty\n";
 		INFO("Pending connection is empty\n");
 
 		// xia_socket_msg is on the stack; allocate a copy on the heap
@@ -2746,7 +2743,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
-	sk->nxt_xport = CLICK_XIA_NXT_TRN;
+	sk->nxt_xport = CLICK_XIA_NXT_XTCP;
 
 	if (!sk->pending_connection_buf.empty()) {
 		sock *new_sk = sk->pending_connection_buf.front();
@@ -2849,6 +2846,8 @@ Xaccept_done:
 
 void XTRANSPORT::Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
+	UNUSED(_sport);
+	UNUSED(xia_socket_msg);
 #if 0
 	sock *sk = portToSock.get(_sport);
 
@@ -3424,19 +3423,14 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
 	int pktPayloadSize = x_send_msg->payload().size();
 
-	char payload[65536];
-	memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
-
 	//Find DAG info for that stream
 	if (rc == 0 && sk->sock_type == SOCK_RAW) {
+		char payload[65536];
+		memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
+
+		// FIXME: we should check to see that the packet isn't too big here
+		//
 		struct click_xia *xiah = reinterpret_cast<struct click_xia *>(payload);
-//		DBG("xiah->ver = %d", xiah->ver);
-//		DBG("xiah->nxt = %d", xiah->nxt);
-//		DBG("xiah->plen = %d", xiah->plen);
-//		DBG("xiah->hlim = %d", xiah->hlim);
-//		DBG("xiah->dnode = %d", xiah->dnode);
-//		DBG("xiah->snode = %d", xiah->snode);
-//		DBG("xiah->last = %d", xiah->last);
 
 		XIAHeader xiaheader(xiah);
 		XIAHeaderEncap xiahencap(xiaheader);
@@ -3491,23 +3485,45 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 			sk->src_path.parse_re(str_local_addr);
 		}
 
-		DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 		//Add XIA headers
-
 		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
-		if (sk -> get_type() == SOCK_STREAM)
-		{
-			dynamic_cast<XStream *>(sk)->usrsend(payload);
-		} else if (sk -> get_type() == SOCK_DGRAM)
-		{
-			/* code */
-		}
 
-		portToSock.set(_sport, sk);
-		if (_sport != sk->port) {
-			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
-		}
+		if (sk -> get_type() == SOCK_STREAM) {	// why do we need this test, we should always be a stream socket here
+			XStream *st = dynamic_cast<XStream *>(sk);
 
+			int tcp_rc = st->usrsend(payload);
+			//INFO("usrsend reurned %d\n", tcp_rc);
+			if (tcp_rc != 0) {
+				if (tcp_rc == EPIPE) {
+					// the socket is closing
+					ec = rc; // ? is this right???? if so should we signal from the API?/
+					rc = -1;
+
+				} else if (!xia_socket_msg->blocking()) {
+					rc = -1;
+					ec = EWOULDBLOCK;
+
+				} else if (st->stage_data(payload, xia_socket_msg->sequence()) != false) {
+					// transmit queue is full. Saving the data and not returning
+					// until later when it has be added to the queue
+					DBG("Transmit buffer full, saving and blocking\n");
+					return;
+				} else {
+					// in theory this should never happen
+					rc = -1;
+					ec = ENOBUFS;
+				}
+
+			} else {
+//				DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
+			}
+
+//			// FIXME: what is this for? we should already be in the table
+//			portToSock.set(_sport, sk);
+//			if (_sport != sk->port) {
+//				ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
+//			}
+		}
 	}
 
 	x_send_msg->clear_payload(); // clear payload before returning result

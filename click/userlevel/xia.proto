@@ -18,7 +18,7 @@ enum XSocketCallType {
   XREADCHUNK = 15;
   XREMOVECHUNK =16;
   XREQUESTFAILED = 17;
-  //XRESULT = 18;
+  XRESULT = 18;
   XCHANGEAD = 19;
   XREADLOCALHOSTADDR = 20;
   XUPDATENAMESERVERDAG = 21;
@@ -243,7 +243,7 @@ message X_GetSockname_Msg {
 }
 
 message X_Poll_Msg {
-  
+
   message PollFD {
     required int32 port = 1;
     required uint32 flags = 2;
@@ -288,7 +288,7 @@ message msg_response {
   repeated bytes xid = 2;   // can be a list of CID's
   optional string payload = 3;  // bytes or string?
 }
- 
+
 
 message X_Pushchunkto_Msg {
   required string ddag = 1; // dest dag
@@ -299,7 +299,7 @@ message X_Pushchunkto_Msg {
   required bytes payload = 6; // data
   required string cid = 7;
   required int32 length = 8;
-  optional int64 timestamp = 9; 
+  optional int64 timestamp = 9;
 }
 
 message X_Recvchunkfrom_Msg {
@@ -311,7 +311,7 @@ message X_Recvchunkfrom_Msg {
   optional bytes payload = 6; // data
   optional string cid = 7;
   optional int32 length = 8;
-  optional int64 timestamp = 9; 
+  optional int64 timestamp = 9;
 }
 
 message X_Fork_Msg {
@@ -321,8 +321,8 @@ message X_Fork_Msg {
 }
 
 message X_BindPush_Msg {
-  required string sdag = 1; // bind to src dag 
-} 
+  required string sdag = 1; // bind to src dag
+}
 
 message X_SetXcacheSid_Msg {
   optional string sid = 1;

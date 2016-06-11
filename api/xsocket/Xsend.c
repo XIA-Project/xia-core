@@ -48,7 +48,7 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags, const sockaddr_
 int Xsend(int sockfd, const void *buf, size_t len, int flags)
 {
 	#define fmsg  "%s is not currently supported, clearing...\n"
-	int rc;
+	int rc = 0;
 
 	if (flags) {
 		LOGF("flags:%s\n", xferFlags(flags));
@@ -101,13 +101,13 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
-	// process the reply from click
 	if ((rc = click_status(sockfd, seq)) < 0) {
-		LOGF("Error getting status from Click: %s", strerror(errno));
-		return -1;
+		if (isBlocking(sockfd) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+			LOGF("Error retrieving recv data from Click: %s", strerror(errno));
+		}
 	}
 
-	return len;
+	return rc;
 }
 
 /*!
