@@ -151,7 +151,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	 */
 
 	if (payload_len == 0)
-		return;
+		goto skip_data;
 
 	/*
 	 * FIXME: Why offset 2?
@@ -181,6 +181,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		       ntohl(download->header.length),
 		       ntohl(download->header.total_length));
 
+
+skip_data:
 	if (tcp->th_flags & TH_FIN) {
 		/* FIN Received */
 		LOG_CACHE_INFO("At FIN: %s\n", download->data);
@@ -195,6 +197,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		ongoing_downloads.erase(iter);
 		free(download);
 	}
+
 }
 
 void *xcache_cache::run(void *arg)

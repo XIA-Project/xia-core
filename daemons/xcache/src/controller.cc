@@ -617,20 +617,20 @@ int xcache_controller::create_sender(void)
 	int xcache_sock;
 	struct addrinfo *ai;
 
-	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		return -1;
 
-	if(XreadLocalHostAddr(xcache_sock,
-			      myAD, sizeof(myAD), myHID, sizeof(myHID),
-			      my4ID, sizeof(my4ID)) < 0)
+	if (XreadLocalHostAddr(xcache_sock,
+			       myAD, sizeof(myAD), myHID, sizeof(myHID),
+			       my4ID, sizeof(my4ID)) < 0)
 		return -1;
 
-	if(XmakeNewSID(sid_string, sizeof(sid_string))) {
+	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
 		LOG_CTRL_ERROR("XmakeNewSID failed\n");
 		return -1;
 	}
 
-	if(XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
+	if (XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
 		return -1;
 
 	LOG_CTRL_DEBUG("XcacheSID is %s\n", sid_string);
