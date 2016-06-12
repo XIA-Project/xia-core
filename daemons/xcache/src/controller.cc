@@ -124,7 +124,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	LOG_CTRL_INFO("Xcache client now connected with remote\n");
 
 	std::string data;
-	char buf[XIA_MAXBUF] = {0};
+	char buf[1024*1024] = {0};
 	struct cid_header header;
 	size_t remaining;
 	size_t offset;
@@ -154,18 +154,21 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	remaining = ntohl(header.length);
 
+
 	while (remaining > 0) {
-		to_recv = remaining > XIA_MAXBUF ? XIA_MAXBUF : remaining;
+		to_recv = remaining > 1024*1024 ? 1024 * 1024 : remaining;
 
 		LOG_CTRL_ERROR("2 Remaining = %d\n", remaining);
 
 		recvd = Xrecv(sock, buf, to_recv, 0);
+		LOG_CTRL_ERROR("recvd = %d, to_recv = %d\n", recvd, to_recv);
 		if (recvd < 0) {
 			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
 				       ".\n");
 			assert(0);
 			Xclose(sock);
 		} else if (recvd == 0) {
+			LOG_CTRL_ERROR("Xrecv returned 0.\n");
 			break;
 		}
 
@@ -178,24 +181,26 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
 	struct xcache_context *context = lookup_context(cmd->context_id());
 
-	if(!context) {
+	if (!context) {
 		LOG_CTRL_ERROR("Context Lookup Failed\n");
 		delete meta;
 		Xclose(sock);
 		return RET_FAILED;
 	}
 
-	if (meta->get_cid() != computed_cid) {
-		/*
-		 * CID Integrity Check Failed
-		 */
-		LOG_CTRL_ERROR("CID Integrity Check Failed.\n");
-		Xclose(sock);
-		return RET_FAILED;
+	if (!(flags & XCF_SKIPCACHE)) {
+		if (__store(context, meta, (const std::string *)&data) == RET_FAILED) {
+			delete meta;
+			Xclose(sock);
+			return RET_FAILED;
+		}
+	} else {
+		if (verify_content(meta, (const std::string *)&data) == false) {
+			delete meta;
+			Xclose(sock);
+			return RET_FAILED;
+		}
 	}
-
-	if(!(flags & XCF_SKIPCACHE))
-		__store(context, meta, (const std::string *)&data);
 
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -464,15 +469,33 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 	return 0;
 }
 
+bool xcache_controller::verify_content(xcache_meta *meta, const std::string *data)
+{
+	if (meta->get_cid() != compute_cid(data->c_str(), data->length()))
+		return false;
+
+	return true;
+}
+
 int xcache_controller::__store(struct xcache_context *context,
 			       xcache_meta *meta, const std::string *data)
 {
 	lock_meta_map();
 	meta->lock();
 
+	if (verify_content(meta, data) == false) {
+		/*
+		 * Content Verification Failed
+		 */
+		LOG_CTRL_ERROR("Content Verification Failed\n");
+		meta->unlock();
+		unlock_meta_map();
+		return RET_FAILED;
+	}
+
 	meta_map[meta->get_cid()] = meta;
 
-	if(__store_policy(meta) < 0) {
+	if (__store_policy(meta) < 0) {
 		LOG_CTRL_ERROR("Context store failed\n");
 		meta->unlock();
 		unlock_meta_map();

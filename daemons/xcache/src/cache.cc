@@ -10,7 +10,7 @@
 #include "cache.h"
 #include "cid.h"
 #include <clicknet/xia.h>
-#include <clicknet/tcp.h>
+#include <clicknet/xtcp.h>
 
 DEFINE_LOG_MACROS(CACHE)
 
@@ -48,8 +48,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 {
 	int total_nodes, i;
 	struct click_xia *xiah = (struct click_xia *)pkt;
-	struct click_xia_ext *xiaext;
-	struct click_tcp *tcp;
+	struct xtcp *tcp;
 	std::string cid;
 	int payload_len;
 	xcache_meta *meta;
@@ -81,26 +80,17 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		};
 	}
 
-	xiaext = (struct click_xia_ext *)
+	tcp = (struct xtcp *)
 		((char *)xiah + sizeof(struct click_xia) +
 		 (total_nodes) * sizeof(struct click_xia_xid_node));
 
-	LOG_CACHE_ERROR("xiaext->nxt = %d\n", xiaext->nxt);
-	LOG_CACHE_ERROR("xiaext->hlen = %d\n", xiaext->hlen);
-	LOG_CACHE_ERROR("xiaext->type = %d\n", xiaext->type);
-
-	tcp = (struct click_tcp *)((char *)xiaext +
-				   sizeof(struct click_xia_ext));
-	LOG_CACHE_ERROR("tcp->th_sport = %x\n", ntohs(tcp->th_sport));
-	LOG_CACHE_ERROR("tcp->th_dport = %x\n", ntohs(tcp->th_dport));
 	LOG_CACHE_ERROR("tcp->th_ack = %d\n", ntohl(tcp->th_ack));
 	LOG_CACHE_ERROR("tcp->th_seq = %d\n", ntohl(tcp->th_seq));
-	LOG_CACHE_ERROR("tcp->th_flags = %x\n", tcp->th_flags);
+	LOG_CACHE_ERROR("tcp->th_flags = %x\n", ntohs(tcp->th_flags));
 	LOG_CACHE_ERROR("tcp->th_off = %d\n", tcp->th_off);
 
-	payload_len = ntohs(xiah->plen) - xiaext->hlen;
-
-	char *payload = (char *)xiaext + xiaext->hlen;
+	char *payload = (char *)tcp + tcp->th_off * 4;
+	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
 	LOG_CACHE_ERROR("Payload length = %d\n", payload_len);
 
@@ -183,9 +173,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 
 skip_data:
-	if (tcp->th_flags & TH_FIN) {
+	if (htons(tcp->th_flags) & XTH_FIN) {
 		/* FIN Received */
-		LOG_CACHE_INFO("At FIN: %s\n", download->data);
 		std::string *data = new std::string(download->data,
 						    ntohl(download->header.length));
 
@@ -197,7 +186,6 @@ skip_data:
 		ongoing_downloads.erase(iter);
 		free(download);
 	}
-
 }
 
 void *xcache_cache::run(void *arg)
