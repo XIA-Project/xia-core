@@ -996,6 +996,7 @@ XStream::tcp_output()
 	WritablePacket *p = NULL;
 	WritablePacket *tcp_payload = NULL;
 
+	ti.th_nxt = CLICK_XIA_NXT_NO;
 
 	for (int i=0; i < MAX_TCPOPTLEN; i++) {
 		opt[i] = 0;
@@ -1344,6 +1345,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 		th.th_win = htons((u_short)win);
 	}
 
+	th.th_nxt = CLICK_XIA_NXT_NO;
 	th.th_seq =   htonl(seq+1);
 	th.th_ack =   htonl(ack);
 	th.th_flags = htons(flags);

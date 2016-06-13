@@ -6,10 +6,6 @@
 #include <click/packet.hh>
 #include <click/xiaheader.hh>
 #include <clicknet/tcp.h>
-//#include <click/string.hh>
-//#include <click/glue.hh>
-//#include <click/xid.hh>
-
 
 // FIXME: these need to be integrated into the new streaming transport somehow
 //    static StreamHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
@@ -58,6 +54,7 @@ class StreamHeaderEncap
 public:
     StreamHeaderEncap() {
 		_hdr = (struct xtcp*)calloc(1, sizeof(struct xtcp) + XTCP_OPTIONS_MAX);
+		_hdr->th_nxt = CLICK_XIA_NXT_NO;
 	}
 
     static StreamHeaderEncap* MakeTCPHeader(xtcp *tcph) {
