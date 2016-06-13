@@ -1,3 +1,4 @@
+#if 0
 /*
 ** Copyright 2011 Carnegie Mellon University
 **
@@ -437,3 +438,4 @@ void XfreeChunkInfo(ChunkInfo *infop)
 		free(infop);
 }
 
+#endif

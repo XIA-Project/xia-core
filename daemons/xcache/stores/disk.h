@@ -82,7 +82,36 @@ public:
 
 	std::string get_partial(xcache_meta *meta, off_t off, size_t len)
 	{
-		return "";
+		int ret, fd, bytes;
+		std::string path;
+		char buf[256];
+
+		path = content_dir + meta->get_cid();
+
+		fd = open(path.c_str(), O_RDONLY);
+		if (fd < 0) {
+			std::cout << "Unexpected error.\n";
+			return "";
+		}
+
+		std::string data("");
+		bytes = 0;
+
+		lseek(fd, off, SEEK_SET);
+
+		while ((ret = read(fd, buf, 256)) != 0) {
+			std::string temp(buf, ret);
+			data += temp;
+			bytes += ret;
+			if (bytes >= len)
+				break;
+		}
+
+		data.resize(len);
+
+		close(fd);
+
+		return data;
 	}
 
 	void print(void)

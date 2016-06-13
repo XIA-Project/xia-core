@@ -202,7 +202,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		}
 	}
 
-	if(resp) {
+	if (resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
 	}
@@ -309,13 +309,13 @@ void *xcache_controller::__fetch_content(void *__args)
 
 	args->ret = ret;
 
-	if(!(args->flags & XCF_BLOCK)) {
+	if (!(args->flags & XCF_BLOCK)) {
 		/*
 		 * FIXME: In case of error must notify the error
 		 */
 		struct xcache_context *c = args->ctrl->lookup_context(args->cmd->context_id());
 
-		if(c)
+		if (c)
 			args->ctrl->xcache_notify(c, &addr, daglen, XCE_CHUNKARRIVED);
 
 		delete args->cmd;
@@ -591,7 +591,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 
 	LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
 
-	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)) {
+	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0) != RET_OK) {
 		LOG_CTRL_ERROR("This should not happen.\n");
 		assert(0);
 	}
@@ -599,11 +599,13 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	struct cid_header header;
 	size_t remaining;
 	size_t offset;
-	size_t sent;
+	int sent;
 
 	header.length = htonl(resp.data().length());
 	remaining = sizeof(header);
 	offset = 0;
+
+	LOG_CTRL_INFO("Header Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
@@ -615,14 +617,19 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
+		LOG_CTRL_INFO("Header Send Remaining %d\n", remaining);
+
 	}
 
 	remaining = resp.data().length();
 	offset = 0;
 
+	LOG_CTRL_INFO("Content Send Start\n");
+
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
+		LOG_CTRL_INFO("Sent = %d\n", sent);
 		if (sent < 0) {
 			LOG_CTRL_ERROR("Receiver Closed the connection - Data"
 				       ".\n");
@@ -631,7 +638,10 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
+		LOG_CTRL_INFO("Content Send Remaining %d\n", remaining);
 	}
+	LOG_CTRL_INFO("Send Done\n");
+
 }
 
 int xcache_controller::create_sender(void)

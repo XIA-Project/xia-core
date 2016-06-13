@@ -88,21 +88,21 @@ int main(int argc, char *argv[])
 		switch(c) {
 		case 0:
 			/* long option passed */
-			if(!strcmp(options[option_index].name, "host")) {
+			if (!strcmp(options[option_index].name, "host")) {
 				sethostname(&xcache_conf, optarg);
-			} else if(!strcmp(options[option_index].name, "help")) {
+			} else if (!strcmp(options[option_index].name, "help")) {
 				usage(argv);
 				return 0;
-			} else if(!strcmp(options[option_index].name, "version")) {
+			} else if (!strcmp(options[option_index].name, "version")) {
 				display_version();
 				return 0;
-			} else if(!strcmp(options[option_index].name, "log_level")) {
+			} else if (!strcmp(options[option_index].name, "log_level")) {
 				logger_conf.level = strtol(optarg, NULL, 10);
 				return 0;
-			} else if(!strcmp(options[option_index].name, "log_mask")) {
+			} else if (!strcmp(options[option_index].name, "log_mask")) {
 				logger_conf.mask = strtol(optarg, NULL, 0);
 				break;
-			} else if(!strcmp(options[option_index].name, "threads")) {
+			} else if (!strcmp(options[option_index].name, "threads")) {
 				xcache_conf.threads = strtol(optarg, NULL, 0);
 				break;
 			} else {

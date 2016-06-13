@@ -144,8 +144,6 @@ extern int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
 extern int XfreeCacheSlice(ChunkContext *ctx);
-extern int XputChunk(const ChunkContext *ctx, const char *data, unsigned length, ChunkInfo *info);
-extern int XputFile(ChunkContext *ctx, const char *fname, unsigned chunkSize, ChunkInfo **infoList);
 extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned chunkSize, ChunkInfo **infoList);
 extern int XremoveChunk(ChunkContext *ctx, const char *cid);
 extern void XfreeChunkInfo(ChunkInfo *infoList);

@@ -255,7 +255,7 @@ int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, soc
 		memcpy(&data[i], &addrs[i], addrlen);
 	}
 
-	if(__XputMetaChunk(h, (char *)data, sizeof(sockaddr_x) * count, metachunk) < 0) {
+	if (__XputMetaChunk(h, (char *)data, sizeof(sockaddr_x) * count, metachunk) < 0) {
 		free(data);
 		return -1;
 	}
@@ -276,30 +276,30 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 	int count;
 	char *buf;
 
-	if(h == NULL) {
+	if (h == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
 
-	if(fname == NULL) {
+	if (fname == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
 
-	if(chunkSize == 0)
+	if (chunkSize == 0)
 		chunkSize =  DEFAULT_CHUNK_SIZE;
 
-	if(stat(fname, &fs) != 0)
+	if (stat(fname, &fs) != 0)
 		return -1;
 
-	if(!(fp = fopen(fname, "rb")))
+	if (!(fp = fopen(fname, "rb")))
 		return -1;
 
 	numChunks = fs.st_size / chunkSize;
-	if(fs.st_size % chunkSize)
+	if (fs.st_size % chunkSize)
 		numChunks ++;
 
-	if(!(addrlist = (sockaddr_x *)calloc(numChunks, sizeof(sockaddr_x)))) {
+	if (!(addrlist = (sockaddr_x *)calloc(numChunks, sizeof(sockaddr_x)))) {
 		fclose(fp);
 		return -1;
 	}
