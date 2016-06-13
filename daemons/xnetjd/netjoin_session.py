@@ -30,7 +30,12 @@ class NetjoinSession(threading.Thread):
             receiver=None,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
-        (self.START, self.HS_2_WAIT, self.HS_3_WAIT, self.HS_4_WAIT) = range(4)
+        (self.START,
+                self.BEACON_RCVD, self.HS_1_RCVD,
+                self.HS_2_WAIT, self.HS_2_RCVD,
+                self.HS_3_WAIT, self.HS_3_RCVD,
+                self.HS_4_WAIT, self.HS_4_RCVD,
+                self.HS_DONE) = range(10)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
@@ -137,6 +142,8 @@ class NetjoinSession(threading.Thread):
     def handle_net_descriptor(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        self.state = self.BEACON_RCVD
+
         logging.info("Got a beacon from a network we want to join")
 
         # A layer 2 handler for creating/processing l2 requests
@@ -162,6 +169,8 @@ class NetjoinSession(threading.Thread):
 
     def handle_handshake_one(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
+
+        self.state = self.HS_1_RCVD
 
         # Convert incoming protobuf to a handshake one object we can assess
         netjoin_h1 = NetjoinHandshakeOne(self, mymac)
@@ -198,6 +207,8 @@ class NetjoinSession(threading.Thread):
 
     def handle_handshake_two(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
+
+        self.state = self.HS_2_RCVD
 
         logging.info("Got a handshake two message")
         netjoin_h2 = NetjoinHandshakeTwo(self)
@@ -256,6 +267,8 @@ class NetjoinSession(threading.Thread):
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
+        self.state = self.HS_3_RCVD
+
         # Disable retransmission of handshake two
         self.disable_retransmission()
 
@@ -306,8 +319,12 @@ class NetjoinSession(threading.Thread):
         # We don't need to retransmit handshake 4
         self.disable_retransmission()
 
+        self.state = self.HS_DONE
+
     def handle_handshake_four(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
+
+        self.state = self.HS_4_RCVD
 
         # Disable retransmission of handshake 3
         self.disable_retransmission()
@@ -331,6 +348,7 @@ class NetjoinSession(threading.Thread):
         logging.info("Valid handshake four: We are on this network now")
         total_joining_time = time.time() - self.start_time
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
+        self.state = self.HS_DONE
         return True
 
     # Note: we forget the last message on disabling retransmission
@@ -385,9 +403,33 @@ class NetjoinSession(threading.Thread):
                     logging.error("Expected net_descriptor or handshake one")
                 continue
 
+            if self.state == self.BEACON_RCVD:
+                if message_type == "net_descriptor":
+                    logging.info("Beacon rcvd while handling another ignored")
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected net_descriptor")
+                continue
+
+            if self.state == self.HS_1_RCVD:
+                if message_type == "handshake_one":
+                    logging.info("HS1 rcvd while handling another. Ignored")
+                else:
+                    logging.error("Invalid message:{}".format(message_type))
+                    logging.error("Expected handshake_one retransmit only")
+                continue
+
             if self.state == self.HS_2_WAIT:
                 if message_type == "handshake_two":
                     self.handle_handshake_two(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake two.")
+                continue
+
+            if self.state == self.HS_2_RCVD:
+                if message_type == "handshake_two":
+                    logging.info("HS2 rcvd while handling another. Ignored")
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake two.")
@@ -401,6 +443,14 @@ class NetjoinSession(threading.Thread):
                     logging.error("Expected handshake three.")
                 continue
 
+            if self.state == self.HS_3_RCVD:
+                if message_type == "handshake_three":
+                    logging.info("HS3 rcvd while handling another. Ignored")
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake three.")
+                continue
+
             if self.state == self.HS_4_WAIT:
                 if message_type == "handshake_four":
                     if self.handle_handshake_four(message_tuple) == True:
@@ -408,6 +458,23 @@ class NetjoinSession(threading.Thread):
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake four.")
+                continue
+
+            if self.state == self.HS_4_RCVD:
+                if message_type == "handshake_four":
+                    logging.info("HS4 rcvd while handling another. Ignored")
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake four.")
+                continue
+
+            if self.state == self.HS_DONE:
+                if message_type == "handshake_three":
+                    logging.info("Got HS3 after sending HS4, send a new HS4")
+                    self.handle_handshake_three(message_tuple)
+                else:
+                    logging.error("Invalid message: {}".format(message_type))
+                    logging.error("Expected handshake three.")
                 continue
 
         if self.receiver is not None:
