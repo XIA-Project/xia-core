@@ -16,8 +16,8 @@
 
 CLICK_DECLS
 
-XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port)
-	: sock(transport, port, SOCK_DGRAM) {
+XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port, int type)
+	: sock(transport, port, type) {
 		// cout << "\t\tCreatign a " << port << endl;
 		memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));
@@ -71,31 +71,68 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	// printf("read_from_recv_buf in datagram\n");
 	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 
+	bool peek = x_recvfrom_msg->flags() & MSG_PEEK;
+
 	// Get just the next packet in the recv buffer (we don't return data from more
 	// than one packet in case the packets came from different senders). If no
 	// packet is available, we indicate to the app that we returned 0 bytes.
 	WritablePacket *p = recv_buffer[dgram_buffer_start];
 
 	if (recv_buffer_count > 0 && p) {
+		// get different sized packages depending on socket type
+		// datagram only wants payload
+		// raw wants transport header too
+		// packet wants it all
 		XIAHeader xiah(p->xia_header());
 		TransportHeader thdr(p);
-		int data_size = xiah.plen() - thdr.hlen();
+		int data_size;
+		String payload;
 
+		switch (sock_type) {
+			case SOCK_DGRAM:
+				data_size = xiah.plen() - thdr.hlen();
+				payload = String((const char*)thdr.payload(), data_size);
+				break;
+
+			case SOCK_RAW:
+			{
+				String header((const char*)xiah.hdr(), xiah.hdr_size());
+				String data((const char*)xiah.payload(), xiah.plen());
+				payload = header + data;
+				data_size = payload.length();
+			}
+				break;
+
+			default:
+			// this should not be possible
+			data_size = 0;
+			break;
+		}
+
+		// this part is the same for everyone
 		String src_path = xiah.src_path().unparse();
-		String payload((const char*)thdr.payload(), data_size);
+
+		uint16_t iface = SRC_PORT_ANNO(p);
+
+		x_recvfrom_msg->set_interface_id(iface);
 		x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
 		x_recvfrom_msg->set_sender_dag(src_path.c_str());
 		x_recvfrom_msg->set_bytes_returned(data_size);
 
-		p->kill();
-		recv_buffer[dgram_buffer_start] = NULL;
-		recv_buffer_count--;
-		dgram_buffer_start = (dgram_buffer_start + 1) % recv_buffer_size;
+
+		if (!peek) {
+			// NOTE: bytes beyond what the app asked for will be discarded,
+			// they are not saved for the next recv like streaming socket data
+
+			p->kill();
+			recv_buffer[dgram_buffer_start] = NULL;
+			recv_buffer_count--;
+			dgram_buffer_start = (dgram_buffer_start + 1) % recv_buffer_size;
+		}
+
 		return data_size;
-	} else {
-		x_recvfrom_msg->set_bytes_returned(0);
-		return 0;
 	}
+	return -1;
 }
 
 CLICK_ENDDECLS

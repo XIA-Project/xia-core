@@ -2274,8 +2274,9 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		sk = new XStream(this, _sport);
 		break;
 	}
+	case SOCK_RAW:
 	case SOCK_DGRAM: {
-		sk = new XDatagram(this, _sport);
+		sk = new XDatagram(this, _sport, sock_type);
 		break;
 	}
 //	case SOCK_CHUNK: {
@@ -2299,6 +2300,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	xia::X_Setsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_setsockopt();
 	sock *sk = portToSock.get(_sport);
 
+	printf("option = %08x\n", x_sso_msg->opt_type());
 	switch (x_sso_msg->opt_type()) {
 	case XOPT_HLIM:
 	{
@@ -2310,6 +2312,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 	case XOPT_NEXT_PROTO:
 	{
+		printf("set next proto\n");
 		int nxt = x_sso_msg->int_opt();
 		sk->nxt_xport = nxt;
 		if (nxt == CLICK_XIA_NXT_XCMP)
@@ -2320,6 +2323,7 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 	break;
 
 	case XOPT_BLOCK:
+		printf("set block\n");
 		sk->isBlocking = x_sso_msg->int_opt();
 		break;
 
