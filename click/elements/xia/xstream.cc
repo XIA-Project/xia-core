@@ -1018,7 +1018,7 @@ XStream::tcp_output()
 	// 		   			{  _q_usr_input.byte_length() }
 
 	// FIXME: WHERE SHOULD THIS LOGIC GO?????
-	if (staged) {
+	if (_staged) {
 		unstage_data();
 	}
 
@@ -1930,34 +1930,57 @@ void XStream::check_for_and_handle_pending_recv() {
 * @return  The number of bytes read from the buffer.
 */
 int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-	//printf("read_from_recv_buf\n");
-	// printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
 	xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 	int bytes_requested = x_recv_msg->bytes_requested();
+	bool peek = x_recv_msg->flags() & MSG_PEEK;
 	int bytes_returned = 0;
-	char buf[1024*1024]; // TODO: pick a buf size
-	memset(buf, 0, 1024*1024);
-	//printf("rfrb asked for %d\n", bytes_requested);
+	int bytes_pulled = 0;
+	int extra = 0;
+	char *buf;
+
+	// FIXME: be smarter about how much data we can return
+	bytes_requested = min(bytes_requested, 60 * 1024);
+
+	if (_tail_length != 0) {
+		buf = _tail;
+		bytes_pulled = _tail_length;
+	} else {
+		buf = (char *)malloc(65*1024);
+	}
 
 	while (has_pullable_data()) {
-		if (bytes_returned >= bytes_requested) break;
+		if (bytes_pulled >= bytes_requested) break;
 
 		WritablePacket *p = _q_recv.pull_front();
-
-		size_t data_size = p -> length();
-		memcpy((void*)(&buf[bytes_returned]), (const void*)p -> data(), data_size);
-		bytes_returned += data_size;
+		size_t data_size = p->length();
+		memcpy((void*)(&buf[bytes_pulled]), (const void*)p->data(), data_size);
+		bytes_pulled += data_size;
 
 		p->kill();
-
-//		printf("	port %u grabbing index %d, seqnum %d\n", tcp_conn->port, i%tcp_conn->recv_buffer_size, i);
 	}
-	//printf("rfrb returned %d\n", bytes_returned);
-
-	x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
+	bytes_returned = min(bytes_requested, bytes_pulled);
+	x_recv_msg->set_payload(buf, bytes_returned);
 	x_recv_msg->set_bytes_returned(bytes_returned);
 
-//		printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
+	extra = bytes_pulled - bytes_returned;
+
+	if (peek) {
+		// we need to save all of the data we pulled for next call
+		extra = bytes_pulled;
+	} else if (extra != 0) {
+		// we have too much data. save the tail for next call
+		memmove(buf, &buf[bytes_returned], extra);
+	}
+
+	if (extra) {
+		// save the data
+		_tail = buf;
+		_tail_length = extra;
+	} else {
+		_tail = NULL;
+		_tail_length = 0;
+		free(buf);
+	}
 	return bytes_returned;
 }
 
@@ -2005,8 +2028,10 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 
 	_so_state = 0;
 
-	staged = NULL;
-	staged_seq = 0;
+	_staged = NULL;
+	_staged_seq = 0;
+	_tail = NULL;
+	_tail_length = 0;
 
 	/*
 	if (tp->so_flags & SO_FIN_AFTER_IDLE) {
@@ -2035,9 +2060,9 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 bool XStream::stage_data(WritablePacket *p, unsigned seq)
 {
 	//printf("staging seq #%d\n", seq);
-	if (staged == NULL) {
-		staged = p;
-		staged_seq = seq;
+	if (_staged == NULL) {
+		_staged = p;
+		_staged_seq = seq;
 		return true;
 	} else {
 		return false;
@@ -2047,19 +2072,19 @@ bool XStream::stage_data(WritablePacket *p, unsigned seq)
 WritablePacket *XStream::unstage_data()
 {
 	// if there's data, try to put it into the queue
-	if (staged && (_q_usr_input.push(staged) == 0)) {
+	if (_staged && (_q_usr_input.push(_staged) == 0)) {
 
-		WritablePacket *p = staged;
-		//printf("unstaging seq#%d\n", staged_seq);
+		WritablePacket *p = _staged;
+		//printf("unstaging seq#%d\n", _staged_seq);
 
 		// tell the API we let it go into the buffer
 		xia::XSocketMsg xsm;
 		xsm.set_type(xia::XRESULT);
-		xsm.set_sequence(staged_seq);
+		xsm.set_sequence(_staged_seq);
 		get_transport()->ReturnResult(port, &xsm, p->length());
 
-		staged = NULL;
-		staged_seq = 0;
+		_staged = NULL;
+		_staged_seq = 0;
 
 		return p;
 

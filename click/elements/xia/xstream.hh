@@ -231,8 +231,13 @@ private:
 	tcp_seq_t	so_recv_buffer_size;
 	int			_so_state;
 
-	WritablePacket *staged;		// holding location for when xmit buffer is full and we are blocking
-	unsigned staged_seq;
+	// holding area for extra data when the api doesn't ask for a full packet
+	char *_tail;
+	unsigned _tail_length;
+
+	// holding location for when xmit buffer is full and we are blocking
+	WritablePacket *_staged;
+	unsigned _staged_seq;
 };
 
 /* THE method where we register, and handle any TCP State Updates */
