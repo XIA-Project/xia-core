@@ -72,15 +72,13 @@ int Xclose(int sockfd)
 		goto done;
 	}
 
-	if (isTempSID(sockfd) && xcm->refcount() <= 0) {
+	if ((isTempSID(sockfd) || xcm->delkeys()) && xcm->refcount() <= 0) {
 
-		if (xcm->delkeys()) {
-			LOGF("Deleting keys for %s", getTempSID(sockfd));
+		LOGF("Deleting keys for %s", getTempSID(sockfd));
 
-			// Delete any temporary keys created for this sockfd
-			if (XremoveSID(getTempSID(sockfd))) {
-				LOGF("ERROR removing key files for %s", getTempSID(sockfd));
-			}
+		// Delete any temporary keys created for this sockfd
+		if (XremoveSID(getTempSID(sockfd))) {
+			LOGF("ERROR removing key files for %s", getTempSID(sockfd));
 		}
 	}
 done:
