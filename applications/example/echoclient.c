@@ -36,7 +36,7 @@
 
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 
-#define MAX_BUF_SIZE 0x80000 // Limit test packets to 512k
+#define MAX_BUF_SIZE 62000
 
 
 // FIXME: clean up globals and move into a structure or similar
