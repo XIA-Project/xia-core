@@ -6,10 +6,11 @@ DEFINE_LOG_MACROS(META)
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
-xcache_meta::xcache_meta(std::string cid)
+xcache_meta::xcache_meta(std::string cid, int type)
 {
 	store = NULL;
 	this->cid = cid;
+	this->type = type;
 	len = 0;
 	pthread_mutex_init(&meta_lock, NULL);
 }

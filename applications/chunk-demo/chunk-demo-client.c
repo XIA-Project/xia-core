@@ -20,8 +20,6 @@ char my_hid[MAX_XID_SIZE];
 
 XcacheHandle h;
 
-int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
-
 /*
 ** write the message to stdout unless in quiet mode
 */
@@ -89,7 +87,7 @@ int get_url(int sock, char *reply, int sz)
 	return n;
 }
 
-int make_and_getchunk(int sock)
+int make_and_getchunk(int sock, int type)
 {
 	int offset;
 	char cmd[5120];
@@ -100,7 +98,11 @@ int make_and_getchunk(int sock)
 	int ret;
 
 	// send the file request
-	sprintf(cmd, "make");
+	if (type == CHUNK_CID)
+		sprintf(cmd, "make");
+	else
+		sprintf(cmd, "make_ncid");
+
 	sendCmd(sock, cmd);
 
 	// get back number of chunks in the file
@@ -250,8 +252,10 @@ int main(int argc, char **argv)
 
 		fgets(cmd, 511, stdin);
 
-		if (strncmp(cmd, "make", 4) == 0){
-			make_and_getchunk(sock);
+		if (strncmp(cmd, "make_ncid", 9) == 0){
+			make_and_getchunk(sock, CHUNK_NCID);
+		} else if (strncmp(cmd, "make", 4) == 0){
+			make_and_getchunk(sock, CHUNK_CID);
 		}
 	}
 	return 1;

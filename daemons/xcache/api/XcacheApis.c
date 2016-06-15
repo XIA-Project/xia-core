@@ -190,7 +190,8 @@ int XcacheHandleInit(XcacheHandle *h)
 	return 0;
 }
 
-static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, int flags)
+static int __XputChunk(XcacheHandle *h, const char *data, size_t length,
+		       sockaddr_x *addr, int flags, struct chunk_extra *extra)
 {
 	xcache_cmd cmd;
 
@@ -198,19 +199,21 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	cmd.set_context_id(h->contextID);
 	cmd.set_data(data, length);
 	cmd.set_flags(flags);
+	if (extra != NULL)
+		cmd.set_extra(extra, sizeof(struct chunk_extra));
 
-	if(send_command(h->xcacheSock, &cmd) < 0) {
+	if (send_command(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
 		/* Error in Sending chunk */
 		return -1;
 	}
 
-	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+	if (get_response_blocking(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "Did not get a valid response from xcache\n");
 		return -1;
 	}
 
-	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+	if (cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
 		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
 			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
 			return xcache_cmd::XCACHE_ERR_EXISTS;
@@ -227,19 +230,19 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	return xcache_cmd::XCACHE_OK;
 }
 
-static inline int __XputDataChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
+static inline int __XputDataChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, struct chunk_extra *extra)
 {
-	return __XputChunk(h, data, length, addr, XCF_DATACHUNK);
+	return __XputChunk(h, data, length, addr, XCF_DATACHUNK, extra);
 }
 
 static inline int __XputMetaChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
 {
-	return __XputChunk(h, data, length, addr, XCF_METACHUNK);
+	return __XputChunk(h, data, length, addr, XCF_METACHUNK, NULL);
 }
 
-int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
+int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, struct chunk_extra *extra)
 {
-	return __XputDataChunk(h, data, length, addr);
+	return __XputDataChunk(h, data, length, addr, extra);
 }
 
 int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count)
@@ -313,7 +316,7 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 	i = 0;
 	while (!feof(fp)) {
 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
-			rc = XputChunk(h, buf, count, &addrlist[i]);
+			rc = XputChunk(h, buf, count, &addrlist[i], NULL);
 			if(rc < 0)
 				break;
 			if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {
@@ -372,7 +375,7 @@ int XputBuffer(XcacheHandle *h, const char *data, size_t length, size_t chunkSiz
 	while(offset < length) {
 		int to_copy = MIN(length - offset, chunkSize);
 		memcpy(buf, data + offset, to_copy);
-		rc = XputChunk(h, buf, to_copy, &addrlist[i]);
+		rc = XputChunk(h, buf, to_copy, &addrlist[i], NULL);
 		if(rc < 0)
 			break;
 		if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {

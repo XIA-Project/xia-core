@@ -86,6 +86,9 @@ XID::unparse() const
         case CLICK_XIA_XID_TYPE_IP:
            c += sprintf(c, "IP");
       	   break;
+        case CLICK_XIA_XID_TYPE_NCID:
+           c += sprintf(c, "NCID");
+      	   break;
         default:
            if (XidMap::name(ntohl(_xid.type), name))
              c += sprintf(c, "%s", name.c_str());

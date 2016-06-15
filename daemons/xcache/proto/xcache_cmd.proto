@@ -21,7 +21,7 @@ message xcache_cmd {
 		XCACHE_OK = 1;
 		XCACHE_ERR_EXISTS = 2;
 	};
-  
+
 	required req_type cmd = 1;
 
 	optional int32 context_id = 2;
@@ -36,6 +36,7 @@ message xcache_cmd {
 	optional int32 readoffset = 11;
 	optional int32 readlen = 12;
 	optional bytes msg = 13;
+	optional bytes extra = 14;
 };
 
 message xcache_notif {

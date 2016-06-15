@@ -5,7 +5,6 @@ OBJS=XcacheApis.o ../common/xcache_sock.o
 
 lib: $(OBJS)
 	$(AR) -rcs libxcache.a $(OBJS) ../bin/xcache_cmd.pb.o
-	rm -f *.o
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $^

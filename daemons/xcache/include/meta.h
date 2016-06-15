@@ -31,6 +31,8 @@ private:
 	std::string cid;
 
 public:
+	int type;
+
 	/**
 	 * A Constructor.
 	 */
@@ -39,7 +41,7 @@ public:
 	/**
 	 * Another Constructor.
 	 */
-	xcache_meta(std::string);
+	xcache_meta(std::string, int);
 
 	/**
 	 * Set Content store for this meta.

@@ -13,7 +13,8 @@ static struct {
 	{ XID_TYPE_AD, "AD:" },
 	{ XID_TYPE_HID, "HID:" },
 	{ XID_TYPE_SID, "SID:" },
-	{ XID_TYPE_CID, "CID:" }
+	{ XID_TYPE_CID, "CID:" },
+	{ XID_TYPE_NCID, "NCID:" }
 };
 
 const char *get_xid_str(int id)

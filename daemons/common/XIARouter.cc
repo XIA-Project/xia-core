@@ -163,8 +163,12 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 		return XR_INVALID_XID;
 
 	n = mutableXID.find(":");
-	if (n == string::npos || n >= sizeof(xidtype))
+	// FIXME: how did xidtype get this value?
+
+	if (n == string::npos || n > sizeof(xidtype)) {
+		printf("Here 3, n = %d, size = %d, npos = %d\n", n, sizeof(xidtype), string::npos);
 		return XR_INVALID_XID;
+	}
 
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;

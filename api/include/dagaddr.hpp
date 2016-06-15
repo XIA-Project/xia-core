@@ -28,6 +28,7 @@ public:
 	static const unsigned int XID_TYPE_CID = 0x12;
 	static const unsigned int XID_TYPE_SID = 0x13;
 	static const unsigned int XID_TYPE_IP = 0x14;
+	static const unsigned int XID_TYPE_NCID = 0x15;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
 	static const std::string XID_TYPE_DUMMY_SOURCE_STRING;

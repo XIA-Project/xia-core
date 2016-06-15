@@ -16,6 +16,8 @@
 #define CLICK_XIA_XID_TYPE_CID      (0x12)
 #define CLICK_XIA_XID_TYPE_SID      (0x13)
 #define CLICK_XIA_XID_TYPE_IP       (0x14)
+#define CLICK_XIA_XID_TYPE_NCID     (0x15)
+
 
 #define CLICK_XIA_XID_ID_LEN        20
 

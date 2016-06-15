@@ -5,12 +5,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "../common/xcache_events.h"
+#include <openssl/sha.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define CIDLEN 512
+#define CIDLEN (SHA_DIGEST_LENGTH * 2)
+#define NCID_STRLEN 256
 
 typedef struct {
 	char* cid;
@@ -42,6 +44,20 @@ typedef struct {
 #define XCF_METACHUNK 0x10
 #define XCF_DATACHUNK 0x20
 
+#define CHUNK_CID 1
+#define CHUNK_NCID 2
+
+struct chunk_extra {
+	int chunk_type;
+
+	union {
+		struct chunk_ncid_extra {
+			char name[NCID_STRLEN];
+			sockaddr_x certDAG;
+		} ncid;
+	} u;
+};
+
 /**
  * XcacheHandleInit
  * Initializes XcacheHandle.
@@ -54,9 +70,12 @@ int XcacheHandleDestroy(XcacheHandle *h);
 #endif
 
 
-extern int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *info);  //DONE
-extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE
-extern int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE
+extern int XputChunk(XcacheHandle *h, const char *data, size_t length,
+		     sockaddr_x *info, struct chunk_extra *extra);
+extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize,
+		    sockaddr_x **info);
+extern int XputBuffer(XcacheHandle *h, const void *data, size_t length,
+		      size_t chunkSize, sockaddr_x **info);
 extern int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count); //DONE
 
 extern int XbufInit(XcacheBuf *xbuf);

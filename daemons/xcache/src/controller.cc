@@ -95,6 +95,32 @@ static int xcache_create_lib_socket(void)
 	return s;
 }
 
+std::string xcache_controller::get_id(int *type, xcache_cmd *cmd)
+{
+	struct chunk_extra *extra;
+	SHA_CTX ctx;
+	unsigned char digest[SHA_DIGEST_LENGTH];
+
+	if (!cmd->has_extra()) {
+		*type = CHUNK_CID;
+		return compute_cid(cmd->data().c_str(), cmd->data().length());
+	}
+
+	extra = (struct chunk_extra *)cmd->extra().c_str();
+
+	*type = extra->chunk_type;
+
+	if (extra->chunk_type == CHUNK_CID)
+		return compute_cid(cmd->data().c_str(), cmd->data().length());
+
+	SHA1_Init(&ctx);
+	SHA1_Update(&ctx, extra->u.ncid.name, strlen(extra->u.ncid.name));
+	SHA1_Update(&ctx, &extra->u.ncid.certDAG, sizeof(sockaddr_x));
+	SHA1_Final(digest, &ctx);
+
+	return hex_str(digest, SHA_DIGEST_LENGTH);
+}
+
 void xcache_controller::status(void)
 {
 	LOG_CTRL_INFO("[Status]\n");
@@ -130,7 +156,9 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	size_t offset;
 
 	Node expected_cid(g.get_final_intent());
-	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
+
+	// FIXME: Following always receives CID
+	xcache_meta *meta = new xcache_meta(expected_cid.id_string(), CHUNK_CID);
 
 	meta->set_FETCHING();
 
@@ -153,7 +181,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	}
 
 	remaining = ntohl(header.length);
-
 
 	while (remaining > 0) {
 		to_recv = remaining > 1024*1024 ? 1024 * 1024 : remaining;
@@ -471,8 +498,11 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 
 bool xcache_controller::verify_content(xcache_meta *meta, const std::string *data)
 {
-	if (meta->get_cid() != compute_cid(data->c_str(), data->length()))
-		return false;
+	if (meta->type == CHUNK_CID) {
+		if (meta->get_cid() != compute_cid(data->c_str(), data->length()))
+			return false;
+		return true;
+	}
 
 	return true;
 }
@@ -512,27 +542,28 @@ int xcache_controller::__store(struct xcache_context *context,
 	return RET_SENDRESP;
 }
 
-sockaddr_x xcache_controller::cid2addr(std::string cid)
+sockaddr_x xcache_controller::cid2addr(std::string cid, int type)
 {
 	sockaddr_x addr;
-	std::string myCid("CID:");
+	std::string contentID;
 	int xcache_sock;
 	char AD[MAX_XID_SIZE];
 	char HID[MAX_XID_SIZE];
 	char FourID[MAX_XID_SIZE];
 
-	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		assert(0);
 
-	if(XreadLocalHostAddr(xcache_sock, AD, sizeof(AD), HID, sizeof(HID),
+	if (XreadLocalHostAddr(xcache_sock, AD, sizeof(AD), HID, sizeof(HID),
 			      FourID, sizeof(FourID)) < 0)
 		assert(0);
 
 	Xclose(xcache_sock);
 
-	myCid += cid;
+	contentID = std::string((type == CHUNK_CID) ? "CID:" : "NCID:");
+	contentID += cid;
 
-	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
+	dag_add_nodes(&addr, 3, AD, HID, contentID.c_str());
 	dag_set_intent(&addr, 2);
 	dag_add_path(&addr, 3, 0, 1, 2);
 
@@ -543,7 +574,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
-	std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
+	int type;
+	std::string cid = get_id(&type, cmd);
 
 	meta = acquire_meta(cid);
 
@@ -557,25 +589,27 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 		/*
 		 * New object - Allocate a meta
 		 */
-		meta = new xcache_meta(cid);
+		meta = new xcache_meta(cid, type);
 
 		context = lookup_context(cmd->context_id());
-		if(!context) {
+		if (!context) {
 			return RET_FAILED;
 		}
 
-		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
+		if (__store(context, meta, &cmd->data()) == RET_FAILED) {
 			return RET_FAILED;
 		}
+
+		sockaddr_x addr = cid2addr(cid, type);
+
+		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
+		Graph g(&addr);
+		printf("--------------------\n");
+		g.print_graph();
 	}
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
-	sockaddr_x addr = cid2addr(cid);
-	resp->set_dag((char *)&addr, sizeof(sockaddr_x));
-	Graph g(&addr);
-	printf("--------------------\n");
-	g.print_graph();
 
 	LOG_CTRL_INFO("Store Finished\n");
 
@@ -690,7 +724,12 @@ int xcache_controller::register_meta(xcache_meta *meta)
 {
 	int rv;
 	std::string empty_str("");
-	std::string temp_cid("CID:");
+	std::string temp_cid;
+
+	if (meta->type == CHUNK_CID)
+		temp_cid = std::string("CID:");
+	else
+		temp_cid = std::string("NCID:");
 
 	temp_cid += meta->get_cid();
 
@@ -886,8 +925,8 @@ repeat:
 		}
 	}
 
-	for(iter = active_conns.begin(); iter != active_conns.end(); ) {
-		if(!FD_ISSET(*iter, &fds)) {
+	for (iter = active_conns.begin(); iter != active_conns.end(); ) {
+		if (!FD_ISSET(*iter, &fds)) {
 			++iter;
 			continue;
 		}
@@ -904,7 +943,7 @@ repeat:
 
 		remaining = ntohl(msg_length);
 
-		while(remaining > 0) {
+		while (remaining > 0) {
 			ret = recv(*iter, buf, MIN(512, remaining), 0);
 			LOG_CTRL_INFO("Recv returned %d, remaining = %d\n", ret, remaining);
 			if(ret <= 0)
@@ -914,7 +953,7 @@ repeat:
 			remaining -= ret;
 		}
 
-		if(msg_length == 0 && ret <= 0) {
+		if (msg_length == 0 && ret <= 0) {
 			goto disconnected;
 		} else {
 			bool parse_success = cmd.ParseFromString(buffer);
@@ -931,12 +970,12 @@ repeat:
 		 */
 		ret = fast_process_req(*iter, &resp, &cmd);
 
-		if(ret == RET_SENDRESP) {
+		if (ret == RET_SENDRESP) {
 			/*
 			 * Send response back to the client
 			 */
 			resp.SerializeToString(&buffer);
-			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
+			if (send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
 				LOG_CTRL_ERROR("FIXME: handle return value of write\n");
 			} else {
 				LOG_CTRL_INFO("Data sent to client\n");

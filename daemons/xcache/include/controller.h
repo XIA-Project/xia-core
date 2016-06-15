@@ -91,6 +91,7 @@ public:
 		sem_init(&req_sem, 0, 0);
 	}
 
+	std::string get_id(int *type, xcache_cmd *cmd);
 	/**
 	 * Xcache Sender Thread.
 	 * For sending content chunk, this thread keeps on "Accepting" connections
@@ -182,7 +183,7 @@ public:
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);
-	sockaddr_x cid2addr(std::string cid);
+	sockaddr_x cid2addr(std::string cid, int);
 
 	void enqueue_request_safe(xcache_req *req);
 	xcache_req *dequeue_request_safe(void);

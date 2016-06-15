@@ -49,11 +49,11 @@ elementclass XIAPacketRoute {
 	// order is important!
 	//
 	// c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next FOO, -);
-	
+
 	// print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
-	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, -);
+	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next NCID, -);
 	//print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// pdesty :: XIAPrint(">>>  DEST YES");
 	// pdestn :: XIAPrint(">>>  DEST NO");
@@ -93,28 +93,29 @@ elementclass XIAPacketRoute {
 
 	// rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO :: XIAXIDRouteTable($local_addr, $num_ports);
 	// c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, [2]output;
-	
-	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($local_addr, $num_ports);
+
+	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_NCID :: XIAXIDRouteTable($local_addr, $num_ports);
 	//c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, [2]output;
 	c[0] -> rt_AD; //DEBUG BLOCK
 	c[1] -> rt_HID;
 	c[2] -> rt_SID;
 	c[3] -> rt_CID;
 	c[4] -> rt_IP;
-	c[5] -> [2]output;
-		
+	c[5] -> rt_NCID;
+	c[6] -> [2]output;
+
 	// TO ADD A NEW USER DEFINED XID (step 3)
 	// add rt_XID_NAME before the arrow in the following 7 lines
 	// if the XID is used for routing like an AD or HID, add it to lines 1,2,4,5,7
 	// if the XID should be treated like a SID and will return data to the API, add it to lines 1,3,4,6,7
 
-	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0] -> GPRP;		
-	rt_AD[1], rt_HID[1], 			           rt_IP[1] -> XIANextHop -> check_dest;
-	                     rt_SID[1], rt_CID[1]			-> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
-	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2] -> consider_next_path;
-	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3] -> Discard;
-			  			 rt_SID[3]					    -> [3]output;
-	rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] -> x; // xcmp redirect message
+	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_NCID[0] -> GPRP;
+	rt_AD[1], rt_HID[1], rt_IP[1] -> XIANextHop -> check_dest;
+	rt_SID[1], rt_CID[1], rt_NCID[1] -> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_NCID[2] -> consider_next_path;
+	rt_AD[3], rt_HID[3], rt_CID[3], rt_IP[3], rt_NCID[3] -> Discard;
+	rt_SID[3] -> [3]output;
+	rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4], rt_NCID[4] -> x; // xcmp redirect message
 };
 
 
@@ -314,6 +315,7 @@ elementclass XIARoutingCore {
 	Script(write n/proc/rt_SID.add - $FALLBACK);	 // no default route for SID; consider other path
 	Script(write n/proc/rt_CID.add - $FALLBACK);	 // no default route for CID; consider other path
 	Script(write n/proc/rt_IP.add - $FALLBACK);		// no default route for IP; consider other path
+	Script(write n/proc/rt_NCID.add - $FALLBACK);		// no default route for IP; consider other path
 
 	// TO ADD A NEW USER DEFINED XID (step 4)
 	// create a default fallback route for the new XID
