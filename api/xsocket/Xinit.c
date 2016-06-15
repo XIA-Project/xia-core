@@ -32,9 +32,10 @@
 #include <limits.h>
 #include <pthread.h>
 #include <errno.h>
-#include <dlfcn.h> 
+#include <dlfcn.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <signal.h>
 #include "state.h"
 
 #define LIBNAME	"libc.so.6"
@@ -81,6 +82,45 @@ size_t api_mtu()
 	return mtu_internal;
 }
 
+void cleanup()
+{
+	// loop through left open sockets and close them
+	SocketMap *socketmap = SocketMap::getMap();
+	SMap *sockets = socketmap->smap();
+	SMap::iterator it;
+
+	for (it = sockets->begin(); it != sockets->end(); it++) {
+		printf("closing %d\n", it->first);
+		Xclose(it->first);
+	}
+}
+
+
+struct sigaction sa_new;
+//struct sigaction sa_term;
+struct sigaction sa_int;
+
+void handler(int sig)
+{
+	printf("in handler!\n");
+	cleanup();
+
+	// chain to the old handler if it exists
+	switch (sig) {
+//		case SIGTERM:
+//			if (sa_term.sa_handler)
+//				(sa_term.sa_handler)(sig);
+//			break;
+		case SIGINT:
+			if (sa_int.sa_handler)
+				(sa_int.sa_handler)(sig);
+			break;
+		default:
+			break;
+	}
+}
+
+
 
 
 // Run at library load time to initialize function pointers
@@ -92,7 +132,7 @@ void __attribute__ ((constructor)) api_init()
 	if (!handle) {
 		fprintf(stderr, "Unable to locate %s. Is there a different version of libc?", LIBNAME);
 		exit(-1);
-	} 
+	}
 
 	if(!(_f_socket = (socket_t)dlsym(handle, "socket")))
 		printf("can't find socket!\n");
@@ -120,22 +160,33 @@ void __attribute__ ((constructor)) api_init()
     api_mtu();
     get_conf();
 
+	memset (&sa_new, 0, sizeof (struct sigaction));
+	sigemptyset (&sa_new.sa_mask);
+	sa_new.sa_handler = handler;
+	sa_new.sa_flags = 0;
+
+	sigaction (SIGINT, NULL, &sa_int);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGINT, &sa_new, &sa_int);
+	}
+//	sigaction (SIGTERM, NULL, &sa_term);
+//	if (sa_int.sa_handler != SIG_IGN) {
+//		sigaction(SIGTERM, &sa_new, &sa_term);
+//	}
+
     // force creation of the socket map
 	SocketMap::getMap();
 }
+
+
+
+
 
 // Run at library unload time to close sockets left open by the app
 //  sadly will not be called if the app is terminated due to a signal
 void __attribute__ ((destructor)) api_destruct(void)
 {
-	// loop through left open sockets and close them
-	SocketMap *socketmap = SocketMap::getMap();
-	SMap *sockets = socketmap->smap();
-	SMap::iterator it;
-
-	for (it = sockets->begin(); it != sockets->end(); it++) {
-		Xclose(it->first);
-	}
+	cleanup();
 }
 
 
@@ -289,4 +340,3 @@ void __InitXSocket::print_conf()
 }
 int  __XSocketConf::initialized=0;
 char __XSocketConf::master_conf[BUF_SIZE];
-
