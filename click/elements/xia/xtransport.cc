@@ -1670,7 +1670,8 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	if (sk)
 		return sk;
 
-	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID ||
+	    ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_NCID) {
 		std::cout << "Searching for xcacheSID\n";
 		// Packet destined to a CID. Handling it specially.
 		// FIXME: This is hackish. Maybe give users the ability to

@@ -81,8 +81,12 @@ static node_t str_to_node(char *xidstr)
 		pos += 3;
 	} else if(STREQ(pos, "IP")) {
 		node.s_xid.s_type = XID_TYPE_IP;
-		printf("Unrecognized type\n");
+		printf("IP\n");
 		pos += 2;
+	} else if(STREQ(pos, "NCID")) {
+		node.s_xid.s_type = XID_TYPE_NCID;
+		printf("NCID\n");
+		pos += 4;
 	} else if(STREQ(pos, "SRC")) {
 		node.s_xid.s_type = XID_TYPE_DUMMY_SOURCE;
 		printf("Source\n");

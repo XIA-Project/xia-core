@@ -158,7 +158,12 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	Node expected_cid(g.get_final_intent());
 
 	// FIXME: Following always receives CID
-	xcache_meta *meta = new xcache_meta(expected_cid.id_string(), CHUNK_CID);
+	xcache_meta *meta;
+
+	if (expected_cid.type() == XID_TYPE_CID)
+		meta = new xcache_meta(expected_cid.id_string(), CHUNK_CID);
+	else
+		meta = new xcache_meta(expected_cid.id_string(), CHUNK_NCID);
 
 	meta->set_FETCHING();
 

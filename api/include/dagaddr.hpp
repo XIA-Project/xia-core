@@ -37,6 +37,7 @@ public:
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
+	static const std::string XID_TYPE_NCID_STRING;
 
 public:
 	Node();

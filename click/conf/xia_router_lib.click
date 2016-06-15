@@ -131,7 +131,7 @@ elementclass RouteEngine {
 	// output[2]: arrived at destination node; go to cache
 
 	proc :: XIAPacketRoute($local_addr, $num_ports);
-	srcCidClassifier::XIAXIDTypeClassifier(src CID, -);
+	srcCidClassifier::XIAXIDTypeClassifier(src NCID, src CID, -);
 	cidFilter::XIACidFilter($local_addr);
 
 	input[0] -> proc
@@ -139,11 +139,11 @@ elementclass RouteEngine {
 
 	proc[0] -> srcCidClassifier;
 	// All the non-CID packets are forwarded to other interface
-	srcCidClassifier[1] -> [0]output;
+	srcCidClassifier[2] -> [0]output;
 
 	// All source CID packets are considered for caching. So,
 	// sending one copy of CID to other interface
-	srcCidClassifier[0] -> cidFork::Tee(2) -> [0]output;
+	srcCidClassifier[0], srcCidClassifier[1] -> cidFork::Tee(2) -> [0]output;
 
 	FromXcache($cache_in_port)->cidFilter;
 	// And the other to CIDfilter
@@ -181,8 +181,8 @@ elementclass XIALineCard {
 	// print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
-	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst NCID, -);
+	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, dst NCID, -);
 
     // AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(LOCALHID $local_hid, INTERFACE $num, SRC $local_addr, ACTIVE $isrouter);

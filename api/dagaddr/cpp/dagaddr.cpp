@@ -112,6 +112,7 @@ const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
 const std::string Node::XID_TYPE_SID_STRING = "SID";
 const std::string Node::XID_TYPE_IP_STRING = "IP";
+const std::string Node::XID_TYPE_NCID_STRING = "NCID";
 
 
 /**
@@ -274,6 +275,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_SID;
 	else if (type_str == XID_TYPE_IP_STRING)
 		ptr_->type = XID_TYPE_IP;
+	else if (type_str == XID_TYPE_NCID_STRING)
+		ptr_->type = XID_TYPE_NCID;
 	else if (type_str == XID_TYPE_DUMMY_SOURCE_STRING)
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
@@ -360,6 +363,8 @@ Node::type_string() const
 			return XID_TYPE_SID_STRING;
 		case XID_TYPE_IP:
 			return XID_TYPE_IP_STRING;
+		case XID_TYPE_NCID:
+			return XID_TYPE_NCID_STRING;
 		case XID_TYPE_DUMMY_SOURCE:
 			return XID_TYPE_DUMMY_SOURCE_STRING;
 		default:
@@ -959,7 +964,7 @@ Graph::next_hop(const Node& n)
 	// find the next intent node (the final intent of the new DAG)
 	// for now, we we'll only consider CIDs and SIDs to be intent nodes
 	std::size_t intentIndex = nIndex;
-	while (intentIndex == nIndex || (nodes_[intentIndex].type() != Node::XID_TYPE_CID && nodes_[intentIndex].type() != Node::XID_TYPE_SID))
+	while (intentIndex == nIndex || (nodes_[intentIndex].type() != Node::XID_TYPE_CID && nodes_[intentIndex].type() != Node::XID_TYPE_SID) && nodes_[intentIndex].type() != Node::XID_TYPE_NCID)
 	{
 		if (is_sink(intentIndex)) {
 			break;
