@@ -220,12 +220,13 @@ int process(int sock)
 
 	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
-	// struct pollfd pfds[2];
-	// pfds[0].fd = sock;
-	// pfds[0].events = POLLIN;
-	// if ((rc = Xpoll(pfds, 1, 50000)) <= 0) {
-	// 	die(-5, "Poll returned %d\n", rc);
-	// }
+	int rc;
+	struct pollfd pfds[2];
+	pfds[0].fd = sock;
+	pfds[0].events = POLLIN;
+	if ((rc = Xpoll(pfds, 1, 50000)) <= 0) {
+		die(-5, "Poll returned %d\n", rc);
+	}
 
 	memset(buf2, 0, sizeof(buf2));
 	count = 0;
