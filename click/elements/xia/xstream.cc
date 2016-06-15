@@ -246,11 +246,11 @@ XStream::tcp_input(WritablePacket *p)
 				// indicate the next packet we expect to get from the sender.
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
+					check_for_and_handle_pending_recv();
 					if (polling) {
 						// tell API we are readable
 						get_transport()->ProcessPollEvent(port, POLLIN);
 					}
-					check_for_and_handle_pending_recv();
 					//debug_output(VERB_TCPSTATS, "input (fp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -349,10 +349,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport() -> ChangeState(this, CONNECTED);
 				tcp_set_state(TCPS_ESTABLISHED);
 				//printf("\t\t\t\tClient side 3way handshake is done.\n");
-				if (polling) {
-					// tell API we are writble now
-					get_transport()->ProcessPollEvent(port, POLLOUT);
-				}
+
 
 				//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
@@ -364,6 +361,11 @@ XStream::tcp_input(WritablePacket *p)
 				connect_msg->set_ddag(src_path.unparse().c_str());
 				connect_msg->set_status(X_Connect_Msg::XCONNECTED);
 				get_transport()->ReturnResult(port, &xsm);
+
+				if (polling) {
+					// tell API we are writble now
+					get_transport()->ProcessPollEvent(port, POLLOUT);
+				}
 
 				/* Apply Window Scaling Options if set in incoming header */
 				if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) ==
@@ -784,11 +786,11 @@ XStream::tcp_input(WritablePacket *p)
 
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
+					check_for_and_handle_pending_recv();
 					if (polling) {
 						// tell API we are readable
 						get_transport()->ProcessPollEvent(port, POLLIN);
 					}
-					check_for_and_handle_pending_recv();
 					//debug_output(VERB_TCPSTATS, "input (closing) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -868,11 +870,11 @@ step6:
 
 		if (! _q_recv.is_empty() && has_pullable_data()) {
 			tp->rcv_nxt = _q_recv.last_nxt();
+			check_for_and_handle_pending_recv();
 			if (polling) {
 				// tell API we are readable
 				get_transport()->ProcessPollEvent(port, POLLIN);
 			}
-			check_for_and_handle_pending_recv();
 			//debug_output(VERB_TCPSTATS, "input (sp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 		}
 
@@ -1520,7 +1522,6 @@ XStream::tcp_setpersist() {
 		TCPTV_PERSMIN, TCPTV_PERSMAX);
 	if(tp->t_rxtshift < TCP_MAXRXTSHIFT)
 			tp->t_rxtshift++;
-
 }
 void
 XStream::tcp_xmit_timer(short rtt) {
@@ -1907,6 +1908,7 @@ XStream::print_state(StringAccum &sa)
 */
 void XStream::check_for_and_handle_pending_recv() {
 	if (recv_pending) {
+
 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
 		recv_pending = false;

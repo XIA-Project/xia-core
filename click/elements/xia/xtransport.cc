@@ -3086,7 +3086,8 @@ void XTRANSPORT::Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 				// is there any read data?
 				if (flags & POLLIN) {
 					if (sk->sock_type == SOCK_STREAM) {
-						if (sk->recv_base < sk->next_recv_seqnum) {
+						XStream *st = dynamic_cast<XStream *>(sk);
+						if (st->has_pullable_data()) {
 							flags_out |= POLLIN;
 						} else if (sk->state == CLOSE_WAIT) {
 							// other end closed, app needs to know!
