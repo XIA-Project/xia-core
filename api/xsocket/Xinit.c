@@ -90,7 +90,6 @@ void cleanup()
 	SMap::iterator it;
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
-		printf("closing %d\n", it->first);
 		Xclose(it->first);
 	}
 }
@@ -102,7 +101,6 @@ struct sigaction sa_int;
 
 void handler(int sig)
 {
-	printf("in handler!\n");
 	cleanup();
 
 	// chain to the old handler if it exists
