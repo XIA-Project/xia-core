@@ -36,7 +36,7 @@
 
 #define STREAM_NAME "www_s.stream_echo.aaa.xia"
 
-#define MAX_BUF_SIZE 0x80000 // Limit test packets to 512k
+#define MAX_BUF_SIZE 62000
 
 
 // FIXME: clean up globals and move into a structure or similar
@@ -202,9 +202,8 @@ int process(int sock)
 	int size;
 	int sent = 0;
 	int received = 0;
-	int rc = 0;
-	char buf1[MAX_BUF_SIZE + 1], buf2[MAX_BUF_SIZE + 1], temp[MAX_BUF_SIZE + 1];
-	char *bufp = buf1;
+	char buf1[MAX_BUF_SIZE + 1], buf2[MAX_BUF_SIZE + 1];
+
 	if (pktSize == 0)
 		size = (rand() % MAX_BUF_SIZE) + 1;
 	else
@@ -212,41 +211,16 @@ int process(int sock)
 	randomString(buf1, size);
 	printf("%d\n", (int)size);
 	int count = size;
-	if (count <= 51200)
-	{
-		sent = Xsend(sock, buf1, count, 0);
-		if (sent < 0)
-		{
-			die(-4, "Send error %d on socket %d\n", errno, sock);
-		}
-	} else {
-		while (count > 0) {
-			if (count > 51200)
-			{
-			printf("count %d\n",count);
 
-				sent += Xsend(sock, bufp, 51200, 0);
-				bufp += 51200;
-				if (sent < 0)
-				{
-					die(-4, "Send error %d on socket %d\n", errno, sock);
-				}
-			} else {
-			printf("count %d\n",count);
-				sent += Xsend(sock, bufp, count, 0);
-								if (sent < 0)
-				{
-					die(-4, "Send error %d on socket %d\n", errno, sock);
-				}
-			}
-			count -= 51200;
-			printf("count %d\n",count);
-		}
+	sent = Xsend(sock, buf1, count, 0);
+	if (sent < 0)
+	{
+		die(-4, "Send error %d on socket %d\n", errno, sock);
 	}
-	
 
 	say("Xsock %4d sent %d of %d bytes\n", sock, sent, size);
 
+	int rc;
 	struct pollfd pfds[2];
 	pfds[0].fd = sock;
 	pfds[0].events = POLLIN;
@@ -255,16 +229,12 @@ int process(int sock)
 	}
 
 	memset(buf2, 0, sizeof(buf2));
-	memset(temp, 0, sizeof(temp));
 	count = 0;
-	while (sent != received && (count = Xrecv(sock, temp, sizeof(temp), 0)) > 0) {
+	while (sent != received && (count = Xrecv(sock, &buf2[received], sizeof(buf2) - received, 0)) > 0) {
 		say("%5d received %d bytes\n", sock, count);
 		received += count;
-		strncat(buf2, temp, count);
-		memset(temp, 0, sizeof(temp));
+		buf2[received] = 0;
 	}
-	// if ((received = Xrecv(sock, buf2, sizeof(buf2), 0)) < 0)
-	// 	die(-5, "Receive error %d on socket %d\n", errno, sock);
 
 	say("Xsock %4d received %d bytes in total\n", sock, received);
 

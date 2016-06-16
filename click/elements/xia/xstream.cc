@@ -6,7 +6,7 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-
+#include <fcntl.h>
 
 #include "xstream.hh"
 #include "xtransport.hh"
@@ -45,6 +45,24 @@ XStream::push(Packet *_p) {
 	WritablePacket *p = _p->uniqueify();
 	tcp_input(p);
 }
+
+tcp_seq XStream::_tcp_iss()
+{
+	// create a random starting sequence #
+	tcp_seq iss;
+	int r  = open("/dev/urandom", O_RDONLY);
+	int rc = read(r, &iss, sizeof(iss));
+	close(r);
+
+	// this ought not to happen
+	if (rc != sizeof(iss)) {
+		iss = 0x011111;
+	}
+
+	printf("iss = %u\n", iss);
+	return iss;
+}
+
 
 
 inline void
@@ -246,11 +264,11 @@ XStream::tcp_input(WritablePacket *p)
 				// indicate the next packet we expect to get from the sender.
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
+					check_for_and_handle_pending_recv();
 					if (polling) {
 						// tell API we are readable
 						get_transport()->ProcessPollEvent(port, POLLIN);
 					}
-					check_for_and_handle_pending_recv();
 					//debug_output(VERB_TCPSTATS, "input (fp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -299,9 +317,7 @@ XStream::tcp_input(WritablePacket *p)
 			if (iss) {
 				tp->iss = iss;
 			} else {
-				//printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = 0x1; /* TODO: sensible iss function */
-				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
+				tp->iss = _tcp_iss(); // get a random starting sequence #
 			}
 			tp->irs = ti.ti_seq;
 			_tcp_sendseqinit(tp);
@@ -349,10 +365,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport() -> ChangeState(this, CONNECTED);
 				tcp_set_state(TCPS_ESTABLISHED);
 				//printf("\t\t\t\tClient side 3way handshake is done.\n");
-				if (polling) {
-					// tell API we are writble now
-					get_transport()->ProcessPollEvent(port, POLLOUT);
-				}
+
 
 				//sk->expiry = Timestamp::now() + Timestamp::make_msec(_ackdelay_ms);
 
@@ -364,6 +377,10 @@ XStream::tcp_input(WritablePacket *p)
 				connect_msg->set_ddag(src_path.unparse().c_str());
 				connect_msg->set_status(X_Connect_Msg::XCONNECTED);
 				get_transport()->ReturnResult(port, &xsm);
+				if (polling) {
+					// tell API we are writble now
+					get_transport()->ProcessPollEvent(port, POLLOUT);
+				}
 
 				/* Apply Window Scaling Options if set in incoming header */
 				if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) ==
@@ -784,11 +801,11 @@ XStream::tcp_input(WritablePacket *p)
 
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
+					check_for_and_handle_pending_recv();
 					if (polling) {
 						// tell API we are readable
 						get_transport()->ProcessPollEvent(port, POLLIN);
 					}
-					check_for_and_handle_pending_recv();
 					//debug_output(VERB_TCPSTATS, "input (closing) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -868,11 +885,11 @@ step6:
 
 		if (! _q_recv.is_empty() && has_pullable_data()) {
 			tp->rcv_nxt = _q_recv.last_nxt();
+			check_for_and_handle_pending_recv();
 			if (polling) {
 				// tell API we are readable
 				get_transport()->ProcessPollEvent(port, POLLIN);
 			}
-			check_for_and_handle_pending_recv();
 			//debug_output(VERB_TCPSTATS, "input (sp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 		}
 
@@ -996,6 +1013,7 @@ XStream::tcp_output()
 	WritablePacket *p = NULL;
 	WritablePacket *tcp_payload = NULL;
 
+	ti.th_nxt = CLICK_XIA_NXT_NO;
 
 	for (int i=0; i < MAX_TCPOPTLEN; i++) {
 		opt[i] = 0;
@@ -1017,7 +1035,7 @@ XStream::tcp_output()
 	// 		   			{  _q_usr_input.byte_length() }
 
 	// FIXME: WHERE SHOULD THIS LOGIC GO?????
-	if (staged) {
+	if (_staged) {
 		unstage_data();
 	}
 
@@ -1344,6 +1362,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 		th.th_win = htons((u_short)win);
 	}
 
+	th.th_nxt = CLICK_XIA_NXT_NO;
 	th.th_seq =   htonl(seq+1);
 	th.th_ack =   htonl(ack);
 	th.th_flags = htons(flags);
@@ -1518,7 +1537,6 @@ XStream::tcp_setpersist() {
 		TCPTV_PERSMIN, TCPTV_PERSMAX);
 	if(tp->t_rxtshift < TCP_MAXRXTSHIFT)
 			tp->t_rxtshift++;
-
 }
 void
 XStream::tcp_xmit_timer(short rtt) {
@@ -1719,7 +1737,7 @@ void
 XStream::usropen()
 {
 	if (tp->iss == 0) {
-		tp->iss = 0x11111;
+		tp->iss = _tcp_iss();
 		//debug_output(VERB_ERRORS, "Setting initial sequence to [%d], because it was 0", tp->iss);
 		// Setting a non-zero initial sequence number because I see some weird
 		// problems in wireshark when initial seq is 0
@@ -1905,6 +1923,7 @@ XStream::print_state(StringAccum &sa)
 */
 void XStream::check_for_and_handle_pending_recv() {
 	if (recv_pending) {
+
 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
 		recv_pending = false;
@@ -1928,34 +1947,57 @@ void XStream::check_for_and_handle_pending_recv() {
 * @return  The number of bytes read from the buffer.
 */
 int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-	//printf("read_from_recv_buf\n");
-	// printf("<<< read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
 	xia::X_Recv_Msg *x_recv_msg = xia_socket_msg->mutable_x_recv();
 	int bytes_requested = x_recv_msg->bytes_requested();
+	bool peek = x_recv_msg->flags() & MSG_PEEK;
 	int bytes_returned = 0;
-	char buf[1024*1024]; // TODO: pick a buf size
-	memset(buf, 0, 1024*1024);
-	//printf("rfrb asked for %d\n", bytes_requested);
+	int bytes_pulled = 0;
+	int extra = 0;
+	char *buf;
+
+	// FIXME: be smarter about how much data we can return
+	bytes_requested = min(bytes_requested, 60 * 1024);
+
+	if (_tail_length != 0) {
+		buf = _tail;
+		bytes_pulled = _tail_length;
+	} else {
+		buf = (char *)malloc(65*1024);
+	}
 
 	while (has_pullable_data()) {
-		if (bytes_returned >= bytes_requested) break;
+		if (bytes_pulled >= bytes_requested) break;
 
 		WritablePacket *p = _q_recv.pull_front();
-
-		size_t data_size = p -> length();
-		memcpy((void*)(&buf[bytes_returned]), (const void*)p -> data(), data_size);
-		bytes_returned += data_size;
+		size_t data_size = p->length();
+		memcpy((void*)(&buf[bytes_pulled]), (const void*)p->data(), data_size);
+		bytes_pulled += data_size;
 
 		p->kill();
-
-//		printf("	port %u grabbing index %d, seqnum %d\n", tcp_conn->port, i%tcp_conn->recv_buffer_size, i);
 	}
-	//printf("rfrb returned %d\n", bytes_returned);
-
-	x_recv_msg->set_payload(buf, bytes_returned); // TODO: check this: need to turn buf into String first?
+	bytes_returned = min(bytes_requested, bytes_pulled);
+	x_recv_msg->set_payload(buf, bytes_returned);
 	x_recv_msg->set_bytes_returned(bytes_returned);
 
-//		printf(">>> read_from_recv_buf: port=%u, recv_base=%d, next_recv_seqnum=%d, recv_buf_size=%d\n", tcp_conn->port, tcp_conn->recv_base, tcp_conn->next_recv_seqnum, tcp_conn->recv_buffer_size);
+	extra = bytes_pulled - bytes_returned;
+
+	if (peek) {
+		// we need to save all of the data we pulled for next call
+		extra = bytes_pulled;
+	} else if (extra != 0) {
+		// we have too much data. save the tail for next call
+		memmove(buf, &buf[bytes_returned], extra);
+	}
+
+	if (extra) {
+		// save the data
+		_tail = buf;
+		_tail_length = extra;
+	} else {
+		_tail = NULL;
+		_tail_length = 0;
+		free(buf);
+	}
 	return bytes_returned;
 }
 
@@ -2003,8 +2045,10 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 
 	_so_state = 0;
 
-	staged = NULL;
-	staged_seq = 0;
+	_staged = NULL;
+	_staged_seq = 0;
+	_tail = NULL;
+	_tail_length = 0;
 
 	/*
 	if (tp->so_flags & SO_FIN_AFTER_IDLE) {
@@ -2033,9 +2077,9 @@ XStream::XStream(XTRANSPORT *transport, const unsigned short port)
 bool XStream::stage_data(WritablePacket *p, unsigned seq)
 {
 	//printf("staging seq #%d\n", seq);
-	if (staged == NULL) {
-		staged = p;
-		staged_seq = seq;
+	if (_staged == NULL) {
+		_staged = p;
+		_staged_seq = seq;
 		return true;
 	} else {
 		return false;
@@ -2045,19 +2089,19 @@ bool XStream::stage_data(WritablePacket *p, unsigned seq)
 WritablePacket *XStream::unstage_data()
 {
 	// if there's data, try to put it into the queue
-	if (staged && (_q_usr_input.push(staged) == 0)) {
+	if (_staged && (_q_usr_input.push(_staged) == 0)) {
 
-		WritablePacket *p = staged;
-		//printf("unstaging seq#%d\n", staged_seq);
+		WritablePacket *p = _staged;
+		//printf("unstaging seq#%d\n", _staged_seq);
 
 		// tell the API we let it go into the buffer
 		xia::XSocketMsg xsm;
 		xsm.set_type(xia::XRESULT);
-		xsm.set_sequence(staged_seq);
+		xsm.set_sequence(_staged_seq);
 		get_transport()->ReturnResult(port, &xsm, p->length());
 
-		staged = NULL;
-		staged_seq = 0;
+		_staged = NULL;
+		_staged_seq = 0;
 
 		return p;
 

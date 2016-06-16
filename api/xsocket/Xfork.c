@@ -43,7 +43,7 @@ static int makeList(bool increment)
 	xia::X_Fork_Msg *fm = xsm.mutable_x_fork();
 
 	socketmap->lock();
-	LOGF("XFORK: count = %d\n", sockets->size());
+	//LOGF("XFORK: count = %d\n", sockets->size());
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
 		int sock = it->first;
@@ -56,7 +56,7 @@ static int makeList(bool increment)
 		fm->add_ports(sin.sin_port);
 		count++;
 
-		LOGF("adding socket:%d port:%d", sock, sin.sin_port);
+		//LOGF("adding socket:%d port:%d", sock, sin.sin_port);
 	}
 	socketmap->unlock();
 
@@ -64,10 +64,9 @@ static int makeList(bool increment)
 		fm->set_increment(increment);
 		fm->set_count(count);
 
-LOG("making an api socket");
 		sock = MakeApiSocket(SOCK_DGRAM);
 
-		LOG("sending socket list to click");
+		//LOG("sending socket list to click");
 		if ((rc = click_send(sock, &xsm)) < 0) {
 			LOGF("Error talking to Click: %s", strerror(errno));
 			goto done;
@@ -95,15 +94,15 @@ int Xfork(void)
 {
 	int rc = -1;
 
-	LOG("incrementing refcounts");
+	//LOG("incrementing refcounts");
 	if ((rc = makeList(true)) >= 0) {
-		
-		LOG("Calling real fork");
+
+		//LOG("Calling real fork");
 		rc = (_f_fork)();
 		if (rc < 0) {
 			int e = errno;
 			LOG("fork failed, decrementing refcounts");
-			
+
 			// fork failed, so don't bother to check return value here
 			makeList(false);
 			errno = e;
@@ -111,7 +110,7 @@ int Xfork(void)
 
 	} else {
 		// can't talk to click for some reason
-		
+
 		rc = -1;
 	}
 

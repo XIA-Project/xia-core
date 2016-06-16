@@ -468,7 +468,6 @@ protected:
 
     bool did_poll;
     ErrorHandler    *_errh;
-
 	} ;
 
 
