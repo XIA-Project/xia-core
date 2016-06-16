@@ -224,6 +224,7 @@ private:
 	inline void tcp_set_state(short);
 	inline void print_tcpstats(WritablePacket *p, const char *label);
 	short tcp_state() const { return tp->t_state; }
+	tcp_seq _tcp_iss();
 
 
 	TCPQueue	_q_recv;

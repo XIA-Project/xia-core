@@ -6,7 +6,7 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-
+#include <fcntl.h>
 
 #include "xstream.hh"
 #include "xtransport.hh"
@@ -45,6 +45,24 @@ XStream::push(Packet *_p) {
 	WritablePacket *p = _p->uniqueify();
 	tcp_input(p);
 }
+
+tcp_seq XStream::_tcp_iss()
+{
+	// create a random starting sequence #
+	tcp_seq iss;
+	int r  = open("/dev/urandom", O_RDONLY);
+	int rc = read(r, &iss, sizeof(iss));
+	close(r);
+
+	// this ought not to happen
+	if (rc != sizeof(iss)) {
+		iss = 0x011111;
+	}
+
+	printf("iss = %u\n", iss);
+	return iss;
+}
+
 
 
 inline void
@@ -299,9 +317,7 @@ XStream::tcp_input(WritablePacket *p)
 			if (iss) {
 				tp->iss = iss;
 			} else {
-				//printf("tcpinput TCPS_LISTEN: You should pick a correct tcpiss\n");
-				tp->iss = 0x1; /* TODO: sensible iss function */
-				//tp->iss = _tcp_iss(); /* suggested sensible iss function */
+				tp->iss = _tcp_iss(); // get a random starting sequence #
 			}
 			tp->irs = ti.ti_seq;
 			_tcp_sendseqinit(tp);
@@ -361,7 +377,6 @@ XStream::tcp_input(WritablePacket *p)
 				connect_msg->set_ddag(src_path.unparse().c_str());
 				connect_msg->set_status(X_Connect_Msg::XCONNECTED);
 				get_transport()->ReturnResult(port, &xsm);
-
 				if (polling) {
 					// tell API we are writble now
 					get_transport()->ProcessPollEvent(port, POLLOUT);
@@ -1722,7 +1737,7 @@ void
 XStream::usropen()
 {
 	if (tp->iss == 0) {
-		tp->iss = 0x11111;
+		tp->iss = _tcp_iss();
 		//debug_output(VERB_ERRORS, "Setting initial sequence to [%d], because it was 0", tp->iss);
 		// Setting a non-zero initial sequence number because I see some weird
 		// problems in wireshark when initial seq is 0
