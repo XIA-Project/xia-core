@@ -147,7 +147,7 @@ xcache_server
 xcache_client
 daemons/xcache/local_testing
 
-key/
+key/*
 
 xcache.host*
 xcache.router*

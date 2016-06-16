@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# Slightly modified script from here:
+# https://github.com/cobbzilla/cobbzilla-utils/blob/master/bin/gsync
+#
+# suggested usage inside xia-core directory
+# push changes to remote:
+#   gsync -a . remote_host:xia-core
+#
+# push resolv.conf to remote
+#  rsync -a etc/resolv.conf remote_host:xia-core/etc 
+#
+# Usage: gsync [rsync-options] source destination
+#
+# Synchronize a git source directory with a remote directory, excluding files according to then
+# rules found in .gitignore. If subdirectories also contain .gitignore files, then those rules
+# will be applied (but only in each respective subdirectory).
+#
+# Note that ONLY .gitignore files in the directory where this command is run from will be considered
+# Thus, when the source or destination is a local path, it should be specified relative to the current
+# directory.
+#
+# There will be two rsync statements - one to exclude everything that should be excluded,
+# and a second to handle the exceptions to the exclusion rules - the lines in .gitignore that begin with !
+#
+# The exceptions to the exclusions are rsync'd first, and if that succeeds, the second rsync
+# copies everything else.
+#
+#
+# --- SUPPORT OPEN SOURCE ---
+# If you find this script has saved you a decent amount time, please consider dropping me some coin.
+# I will be forever grateful and your name will be permanently emblazoned on my Wall of Honor.
+# My bitcoin wallet address is 1HoiSHKxYM4EtsP3xFGsY2xWYvh4hAuJ2q
+# Paypal or Dwolla: jonathan (replace this with the 'AT' sign on your keyboard) kyuss.org
+#
+# Thank You.
+#
+#    - jonathan.
+#
+
+if [[ -z "${1}" || -z "${2}" || "${1}" == "--help" || "${1}" == "-help" || "${1}" == "-h" ]] ; then
+  echo "Usage: gsync [rsync-options] source destination"
+  exit 1
+fi
+
+includes="--include=.gitignore"
+excludes='--exclude=.git*'
+base="$(pwd)"
+
+function process_git_ignore () {
+
+  git_ignore="${1}"
+  if [ "$(dirname ${git_ignore})" = "${base}" ] ; then
+    prefix=""
+  else
+    prefix=".$(echo -n "$(dirname ${git_ignore})" | sed -e 's,^'${base}',,')"
+  fi
+
+  while read -r line || [[ -n "${line}" ]] ; do
+
+    pre=$(echo ${line} | cut -b1)
+    if [ "$pre" == "#" ]; then
+        # skip the line 
+        true
+    elif [ "$pre" == "!" ] ; then
+      includes="${includes}
+      --include='${prefix}$(echo "${line}" | sed -e 's/^!//' | sed -e 's/ /\\ /g')'"
+    else
+      excludes="${excludes}
+      --exclude='${prefix}$(echo "${line}" | sed -e 's/ /\\ /g')'"
+    fi
+  done < ${git_ignore}
+
+}
+
+# root .gitignore file
+if [ -f .gitignore ] ; then
+  process_git_ignore "$(pwd)/.gitignore"
+fi
+
+# check for other .gitignore files
+for i in $(find $(pwd) -mindepth 2 -type f -name .gitignore) ; do
+  process_git_ignore "${i}"
+done
+
+rsync ${includes} --exclude="*" ${@} && rsync ${excludes} ${@}
+
+# for debugging
+#echo "rsync ${includes} --exclude=\"*\" ${@}" && echo "rsync ${excludes} ${@}"
+#echo "rsync ${excludes} ${@}"
