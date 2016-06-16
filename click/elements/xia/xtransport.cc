@@ -466,7 +466,8 @@ const char *XTRANSPORT::StateStr(SocketState state)
 
 void XTRANSPORT::ChangeState(sock *sk, SocketState state)
 {
-	INFO("socket %d changing state from %s to %s\n", sk->port, StateStr(sk->state), StateStr(state));
+	// FIXME: use the Xstream state instead of duplicating it in xtransport
+	//INFO("socket %d changing state from %s to %s\n", sk->port, StateStr(sk->state), StateStr(state));
 	sk->state = state;
 }
 
@@ -576,13 +577,12 @@ WritablePacket *XTRANSPORT::copy_cid_response_packet(Packet *p, sock *sk)
 
 bool XTRANSPORT::TeardownSocket(sock *sk)
 {
-	INFO("TeardownSocket is called");
 	XID src_xid;
 	XID dst_xid;
 	bool have_src = 0;
 	bool have_dst = 0;
 
-	INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
+	//INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
 
 	CancelRetransmit(sk);
 
@@ -623,7 +623,7 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 		// we only do this if the socket wasn't generateed due to an accept
 
 		if (have_src) {
-			DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
+			//DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
 			delRoute(src_xid);
 			XIDtoSock.erase(src_xid);
 		}
@@ -791,7 +791,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 			// INFO("This is %d, %d",i->second->port,i->second->reap);
 			if (i->second->reap)
 			{
-				INFO("Going to remove %d", i->second->port);
+				//INFO("Going to remove %d", i->second->port);
 				TeardownSocket(i->second);
 			}
 		}
@@ -2267,7 +2267,14 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
 
-	DBG("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
+	if (portToSock.get(_sport) != NULL) {
+		// this port is still in use by another xsocket (probably in close wait)
+		WARN("port %u still associated with a tcp connection in close wait\nbad things might happen\n", _sport);
+		//ReturnResult(_sport, xia_socket_msg, -1, ENFILE);
+		//return;
+	}
+
+	//DBG("create %s socket %d\n", SocketTypeStr(sock_type), _sport);
 	sock *sk = NULL;
 	switch (sock_type) {
 	case SOCK_STREAM: {
@@ -2279,10 +2286,6 @@ void XTRANSPORT::Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 		sk = new XDatagram(this, _sport, sock_type);
 		break;
 	}
-//	case SOCK_CHUNK: {
-//		sk = new XChunk(this, _sport);
-//		break;
-//	}
 	}
 
 	// Map the source port to sock
@@ -2299,6 +2302,11 @@ void XTRANSPORT::Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 {
 	xia::X_Setsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_setsockopt();
 	sock *sk = portToSock.get(_sport);
+
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
 
 	switch (x_sso_msg->opt_type()) {
 	case XOPT_HLIM:
@@ -2349,6 +2357,11 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_
 
 	sock *sk = portToSock.get(_sport);
 
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
 	switch (x_sso_msg->opt_type()) {
 	case XOPT_HLIM:
 		x_sso_msg->set_int_opt(sk->hlim);
@@ -2394,6 +2407,12 @@ void XTRANSPORT::Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	//Set the source DAG in sock
 	sock *sk = portToSock.get(_sport);
+
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
 	if (sk->src_path.parse(sdag_string)) {
 		sk->initialized = true;
 		sk->port = _sport;
@@ -2563,7 +2582,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	if (ref == 0) {
 
-		INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), ref);
+		//INFO("closing %d state=%s new refcount = %d\n", sk->port, StateStr(sk->state), ref);
 
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
@@ -2582,7 +2601,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 
 	} else {
 		// the app was forked and not everyone has closed the socket yet
-		INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), ref);
+		//INFO("decremented ref count on %d state=%s new refcount=%d\n", sk->port, StateStr(sk->state), ref);
 	}
 
 	xcm->set_refcount(ref);
@@ -2599,13 +2618,10 @@ void XTRANSPORT::Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg
 	XIAPath dst_path;
 	sock *sk = portToSock.get(_sport);
 
-	std::cout << "Reached Xconnect with Dest = " << dest << "\n";
-
 	dst_path.parse(dest);
 
 	if (!sk) {
-		// FIXME: WHY WOULD THIS HAPPEN?
-		ERROR("Invalid socket %d\n", _sport);
+		ERROR("An Xstream socket using the same port # deleted our state\nwe can probably recover, but socket options will be lost\n");
 		sk = new sock();
 
 	}
@@ -2689,7 +2705,12 @@ void XTRANSPORT::Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	INFO("Socket %d Xlisten\n", _sport);
 
 	sock *sk = portToSock.get(_sport);
-	std::cout << _sport << " xcache = " << sk->xcacheSock << " Listen\n";
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
+	//std::cout << _sport << " xcache = " << sk->xcacheSock << " Listen\n";
 	if (sk->state == INACTIVE || sk->state == LISTEN) {
 		ChangeState(sk, LISTEN);
 		sk->backlog = x_listen_msg->backlog();
@@ -2706,6 +2727,11 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 {
 	sock *sk = portToSock.get(_sport);
 
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
 	if (!sk->pending_connection_buf.empty()) {
 		// If there is already a pending connection, return true now
 		INFO("Pending connection is not empty\n");
@@ -2716,7 +2742,7 @@ void XTRANSPORT::XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_sock
 	} else if (xia_socket_msg->blocking()) {
 		// If not and we are blocking, add this request to the pendingAccept queue and wait
 
-		INFO("Pending connection is empty\n");
+		//INFO("Pending connection is empty\n");
 
 		// xia_socket_msg is on the stack; allocate a copy on the heap
 		xia::XSocketMsg *xsm_cpy = new xia::XSocketMsg();
@@ -2738,10 +2764,21 @@ void XTRANSPORT::Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 	// _sport is the *existing accept socket*
 	unsigned short new_port = xia_socket_msg->x_accept().new_port();
 	sock *sk = portToSock.get(_sport);
+	if (!sk) {
+		WARN("An Xstream socket in CLOSE_WAIT deleted our socket state\n");
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
 
-	DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
-	DBG("p buf size = %d\n", sk->pending_connection_buf.size());
-	DBG("blocking = %d\n", sk->isBlocking);
+	if (portToSock.get(new_port) != NULL) {
+		WARN("port %u still associated with a tcp connection in close wait\nbad things might happen\n", _sport);
+		//ReturnResult(_sport, xia_socket_msg, -1, ENFILE);
+		//return;
+	}
+
+	//DBG("_sport %d, new_port %d seq:%d\n", _sport, new_port, xia_socket_msg->sequence());
+	//DBG("p buf size = %d\n", sk->pending_connection_buf.size());
+	//DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
 	sk->nxt_xport = CLICK_XIA_NXT_XTCP;
@@ -2972,7 +3009,9 @@ void XTRANSPORT::ProcessPollEvent(unsigned short _sport, unsigned int flags_out)
 			port = pit->first;
 
 			sock *sk = portToSock.get(port);
-			sk->polling--;
+			if (sk)
+				sk->polling--;
+			// else should we pop it out of the list?
 		}
 
 		// get rid of this poll event
@@ -3041,8 +3080,10 @@ void XTRANSPORT::CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg)
 		pe.events.set(port, flags);
 		sock *sk = portToSock.get(port);
 
-		// let the socket know a poll is enabled on it
-		sk->polling++;
+		if (sk) {
+			// let the socket know a poll is enabled on it
+			sk->polling++;
+		}
 	}
 
 	// register the poll event
@@ -3388,6 +3429,10 @@ void XTRANSPORT::Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_
 void XTRANSPORT::Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	sock *sk = portToSock.get(_sport);
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
 
 	xia::X_GetPeername_Msg *_msg = xia_socket_msg->mutable_x_getpeername();
 	_msg->set_dag(sk->dst_path.unparse().c_str());
@@ -3400,7 +3445,10 @@ void XTRANSPORT::Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket
 void XTRANSPORT::Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	sock *sk = portToSock.get(_sport);
-
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
 	xia::X_GetSockname_Msg *_msg = xia_socket_msg->mutable_x_getsockname();
 	_msg->set_dag(sk->src_path.unparse().c_str());
 
@@ -3419,7 +3467,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, W
 	// Make sure the socket state isn't null
 	if (rc == 0 && !sk) {
 		rc = -1;
-		ec = EBADF; // FIXME: is this the right error?
+		ec = EBADF;
 	}
 
 	xia::X_Send_Msg *x_send_msg = xia_socket_msg->mutable_x_send();
@@ -3598,8 +3646,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg,
 		ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 	}
 
-	sk = portToSock.get(_sport);
-
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 
@@ -3646,9 +3692,10 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
 	sock *sk = portToSock.get(_sport);
 
-	if (sk->port != _sport) {
-		ERROR("ERROR sk->port %d _sport %d", sk->port, _sport);
-		// FIXME: do something with the error
+	if (!sk || sk->port != _sport) {
+		ERROR("ERROR no socket associated with port %d", _sport);
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
 	}
 
 	if (sk && (sk->state == CONNECTED || sk->state == CLOSE_WAIT)) {
@@ -3694,13 +3741,10 @@ void XTRANSPORT::Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 // perhaps they should be combined
 void XTRANSPORT::Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg)
 {
-	// cout << "XRECVFROM IS CALLED" <<endl;
-
-	// FIXME: do we even need this check???
 	sock *sk = portToSock.get(_sport);
-	if (sk->port != _sport) {
-		ERROR("ERROR sk->port %d _sport %d", sk->port, _sport);
-		// FIXME: do something with the error
+	if (!sk || sk->port != _sport) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
 	}
 
 	dynamic_cast<XDatagram *>(sk) -> read_from_recv_buf(xia_socket_msg);
