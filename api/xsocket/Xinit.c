@@ -94,9 +94,9 @@ void cleanup()
 	}
 }
 
-
+#if 0
 struct sigaction sa_new;
-//struct sigaction sa_term;
+struct sigaction sa_term;
 struct sigaction sa_int;
 
 void handler(int sig)
@@ -105,10 +105,10 @@ void handler(int sig)
 
 	// chain to the old handler if it exists
 	switch (sig) {
-//		case SIGTERM:
-//			if (sa_term.sa_handler)
-//				(sa_term.sa_handler)(sig);
-//			break;
+		case SIGTERM:
+			if (sa_term.sa_handler)
+				(sa_term.sa_handler)(sig);
+			break;
 		case SIGINT:
 			if (sa_int.sa_handler)
 				(sa_int.sa_handler)(sig);
@@ -117,8 +117,7 @@ void handler(int sig)
 			break;
 	}
 }
-
-
+#endif
 
 
 // Run at library load time to initialize function pointers
@@ -158,6 +157,7 @@ void __attribute__ ((constructor)) api_init()
     api_mtu();
     get_conf();
 
+#if 0
 	memset (&sa_new, 0, sizeof (struct sigaction));
 	sigemptyset (&sa_new.sa_mask);
 	sa_new.sa_handler = handler;
@@ -167,11 +167,11 @@ void __attribute__ ((constructor)) api_init()
 	if (sa_int.sa_handler != SIG_IGN) {
 		sigaction(SIGINT, &sa_new, &sa_int);
 	}
-//	sigaction (SIGTERM, NULL, &sa_term);
-//	if (sa_int.sa_handler != SIG_IGN) {
-//		sigaction(SIGTERM, &sa_new, &sa_term);
-//	}
-
+	sigaction (SIGTERM, NULL, &sa_term);
+	if (sa_int.sa_handler != SIG_IGN) {
+		sigaction(SIGTERM, &sa_new, &sa_term);
+	}
+#endif
     // force creation of the socket map
 	SocketMap::getMap();
 }
