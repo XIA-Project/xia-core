@@ -45,16 +45,8 @@ XLog::initialize(ErrorHandler *)
     _errh = new SyslogErrorHandler(_level, _verbose);
     _errh->enable();
 
-#if 0
-    _errh->debug("This is debug (7)");
-    _errh->ldebug("XXXXXXXXX", "This is ldebug (7)");
-    _errh->message("This is message (6)");
-    click_chatter("This is click_chatter (6)"); 
-    _errh->notice("This is notice (5)");
-    _errh->warning("This is warning (4)");
-    _errh->error("This is error (3)");
-#endif
-
+    // FIXME: do we have to delete old handlers
+    ErrorHandler::set_default_handler((ErrorHandler*)_errh);
 #endif
     return 0;
 }

@@ -16,7 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <fcntl.h>
+#include <unistd.h>
 #include <click/config.h>
 #include "xiachallengesource.hh"
 #include <click/nameinfo.hh>
@@ -30,6 +31,7 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/hmac.h> // HMAC()
 
 
 CLICK_DECLS
@@ -96,7 +98,12 @@ XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
                    cpEnd) < 0)
         return -1; // error config
 
-	generate_secret();
+
+	if (!generate_secret()) {
+		errh->error("Unable to generate router_secret: %s\n", strerror(errno));
+		return -1;
+	}
+
 	local_hid_str = local_hid.unparse().c_str();
 
 	_name = new char [local_hid_str.length()+1];
@@ -111,15 +118,14 @@ XIAChallengeSource::initialize(ErrorHandler *)
     return 0;
 }
 
-void
+
+bool
 XIAChallengeSource::generate_secret()
 {
-    static const char characters[] =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    for (int i=0;i<router_secret_length;i++) {
-        router_secret[i] = characters[rand() % (sizeof(characters) - 1)];
-    }
-    router_secret[router_secret_length] = 0;
+	int r  = open("/dev/urandom", O_RDONLY);
+	int rc = read(r, router_secret, router_secret_length);
+	close(r);
+	return (rc == router_secret_length);
 }
 
 int
@@ -223,7 +229,8 @@ XIAChallengeSource::verify_response(Packet *p_in)
 	// Verify HMAC: Check if the challenge message really originated from here
 	unsigned int hmac_len = 20;
 	unsigned char challenge_hmac[hmac_len];
-	HMAC(router_secret, router_secret_length, (unsigned char *)chalComponents.get_buffer(), chalComponents.size(), challenge_hmac, &hmac_len);
+	HMAC(EVP_sha1(), router_secret, router_secret_length, (unsigned char *)chalComponents.get_buffer(), chalComponents.size(), challenge_hmac, &hmac_len);
+
 	if(memcmp(hmac, challenge_hmac, hmac_len)) {
 		click_chatter("%s> Error: Invalid hmac returned with response", _name);
 		return;
@@ -305,7 +312,7 @@ XIAChallengeSource::send_challenge(Packet *p)
 	// HMAC computed on all abovementioned entries
 	unsigned char challenge_hmac[20];
 	unsigned int hmac_len = 20;
-	HMAC(router_secret, router_secret_length, (unsigned char *)buf.get_buffer(), buf.size(), challenge_hmac, &hmac_len);
+	HMAC(EVP_sha1(), router_secret, router_secret_length, (unsigned char *)buf.get_buffer(), buf.size(), challenge_hmac, &hmac_len);
 
 	// Build the challenge
 	XIASecurityBuffer challenge = XIASecurityBuffer(512);
@@ -359,3 +366,4 @@ XIAChallengeSource::push(int in_port, Packet *p_in)
 CLICK_ENDDECLS
 EXPORT_ELEMENT(XIAChallengeSource)
 ELEMENT_MT_SAFE(XIAChallengeSource)
+ELEMENT_LIBS(-lcrypto -lssl)

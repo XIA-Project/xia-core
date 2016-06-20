@@ -23,8 +23,6 @@
 #include <clicknet/xia.h>
 #include <click/xiapath.hh>
 #include <click/hashtable.hh>
-#include <elements/ipsec/sha1_impl.hh>
-#include <elements/ipsec/hmac.hh>
 #include <string>
 CLICK_DECLS
 
@@ -59,7 +57,7 @@ class XIAChallengeSource : public Element { public:
     void push(int, Packet *);
 
 private:
-	void generate_secret();
+	bool generate_secret();
     void send_challenge(Packet *);
 	void verify_response(Packet *);
 	bool is_verified(Packet *);

@@ -189,8 +189,17 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			break;
 		}
 
-		// this is handled in the API & in click ********************
+		// firefox wants to set this for some reason???
+		case SO_ERROR:
+			if (ssoCheckSize(&optlen, sizeof(int)) < 0) {
+				rc = -1;
+			}
+			else {
+				rc = ssoPutInt(sockfd, optname, (const int *)optval, optlen);
+			}
+			break;
 
+		// this is handled in the API & in click ********************
 		case SO_DEBUG:
 			if (ssoCheckSize(&optlen, sizeof(int)) < 0) {
 				rc = -1;
@@ -248,6 +257,12 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			rc = -1;
 			break;
 
+
+		// OK to lie about???
+		case SO_DONTROUTE:
+			rc = 0;
+			break;
+
 		// READ ONLY OPTIONS ****************************************
 		case SO_ACCEPTCONN:
 		case SO_DOMAIN:
@@ -258,9 +273,9 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 			rc = -1;
 			break;
 
+
 		// NOT SUPPORTED/DOESN"T MAKE SENSE IN XIA ******************
 		case SO_BINDTODEVICE:	// should we support this one when we get multihoming?
-		case SO_DONTROUTE:
 		case SO_MARK:
 		case SO_OOBINLINE:
 		case SO_PASSCRED:

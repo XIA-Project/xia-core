@@ -115,6 +115,29 @@ idrec fcntl_flags[] = {
 	FR(O_WRONLY)
 };
 
+idrec fcntl_cmds[] = {
+	FR(F_DUPFD),
+	FR(F_DUPFD_CLOEXEC),
+	FR(F_SETFD),
+	FR(F_SETFL),
+	FR(F_SETOWN),
+	FR(F_SETOWN_EX),
+	FR(F_SETSIG),
+	FR(F_SETLEASE),
+	FR(F_NOTIFY),
+	FR(F_SETPIPE_SZ),
+	FR(F_GETLK),
+	FR(F_SETLK),
+	FR(F_SETLKW),
+	FR(F_GETFD),
+	FR(F_GETFL),
+	FR(F_GETOWN),
+	FR(F_GETOWN_EX),
+	FR(F_GETSIG),
+	FR(F_GETLEASE),
+	FR(F_GETPIPE_SZ)
+};
+
 idrec poll_flags[] = {
 	FR(POLLERR),
 	FR(POLLHUP),
@@ -168,19 +191,14 @@ idrec opt_values[] = {
 	FR(SO_TYPE)
 };
 
+
 /*!
 * @brief Prints some debug information
 *
 * @param sock
 */
 void debug(int sock) {
-	struct sockaddr_in my_addr;
-	socklen_t len = sizeof(my_addr);
-	if(getsockname(sock, (struct sockaddr *)&my_addr, &len) < 0) {
-		printf("Error retrieving socket's UDP port: %s", strerror(errno));
-	}
-
-	printf("[ sock %d/%d, thread %p ]\t", sock, ((struct sockaddr_in)my_addr).sin_port, (void*)pthread_self());
+	printf("[ sock %d/%d, thread %p ]\t", sock, getPort(sock), (void*)pthread_self());
 }
 
 /*!
@@ -248,6 +266,8 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		xsm->set_blocking(true);
 	}
 
+	xsm->set_port(getPort(sockfd));
+
 	std::string p_buf;
 	xsm->SerializeToString(&p_buf);
 
@@ -288,13 +308,14 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 	int rc;
 
 	if (isBlocking(sock)) {
-		// make sure click know if it should reply immediately or not
+		// make sure click knows if it should reply immediately or not
 		msg->set_blocking(true);
 	}
 
 	while (1) {
 		// see if another thread received and cached our packet
-		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
+		if (0) {
+//		if ((rc = getCachedPacket(sock, seq, buf, buflen)) > 0) {
 
 			LOGF("Got cached response with sequence # %d\n", seq);
 			std::string s(buf, rc);
@@ -303,12 +324,13 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 
 		} else {
 
+			bzero(buf, buflen);
 			// we do this with a blocking socket even if the Xsocket is marked as nonblocking.
 			// The UDP socket is treated as an API call rather than a sock so making it
 			// non-blocking would cause problems
 			rc = (_f_recvfrom)(sock, buf, buflen - 1 , 0, NULL, NULL);
 
-			// LOGF("seq %d received %d bytes\n", seq, rc);
+//			LOGF("seq %d received %d bytes\n", seq, rc);
 
 			if (rc < 0) {
 				if (isBlocking(sock) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -327,8 +349,20 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 					break;
 
 				// these are not the data you were looking for
-				LOGF("Expected packet %u, received %u, caching packet\n", seq, sn);
-				cachePacket(sock, sn, buf, buflen);
+				LOGF("Expected packet %u, received %u, replaying packet\n", seq, sn);
+//				cachePacket(sock, sn, buf, buflen);
+//				msg->PrintDebugString();
+
+				// shove this back into click so the requester can get at it
+				xia::X_Replay_Msg *xrm = msg->mutable_x_replay();
+				xrm->set_sequence(msg->sequence());
+				xrm->set_type(msg->type());
+
+				msg->set_sequence(0);
+				msg->set_type(xia::XREPLAY);
+
+				click_send(sock, msg);
+
 				msg->Clear();
 			}
 		}
@@ -340,8 +374,9 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 {
 	int rc;
-	char buf[XIA_INTERNAL_BUFSIZE];
-	unsigned buflen = sizeof(buf);
+	int e = 0;
+	unsigned buflen = api_mtu();
+	char *buf = (char *)malloc(buflen);
 
 	if ((rc = click_get(sock, seq, buf, buflen, msg)) >= 0) {
 
@@ -349,16 +384,20 @@ int click_reply(int sock, unsigned seq, xia::XSocketMsg *msg)
 
 		rc = res->return_code();
 		if (rc == -1)
-			errno = res->err_code();
+			e = res->err_code();
 	}
+
+	free(buf);
+	errno = e;
 
 	return rc;
 }
 
 int click_status(int sock, unsigned seq)
 {
-	char buf[XIA_INTERNAL_BUFSIZE];
-	unsigned buflen = sizeof(buf);
+	unsigned buflen = api_mtu();
+	char *buf = (char *)malloc(buflen);
+	int e = 0;
 	int rc;
 	xia::XSocketMsg msg;
 
@@ -368,10 +407,49 @@ int click_status(int sock, unsigned seq)
 
 		rc = res->return_code();
 		if (rc == -1)
-			errno = res->err_code();
+			e = res->err_code();
 	}
 
+	free(buf);
+	errno = e;
 	return rc;
+}
+
+int MakeApiSocket(int transport_type)
+{
+	struct sockaddr_in sa;
+	int sock;
+	unsigned short port;
+
+	socklen_t len = sizeof(sa);
+
+	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		LOGF("Error creating socket: %s", strerror(errno));
+		return sock;
+	}
+
+	// bind to an unused random port number
+	sa.sin_family = PF_INET;
+	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+	sa.sin_port = 0;
+
+	if ((_f_bind)(sock, (const struct sockaddr *)&sa, sizeof(sa)) < 0) {
+		(_f_close)(sock);
+
+		LOGF("Error binding new socket to local port: %s", strerror(errno));
+		return -1;
+	}
+
+	if((_f_getsockname)(sock, (struct sockaddr *)&sa, &len) < 0) {
+		LOGF("Error retrieving socket's UDP port: %s", strerror(errno));
+		port = 0;
+	} else {
+		port = ((struct sockaddr_in)sa).sin_port;
+	}
+
+	allocSocketState(sock, transport_type, port);
+
+	return sock;
 }
 
 // print out the list of flags in the bitmap
@@ -523,6 +601,11 @@ const char *optValue(size_t f)
 const char *protoValue(size_t f)
 {
 	return getValue(proto_values, sizeof(proto_values)/sizeof(idrec), f);
+}
+
+const char *fcntlCmd(int c)
+{
+	return getValue(fcntl_cmds, sizeof(fcntl_cmds)/sizeof(idrec), c);
 }
 
 int checkXid(const char *xid, const char *type)

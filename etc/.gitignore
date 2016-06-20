@@ -1,3 +1,5 @@
 xsockconf.ini
 nodes.conf
 resolv.conf
+sidmap.conf
+
