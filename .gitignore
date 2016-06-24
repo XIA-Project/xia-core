@@ -124,6 +124,7 @@ example/tods
 example/xcmpping
 example/xcmptraceroute
 example/xecho
+arada/waveserver/waveserver
 
 # output from scripts
 etc/click/host.click
