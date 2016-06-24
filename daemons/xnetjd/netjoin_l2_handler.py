@@ -12,7 +12,7 @@ class NetjoinL2Handler(object):
 
     # Table setting retransmission rate and duration for all l2 types
     l2_type_info = {
-            LayerTwoIdentifier.ETHERNET:L2Info(rate=1.0, iterations=5),
+            LayerTwoIdentifier.ETHERNET:L2Info(rate=0.1, iterations=50),
             LayerTwoIdentifier.WIFI    :L2Info(rate=0.1, iterations=5),
             LayerTwoIdentifier.DSRC    :L2Info(rate=0.2, iterations=3),
             }
