@@ -41,7 +41,9 @@ int Xclose(int sockfd)
 {
 	int rc = -1;
 	int sock = 0;
+#if 0
 	int ref;
+#endif
 
 	if (getSocketType(sockfd) == XSOCK_INVALID)
 	{
