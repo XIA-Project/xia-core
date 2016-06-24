@@ -593,7 +593,7 @@ Graph::print_graph() const
 		else
 			printf("      ");
 
-		printf("Node %u: [%s] ", i, nodes_[i].type_string().c_str());
+		printf("Node %lu: [%s] ", i, nodes_[i].type_string().c_str());
 		//printf("%20s", nodes_[i].id());
 		for (std::size_t j = 0; j < Node::ID_LEN; j++)
 			printf("%02x", nodes_[i].id()[j]);
@@ -605,7 +605,7 @@ Graph::print_graph() const
 				first = false;
 				printf(" ->");
 			}
-			printf(" Node %u", out_edges_[i][j]);
+			printf(" Node %lu", out_edges_[i][j]);
 		}
 		if (is_sink(i))
 			printf(" [SNK]");
