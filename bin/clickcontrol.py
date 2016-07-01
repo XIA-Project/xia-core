@@ -67,6 +67,11 @@ class ClickControl:
         try:
             self.sock.connect((clickhost, port))
             self.initialized = True
+            click_ver = self.sock.recv(1024)
+            if "Click::ControlSocket" not in click_ver:
+                print 'ERROR: Click did not provide version info on connect'
+            else:
+                print 'Connected to {}'.format(click_ver)
         except:
             print 'ERROR: Unable to connect to Click'
             sys.exit(-1)
