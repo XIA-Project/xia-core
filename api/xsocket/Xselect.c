@@ -26,8 +26,8 @@
 
 typedef struct {
 	int fd;
-	unsigned port;
-} Sock2Port;
+	unsigned id;
+} Sock2ID;
 
 
 static void setNBConnState(int fd)
@@ -83,7 +83,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	}
 
 	struct pollfd *rfds = (struct pollfd*)calloc(nfds + 1, sizeof(struct pollfd));
-	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
+	Sock2ID *s2i = (Sock2ID*)calloc(nfds, sizeof(Sock2ID));
 
 	memcpy(rfds, ufds, nfds * sizeof(struct pollfd));
 
@@ -97,19 +97,15 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 		if (ufds[i].fd > 0 && (ufds[i].events != 0)) {
 			if (getSocketType(ufds[i].fd) != XSOCK_INVALID) {
 				// add the Xsocket to the xpoll struct
-				// TODO: should this work for Content sockets?
 
 				xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
 
-				// find the port number associated with this Xsocket
-				struct sockaddr_in sin;
-				socklen_t slen = sizeof(sin);
-				(_f_getsockname)(ufds[i].fd, (struct sockaddr*)&sin, &slen);
-				// LOGF("XSocket! sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
+				unsigned id = getID(ufds[i].fd);
+				// LOGF("XSocket sock %d, id %d, flags %x\n", ufds[i].fd, , ufds[i].events);
 
-				pfd->set_port(sin.sin_port);
-				s2p[i].fd = ufds[i].fd;
-				s2p[i].port = sin.sin_port;
+				pfd->set_id(id);
+				s2i[i].fd = ufds[i].fd;
+				s2i[i].id = id;
 
 				// FIXME: hack for curl - think about better ways to deal with this
 				if (ufds[i].events & POLLRDNORM || ufds[i].events & POLLRDBAND) {
@@ -128,7 +124,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				rfds[i].fd = -rfds[i].fd;
 
 			} else {
-				s2p[i].fd = s2p[i].port = 0;
+				s2i[i].fd = s2i[i].id = 0;
 			}
 		}
 	}
@@ -141,6 +137,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	xsm.set_type(xia::XPOLL);
 	xsm.set_sequence(0);
+	xsm.set_id(0);
 	pollMsg->set_nfds(nxfds);
 	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
@@ -183,7 +180,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 			// loop thru returned xsockets
 			for (int i = 0; i < xrc; i++) {
 				const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
-				unsigned port = pfd_out.port();
+				unsigned id = pfd_out.id();
 				unsigned flags = pfd_out.flags();
 
 				//LOGF("poll returned x%0x for %d\n", flags, port);
@@ -191,8 +188,8 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 				// find the associated socket
 				int fd = 0;
 				for (unsigned j = 0; j < nfds; j++) {
-					if (port == s2p[j].port) {
-						fd = s2p[j].fd;
+					if (id == s2i[j].id) {
+						fd = s2i[j].fd;
 						break;
 					}
 				}
@@ -246,7 +243,7 @@ done:
 		(_f_close)(sock);
 	}
 	free(rfds);
-	free(s2p);
+	free(s2i);
 	errno = eno;
 	return rc;
 }
@@ -269,7 +266,7 @@ void XselectCancel(int sock)
 **
 ** Xsocket specific version of select. See the select man page for more detailed information.
 ** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
-** are handled with the Xpoll APIs via click, and regular sockets and fds are handled 
+** are handled with the Xpoll APIs via click, and regular sockets and fds are handled
 ** through the normal select API.
 **
 ** @param ndfs The highest socket number contained in the fd_sets plus 1
@@ -280,7 +277,7 @@ void XselectCancel(int sock)
 ** @returns greater than 0, number of sockets ready
 ** @returns 0 if the timeout expired
 ** @returns less than 0 if an error occurs
-** @warning this function is only valid for stream and datagram sockets. 
+** @warning this function is only valid for stream and datagram sockets.
 */
 int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout)
 {
@@ -301,12 +298,13 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	FD_ZERO(&immediate_fds);
 
 	// if the fd sets are sparse, this will waste space especially if nfds is large
-	Sock2Port *s2p = (Sock2Port*)calloc(nfds, sizeof(Sock2Port));
+	Sock2ID *s2i = (Sock2ID*)calloc(nfds, sizeof(Sock2ID));
 
 	// create protobuf message
 	xia::XSocketMsg xsm;
 	xsm.set_type(xia::XPOLL);
 	xsm.set_sequence(0);
+	xsm.set_id(0);
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
 	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 
@@ -338,15 +336,10 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 			xia::X_Poll_Msg::PollFD *pfd = pollMsg->add_pfds();
 
-			// find the port number associated with this Xsocket
-			struct sockaddr_in sin;
-			socklen_t slen = sizeof(sin);
-			(_f_getsockname)(i, (struct sockaddr*)&sin, &slen);
-			//printf("sock %d, port %d, flags %x\n", ufds[i].fd, ntohs(sin.sin_port), ufds[i].events);
-
-			pfd->set_port(sin.sin_port);
-			s2p[i].fd = i;
-			s2p[i].port = sin.sin_port;
+			unsigned id = getID(i);
+			pfd->set_id(id);
+			s2i[i].fd = i;
+			s2i[i].id = id;
 
 			pfd->set_flags(flags);
 
@@ -362,7 +355,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 			if (e != 0)
 				FD_SET(i, &efds);
 
-			s2p[i].fd = s2p[i].port = 0;
+			s2i[i].fd = s2i[i].id = 0;
 		}
 	}
 
@@ -432,12 +425,12 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 			for (int i = 0; i < xrc; i++) {
 				const xia::X_Poll_Msg::PollFD& pfd_out = pout->pfds(i);
 				int flags = pfd_out.flags();
-				unsigned port = pfd_out.port();
+				unsigned id = pfd_out.id();
 
 				int fd = 0;
 				for (int j = 0; j < nfds; j++) {
-					if (port == s2p[j].port) {
-						fd = s2p[j].fd;
+					if (id == s2i[j].id) {
+						fd = s2i[j].fd;
 						break;
 					}
 				}
@@ -474,7 +467,7 @@ done:
 		freeSocketState(sock);
 		(_f_close)(sock);
 	}
-	free(s2p);
+	free(s2i);
 	errno = eno;
 	return (rc <= 0 ? rc : count);
 }

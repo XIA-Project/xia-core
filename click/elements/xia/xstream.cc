@@ -372,6 +372,7 @@ XStream::tcp_input(WritablePacket *p)
 				// Notify API that the connection is established
 				XSocketMsg xsm;
 				xsm.set_type(XCONNECT);
+				xsm.set_id(get_id());
 				xsm.set_sequence(0); // TODO: what should this be?
 				xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
 				connect_msg->set_ddag(src_path.unparse().c_str());
@@ -2034,10 +2035,9 @@ XStream::tcp_newtcpcb()
 }
 
 
-XStream::XStream(XTRANSPORT *transport, const unsigned short port)
-	: sock(transport, port, SOCK_STREAM), _q_recv(this), _q_usr_input(this)
+XStream::XStream(XTRANSPORT *transport, const unsigned short port, uint32_t id)
+	: sock(transport, port, id, SOCK_STREAM), _q_recv(this), _q_usr_input(this)
 {
-
 	tp = tcp_newtcpcb();
 	tp->t_state = TCPS_CLOSED;
 

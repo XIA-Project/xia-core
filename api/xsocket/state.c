@@ -66,6 +66,7 @@ void SocketState::init()
 	m_timeout.tv_sec = 0;
 	m_timeout.tv_usec = 0;
 	m_port = 0;
+	m_id = 0;
 	pthread_mutex_init(&m_sequence_lock, NULL);
 }
 
@@ -417,4 +418,24 @@ const sockaddr_x *dgramPeer(int sock)
 	if (sstate)
 		peer = sstate->peer();
 	return peer;
+}
+
+void setID(int sock, unsigned id)
+{
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+	if (sstate) {
+		sstate->setID(id);
+	}
+}
+
+unsigned getID(int sock)
+{
+	int rc = 0;
+	SocketState *sstate = SocketMap::getMap()->get(sock);
+
+	if (sstate) {
+		rc = sstate->getID();
+	}
+
+	return rc;
 }

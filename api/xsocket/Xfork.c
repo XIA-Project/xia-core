@@ -46,17 +46,12 @@ static int makeList(bool increment)
 	//LOGF("XFORK: count = %d\n", sockets->size());
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
-		int sock = it->first;
+		unsigned id = it->second->getID();
 
-		// find the port number associated with this Xsocket
-		struct sockaddr_in sin;
-		socklen_t slen = sizeof(sin);
-		(_f_getsockname)(sock, (struct sockaddr*)&sin, &slen);
-
-		fm->add_ports(sin.sin_port);
+		fm->add_ids(id);
 		count++;
 
-		//LOGF("adding socket:%d port:%d", sock, sin.sin_port);
+		//LOGF("adding socket:%d id:%d", sock, id);
 	}
 	socketmap->unlock();
 

@@ -116,9 +116,13 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 	// process the reply from click
-	if ((rc = click_status(sockfd, seq)) < 0) {
+	xsm.Clear();
+	if (click_reply(sockfd, seq, &xsm) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
 	}
+
+	setID(sockfd, xsm.id());
+	//LOGF("new id = %d\n", xsm.id());
 
 	if (rc == 0) {
 		setBlocking(sockfd, block);

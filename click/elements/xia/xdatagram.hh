@@ -50,7 +50,7 @@ class XIAContentModule;
 class XDatagram : public sock {
 
 public:
-	XDatagram(XTRANSPORT *transport, unsigned short port, int type);
+	XDatagram(XTRANSPORT *transport, unsigned short port, uint32_t id, int type);
 	XDatagram(){};
 	~XDatagram() {};
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);

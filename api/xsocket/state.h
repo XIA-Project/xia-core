@@ -72,6 +72,9 @@ public:
 	void setTempSID(const char *sid);
 	const char *getTempSID() {return m_temp_sid;};
 
+	void setID(unsigned id) { m_id = id; };
+	unsigned getID() { return m_id; };
+
 	void init();
 private:
 	int m_transportType;
@@ -84,6 +87,7 @@ private:
 	int m_sid_assigned;
 	unsigned m_sequence;
 	unsigned short m_port;
+	unsigned m_id;
 	struct timeval m_timeout;
 	pthread_mutex_t m_sequence_lock;
 	map<unsigned, string> m_packets;

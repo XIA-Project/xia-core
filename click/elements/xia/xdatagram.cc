@@ -16,13 +16,12 @@
 
 CLICK_DECLS
 
-XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port, int type)
-	: sock(transport, port, type) {
-		// cout << "\t\tCreatign a " << port << endl;
-		memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
+XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port, uint32_t id, int type)
+	: sock(transport, port, id, type) {
+	// cout << "\t\tCreatign a " << port << endl;
+	memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));
-
-	}
+}
 
 void
 XDatagram::push(WritablePacket *p_in) {
@@ -69,6 +68,7 @@ XDatagram::check_for_and_handle_pending_recv() {
 int
 XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	// printf("read_from_recv_buf in datagram\n");
+
 	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 
 	bool peek = x_recvfrom_msg->flags() & MSG_PEEK;

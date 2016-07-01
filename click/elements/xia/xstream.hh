@@ -178,7 +178,7 @@ private:
 class XStream  : public sock {
 
 public:
-	XStream(XTRANSPORT *transport, unsigned short port);
+	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
 	XStream(){};
 	~XStream() {};
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);

@@ -66,7 +66,7 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 
 
 	if ((new_sockfd = MakeApiSocket(SOCK_STREAM)) < 0) {
-		LOGF("Error createing new API socket: %s:", strerror(errno));
+		LOGF("Error creating new API socket: %s:", strerror(errno));
 		return -1;
 	}
 
@@ -74,12 +74,12 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 	xsm.set_type(xia::XACCEPT);
 	seq = seqNo(new_sockfd);
 	xsm.set_sequence(seq);
-	
+
 	xia::X_Accept_Msg *x_accept_msg = xsm.mutable_x_accept();
 
 	// Tell click what the new socket's port is (but we'll tell click over the old socket)
 	x_accept_msg->set_new_port(getPort(new_sockfd));
-	
+
 	if (self_addr) {
 		x_accept_msg->set_sendmypath(true);
 	}
@@ -97,6 +97,10 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 	}
 
 	xia::X_Accept_Msg *msg = xsm.mutable_x_accept();
+
+	// get the ID assigned by click
+	setID(new_sockfd, msg->new_id());
+
 	if (addr != NULL && *addrlen >= sizeof(sockaddr_x)) {
 
 		Graph g(msg->remote_dag().c_str());

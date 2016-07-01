@@ -57,9 +57,8 @@ int Xclose(int sockfd)
 
 	xcm = xsm.mutable_x_close();
 
-	unsigned short port;
-	port = getPort(sockfd);
-	xcm->set_port(port);
+	unsigned id = getID(sockfd);
+	xcm->set_id(id);
 
 	sock = MakeApiSocket(SOCK_DGRAM);
 

@@ -88,6 +88,8 @@ using namespace xia;
 #define VERB_DISPATCH   0x40 // for anything related to interconnecting handlers
 #define VERB_MFH_STATE  0x80 // for the 5-state statemachine of MFH
 
+#define INITIAL_ID 100
+
 enum SocketState {INACTIVE = 0, LISTEN, SYN_RCVD, SYN_SENT, CONNECTED, FIN_WAIT1, FIN_WAIT2, TIME_WAIT, CLOSING, CLOSE_WAIT, LAST_ACK, CLOSED};
 enum HandlerState { CREATE, INITIALIZE, ACTIVE, SHUTDOWN, CLOSE };
 
@@ -96,7 +98,7 @@ CLICK_DECLS
 typedef struct {
 	bool forever;
 	Timestamp expiry;
-	HashTable<unsigned short, unsigned int> events;
+	HashTable<uint32_t, unsigned int> events;
 } PollEvent;
 
 #ifndef TCP_GLOBALS
@@ -154,6 +156,7 @@ private:
 	XID _xcache_sid;
 	bool _is_dual_stack_router;
 	XIAPath _nameserver_addr;
+	uint32_t _next_id;
 
 	Packet* UDPIPPrep(Packet *, int);
 
@@ -177,13 +180,13 @@ public:
 public:
 	XIAXIDRouteTable *_routeTable;
 
-	// list of ports wanting xcmp notifications
-	list<int> xcmp_listeners;
+	// list of ids wanting xcmp notifications
+	list<uint32_t> xcmp_listeners;
 
-	// list of ports waiting for a notification
-	list <int> notify_listeners;
+	// list of ids waiting for a notification
+	list <uint32_t> notify_listeners;
 
-	// outstanding poll/selects indexed by API port #
+	// outstanding poll/selects indexed by API id #
 	HashTable<unsigned short, PollEvent> poll_events;
 
 	// For Content Push APIs
@@ -194,7 +197,7 @@ public:
 	HashTable<XIDpair , sock*> XIDpairToSock;
 
 	// find sock structure based on API port #
-	HashTable<unsigned short, sock*> portToSock;
+	HashTable<uint32_t, sock*> idToSock;
 
 	// servers keep track of in process connect attempts here
 	HashTable<XIDpair , sock*> XIDpairToConnectPending;
@@ -205,7 +208,7 @@ public:
 	 * Xtransport Methods
 	* ========================= */
 public:
-	void ReturnResult(int sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
+	void ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
 	void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
 	WritablePacket* copy_packet(Packet *, struct sock *);
@@ -231,45 +234,45 @@ public:
 	void ProcessCachePacket(WritablePacket *p_in);
 	void ProcessXhcpPacket(WritablePacket *p_in);
 
+	void ProcessPollEvent(uint32_t id, unsigned int);
 	void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
-	void ProcessPollEvent(unsigned short, unsigned int);
 	void CancelPollEvent(unsigned short _sport);
 	/*
 	** Xsockets API handlers
 	*/
-	void Xsocket(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xsetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xgetsockopt(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xbind(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xclose(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xconnect(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xlisten(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void XreadyToAccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xaccept(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xchangead(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xreadlocalhostaddr(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void XsetXcacheSid(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xupdatenameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xreadnameserverdag(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xgetpeername(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xgetsockname(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xisdualstackrouter(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xsend(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	void Xsendto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	void Xrecv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xrecvfrom(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	//void XrequestChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	//void XgetChunkStatus(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	//void XreadChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	//void XremoveChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	//void XpushChunkto(unsigned short _sport, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	//void XbindPush(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	//void XputChunk(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xpoll(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xupdaterv(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xfork(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xreplay(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
-	void Xnotify(unsigned short _sport, xia::XSocketMsg *xia_socket_msg);
+	void Xsocket(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xsetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xbind(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xclose(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xconnect(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xlisten(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XreadyToAccept(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xaccept(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xchangead(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreadlocalhostaddr(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XsetXcacheSid(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatenameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreadnameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetpeername(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockname(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xisdualstackrouter(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xsend(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xsendto(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xrecv(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xrecvfrom(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	//void XrequestChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	//void XgetChunkStatus(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	//void XreadChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	//void XremoveChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	//void XpushChunkto(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	//void XbindPush(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	//void XputChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdaterv(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xfork(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -292,12 +295,12 @@ public:
 
 	// timer retransmit handlers
 	void RetransmitCIDRequest(sock *sk, Timestamp &now, Timestamp &erlist_pending_expiry);
-	bool RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now);
-	bool RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now);
-	bool RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now);
-	bool RetransmitMIGRATE(sock *sk, unsigned short _sport, Timestamp &now);
-	bool RetransmitSYN(sock *sk, unsigned short _sport, Timestamp &now);
-	bool RetransmitSYNACK(sock *sk, unsigned short _sport, Timestamp &now);
+	bool RetransmitDATA(sock *sk, uint32_t id, Timestamp &now);
+	bool RetransmitFIN(sock *sk, uint32_t id, Timestamp &now);
+	bool RetransmitFINACK(sock *sk, uint32_t id, Timestamp &now);
+	bool RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now);
+	bool RetransmitSYN(sock *sk, uint32_t id, Timestamp &now);
+	bool RetransmitSYNACK(sock *sk, uint32_t id, Timestamp &now);
 
 	void SendControlPacket(int type, sock *sk, const void *, size_t plen, XIAPath &src_path, XIAPath &dst_path);
 	void MigrateFailure(sock *sk);
@@ -325,6 +328,7 @@ public:
 		HandlerCall::call_write(_routeTable, "remove", cmd);
 	}
 
+	uint32_t NewID();
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -369,91 +373,93 @@ class sock : public Element {
     void set_pending_recv_msg(XSocketMsg *msg) {pending_recv_msg = msg;}
     XIDpair get_key() {return key;}
     void set_key(XIDpair k) {key = k;}
+	uint32_t get_id() { return id; }
+	void set_id(uint32_t new_id) { id = new_id; }
 
     XTRANSPORT *get_transport() { return transport; }
-	sock(XTRANSPORT *transport, unsigned short port, int type);
+	sock(XTRANSPORT *transport, unsigned short port, uint32_t id, int type);
 	sock();
 	/* =========================
 	 * Common Socket states
 	 * ========================= */
-		unsigned short port;		// API Port
-		int sock_type;				// STREAM, DGRAM, RAW, CHUNK
-		SocketState state;			// Socket state (Mainly for STREAM)
-		bool isBlocking;			// true if socket is blocking (default)
-		bool initialized;			// FIXME: used by dgram and chunks. can we replace it?
-		int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
-		int so_debug;				// set/read via SO_DEBUG. could be used for tracing in the future
-		int interface_id;			// port of the interface the packets arrive on
-		unsigned polling;			// # of outstanding poll/select requests on this socket
-		bool recv_pending;			// true if API is waiting to receive data
-		bool timer_on;				// if true timer is enabled
-		Timestamp expiry;			// when timer should fire next
+	unsigned short port;		// API Port
+	int sock_type;				// STREAM, DGRAM, RAW, CHUNK
+	SocketState state;			// Socket state (Mainly for STREAM)
+	bool isBlocking;			// true if socket is blocking (default)
+	bool initialized;			// FIXME: used by dgram and chunks. can we replace it?
+	int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
+	int so_debug;				// set/read via SO_DEBUG. could be used for tracing in the future
+	int interface_id;			// port of the interface the packets arrive on
+	unsigned polling;			// # of outstanding poll/select requests on this socket
+	bool recv_pending;			// true if API is waiting to receive data
+	bool timer_on;				// if true timer is enabled
+	Timestamp expiry;			// when timer should fire next
 
-		XIAPath src_path;			// peer DAG
-		XIAPath dst_path;			// our DAG
-		uint8_t hlim;				// hlim/ttl
+	XIAPath src_path;			// peer DAG
+	XIAPath dst_path;			// our DAG
+	uint8_t hlim;				// hlim/ttl
 
-		bool full_src_dag;			// bind to full dag or just to SID
+	bool full_src_dag;			// bind to full dag or just to SID
 
-		unsigned short nxt_xport;
+	unsigned short nxt_xport;
 
-		int refcount;				// # of processes that have this socket open
+	int refcount;				// # of processes that have this socket open
 
-		/* =========================
-		 * "TCP" state
-		 * ========================= */
-		unsigned backlog;			// max # of outstanding connections
-		uint32_t seq_num;
-		uint32_t ack_num;
-		bool isAcceptedSocket;		// true if this socket is generated due to an accept
-		int num_connect_tries;		// FIXME: can these all be flattened into one variable?
-		int num_retransmits;
-		int num_close_tries;
-		WritablePacket *pkt;		// Control packet waiting to be ack'd (FIXME: could this just go in the send buffer?)
+	/* =========================
+	 * "TCP" state
+	 * ========================= */
+	unsigned backlog;			// max # of outstanding connections
+	uint32_t seq_num;
+	uint32_t ack_num;
+	bool isAcceptedSocket;		// true if this socket is generated due to an accept
+	int num_connect_tries;		// FIXME: can these all be flattened into one variable?
+	int num_retransmits;
+	int num_close_tries;
+	WritablePacket *pkt;		// Control packet waiting to be ack'd (FIXME: could this just go in the send buffer?)
 
-		// connect/accept
-		queue<sock*> pending_connection_buf;	// list of outstanding connections waiting to be accepted
-		queue<xia::XSocketMsg*> pendingAccepts;	// stores accept messages from API when there are no pending connections
+	// connect/accept
+	queue<sock*> pending_connection_buf;	// list of outstanding connections waiting to be accepted
+	queue<xia::XSocketMsg*> pendingAccepts;	// stores accept messages from API when there are no pending connections
 
-		// send buffer
-		uint32_t send_buffer_size;
-		uint32_t send_base;				// the sequence # of the oldest unacked packet
-		uint32_t next_send_seqnum;		// the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
-		uint32_t remote_recv_window;	// num additional *packets* the receiver has room to buffer
-		WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for
+	// send buffer
+	uint32_t send_buffer_size;
+	uint32_t send_base;				// the sequence # of the oldest unacked packet
+	uint32_t next_send_seqnum;		// the smallest unused sequence # (i.e., the sequence # of the next packet to be sent)
+	uint32_t remote_recv_window;	// num additional *packets* the receiver has room to buffer
+	WritablePacket *send_buffer[MAX_SEND_WIN_SIZE]; // packets we've sent but have not gotten an ACK for
 
-		/* =========================
-		 * shared tcp/udp receive buffers
-		 * ========================= */
-		WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app
-		uint32_t recv_buffer_size;		// the number of PACKETS we can buffer (received but not delivered to app)
-		uint32_t recv_base;				// sequence # of the oldest received packet not delivered to app
-		uint32_t next_recv_seqnum;		// the sequence # of the next in-order packet we expect to receive
-		int dgram_buffer_start;			// the first undelivered index in the recv buffer (DGRAM only)
-		int dgram_buffer_end;			// the last undelivered index in the recv buffer (DGRAM only)
-		uint32_t recv_buffer_count;		// the number of packets in the buffer (DGRAM only)
-		xia::XSocketMsg *pending_recv_msg;
+	/* =========================
+	 * shared tcp/udp receive buffers
+	 * ========================= */
+	WritablePacket *recv_buffer[MAX_RECV_WIN_SIZE]; // packets we've received but haven't delivered to the app
+	uint32_t recv_buffer_size;		// the number of PACKETS we can buffer (received but not delivered to app)
+	uint32_t recv_base;				// sequence # of the oldest received packet not delivered to app
+	uint32_t next_recv_seqnum;		// the sequence # of the next in-order packet we expect to receive
+	int dgram_buffer_start;			// the first undelivered index in the recv buffer (DGRAM only)
+	int dgram_buffer_end;			// the last undelivered index in the recv buffer (DGRAM only)
+	uint32_t recv_buffer_count;		// the number of packets in the buffer (DGRAM only)
+	xia::XSocketMsg *pending_recv_msg;
 
-		/* =========================
-		 * tcp connection migration
-		 * ========================= */
-		bool migrateack_waiting;
-		String last_migrate_ts;
-		int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
-		WritablePacket *migrate_pkt;
+	/* =========================
+	 * tcp connection migration
+	 * ========================= */
+	bool migrateack_waiting;
+	String last_migrate_ts;
+	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
+	WritablePacket *migrate_pkt;
 
-		/* =========================
-		 * Chunk States
-		* ========================= */
-		bool xcacheSock;
-		HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
-		HashTable<XID, Timestamp> XIDtoExpiryTime;
-		HashTable<XID, bool> XIDtoTimerOn;
-		HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
-		HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
-		HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
+	/* =========================
+	 * Chunk States
+	* ========================= */
+	bool xcacheSock;
+	HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
+	HashTable<XID, Timestamp> XIDtoExpiryTime;
+	HashTable<XID, bool> XIDtoTimerOn;
+	HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
+	HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
+	HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
 
-		bool reap;
+	bool reap;
 protected:
     XTRANSPORT *transport;
     HandlerState hstate;
@@ -462,6 +468,7 @@ protected:
     int nxt;
     int last;
 
+	uint32_t id;
 
     String sdag;
     String ddag;

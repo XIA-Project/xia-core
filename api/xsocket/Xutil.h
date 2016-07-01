@@ -83,6 +83,8 @@ unsigned seqNo(int sock);
 void cachePacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int getCachedPacket(int sock, unsigned seq, char *buf, unsigned buflen);
 int connectDgram(int sock, sockaddr_x *addr);
+void setID(int sock, unsigned);
+unsigned getID(int sock);
 int MakeApiSocket(int transport_type);
 const sockaddr_x *dgramPeer(int sock);
 
