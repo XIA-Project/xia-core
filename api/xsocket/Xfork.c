@@ -43,7 +43,7 @@ static int makeList(bool increment)
 	xia::X_Fork_Msg *fm = xsm.mutable_x_fork();
 
 	socketmap->lock();
-	LOGF("XFORK: count = %d\n", sockets->size());
+	LOGF("XFORK: count = %lu\n", sockets->size());
 
 	for (it = sockets->begin(); it != sockets->end(); it++) {
 		int sock = it->first;
