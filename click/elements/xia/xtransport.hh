@@ -186,7 +186,7 @@ public:
 	// list of ids waiting for a notification
 	list <uint32_t> notify_listeners;
 
-	// outstanding poll/selects indexed by API id #
+	// outstanding poll/selects indexed by control socket port #
 	HashTable<unsigned short, PollEvent> poll_events;
 
 	// For Content Push APIs

@@ -59,7 +59,7 @@ tcp_seq XStream::_tcp_iss()
 		iss = 0x011111;
 	}
 
-	printf("iss = %u\n", iss);
+	//printf("iss = %u\n", iss);
 	return iss;
 }
 
@@ -265,10 +265,6 @@ XStream::tcp_input(WritablePacket *p)
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
 					check_for_and_handle_pending_recv();
-					if (polling) {
-						// tell API we are readable
-						get_transport()->ProcessPollEvent(port, POLLIN);
-					}
 					//debug_output(VERB_TCPSTATS, "input (fp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -380,7 +376,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->ReturnResult(port, &xsm);
 				if (polling) {
 					// tell API we are writble now
-					get_transport()->ProcessPollEvent(port, POLLOUT);
+					get_transport()->ProcessPollEvent(get_id(), POLLOUT);
 				}
 
 				/* Apply Window Scaling Options if set in incoming header */
@@ -629,7 +625,7 @@ XStream::tcp_input(WritablePacket *p)
 		}
 		if (listening_sock->polling) {
 			// tell API we are writeable
-			get_transport() -> ProcessPollEvent(listening_sock->port, POLLIN|POLLOUT);
+			get_transport()->ProcessPollEvent(listening_sock->get_id(), POLLIN|POLLOUT);
 		}
 		// finish the connection handshake
 		get_transport() -> XIDpairToConnectPending.erase(key);
@@ -803,10 +799,6 @@ XStream::tcp_input(WritablePacket *p)
 				if (! _q_recv.is_empty() && has_pullable_data()) {
 					tp->rcv_nxt = _q_recv.last_nxt();
 					check_for_and_handle_pending_recv();
-					if (polling) {
-						// tell API we are readable
-						get_transport()->ProcessPollEvent(port, POLLIN);
-					}
 					//debug_output(VERB_TCPSTATS, "input (closing) updating rcv_nxt to [%u]", tp->rcv_nxt);
 				}
 
@@ -887,10 +879,6 @@ step6:
 		if (! _q_recv.is_empty() && has_pullable_data()) {
 			tp->rcv_nxt = _q_recv.last_nxt();
 			check_for_and_handle_pending_recv();
-			if (polling) {
-				// tell API we are readable
-				get_transport()->ProcessPollEvent(port, POLLIN);
-			}
 			//debug_output(VERB_TCPSTATS, "input (sp) updating rcv_nxt to [%u]", tp->rcv_nxt);
 		}
 
@@ -923,7 +911,7 @@ step6:
 			}
 		}
 		if (polling) {
-			get_transport() -> ProcessPollEvent(port, POLLIN|POLLHUP);
+			get_transport()->ProcessPollEvent(get_id(), POLLIN|POLLHUP);
 		}
 
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
@@ -1621,8 +1609,7 @@ XStream::tcp_drop(int err)
 	get_transport()->ReturnResult(port, &xsm);
 
 	if (polling) {
-		//printf("checking poll event for %d from timer\n", port);
-		get_transport()->ProcessPollEvent(port, POLLHUP);
+		get_transport()->ProcessPollEvent(get_id(), POLLHUP);
 	}
 	tp->so_error = err;
 	tcp_set_state(TCPS_CLOSED);
@@ -1930,6 +1917,10 @@ void XStream::check_for_and_handle_pending_recv() {
 		recv_pending = false;
 		delete pending_recv_msg;
 		pending_recv_msg = NULL;
+	}
+	if (polling) {
+		// tell API we are readable
+		get_transport()->ProcessPollEvent(get_id(), POLLIN);
 	}
 }
 

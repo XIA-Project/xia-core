@@ -2301,7 +2301,7 @@ void XTRANSPORT::Xsocket(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	id = NewID();
 	xia_socket_msg->set_id(id);
 
-	DBG("create %s socket id=%d port=%d\n", SocketTypeStr(sock_type), id, _sport);
+	//DBG("create %s socket id=%d port=%d\n", SocketTypeStr(sock_type), id, _sport);
 	sock *sk = NULL;
 	switch (sock_type) {
 	case SOCK_STREAM: {
@@ -2497,12 +2497,10 @@ void XTRANSPORT::Xfork(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	for (int i = 0; i < count; i++) {
 		uint32_t fid = msg->ids(i);
 
-		DBG("id = %d\n", fid);
-
 		sock *sk = idToSock.get(fid);
 		if (sk) {
 			sk->refcount += increment;
-			DBG("%s refcount for %d (%d)\n", (increment > 0 ? "incrementing" : "decrementing"), fid, sk->refcount);
+			//DBG("%s refcount for %d (%d)\n", (increment > 0 ? "incrementing" : "decrementing"), fid, sk->refcount);
 			assert(sk->refcount > 0);
 		}
 	}
@@ -2603,7 +2601,7 @@ void XTRANSPORT::Xclose(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	sock *sk = idToSock.get(cid);
 	bool teardown_now = true;
 
-	INFO("id=%d port=%d\n", cid, _sport);
+	//INFO("id=%d port=%d\n", cid, _sport);
 
 	if (!sk) {
 		// this shouldn't happen!
@@ -2741,7 +2739,7 @@ void XTRANSPORT::Xlisten(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 	xia::X_Listen_Msg *x_listen_msg = xia_socket_msg->mutable_x_listen();
 	unsigned short _sport = xia_socket_msg->port();
-	INFO("Socket %d Xlisten\n", id);
+	//INFO("Socket %d Xlisten\n", id);
 
 	sock *sk = idToSock.get(xia_socket_msg->id());
 	if (!sk) {
@@ -2807,17 +2805,10 @@ void XTRANSPORT::Xaccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	unsigned short new_port = xia_socket_msg->x_accept().new_port();
 
 	sock *sk = idToSock.get(id);
-//	if (!sk) {
-//		WARN("An Xstream socket in CLOSE_WAIT deleted our socket state\n");
-//		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
-//		return;
-//	}
-//
-//	if (portToSock.get(new_port) != NULL) {
-//		WARN("port %u still associated with a tcp connection in close wait\nbad things might happen\n", _sport);
-//		//ReturnResult(_sport, xia_socket_msg, -1, ENFILE);
-//		//return;
-//	}
+	if (!sk) {
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
 
 	//DBG("id %d, new_port %d seq:%d\n", id, new_port, xia_socket_msg->sequence());
 	//DBG("p buf size = %d\n", sk->pending_connection_buf.size());
@@ -3027,22 +3018,23 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		HashTable<uint32_t, unsigned int>::iterator sevent = pe.events.find(id);
 
 		// socket isn't in this poll instance, keep looking
-		if (sevent == pe.events.end())
+		if (sevent == pe.events.end()) {
 			continue;
+		}
 
 		uint32_t pid = sevent->first;
 		unsigned int mask = sevent->second;
 
 		// if flags_out isn't an error and doesn't match the event mask keep looking
-		if (!(flags_out & mask) && !(flags_out & (POLLHUP | POLLERR | POLLNVAL)))
+		if (!(flags_out & mask) && !(flags_out & (POLLHUP | POLLERR | POLLNVAL))) {
 			continue;
+		}
 
 		xia::XSocketMsg xsm;
 		xsm.set_id(21);
-
 		xsm.set_type(xia::XPOLL);
-		xia::X_Poll_Msg *msg = xsm.mutable_x_poll();
 
+		xia::X_Poll_Msg *msg = xsm.mutable_x_poll();
 		msg->set_nfds(1);
 		msg->set_type(xia::X_Poll_Msg::RESULT);
 
@@ -3050,7 +3042,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		pfd->set_flags(flags_out);
 		pfd->set_id(pid);
 
-		INFO("id=%d port=%d\n", pid, pollport);
+		//INFO("id=%d port=%d\n", pid, pollport);
 
 		// do I need to set other flags in the return struct?
 		ReturnResult(pollport, &xsm, 1, 0);
@@ -3248,7 +3240,7 @@ void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 void XTRANSPORT::Xchangead(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	unsigned short _sport = xia_socket_msg->port();
-	INFO("id = %d\n", id);
+
 	// Save the old AD
 	String str_local_addr = _local_addr.unparse();
 	size_t old_AD_start = str_local_addr.find_left("AD:");
@@ -3400,7 +3392,6 @@ void XTRANSPORT::Xchangead(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 		output(NETWORK_PORT).push(p);
 	}
 #endif
-INFO("changead id = %d\n", xia_socket_msg->id());
 	ReturnResult(_sport, xia_socket_msg);
 
 
