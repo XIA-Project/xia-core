@@ -605,7 +605,7 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	bool have_src = 0;
 	bool have_dst = 0;
 
-	//INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->port);
+	//INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->get_id());
 
 	CancelRetransmit(sk);
 
@@ -663,14 +663,6 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	}
 
 	idToSock.erase(sk->get_id());
-
-	// MERGE - why is this commented out now?
-	// for (int i = 0; i < sk->recv_buffer_size; i++) {
-	// 	if (sk->recv_buffer[i] != NULL) {
-	// 		sk->recv_buffer[i]->kill();
-	// 		sk->recv_buffer[i] = NULL;
-	// 	}
-	// }
 
 	delete sk;
 	return true;
@@ -811,10 +803,10 @@ void XTRANSPORT::run_timer(Timer *timer)
 		(globals()->tcp_now)++;
 	} else if (timer == _reaper) {
 		for (; i; i++) {
-			// INFO("This is %d, %d",i->second->port,i->second->reap);
+			//INFO("This is %d, %d",i->second->id, i->second->reap);
 			if (i->second->reap)
 			{
-				//INFO("Going to remove %d", i->second->port);
+				//INFO("Going to remove %d", i->second->id);
 				TeardownSocket(i->second);
 			}
 		}
@@ -2588,6 +2580,8 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 	bool should_delete;
 
 	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
+	// the passed id is for the control socket, not the one to close
+	// so we get the id to close from the one given by the API
 	uint32_t cid = xcm->id();
 
 	sock *sk = idToSock.get(cid);
