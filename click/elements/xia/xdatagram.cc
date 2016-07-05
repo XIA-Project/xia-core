@@ -31,7 +31,7 @@ XDatagram::push(WritablePacket *p_in) {
 		interface_id = SRC_PORT_ANNO(p_in);
 		if (polling) {
 			// tell API we are readable
-			get_transport()->ProcessPollEvent(port, POLLIN);
+			get_transport()->ProcessPollEvent(get_id(), POLLIN);
 		}
 		check_for_and_handle_pending_recv();
 	}
