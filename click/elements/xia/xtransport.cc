@@ -2146,9 +2146,6 @@ void XTRANSPORT::ProcessCachePacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 {
-	//Extract the destination port
-	//unsigned short _sport = SRC_PORT_ANNO(p_in);
-
 	std::string p_buf;
 	p_buf.assign((const char*)p_in->data(), (const char*)p_in->end_data());
 
@@ -2157,111 +2154,114 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	xia_socket_msg.ParseFromString(p_buf);
 	uint32_t id = xia_socket_msg.id();
 
+	//Extract the destination port
+	unsigned short _sport = SRC_PORT_ANNO(p_in);
+
 	// DBG("Push: Got packet from API id:%d", id);
 
 	switch (xia_socket_msg.type()) {
 	case xia::XSOCKET:
-		Xsocket(id, &xia_socket_msg);
+		Xsocket(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XSETSOCKOPT:
-		Xsetsockopt(id, &xia_socket_msg);
+		Xsetsockopt(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XGETSOCKOPT:
-		Xgetsockopt(id, &xia_socket_msg);
+		Xgetsockopt(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XBIND:
-		Xbind(id, &xia_socket_msg);
+		Xbind(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XCLOSE:
-		Xclose(id, &xia_socket_msg);
+		Xclose(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XCONNECT:
-		Xconnect(id, &xia_socket_msg);
+		Xconnect(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XLISTEN:
-		Xlisten(id, &xia_socket_msg);
+		Xlisten(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREADYTOACCEPT:
-		XreadyToAccept(id, &xia_socket_msg);
+		XreadyToAccept(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XACCEPT:
-		Xaccept(id, &xia_socket_msg);
+		Xaccept(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XCHANGEAD:
-		Xchangead(id, &xia_socket_msg);
+		Xchangead(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREADLOCALHOSTADDR:
-		Xreadlocalhostaddr(id, &xia_socket_msg);
+		Xreadlocalhostaddr(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XSETXCACHESID:
-		XsetXcacheSid(id, &xia_socket_msg);
+		XsetXcacheSid(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XUPDATENAMESERVERDAG:
-		Xupdatenameserverdag(id, &xia_socket_msg);
+		Xupdatenameserverdag(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREADNAMESERVERDAG:
-		Xreadnameserverdag(id, &xia_socket_msg);
+		Xreadnameserverdag(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XISDUALSTACKROUTER:
-		Xisdualstackrouter(id, &xia_socket_msg);
+		Xisdualstackrouter(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XSEND:
-		Xsend(id, &xia_socket_msg, p_in);
+		Xsend(_sport, id, &xia_socket_msg, p_in);
 		break;
 	case xia::XSENDTO:
-		Xsendto(id, &xia_socket_msg, p_in);
+		Xsendto(_sport, id, &xia_socket_msg, p_in);
 		break;
 	case xia::XRECV:
-		Xrecv(id, &xia_socket_msg);
+		Xrecv(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XRECVFROM:
-		Xrecvfrom(id, &xia_socket_msg);
+		Xrecvfrom(_sport, id, &xia_socket_msg);
 		break;
 #if 0
 	case xia::XREQUESTCHUNK:
-		XrequestChunk(id, &xia_socket_msg, p_in);
+		XrequestChunk(_sport, id, &xia_socket_msg, p_in);
 		break;
 	case xia::XGETCHUNKSTATUS:
-		XgetChunkStatus(id, &xia_socket_msg);
+		XgetChunkStatus(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREADCHUNK:
-		XreadChunk(id, &xia_socket_msg);
+		XreadChunk(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREMOVECHUNK:
-		XremoveChunk(id, &xia_socket_msg);
+		XremoveChunk(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XPUTCHUNK:
-		XputChunk(id, &xia_socket_msg);
+		XputChunk(_sport, id, &xia_socket_msg);
 		break;
 #endif
 	case xia::XGETPEERNAME:
-		Xgetpeername(id, &xia_socket_msg);
+		Xgetpeername(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XGETSOCKNAME:
-		Xgetsockname(id, &xia_socket_msg);
+		Xgetsockname(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XPOLL:
-		Xpoll(id, &xia_socket_msg);
+		Xpoll(_sport, id, &xia_socket_msg);
 		break;
 #if 0
 	case xia::XPUSHCHUNKTO:
-		XpushChunkto(id, &xia_socket_msg, p_in);
+		XpushChunkto(_sport, id, &xia_socket_msg, p_in);
 		break;
 	case xia::XBINDPUSH:
-		XbindPush(id, &xia_socket_msg);
+		XbindPush(_sport, id, &xia_socket_msg);
 		break;
 #endif
 	case xia::XUPDATERV:
-		Xupdaterv(id, &xia_socket_msg);
+		Xupdaterv(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XFORK:
-		Xfork(id, &xia_socket_msg);
+		Xfork(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XREPLAY:
-		Xreplay(id, &xia_socket_msg);
+		Xreplay(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XNOTIFY:
-		Xnotify(id, &xia_socket_msg);
+		Xnotify(_sport, id, &xia_socket_msg);
 		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
@@ -2290,11 +2290,10 @@ void XTRANSPORT::ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_
 /*
 ** Handler for the Xsocket API call
 */
-void XTRANSPORT::Xsocket(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Socket_Msg *x_socket_msg = xia_socket_msg->mutable_x_socket();
 	int sock_type = x_socket_msg->type();
-	unsigned short _sport = xia_socket_msg->port();
 
 	// set the id we'll use for future communication with this socket
 	assert(id == 0);
@@ -2325,10 +2324,9 @@ void XTRANSPORT::Xsocket(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 /*
 ** Xsetsockopt API handler
 */
-void XTRANSPORT::Xsetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xsetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Setsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_setsockopt();
-	unsigned short _sport = xia_socket_msg->port();
 	sock *sk = idToSock.get(id);
 
 	if (!sk) {
@@ -2379,10 +2377,9 @@ void XTRANSPORT::Xsetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 /*
 ** Xgetsockopt API handler
 */
-void XTRANSPORT::Xgetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xgetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Getsockopt_Msg *x_sso_msg = xia_socket_msg->mutable_x_getsockopt();
-	unsigned short _sport = xia_socket_msg->port();
 
 	sock *sk = idToSock.get(id);
 
@@ -2426,12 +2423,11 @@ void XTRANSPORT::Xgetsockopt(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	ReturnResult(_sport, xia_socket_msg);
 }
 
-void XTRANSPORT::Xbind(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	int rc = 0, ec = 0;
 
 	xia::X_Bind_Msg *x_bind_msg = xia_socket_msg->mutable_x_bind();
-	unsigned short _sport = xia_socket_msg->port();
 
 	String sdag_string(x_bind_msg->sdag().c_str(), x_bind_msg->sdag().size());
 
@@ -2483,15 +2479,12 @@ void XTRANSPORT::Xbind(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xfork(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 	xia::X_Fork_Msg *msg = xia_socket_msg->mutable_x_fork();
 	int count = msg->count();
 	int increment = msg->increment() ? 1 : -1;
-
-//	xia_socket_msg->PrintDebugString();
 
 	// loop through list of ports and modify the ref counter
 	for (int i = 0; i < count; i++) {
@@ -2510,10 +2503,9 @@ void XTRANSPORT::Xfork(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xreplay(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 
 	xia::X_Replay_Msg *msg = xia_socket_msg->mutable_x_replay();
 
@@ -2527,8 +2519,9 @@ void XTRANSPORT::Xreplay(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 }
 
 
-void XTRANSPORT::Xnotify(uint32_t id, xia::XSocketMsg * /*xia_socket_msg */)
+void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /*xia_socket_msg */)
 {
+	UNUSED(_sport);
 	notify_listeners.push_back(id);
 
 	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
@@ -2537,7 +2530,7 @@ void XTRANSPORT::Xnotify(uint32_t id, xia::XSocketMsg * /*xia_socket_msg */)
 
 #if 0
 // FIXME: This way of doing things is a bit hacky.
-void XTRANSPORT::XbindPush(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XbindPush(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	int rc = 0, ec = 0;
 
@@ -2589,11 +2582,10 @@ void XTRANSPORT::XbindPush(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 #endif
 
 
-void XTRANSPORT::Xclose(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	int ref;
 	bool should_delete;
-	unsigned short _sport = xia_socket_msg->port();
 
 	xia::X_Close_Msg *xcm = xia_socket_msg->mutable_x_close();
 	uint32_t cid = xcm->id();
@@ -2646,10 +2638,9 @@ void XTRANSPORT::Xclose(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xconnect(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Connect_Msg *x_connect_msg = xia_socket_msg->mutable_x_connect();
-	unsigned short _sport = xia_socket_msg->port();
 	String dest(x_connect_msg->ddag().c_str());
 	XIAPath dst_path;
 	sock *sk = idToSock.get(id);
@@ -2730,7 +2721,7 @@ void XTRANSPORT::Xconnect(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xlisten(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xlisten(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	// we just want to mark the socket as listening and return right away.
 
@@ -2738,10 +2729,9 @@ void XTRANSPORT::Xlisten(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 	// FIXME: make sure no one else is bound to this DAG
 
 	xia::X_Listen_Msg *x_listen_msg = xia_socket_msg->mutable_x_listen();
-	unsigned short _sport = xia_socket_msg->port();
 	//INFO("Socket %d Xlisten\n", id);
 
-	sock *sk = idToSock.get(xia_socket_msg->id());
+	sock *sk = idToSock.get(id);
 	if (!sk) {
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
 		return;
@@ -2760,9 +2750,8 @@ void XTRANSPORT::Xlisten(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XreadyToAccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XreadyToAccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
 	sock *sk = idToSock.get(id);
 
 	if (!sk) {
@@ -2795,9 +2784,8 @@ void XTRANSPORT::XreadyToAccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xaccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
 	int rc = 0, ec = 0;
 
 	// id is the *existing accept socket*
@@ -2920,8 +2908,9 @@ Xaccept_done:
 
 
 
-void XTRANSPORT::Xupdaterv(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
+	UNUSED(_sport);
 	UNUSED(id);
 	UNUSED(xia_socket_msg);
 #if 0
@@ -3135,10 +3124,9 @@ void XTRANSPORT::CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg)
 
 
 
-void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 	xia::X_Poll_Msg *poll_in = xia_socket_msg->mutable_x_poll();
 
 	if (poll_in->type() == xia::X_Poll_Msg::DOPOLL) {
@@ -3175,7 +3163,7 @@ void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 					INFO("%d accepts are pending\n", sk->pending_connection_buf.size());
 					flags_out |= POLLIN;
 					if (flags & POLLOUT)
-						flags | POLLOUT;
+						flags |= POLLOUT;
 				}
 
 				// is there any read data?
@@ -3239,10 +3227,9 @@ void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xchangead(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xchangead(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
+	UNUSED(id);
 	// Save the old AD
 	String str_local_addr = _local_addr.unparse();
 	size_t old_AD_start = str_local_addr.find_left("AD:");
@@ -3415,10 +3402,9 @@ void XTRANSPORT::Xchangead(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xreadlocalhostaddr(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 
 	// read the localhost AD and HID
 	String local_addr = _local_addr.unparse();
@@ -3437,19 +3423,20 @@ void XTRANSPORT::Xreadlocalhostaddr(uint32_t id, xia::XSocketMsg *xia_socket_msg
 }
 
 
-void XTRANSPORT::XsetXcacheSid(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
+	UNUSED(_sport);
 	xia::X_SetXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_setxcachesid();
 
 	_xcache_sid.parse(_msg->sid().c_str());
+	// FIXME: this isn't returing a status
 }
 
 
-void XTRANSPORT::Xupdatenameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 
 	xia::X_Updatenameserverdag_Msg *x_updatenameserverdag_msg = xia_socket_msg->mutable_x_updatenameserverdag();
 	String ns_dag(x_updatenameserverdag_msg->dag().c_str());
@@ -3460,10 +3447,9 @@ void XTRANSPORT::Xupdatenameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_m
 
 
 
-void XTRANSPORT::Xreadnameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xreadnameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 
 	// read the nameserver DAG
 	String ns_addr = _nameserver_addr.unparse();
@@ -3477,10 +3463,9 @@ void XTRANSPORT::Xreadnameserverdag(uint32_t id, xia::XSocketMsg *xia_socket_msg
 
 
 
-void XTRANSPORT::Xisdualstackrouter(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xisdualstackrouter(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	unsigned short _sport = xia_socket_msg->port();
 
 	// return a packet indicating whether this node is an XIA-IPv4 dual-stack router
 	xia::X_IsDualStackRouter_Msg *_msg = xia_socket_msg->mutable_x_isdualstackrouter();
@@ -3491,10 +3476,8 @@ void XTRANSPORT::Xisdualstackrouter(uint32_t id, xia::XSocketMsg *xia_socket_msg
 
 
 
-void XTRANSPORT::Xgetpeername(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xgetpeername(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	sock *sk = idToSock.get(id);
 	if (!sk) {
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
@@ -3509,10 +3492,8 @@ void XTRANSPORT::Xgetpeername(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xgetsockname(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xgetsockname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	sock *sk = idToSock.get(id);
 	if (!sk) {
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
@@ -3526,10 +3507,8 @@ void XTRANSPORT::Xgetsockname(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::Xsend(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
+void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	int rc = 0, ec = 0;
 
 	//Find socket state
@@ -3653,10 +3632,8 @@ void XTRANSPORT::Xsend(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePac
 
 
 
-void XTRANSPORT::Xsendto(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
+void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	int rc = 0, ec = 0;
 
 	xia::X_Sendto_Msg *x_sendto_msg = xia_socket_msg->mutable_x_sendto();
@@ -3761,10 +3738,8 @@ void XTRANSPORT::Xsendto(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritableP
 
 
 
-void XTRANSPORT::Xrecv(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xrecv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	sock *sk = idToSock.get(id);
 
 	if (!sk || sk->port != _sport) {
@@ -3814,10 +3789,8 @@ void XTRANSPORT::Xrecv(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 // FIXME: this is identical to Xrecv except for the protobuf type
 // perhaps they should be combined
-void XTRANSPORT::Xrecvfrom(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	unsigned short _sport = xia_socket_msg->port();
-
 	sock *sk = idToSock.get(id);
 	if (!sk) {
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
@@ -3848,7 +3821,7 @@ void XTRANSPORT::Xrecvfrom(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 #if 0
-void XTRANSPORT::XrequestChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
+void XTRANSPORT::XrequestChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in)
 {
 	xia::X_Requestchunk_Msg *x_requestchunk_msg = xia_socket_msg->mutable_x_requestchunk();
 
@@ -3972,7 +3945,7 @@ void XTRANSPORT::XrequestChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg, Wri
 
 
 
-void XTRANSPORT::XgetChunkStatus(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XgetChunkStatus(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Getchunkstatus_Msg *x_getchunkstatus_msg = xia_socket_msg->mutable_x_getchunkstatus();
 
@@ -4027,7 +4000,7 @@ void XTRANSPORT::XgetChunkStatus(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XreadChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XreadChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Readchunk_Msg *x_readchunk_msg = xia_socket_msg->mutable_x_readchunk();
 
@@ -4095,7 +4068,7 @@ void XTRANSPORT::XreadChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XremoveChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XremoveChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Removechunk_Msg *x_rmchunk_msg = xia_socket_msg->mutable_x_removechunk();
 
@@ -4135,7 +4108,7 @@ void XTRANSPORT::XremoveChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XputChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
+void XTRANSPORT::XputChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	xia::X_Putchunk_Msg *x_putchunk_msg = xia_socket_msg->mutable_x_putchunk();
 
@@ -4214,7 +4187,7 @@ void XTRANSPORT::XputChunk(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 
 
-void XTRANSPORT::XpushChunkto(uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket * /*p_in */)
+void XTRANSPORT::XpushChunkto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket * /*p_in */)
 {
 	xia::X_Pushchunkto_Msg *x_pushchunkto_msg = xia_socket_msg->mutable_x_pushchunkto();
 
