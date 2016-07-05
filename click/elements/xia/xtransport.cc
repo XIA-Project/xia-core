@@ -2772,7 +2772,7 @@ void XTRANSPORT::XreadyToAccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 
 	if (!sk->pending_connection_buf.empty()) {
 		// If there is already a pending connection, return true now
-		INFO("Pending connection is not empty\n");
+		//INFO("Pending connection is not empty\n");
 
 		ReturnResult(_sport, xia_socket_msg);
 
@@ -2821,12 +2821,12 @@ void XTRANSPORT::Xaccept(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 		sock *new_sk = sk->pending_connection_buf.front();
 		uint32_t new_id = new_sk->get_id();
 
-		DBG("Get front element from and assign port number %d.", new_port);
+		//DBG("Get front element from and assign port number %d.", new_port);
 
 		if (new_sk->state != CONNECTED) {
 			ERROR("ERROR: sock from pending_connection_buf !isconnected\n");
 		} else {
-			INFO("Socket on port %d is now connected\n", new_port);
+			//INFO("Socket on port %d is now connected\n", new_port);
 		}
 		new_sk->port = new_port;
 		ChangeState(new_sk, CONNECTED);
@@ -3170,6 +3170,14 @@ void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 				flags_out = POLLNVAL;
 
 			} else {
+				// any accepts pending? never true unless a STREAM socket
+				if (!sk->pending_connection_buf.empty()) {
+					INFO("%d accepts are pending\n", sk->pending_connection_buf.size());
+					flags_out |= POLLIN;
+					if (flags & POLLOUT)
+						flags | POLLOUT;
+				}
+
 				// is there any read data?
 				if (flags & POLLIN) {
 					if (sk->sock_type == SOCK_STREAM) {
@@ -3181,12 +3189,6 @@ void XTRANSPORT::Xpoll(uint32_t id, xia::XSocketMsg *xia_socket_msg)
 							flags_out |= POLLIN;
 						}
 
-// FIXME: MERGE need to get this code back in for non-block connects
-//						if (!sk->pending_connection_buf.empty()) {
-//							INFO("%d accepts are pending\n", sk->pending_connection_buf.size());
-//							flags_out |= POLLIN | POLLOUT;
-//						}
-//
 					} else if (sk->sock_type == SOCK_DGRAM || sk->sock_type == SOCK_RAW) {
 						if (sk->recv_buffer_count > 0) {
 							flags_out |= POLLIN;
