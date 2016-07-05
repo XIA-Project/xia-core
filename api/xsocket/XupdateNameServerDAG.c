@@ -21,7 +21,7 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
-int XupdateNameServerDAG(int sockfd, char *nsDAG) {
+int XupdateNameServerDAG(int sockfd, const char *nsDAG) {
   int rc;
 
   if (!nsDAG) {

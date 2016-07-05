@@ -55,6 +55,8 @@ class XIAChallengeSource : public Element { public:
     int initialize(ErrorHandler *);
 
     void push(int, Packet *);
+	void add_handlers();
+	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
 private:
 	bool generate_secret();
@@ -71,6 +73,7 @@ private:
 	String pub_path;
 	String priv_path;
 	XIAPath _src_path;
+	XID _hid;
     HashTable<String, short> _verified_table;
 };
 

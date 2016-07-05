@@ -5,7 +5,7 @@ include xia.mk
 endif
 
 # list of top level directories that need to be built
-MAKEDIRS=click api daemons applications tools
+MAKEDIRS=click api daemons applications arada # tools
 
 # make sure we run clean in anything we built in
 CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
@@ -34,7 +34,7 @@ $(filter-out click, $(MAKEDIRS)):
 #### CONFIG RULES
 # add other configuration targets here as needed
 config: xia.mk
-	@cd click && ./conf_xia
+	@cd click && CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" TARCH=$(TARCH) ./conf_xia 
 
 xia.mk: configure
 	@./configure
@@ -42,7 +42,7 @@ xia.mk: configure
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)
-	-@rm click/.configured
+	-@rm -f click/.configured
 	-@rm xia.mk
 
 $(CLEANDIRS):

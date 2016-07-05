@@ -6,7 +6,19 @@ if [ "$DEBUG" != "" ] ; then
 fi
 
 if [ ! -f .configured ] ; then
-	echo Configuring Click.....
-	./configure --disable-linuxmodule --enable-warp9 --enable-user-multithread --enable-userlevel --enable-multithread=24  --enable-ip6 --enable-ipsec "$*"
+	echo Configuring Click..... 	
+    
+	OPTFLAGS=""
+	if [ "$TARCH" = "mips" ] ; then # target architecture argument
+		OPTFLAGS="--host=mips-linux --libdir=/opt/buildroot-2013.11/output/host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include prefix=/tmp/usb/bin/ --enable-wavelocal --disable-waveremote"
+	else # x86
+		OPTFLAGS="--enable-waveremote --disable-wavelocal"
+	fi
+
+	./configure CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" $OPTFLAGS --enable-tools=no --disable-linuxmodule --enable-warp9 --enable-user-multithread --enable-userlevel --enable-multithread=24  --enable-ip6 --disable-ipsec --disable-analysis --disable-app --disable-aqm --disable-test --disable-threads --disable-icmp --disable-tcpudp  "$*"
+
+else 
+
+
 	touch .configured
 fi

@@ -52,11 +52,12 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     bool have_ena = false;
     
     if (cp_va_kparse(words, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;    
     
+	/* NITIN - disabled because HID is assigned by write handler due
+	 * to multihoming support
     v.push_back(Entry());
     v.back().xida = _my_xid;    
     
@@ -67,6 +68,7 @@ XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) cons
     }
     
     v.back().ena = ena; 
+	*/
     return 0;  
 }
 
@@ -237,6 +239,43 @@ XARPResponder::remove_handler(const String &s, Element *e, void *, ErrorHandler 
     return errh->error("%s not found", xid.unparse().c_str());
 }
 
+enum {DAG, HID};
+
+int XARPResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XARPResponder *ar = static_cast<XARPResponder *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, ar, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+		// Remove entry for old HID from HID->MAC table, if any
+		for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it) {
+			if(ar->_my_xid == it->xida) {
+				ar->_v.erase(it);
+				break;
+			}
+		}
+		// Assign the new HID
+        ar->_my_xid = hid;
+		// Add new entry for this HID to the HID->MAC table
+		Vector<Entry> v(ar->_v);
+		v.push_back(Entry());
+		v.back().xida = hid;
+		v.back().ena = ar->_my_en;
+		normalize(v, true, errh);
+		ar->_v.swap(v);
+        click_chatter("XARPResponder: HID assigned: %s", ar->_my_xid.unparse().c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
 
 void
 XARPResponder::add_handlers()
@@ -245,6 +284,7 @@ XARPResponder::add_handlers()
     set_handler("lookup", Handler::OP_READ | Handler::READ_PARAM, lookup_handler);
     add_write_handler("add", add_handler, 0);
     add_write_handler("remove", remove_handler, 0);
+    add_write_handler("hid", write_param, (void *)HID);
 }
 
 EXPORT_ELEMENT(XARPResponder)

@@ -18,7 +18,48 @@ echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
 echo XIADIR=$(pwd) >> $OUTPUT
 
+if [ "$tarch" = "mips" ]; then
+
 [ "$1" == "DEBUG" ] && echo "DEBUG=1" >> $OUTPUT
+
+cat >> $OUTPUT << EOF
+APIDIR=\$(XIADIR)/api
+BINDIR=\$(XIADIR)/bin
+ETC=\$(XIADIR)/etc
+XLIB=\$(APIDIR)/lib
+XINC=\$(APIDIR)/include
+
+TARCH=mips
+MIPSHOMEDIR=/opt/buildroot-2013.11/output/host
+MIPSINCDIR=\$(MIPSHOMEDIR)/usr/include/
+MIPSPYINCDIR=\$(MIPSHOMEDIR)/usr/include/python2.7/
+MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
+
+CC=mips-linux-g++
+LD=mips-linux-g++
+CFLAGS=-Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CXXFLAGS=\$(CFLAGS)
+
+LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
+
+PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
+PYINCLUDES=-I\$(MIPSPYINCDIR)
+
+ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
+	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
+else
+	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf -lssl -lcrypto
+endif
+
+ifdef DEBUG
+CFLAGS +=-ggdb -DDEBUG
+else
+CFLAGS +=-O2
+endif
+
+EOF
+
+else # regular X86 case
 
 cat >> $OUTPUT << EOF
 APIDIR=\$(XIADIR)/api
@@ -37,6 +78,9 @@ else
 	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
 endif
 
+PYLDFLAGS=`python-config --ldflags`
+PYINCLUDES=`python-config --includes`
+
 ifdef DEBUG
 CFLAGS +=-ggdb -DDEBUG
 else
@@ -44,3 +88,5 @@ CFLAGS +=-O2
 endif
 
 EOF
+
+fi

@@ -166,6 +166,7 @@ void processHostRegister(const char* host_register_msg) {
 	size_t found, start;
 	string msg, hostHID;
 	start = 0;
+	printf("xrouted: Registering: %s.\n", host_register_msg);
 	msg = host_register_msg;
  	// read message-type
 	found=msg.find("^", start);
@@ -181,6 +182,7 @@ void processHostRegister(const char* host_register_msg) {
   	}
 
  	int interface = interfaceNumber("HID", hostHID);
+	printf("xrouted: Routing table entry: interface=%d, host=%s\n", interface, hostHID.c_str());
 	// update the host entry in (click-side) HID table
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
@@ -536,20 +538,26 @@ void updateClickRoutingTable() {
 }
 
 
-
 void initRouteState()
 {
+	char dag[MAX_DAG_SIZE];
+
 	// make the dest DAG (broadcast to other routers)
 	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
 	g.fill_sockaddr(&route_state.ddag);
 
 	syslog(LOG_INFO, "xroute Broadcast DAG: %s", g.dag_string().c_str());
 
-	// read the localhost AD and HID
-	if ( XreadLocalHostAddr(route_state.sock, route_state.myAD, MAX_XID_SIZE, route_state.myHID, MAX_XID_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ) {
+	// read the localhost DAG and 4ID
+	if ( XreadLocalHostAddr(route_state.sock, dag, MAX_DAG_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ) {
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		exit(-1);
 	}
+
+	// Retrieve AD and HID from highest priority path to intent
+	Graph g_localhost(dag);
+	strcpy(route_state.myAD, g_localhost.intent_AD_str().c_str());
+	strcpy(route_state.myHID, g_localhost.intent_HID_str().c_str());
 
 	// make the src DAG (the one the routing process listens on)
 	struct addrinfo *ai;

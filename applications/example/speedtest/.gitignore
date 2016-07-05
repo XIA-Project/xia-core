@@ -1,0 +1,7 @@
+speedtest-client-dgram
+speedtest-client-stream
+speedtest-client-tcpip
+speedtest-server-dgram
+speedtest-server-stream
+speedtest-server-tcpip
+

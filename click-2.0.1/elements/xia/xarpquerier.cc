@@ -90,11 +90,12 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     IPAddress my_mask;
+	/* TODO: NITIN ASK DAN why this exists? Makes kparse unhappy below
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
+	*/
 	
     if (cp_va_kparse(conf, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
@@ -106,8 +107,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	.complete() < 0)
 	return -1;
     */
-
-    _my_xid_configured = true;	
 
     if (!have_broadcast) {
     	String _bcast_xid(BHID);  // Broadcast HID
@@ -144,13 +143,11 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     IPAddress my_ip, my_mask;
-    XID my_xid;
     EtherAddress my_en;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
 	
     if (cp_va_kparse(conf, this, errh,
-	             "XID", cpkP + cpkM, cpXID, &_my_xid,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
@@ -168,10 +165,9 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
         _my_bcast_xid.parse(_bcast_xid);
     }
 
-    if ((my_xid != _my_xid || my_en != _my_en) && _my_xarpt)
+    if ((my_en != _my_en) && _my_xarpt)
 	_xarpt->clear();
 
-    _my_xid = my_xid;
     _my_en = my_en;
     String _bcast_xid(BHID);  // Broadcast HID
     _my_bcast_xid.parse(_bcast_xid);
@@ -437,6 +433,17 @@ XARPQuerier::write_handler(const String &str, Element *e, void *thunk, ErrorHand
 	q->_xarp_queries = q->_drops = q->_xarp_responses = 0;
 	q->_xarpt->clear();
 	return 0;
+    case h_hid:
+    {
+        XID hid;
+        if (cp_va_kparse(str, q, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        q->_my_xid = hid;
+		q->_my_xid_configured = true;
+        click_chatter("XARPQuerier: HID assigned: %s", q->_my_xid.unparse().c_str());
+        return 0;
+    }
     default:
 	return -1;
     }
@@ -455,6 +462,7 @@ XARPQuerier::add_handlers()
     add_write_handler("insert", write_handler, h_insert);
     add_write_handler("delete", write_handler, h_delete);
     add_write_handler("clear", write_handler, h_clear);
+    add_write_handler("hid", write_handler, h_hid);
 }
 
 CLICK_ENDDECLS

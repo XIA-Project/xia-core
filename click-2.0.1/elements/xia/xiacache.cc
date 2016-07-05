@@ -38,13 +38,11 @@ int
 XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* routing_table_elem;
-    XIAPath local_addr;
     int pkt_size=0;
 	int malicious=0;
     bool cache_content_from_network =true;
 
     if (cp_va_kparse(conf, this, errh,
-		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"ROUTETABLENAME", cpkP+cpkM, cpElement, &routing_table_elem,
 		"CACHE_CONTENT_FROM_NETWORK", cpkP, cpBool, &cache_content_from_network,
 		"PACKET_SIZE", 0, cpInteger, &pkt_size,
@@ -60,8 +58,6 @@ XIACache::configure(Vector<String> &conf, ErrorHandler *errh)
 #else
     _content_module->_routeTable = reinterpret_cast<XIAXIDRouteTable*>(routing_table_elem);
 #endif
-    _local_addr = local_addr;
-    _local_hid = local_addr.xid(local_addr.destination_node());
 
     if (pkt_size) XIAContentModule::PKTSIZE= pkt_size;
     _content_module->_cache_content_from_network = cache_content_from_network;
@@ -156,25 +152,32 @@ int XIACache::get_malicious()
 	return _content_module->malicious;
 }
 
-enum {H_MOVE, MALICIOUS};
+enum {DAG, HID, MALICIOUS};
 
 int XIACache::write_param(const String &conf, Element *e, void *vparam,
                 ErrorHandler *errh)
 {
     XIACache *f = static_cast<XIACache *>(e);
     switch(reinterpret_cast<intptr_t>(vparam)) {
-        case H_MOVE: {
-            XIAPath local_addr;
+        case DAG: {
+            XIAPath dag;
             if (cp_va_kparse(conf, f, errh,
-				"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
+				"DAG", cpkP+cpkM, cpXIAPath, &dag,
 				cpEnd) < 0)
 		    return -1;
-            f->_local_addr = local_addr;
-            //click_chatter("%s",local_addr.unparse().c_str());
-            f->_local_hid = local_addr.xid(local_addr.destination_node());
-            
-            
-        } break;
+            f->_local_addr = dag;
+			click_chatter("XIACache: DAG is now %s", f->_local_addr.unparse().c_str());
+			break;
+        }
+		case HID: {
+			XID hid;
+			if (cp_va_kparse(conf, f, errh,
+						"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+				return -1;
+			f->_hid = hid;
+			click_chatter("XIACache: HID assigned: %s", f->_hid.unparse().c_str());
+			break;
+		}
 
 		case MALICIOUS: {
 			f->set_malicious(atoi(conf.c_str()));
@@ -199,7 +202,8 @@ XIACache::read_handler(Element *e, void *thunk)
 }
 
 void XIACache::add_handlers() {
-    add_write_handler("local_addr", write_param, (void *)H_MOVE);
+    add_write_handler("dag", write_param, (void *)DAG);
+    add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("malicious", write_param, (void*)MALICIOUS);
 	add_read_handler("malicious", read_handler, (void*)MALICIOUS);
 }

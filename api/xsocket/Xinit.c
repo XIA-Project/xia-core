@@ -1,3 +1,4 @@
+
 /* ts=4 */
 /*
 ** Copyright 2011 Carnegie Mellon University
@@ -37,7 +38,11 @@
 #include <net/if.h>
 #include "state.h"
 
-#define LIBNAME	"libc.so.6"
+#ifdef __mips__
+    #define LIBNAME "libc.so.0"
+#else
+    #define LIBNAME	"libc.so.6"
+#endif
 
 using namespace std;
 

@@ -189,7 +189,7 @@ main(int argc, char *argv[]) {
 			if(++i < argc) password = argv[i];
 			break;
 		case 'v':
-			eprint("sic-"VERSION", © 2005-2012 Kris Maglione, Anselm R. Garbe, Nico Golde\n");
+			eprint("sic-\"VERSION\", © 2005-2012 Kris Maglione, Anselm R. Garbe, Nico Golde\n");
 		default:
 			eprint("usage: sic [-h service_name] [-p port] [-n nick] [-k keyword] [-v]\n");
 		}

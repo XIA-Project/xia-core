@@ -265,6 +265,7 @@ void *recvCmd (void *socketid)
 int registerReceiver()
 {
     int sock;
+	char localdag[XIA_MAX_DAG_STR_SIZE];
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	// create a socket, and listen for incoming connections
@@ -272,9 +273,12 @@ int registerReceiver()
 		 die(-1, "Unable to create the listening socket\n");
 
     // read the localhost AD and HID
-    if ( XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
+	if ( XreadLocalHostAddr(sock, localdag, XIA_MAX_DAG_STR_SIZE, my4ID, sizeof(my4ID)))
     	die(-1, "Reading localhost address\n");
 
+	Graph g_localhost(localdag);
+	strcpy(myAD, g_localhost.intent_AD_str().c_str());
+	strcpy(myHID, g_localhost.intent_HID_str().c_str());
 	struct addrinfo *ai;
     //FIXME: SID is hardcoded
 	if (Xgetaddrinfo(NULL, SID, NULL, &ai) != 0)

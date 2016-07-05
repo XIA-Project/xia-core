@@ -31,6 +31,9 @@
 #define EDGE_UNUSED 127u
 #define XID_SIZE	20
 #define NODES_MAX	20
+#define MAX_XID_TYPE_STR 8
+#define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
+#define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
 
 typedef struct {
 	unsigned int  s_type;

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -17,16 +17,27 @@
 import sys
 import os
 import re
+import stat
 import hashlib
-from Crypto.PublicKey import RSA
+from subprocess import check_call
 
 # Directory where all the keys will be dumped
 keydir = 'key'
 
 def generate_rsa_key():
-	private = RSA.generate(1024)
-	public = private.publickey()
-	return (private.exportKey(), public.exportKey())
+    private = None
+    public = None
+    check_call("openssl genrsa -out privatekey.txt 1024".split())
+    check_call("openssl rsa -pubout -in privatekey.txt -out publickey.txt".split())
+    with open("privatekey.txt") as privfd:
+        private = privfd.read()
+    with open("publickey.txt") as pubfd:
+        public = pubfd.read()
+    os.remove("privatekey.txt")
+    os.remove("publickey.txt")
+    assert private is not None
+    assert public is not None
+    return (private, public)
 
 def write_key_files(basename, privkey, pubkey):
 	if not os.path.exists(keydir):
@@ -34,9 +45,11 @@ def write_key_files(basename, privkey, pubkey):
 	privkeyfilename = os.path.join(keydir, basename)
 	pubkeyfilename = os.path.join(keydir, basename + '.pub')
 	with open(privkeyfilename, 'w') as privkeyfile:
-		privkeyfile.write(privkey + '\n')
+		privkeyfile.write(privkey)
+	# Make the private key accessible only to owner
+	os.chmod(privkeyfilename, stat.S_IWRITE|stat.S_IREAD)
 	with open(pubkeyfilename, 'w') as pubkeyfile:
-		pubkeyfile.write(pubkey + '\n')
+		pubkeyfile.write(pubkey)
 
 def remove_key_files(key):
 	os.remove(os.path.join(keydir, key))
@@ -57,6 +70,9 @@ def create_new_AD():
 def create_new_HID():
 	return 'HID:' + create_new_address()
 
+def create_new_SID():
+	return 'SID:' + create_new_address()
+
 def delete_AD(ad):
 	adstr, xid = ad.split(':')
 	remove_key_files(xid)
@@ -65,10 +81,14 @@ def delete_HID(hid):
 	hidstr, xid = hid.split(':')
 	remove_key_files(xid)
 
+def delete_SID(sid):
+	sidstr, xid = sid.split(':')
+	remove_key_files(xid)
+
 def pubkey_hash(pubkey):
 	keylist = pubkey.split('\n')
 	# Strip the first and last line because they just contain text markers
-	key = ''.join(keylist[1:-1])
+	key = ''.join(keylist[1:-2])
 	return hashlib.sha1(key).hexdigest()
 
 if __name__ == "__main__":

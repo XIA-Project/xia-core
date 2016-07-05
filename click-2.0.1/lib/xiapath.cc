@@ -142,6 +142,7 @@ XIAPath::parse_re(const String& s, const Element* context)
     reset();
 
     String str_copy = s;
+	click_chatter("XIAPath::parse_re: parsing: %s", s.c_str());
 
     click_xia_xid prev_xid;
     memset(&prev_xid, 0, sizeof(prev_xid));
@@ -171,7 +172,7 @@ XIAPath::parse_re(const String& s, const Element* context)
                 (void)context;
                 if (!cp_xid(tail, &xid)) {
 #endif
-                    click_chatter("unrecognized XID format: %s", tail.c_str());
+                    click_chatter("XIAPath::parse_re: unrecognized XID format: %s", tail.c_str());
                     return false;
                 }
                 fallback.push_back(xid);
@@ -187,7 +188,7 @@ XIAPath::parse_re(const String& s, const Element* context)
         (void)context;
         if (!cp_xid(head, &next_xid)) {
 #endif
-            click_chatter("unrecognized XID format: %s", head.c_str());
+            click_chatter("XIAPath::parse_re: parsing main node: unrecognized XID format: %s", head.c_str());
             return false;
         }
 
@@ -651,6 +652,52 @@ XIAPath::replace_node_xid(String oldXIDstr, String newXIDstr)
 		}
 	}
 	return true;
+}
+
+XIAPath::handle_t
+XIAPath::first_hop_from_node(XIAPath::handle_t node) const
+{
+	Vector<XIAPath::handle_t> child_nodes = next_nodes(node);
+	Vector<XIAPath::handle_t>::iterator it = child_nodes.begin();
+	return *it;
+}
+
+bool
+XIAPath::replace_intent_hid(XID new_hid)
+{
+	handle_t intent_hid_node = find_intent_hid();
+	if(intent_hid_node == INVALID_NODE_HANDLE) {
+		return false;
+	}
+	// If we found the node, replace the HID with the new one
+	_nodes[intent_hid_node].xid = new_hid;
+	return true;
+}
+
+XIAPath::handle_t
+XIAPath::find_intent_hid()
+{
+	handle_t current_node = source_node();
+	handle_t dst = destination_node();
+	handle_t intent_hid_node = INVALID_NODE_HANDLE;
+	// Walk from src to dst on first hops, finding all HIDs on path
+	while(current_node != dst) {
+		if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_HID)) {
+			intent_hid_node = current_node;
+		}
+		current_node = first_hop_from_node(current_node);
+	}
+	// Include destination node in the search for last HID
+	// Most likely, this is the intent HID node
+	if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_HID)) {
+		intent_hid_node = current_node;
+	}
+
+	if(intent_hid_node == INVALID_NODE_HANDLE) {
+		click_chatter("XIAPath: ERROR Intent HID not found");
+		return false;
+	}
+	return intent_hid_node;
 }
 
 Vector<XIAPath::handle_t>

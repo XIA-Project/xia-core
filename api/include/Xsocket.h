@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <poll.h>
 
@@ -39,6 +40,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifdef __mips__ // to add missing constants
+    #define F_SETOWN_EX 15
+    #define F_GETOWN_EX 16
+    #define F_SETPIPE_SZ 1031
+    #define F_GETPIPE_SZ 1032
+    #define SO_REUSEPORT 15
+    #define IPPROTO_BEETPH 94
+    #define MSG_FASTOPEN 0x20000000
+#endif
+
 
 #define MAXBUFLEN    15600 // Note that this limits the size of chunk we can receive TODO: What should this be?
 #define XIA_MAXBUF   MAXBUFLEN
@@ -181,14 +193,18 @@ extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
-extern int XreadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID);
+extern int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID);
+extern int Xgethostname(char *name, size_t len);
+extern int Xgetifaddrs(struct ifaddrs **ifap);
+extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
 /* internal only functions */
-extern int XupdateAD(int sockfd, char *newad, char *new4id);
-extern int XupdateRV(int sockfd);
-extern int XupdateNameServerDAG(int sockfd, char *nsDAG);
+extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
+extern int XupdateRV(int sockfd, int interface, const char *rv_control_dag);
+extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
+extern const char *XnetworkDAGIntentAD(const char *network_dag);
 
 extern int Xgetpeername(int sockd, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xgetsockname(int sockd, struct sockaddr *addr, socklen_t *addrlen);

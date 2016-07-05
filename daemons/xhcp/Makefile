@@ -7,8 +7,8 @@ CFLAGS += -I$(APIDIR)/xsocket/minini
 LDFLAGS += $(LIBS)
 
 COMMON=csclient.cc XIARouter.cc
-SOURCES_CLIENT=xhcp_client.cc
-SOURCES_SERVER=xhcp_server.cc
+SOURCES_CLIENT=xhcp_client.cc xhcp_interface.cc xhcp_beacon.cc
+SOURCES_SERVER=xhcp_server.cc xhcp_beacon.cc
 CLIENT=$(BINDIR)/xhcp_clientd
 SERVER=$(BINDIR)/xhcp_serverd
 

@@ -436,6 +436,7 @@ int initializeClient(const char *name)
 	socklen_t daglen;
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
+	char localdag[XIA_MAX_DAG_STR_SIZE];
 
     // lookup the xia service 
 	daglen = sizeof(dag);
@@ -461,12 +462,15 @@ int initializeClient(const char *name)
 
 	
 	
-	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
+	rc = XreadLocalHostAddr(sock, localdag, XIA_MAX_DAG_STR_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
 		Xclose(sock);
 		 die(-1, "Unable to read local address.\n");
 	} else{
+		Graph g_localhost(localdag);
+		strcpy(my_ad, g_localhost.intent_AD_str().c_str());
+		strcpy(my_hid, g_localhost.intent_HID_str().c_str());
 		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
 	

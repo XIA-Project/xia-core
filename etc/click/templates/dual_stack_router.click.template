@@ -5,7 +5,7 @@ log::XLog(VERBOSE 0, LEVEL 6);
 
 // router instantiation
 // TODO: If we ever connect more than one port to IP, we somehow need to tell the router about all of its IP addresses in local_addr
-${HNAME} :: XIADualRouter4Port(RE ( IP:$EXTERNAL_IP ) $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, 1500, $IP_ACTIVE0, $IPADDR0, $MAC0, $GWADDR0,
+${HNAME} :: XIADualRouter4Port(RE ( IP:$EXTERNAL_IP ) $ADNAME $HID, $ADNAME, $HID, $EXTERNAL_IP, 1500, ${HNAME}, $IP_ACTIVE0, $IPADDR0, $MAC0, $GWADDR0,
                                                                                                          $IP_ACTIVE1, $IPADDR1, $MAC1, $GWADDR1,
                                                                                                          $IP_ACTIVE2, $IPADDR2, $MAC2, $GWADDR2,
                                                                                                          $IP_ACTIVE3, $IPADDR3, $MAC3, $GWADDR3);
