@@ -7,25 +7,18 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-//#include <click/xiacontentheader.hh>
 #include "xtransport.hh"
 #include <click/xiastreamheader.hh>
 #include <click/xiatransportheader.hh>
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"
-//#include "xchunk.hh"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 
 /*
 ** FIXME:
-** - set saner retransmit values before we get backoff code
-** - implement a backoff delay on retransmits so we don't flood the connection
-** - fix cid header size issue so we work correctly with the linux version
-** - if we receive a duplicate SYN, should it reset the SYNACK retransmit count to 0?
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
 ** - see various FIXMEs in the code
-** - get sk in ProcessAPIPacket instead of each individual handler
 ** - replace copy_packet with uniqueify. not needed for migration in reliable transport
 **	 still needed for datagram and cid??
 */
