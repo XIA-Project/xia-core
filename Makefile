@@ -12,7 +12,7 @@ CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-.PHONY: all config clean test $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
+.PHONY: all config clean test fresh $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
 
 #### BUILD RULES
@@ -75,6 +75,15 @@ $(CLEANDIRS):
 #### print out the value of a variable such as CFLAGS
 dump-% :
 	@echo $* = $($*)
+
+#### delete files generated when running XIA
+fresh:
+	@rm -rf key/*
+	@rm -rf etc/resolv.conf
+	@rm -rf etc/nodes.conf
+	@rm -rf ect/click/template/host.click
+	@rm -rf etc/click/template/router.click
+
 
 #### TEST RULES
 test: $(TESTDIRS)
