@@ -78,11 +78,12 @@ dump-% :
 
 #### delete files generated when running XIA
 fresh:
+	@echo deleting XIA runtime files and keys
 	@rm -rf key/*
-	@rm -rf etc/resolv.conf
-	@rm -rf etc/nodes.conf
-	@rm -rf ect/click/template/host.click
-	@rm -rf etc/click/template/router.click
+	@rm -f etc/resolv.conf
+	@rm -f etc/nodes.conf
+	@rm -f etc/xsockconf.ini
+	@rm -f etc/click/templates/*.click
 
 
 #### TEST RULES
