@@ -40,7 +40,8 @@
 extern "C" {
 #endif
 
-#define MAXBUFLEN    65535 // Note that this limits the size of chunk we can receive TODO: What should this be?
+#define MAXBUFLEN    62000	// Must be smaller than the MTU of localhost to allow for the protobuf and its contained data
+							// this isn't calculated, so make sure more than enough room is available for now
 #define XIA_MAXBUF   MAXBUFLEN
 #define XIA_MAXCHUNK MAXBUFLEN
 
