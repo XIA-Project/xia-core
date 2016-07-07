@@ -106,7 +106,6 @@ int main(int argc, char *argv[]){
 	sockaddr_x cdag;
 	socklen_t dlen;
 	int n;
-	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
     
     pid_t pid = getpid();
 
