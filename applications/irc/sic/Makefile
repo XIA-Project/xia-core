@@ -4,6 +4,7 @@ include config.mk
 include ../../../xia.mk
 
 LDFLAGS += $(LIBS)
+CFLAGS += -Wno-write-strings
 
 SRC = sic.c
 OBJ = ${SRC:.c=.o}
