@@ -1,5 +1,7 @@
 include ../../xia.mk
 
+CFLAGS += -Wno-unused-result
+
 all: httpd simpleclient
 
 httpd: httpd.c
