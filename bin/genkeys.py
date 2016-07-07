@@ -42,6 +42,7 @@ def generate_rsa_key():
 def write_key_files(basename, privkey, pubkey):
 	if not os.path.exists(keydir):
 		os.mkdir(keydir)
+		os.chmod(keydir, 0777)
 	privkeyfilename = os.path.join(keydir, basename)
 	pubkeyfilename = os.path.join(keydir, basename + '.pub')
 	with open(privkeyfilename, 'w') as privkeyfile:
