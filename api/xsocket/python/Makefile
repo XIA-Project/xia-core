@@ -6,6 +6,7 @@ XSOCK_LIB=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 TARGET=$(XLIB)/_c_xsocket.so
 LDFLAGS +=-lc -ldl $(PYLDFLAGS)
 PYTHON=$(PYINCLUDES)
+CFLAGS += -Wno-unused-parameter
 
 ifeq ($(wildcard $(XLIB)/libXsocket.a),)
 	PY_LIBS=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
@@ -32,7 +33,7 @@ clean:
 	-rm $(TARGET)
 	-rm $(XLIB)/xsocket.py
 	-rm $(XLIB)/c_xsocket.py
-	-rm $(XLIB)/*.pyc
+	-rm -f $(XLIB)/*.pyc
 	make -C doc clean
 	-rm -f *.so *.o *.pyc
 	-rm c_xsocket_wrap.c
