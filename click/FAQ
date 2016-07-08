@@ -1,0 +1,219 @@
+CLICK FAQ
+=========
+
+*******************************************************************************
+*            The most up-to-date version of this FAQ is on line at            *
+*                                                                             *
+*                    http://www.read.cs.ucla.edu/click/faq                    *
+*                                                                             *
+*******************************************************************************
+
+SECTION 1: GENERAL QUESTIONS
+----------------------------
+
+Q. Is Click experimental software?
+
+A. Yes.
+
+
+Q. The Click Linux patch does not apply cleanly to my version of Linux.
+
+A. Try a version of Linux for which we distribute a specific patch.  See
+   the INSTALL file for a list of patches.
+
+
+Q. How fast can Click route packets?
+
+A. On a 700 MHz Pentium III, we could get 456,000 64-byte packets a second
+   through a Click router with eight active DEC Tulip fast Ethernet cards.
+
+
+Q. How do you do that?
+
+A. Device driver improvements, including polling, and language-level
+   optimizations.
+
+
+Q. Can I get that many packets through a Click router?
+
+A. You should be able to do that right now if you use DEC Tulip fast
+   Ethernet cards or Intel E1000 gigabit Ethernet cards.  These are the
+   main device drivers that we have changed to use our polling extensions
+   to Linux.
+
+
+Q. How does Click run inside a Linux kernel?
+
+A. As a kernel thread.
+
+
+Q. What are the Grid elements?
+
+A. Grid is a set of protocols for routing in multi-hop ad-hoc
+   wireless networks.  See http://pdos.lcs.mit.edu/grid for further
+   details.
+
+
+SECTION 2: QUESTIONS ABOUT POLLING
+----------------------------------
+
+Q. How can I change a device driver to use the Click polling extensions?
+
+A. Benjie Chen, who designed the extensions, never wrote a document
+   describing how to do this.  For now, you'll have to look at our
+   additions to Linux's 'struct device', and the way they are used by our
+   drivers.  You can always write us and ask for help:
+   <click@librelist.com>.
+
+
+Q. Can I use Click without updating device drivers (that is, without
+   polling)?
+
+A. Sure.  Just use FromDevice elements instead of PollDevice elements.
+   Your performance will generally be worse than Linux; we haven't
+   particularly optimized this.
+
+
+SECTION 3: CREATING YOUR OWN ELEMENTS
+-------------------------------------
+
+Q. How can I add my own element class to Click?
+
+A. There are two ways to add an element class to Click: in the main Click
+   collection, or in a package. We recommend that you use packages for
+   nontrivial collections of elements. It has several advantages -- for
+   example, it will keep your code separate from the main Click code. Check
+   out the sample package in 'etc/samplepackage'. However, if you just want
+   to compile a single new element, it will be easier to add it to the main
+   Click collection. This answer shows how.
+
+   First, write your element class.
+
+     Each element class should be written as two C++ source files, FILE.cc
+     and FILE.hh. The easiest way to create an element this is to copy an
+     existing element and change the C++ class's name. You must change at
+     least the following function:
+
+	const char *class_name() const;	// return your element's name
+
+     Other common functions to override include:
+
+	void push(int i, Packet *);	// process push request on input i
+	Packet *pull(int i);		// process pull request on output i
+	Packet *simple_action(Packet *); // for agnostic elements
+
+	const char *port_count() const; // return port count code
+	const char *processing() const; // return processing code
+	int configure(Vector<String> &, ErrorHandler *);
+					// process configuration string
+	void add_handlers();		// set up element handlers
+	int initialize(ErrorHandler *);	// initialize element
+	void cleanup(CleanupStage);	// clean up element state
+
+     All these functions are described in the Click programming manual,
+     doc/click.texi.
+
+     Make sure that your .cc file exports the element class with
+     EXPORT_ELEMENT. For example, the nullelement.cc file ends with:
+
+	EXPORT_ELEMENT(NullElement)
+
+     EXPORT_ELEMENT takes a single argument, the name of the C++ class
+     corresponding to your element. You can have multiple EXPORT_ELEMENT
+     lines if your source file declares multiple element classes.
+
+     If your element is meant only for the user-level driver, add this line
+     near EXPORT_ELEMENT:
+
+	ELEMENT_REQUIRES(userlevel)
+
+     Other driver names are "linuxmodule", "bsdmodule", and "ns". You can
+     also say, for example, "ELEMENT_REQUIRES(userlevel|ns)".
+
+     ELEMENT_REQUIRES can also take element names and package names like
+     'ip6':
+
+	ELEMENT_REQUIRES(linuxmodule Storage ip6)
+
+   Second, put your element in an 'elements/' directory.
+
+     Choose the directory that seems most appropriate for your element.
+     Often, this is 'elements/local', which is designed for locally-created
+     elements. If you place your element in 'local', make sure you provide
+     the '--enable-local' argument to 'configure'.
+
+   Third, run 'make elemlist'.
+
+     'make elemlist' checks the source files in the 'elements/'
+     subdirectories for EXPORT_ELEMENT directives, and compiles a list of
+     elements that Click should compile. After running 'make elemlist',
+     check the 'userlevel/elements.conf' and 'linuxmodule/elements.conf'
+     files to see if your .cc file made it into this list.
+
+   Finally, run 'make install'!
+
+     You are done.
+
+
+Q. My element wasn't compiled! Click reports 'unknown element class'.
+
+A. First, check whether Click's build process found your element, by
+   running "grep ELEMENTNAME CLICKDIR/userlevel/elements.conf".  (If you
+   are having trouble with the Linux kernel module, search
+   CLICKDIR/linuxmodule/elements.conf instead.)  The elements.conf file is
+   generated automatically, and contains information about every element
+   Click plans to compile. If the grep command has no output, then Click
+   didn't find your element. Check these things:
+
+   * Do you have an EXPORT_ELEMENT statement?
+   * Does your element require something with ELEMENT_REQUIRES that is not
+     available?
+   * Did you run 'make elemlist'?
+   * Is the relevant elements/ directory enabled? (For instance, for
+     elements/local, did you run './configure ... --enable-local'?)
+
+   If the elements.conf file does list your element, then Click attempted
+   to compile your element and everything should work.  If you still get
+   'unknown element class', check these things:
+
+   * Userlevel only: Are you running an installed version of Click? (For
+     instance, are you typing "click FILE.click" instead of
+     "CLICKDIR/userlevel/click FILE.click"?) If so, then you will not be
+     able to use your new element until you run 'make install'.
+   * Linuxmodule only: Did you unload the old version of the kernel module
+     and load the new one that contains your element?  The easiest way to
+     do this is with 'make install; click-install -u FILE.click'; the -u
+     option unloads & reloads the kernel module.
+
+
+Q. How can I make Click compile a C++ file that doesn't contain an element?
+
+A. Add an ELEMENT_PROVIDES statement to your .cc file.  The Click build
+   process searches for C and C++ files with 'ELEMENT_PROVIDES' as well as
+   'EXPORT_ELEMENT'.  You'll have to come up with a one-word tag describing
+   the functionality that your .cc file provides.  See the end of
+   'elements/userlevel/fakepcap.cc' for an example; it looks like this:
+
+	...
+	CLICK_ENDDECLS
+	ELEMENT_REQUIRES(userlevel|ns)
+	ELEMENT_PROVIDES(FakePcap)
+
+   Elements that use the 'FakePcap' functionality explicitly require it
+   with ELEMENT_REQUIRES; see 'elements/userlevel/fromdump.cc' for an
+   example.
+
+
+Q. One of my elements must be linked against another library.  How can I
+   make userlevel Click link with that library?
+
+A. Add the required linker flags to an 'ELEMENT_LIBS' statement in your
+   element's .cc file.  For example:
+
+	...
+	CLICK_ENDDECLS
+	EXPORT_ELEMENT(MyElement)
+	ELEMENT_LIBS((-L/usr/local/lib -lmy_library))
+
+   Every element that needs a library should contain the relevant
+   ELEMENT_LIBS.

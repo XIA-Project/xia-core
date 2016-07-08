@@ -149,7 +149,7 @@ private:
 			num_connect_tries = 0;
 			num_retransmits = 0;
 			num_close_tries = 0;
-			
+
 			pkt = NULL;
 			send_buffer_size = DEFAULT_RECV_WIN_SIZE;
 			send_base = 0;
@@ -366,7 +366,7 @@ protected:
 	void ProcessFinAckPacket(WritablePacket *p_in);
 
 	// timer retransmit handlers
-	bool RetransmitCIDRequest(sock *sk, unsigned short _sport, Timestamp &now, Timestamp &erlist_pending_expiry);
+	void RetransmitCIDRequest(sock *sk, Timestamp &now, Timestamp &erlist_pending_expiry);
 	bool RetransmitDATA(sock *sk, unsigned short _sport, Timestamp &now);
 	bool RetransmitFIN(sock *sk, unsigned short _sport, Timestamp &now);
 	bool RetransmitFINACK(sock *sk, unsigned short _sport, Timestamp &now);

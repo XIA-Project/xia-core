@@ -1,0 +1,43 @@
+#! /bin/sh
+
+# make-linux-patch
+
+# Make a patch file for a Linux kernel that adds our hooks.
+# The resulting output can be used thus:
+#  cd /usr/src/linux
+#  patch -p0 -b < patch-file
+
+usage () {
+    echo "Usage: make-linux-patch PUREDIR CLICKDIR" 1>&2
+    exit 1
+}
+
+if [ $# -lt 2 ]; then usage; fi
+if [ ! \( -d "$1" -a -d "$2" \) ]; then usage; fi
+
+puredir_orig="$1"
+clickdir_orig="$2"
+puredir=`cd "$1" && pwd`
+clickdir=`cd "$2" && pwd`
+
+if grep Click: $puredir/include/linux/skbuff.h >/dev/null 2>&1; then
+    echo "Error: pure directory has Click extensions" 1>&2; usage
+elif [ ! -f $puredir/include/linux/skbuff.h ]; then
+    echo "Error: pure directory doesn't contain Linux source" 1>&2; usage
+fi
+
+if [ ! -f $clickdir/include/linux/skbuff.h ]; then
+    echo "Error: Click directory doesn't contain Linux source" 1>&2; usage
+elif grep Click: $clickdir/include/linux/skbuff.h >/dev/null 2>&1; then
+    :
+else
+    echo "Error: Click directory doesn't contain Linux source" 1>&2; usage
+fi
+
+if [ `expr "$puredir" : "/"` != 1 ]; then
+    echo "Error: pure directory must be absolute" 1>&2; usage
+fi
+
+cd $clickdir
+[ $clickdir_orig = . ] && puredir="$puredir_orig"
+diff -ru --exclude=.depend --exclude='*.o' --exclude='*.orig' --exclude='*.flags' $puredir . | grep -v '^Only in \.[/:]'

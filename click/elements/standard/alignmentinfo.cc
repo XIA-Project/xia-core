@@ -31,17 +31,13 @@ AlignmentInfo::AlignmentInfo()
 {
 }
 
-AlignmentInfo::~AlignmentInfo()
-{
-}
-
 int
 AlignmentInfo::configure(Vector<String> &conf, ErrorHandler *errh)
 {
   // check for an earlier AlignmentInfo
   void *a = router()->attachment("AlignmentInfo");
   if (a and a != (void*)this){
-    return ((AlignmentInfo *)a)->configure(conf, errh);
+      return ((AlignmentInfo *)a)->configure(conf, errh);
     }
     
   router()->set_attachment("AlignmentInfo", this);

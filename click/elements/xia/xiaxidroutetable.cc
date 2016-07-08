@@ -43,8 +43,8 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     String broadcast_xid(BHID);  // broadcast HID
-    _bcast_xid.parse(broadcast_xid);    
-    
+    _bcast_xid.parse(broadcast_xid);
+
 	return 0;
 }
 
@@ -91,7 +91,7 @@ XIAXIDRouteTable::read_handler(Element *e, void *thunk)
     }
 }
 
-int 
+int
 XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
@@ -132,18 +132,18 @@ XIAXIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 	XIARouteData *xrd = &table->_rtdata;
 
 	// get the default route
-	String tbl = "-," + String(xrd->port) + "," + 
-		(xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + "," + 
+	String tbl = "-," + String(xrd->port) + "," +
+		(xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + "," +
 		String(xrd->flags) + "\n";
 
 	// get the rest
 	HashTable<XID, XIARouteData *>::iterator it = table->_rts.begin();
 	while (it != table->_rts.end()) {
 		String xid = it.key().unparse();
-		
+
 		xrd = (XIARouteData *)it.value();
 
-		tbl += xid + ","; 
+		tbl += xid + ",";
 		tbl += String(xrd->port) + ",";
 		tbl += (xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + ",";
 		tbl += String(xrd->flags) + "\n";
@@ -159,7 +159,7 @@ XIAXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, Error
 
 	String str_copy = conf;
 	String xid_str = cp_shift_spacevec(str_copy);
-	
+
 	if (xid_str.length() == 0)
 	{
 		// ignore empty entry
@@ -232,7 +232,7 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 		}
 
 		XIARouteData *xrd = new XIARouteData();
-		
+
 		xrd->port = port;
 		xrd->flags = flags;
 		xrd->nexthop = nexthop;
@@ -324,7 +324,7 @@ XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, Er
 	loff_t curpos = 0;
 	while (curpos < file_size)	{
 	file_read(filp, curpos, buf, 1020);
-	char * eol = strchr(buf, '\n');	
+	char * eol = strchr(buf, '\n');
 	if (eol==NULL) {
 			click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
 		break;
@@ -387,7 +387,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 
 	struct click_xia_xid xid_d;
 	xid_d.type = xid_type;
-	
+
 	if (port<0) click_chatter("Random %d ports", -port);
 
 	for (int i = 0; i < count; i++)
@@ -425,13 +425,13 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 
 		if (port<0) {
 #if CLICK_LINUXMODULE
-			u32 random = random32();	
+			u32 random = random32();
 #else
-			int random = rand();	
+			int random = rand();
 #endif
 			random = random % (-port);
 			xrd->port = random;
-			if (i%5000 == 0) 
+			if (i%5000 == 0)
 				click_chatter("Random port for XID %s #%d: %d ",XID(xid_d).unparse_pretty(e).c_str(), i, random);
 		} else
 			xrd->port = port;
@@ -461,7 +461,7 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
         process_xcmp_redirect(p);
         p->kill();
         return;
-    } else {    
+    } else {
     	port = lookup_route(in_ether_port, p);
     }
 
@@ -471,7 +471,7 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
 	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
-	  output(4).push(q); 
+	  output(4).push(q);
     }
 	*/
     if (port >= 0) {
@@ -536,7 +536,7 @@ XIAXIDRouteTable::process_xcmp_redirect(Packet *p)
        xrd1->nexthop = newroute;
        _rts[*dest] = xrd1;
    }
-   
+
    return -1;
 }
 
@@ -562,11 +562,11 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 
     if (_bcast_xid == node.xid) {
     	// Broadcast packet
-    	
+
     	XIAPath source_path = xiah.src_path();
     	source_path.remove_node(source_path.destination_node());
     	XID source_hid = source_path.xid(source_path.destination_node());
-    	
+
     	if(_local_hid == source_hid) {
     	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)
     	    	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
@@ -580,7 +580,7 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 				if ((*it).second->port != in_ether_port) {
 				  // update the entry
 				  (*it).second->port = in_ether_port;
-				}	
+				}
 			  }
     		else
 			  {
@@ -591,11 +591,11 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
 				_rts[source_hid] = xrd1;
 			  }
     		return DESTINED_FOR_LOCALHOST;
-    	}    	
+    	}
 		// TODO: not sure what this should be??
 		assert(0);
-		return DESTINED_FOR_LOCALHOST; 
-    
+		return DESTINED_FOR_LOCALHOST;
+
     } else {
     	// Unicast packet
 		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);

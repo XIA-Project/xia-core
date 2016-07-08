@@ -1,6 +1,4 @@
-ifeq ($(wildcard xia.mk),)
-$(error You must run configure first)
-else
+ifneq ($(wildcard xia.mk),)
 include xia.mk
 endif
 
@@ -23,32 +21,53 @@ all: config $(MAKEDIRS)
 static:
 	make all STATIC='static'
 
-# treat click special since we want multi-proc compiles
-click:
-	make -j$(NPROCS) -C $@
+# generate the click makefile optimized for XIA
+click/Makefile: click/Makefile.in xia.mk
+	cd click; CXXFLAGS="$(CLICKFLAGS)" CFLAGS="$(CLICKFLAGS)" ./configure \
+				$(OPTFLAGS) \
+				--enable-user-multithread \
+				--enable-warp9     \
+				--enable-userlevel \
+	 			--disable-analysis \
+				--disable-tcpudp   \
+				--disable-tools    \
+				--disable-test     \
+				--disable-app      \
+				--disable-aqm      \
+				--disable-simple   \
+				--disable-linuxmodule
 
+
+# treat click special since we want multi-proc compiles
+click: click/Makefile
+	CXXFLAGS="$(CLICKFLAGS)" CFLAGS="$(CLICKFLAGS)" make -j$(NPROCS) -C $@
+
+# rules for all of the other directories
 $(filter-out click, $(MAKEDIRS)):
 	make -C $@ $(STATIC)
 
 
 #### CONFIG RULES
 # add other configuration targets here as needed
-config: xia.mk
-	@cd click && CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" TARCH=$(TARCH) ./conf_xia 
+config: xia.mk click/Makefile
 
+# creates xia.mk
 xia.mk: configure
 	@./configure
-
+	@echo "xia.mk generated (ignore the error below & rerun make)"
+	@false
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)
-	-@rm -f click/.configured
+	-@rm click/Makefile
 	-@rm xia.mk
 
 $(CLEANDIRS):
 	-make -C $(basename $@) clean
 
-
+#### print out the value of a variable such as CFLAGS
+dump-% :
+	@echo $* = $($*)
 
 #### TEST RULES
 test: $(TESTDIRS)

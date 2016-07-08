@@ -1,0 +1,15 @@
+#! /bin/sh
+
+# click-viz : a program to graphically visualize click scripts.
+#
+# The output of this program is meant to be piped to dot to
+# generate a graph. Examples:
+#	click-viz demo.click | dot -Tpng >demo.png
+#       click-flatten demo.click | click-viz | dot -Tpng >demo.png
+#
+# Note: dot may be obtained from http://www.graphviz.org
+#
+# Original author: Jose Vasconcellos <jvasco@bellatlantic.net>
+# Rewritten in click-pretty by Eddie Kohler
+
+click-pretty --dot "$@"

@@ -1,0 +1,82 @@
+%info
+
+This test checks several ToHost properties: that a ToHost without a device
+will accept packets with a device annotation, and drop packets without such
+an annotation; and that ToHost(DEVICE) sets the device annotation
+appropriately; and that ToHost(SNIFFERS true) sends packets to sniffers.
+XXX It doesn't test whether SNIFFERS true sends packets to the kernel.
+
+%require
+click-buildtool provides linuxmodule
+[ `whoami` = root ] || sudo -n true
+
+%script
+SUDO=; if ! [ `whoami` = root ]; then SUDO="sudo -n"; fi
+test -n "`which click-install`"
+usleep () { click -e "DriverManager(wait ${1}us)"; }
+
+$SUDO "`which click-install`" KERNELCONFIG
+$SUDO tcpdump -n -i fake0 >FAKE0 2>&1 &
+usleep 500000
+dump1=$!
+ping -n -i 1 -c 1 1.0.0.2 | grep transmitted | sed 's/^\([0-9]*\).*/\1/' >PING1
+$SUDO sh -c "echo 1 > /click/sw/switch"
+ping -n -i 1 -c 1 1.0.0.3 | grep transmitted | sed 's/^\([0-9]*\).*/\1/' >>PING1
+$SUDO kill $dump1 || true
+cat /click/th0/drops /click/th1/drops >DROPS
+cat /click/c/count >COUNT
+$SUDO "`which click-uninstall`"
+
+%file KERNELCONFIG
+fh1 :: FromHost(fake0, 1.0.0.1/24);
+th0 :: ToHost(SNIFFERS true);
+th1 :: ToHost(fake0);
+
+elementclass ARPer {
+    input -> c :: Classifier(12/0806, 12/0800 23/01)
+	 -> ARPResponder(0/0 0:1:2:3:4:5) -> [0]output;
+    c[1] -> MarkIPHeader(14) -> [1]output
+}
+
+fh1 -> a1 :: ARPer -> th1;
+a1[1] -> ICMPPingResponder -> c::Counter -> sw :: Switch;
+sw[0] -> th0;
+sw[1] -> th1;
+
+// This packet should not go through, because there's no device.
+ICMPSendPings(2.0.0.2, 1.0.0.1, LIMIT 1) -> EtherEncap(0x0800, fake0, fake0) -> th0;
+// This packet should go through.
+ICMPSendPings(2.0.0.3, 1.0.0.1, LIMIT 1) -> EtherEncap(0x0800, fake0, fake0) -> th1;
+
+%ignorex -i FAKE0
+.*listening on.*
+.*packet.*received by.*
+.*packet.*dropped by.*
+.*packet.*captured.*
+.*arp.*
+.*verbose output.*
+.*end of file.*
+.*icmp6.*
+.*\.mdns >.*
+.*\.5353 >.*
+.*igmp.*
+
+%expectx -i FAKE0
+.* 1.0.0.1 > 1.0.0.2: icmp.* echo request.*
+.* 1.0.0.2 > 1.0.0.1: icmp.* echo reply.*
+.* 2.0.0.3 > 1.0.0.1: icmp.* echo request.*
+.* 1.0.0.1 > 1.0.0.3: icmp.* echo request.*
+.* 1.0.0.3 > 1.0.0.1: icmp.* echo reply.*
+
+%expect PING1
+1
+1
+
+%expect DROPS
+1
+0
+
+%expect COUNT
+2
+
+%expect stderr

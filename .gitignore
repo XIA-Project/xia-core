@@ -30,6 +30,7 @@ asm
 xia.mk
 .DS_Store
 *.dSYM
+.fuse*
 
 # directories
 key
@@ -128,10 +129,10 @@ example/xecho
 arada/waveserver/waveserver
 
 # output from scripts
-etc/click/host.click
-etc/click/router.click
-etc/click/dual_stack_host.click
-etc/click/dual_stack_router.click
+etc/click/host*.click
+etc/click/router*.click
+etc/click/dual_stack_host*.click
+etc/click/dual_stack_router*.click
 
 # planetlab
 experiments/planetlab/logs/*.txt

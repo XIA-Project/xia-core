@@ -53,7 +53,7 @@ class XIAPath { public:
     size_t unparse_node(struct click_xia_xid_node* node, size_t n) const;
 
     //// path access methods
-    
+
     typedef size_t handle_t;
 
     // check if the path is valid

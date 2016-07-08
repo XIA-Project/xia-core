@@ -103,7 +103,7 @@ XIAPath::parse_dag(const String& s, const Element* context)
         }
         node.xid = XID(xid);
 
-        // parse indices 
+        // parse indices
         for (size_t i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
             String index_str = cp_shift_spacevec(str_copy);
             if (index_str == "") {
@@ -441,7 +441,7 @@ XIAPath::unparse_node(struct click_xia_xid_node* node, size_t n) const
         }
         else
             index = order - 1;
-        
+
         if (index < n) {  // if the output buffer space is available
             if (order > 0) // not a source node
                 node[index].xid = _nodes[i].xid.xid();
@@ -449,7 +449,7 @@ XIAPath::unparse_node(struct click_xia_xid_node* node, size_t n) const
             if (order < total_n) { // not a destination node
                 for (int j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++) {
                     if (j < _nodes[i].edges.size()) {
-                        size_t next_node_order = _nodes[_nodes[i].edges[j]].order - 1; 
+                        size_t next_node_order = _nodes[_nodes[i].edges[j]].order - 1;
                         assert(next_node_order < total_n);
                         node[index].edge[j].idx = next_node_order;
                     }
@@ -518,7 +518,7 @@ XIAPath::is_valid() const
 
     if (_dst >= static_cast<size_t>(_nodes.size()))
         return false;
-    
+
     // non-degenerative path?
     if (_src == _dst)
         return false;
@@ -732,7 +732,7 @@ XIAPath::remove_node(handle_t node)
 {
     _nodes.erase(&_nodes[node]);
     for (int i = 0; i < _nodes.size(); i++) {
-        int num_edges =_nodes[i].edges.size(); 
+        int num_edges =_nodes[i].edges.size();
         for (int j = 0; j < num_edges; j++) {
             if (_nodes[i].edges[j] == node) {
                 // remove all incoming edges
@@ -767,7 +767,7 @@ XIAPath::remove_edge(size_t from_node, size_t to_node)
 void
 XIAPath::incr(size_t order)
 {
-    int i=0; 
+    int i=0;
     if (!const_cast<XIAPath*>(this)->topological_ordering())
 		return;
     for (; i < _nodes.size(); i++) {
@@ -802,7 +802,6 @@ XIAPath::compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad)
 	int my_ad_c_str_len = strlen(my_ad.unparse().c_str())+1;
 	int their_ad_c_str_len = strlen(their_ad.unparse().c_str())+1;
 	int this_path_c_str_len = this_path_str.length()+1;
-	int other_path_c_str_len = other_path_str.length()+1;
 
 	char *my_ad_c_str = (char *) calloc(my_ad_c_str_len, 1);
 	char *their_ad_c_str = (char *) calloc(their_ad_c_str_len, 1);

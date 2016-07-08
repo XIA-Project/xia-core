@@ -1,0 +1,145 @@
+Dan Aguayo
+aguayo@pdos.lcs.mit.edu
+Grid
+
+John Bicket
+jbicket@mit.edu
+Grid, Wifi, build improvements, user-level FromHost and ToHost, core fixes
+
+Benjie Chen
+benjie@lcs.mit.edu
+polling extensions, Linux kernel patches, stride scheduling, Linux kernel
+thread, device driver updates, other elements, multithreading Click
+
+Douglas S. J. De Couto
+decouto@lcs.mit.edu
+user-level elements, Grid elements, ClickController, cross-compilation, core
+fixes
+
+Cliff Frey
+cliff@meraki.com
+multithreading, continuing maintenance
+
+Thomer Gil
+thomer@lcs.mit.edu
+dynamic IP routing table, IP rate monitoring elements
+
+John Jannotti
+jj@lcs.mit.edu
+initial design, Ethernet switch elements, user-level pcap/BPF elements
+
+Eddie Kohler
+kohler@seas.harvard.edu
+design, core, language, Linux /proc interface, Linux kernel module,
+standard elements, tools, documentation, distribution, IP rewriting
+elements, ClickController, other elements, Tasks, Linux 2.4, Linux 2.6,
+clickfs, adaptive task scheduler, continuing maintenance
+
+Mazu Networks, Inc.
+http://www.mazunetworks.com/
+universal improvements, new elements
+
+Robert Morris
+rtm@lcs.mit.edu
+design, Ethernet, IP, Linux kernel module, radio elements, Linux kernel
+patches, IP router configuration, element documentation, other elements
+
+Michael Neufeld
+Michael.Neufeld@cs.colorado.edu
+NS network simulator integration
+
+Massimiliano Poletto
+maxp@mazunetworks.com
+IP rewriting elements, stride scheduling element, round robin scheduler
+
+Luigi Rizzo
+rizzo@icir.org
+FreeBSD kernel module
+
+Marko Zec
+zec@icir.org
+FreeBSD kernel module, DirectIPLookup element
+
+Nickolai B. Zeldovich
+kolya@lcs.mit.edu
+Linux 2.4, BSD kernel module
+
+Petros Zerfos
+pzerfos@cs.ucla.edu
+adaptive task scheduler
+
+
+Thanks to:
+
+Francis Bogsanyi
+fbogsany@metabunny.com
+Linux 2.6 support
+
+Peilei Fan
+peilei@mit.edu
+IPv6 elements
+
+Mark Huang
+mlhuang@cs.princeton.edu
+FromSocket, ToSocket, FromRawSocket, ToRawSocket, IPFlowRawSockets
+
+Kyle Jamieson
+jamieson@mit.edu
+ARM fixes, 802.11 elements
+
+M. Frans Kaashoek
+kaashoek@lcs.mit.edu
+initial design
+
+Max Krohn
+krohn@mit.edu
+click-mkclgw.pl
+
+Nikitas Liogkas
+nikitas@cs.ucla.edu
+SMP and other patches
+
+Ross Mcilroy
+mcilrorc@docs.gla.ac.uk
+Linux 2.6 support
+
+Alex Snoeren
+snoeren@lcs.mit.edu
+IP security elements
+
+Alexander Yip
+yipal@pdos.lcs.mit.edu
+IP reassembler, other changes
+
+
+Thanks for patches and comments (not a complete list):
+
+Joe Elliott
+joe@inetd.com
+
+Julio Garcia
+julio_garcia@agilent.com
+
+Prem Gopalan
+gopalan@purdue.edu
+
+Kyle Jamieson
+jamieson@mit.edu
+
+Bob Keyes
+bob@sinister.com
+
+Kevin Mitchell
+kevin_mitchell@agilent.com
+
+Richard Mortier
+Richard.Mortier@cl.cam.ac.uk
+
+David Scott Page
+page@cs.utexas.edu
+
+Saurabh Sandhir
+sandhir@purdue.edu
+
+Leigh Stoller
+stoller@cs.utah.edu

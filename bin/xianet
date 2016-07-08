@@ -44,6 +44,7 @@ RENDEZVOUS=0
 REMOTEDSRC=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
+HOSTSCRIPT=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
@@ -66,7 +67,7 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+usage: $NAME [-cvV4rtnZgH] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
              [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
@@ -90,6 +91,7 @@ where:
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
   -N start the nameserver on the specified host
   -W connect via waveserver (ipaddr:port) on Arada box. MAC of DSRC Iface to use
+  -H if running with -t or -r and a config in the form of hostname.click exists, use it
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)
 
@@ -109,7 +111,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:gW:" opt; do
+	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:gW:H" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -173,6 +175,9 @@ setup()
 				NSHOST=$OPTARG
 				NAMESERVER=1
 				CONFFLAGS="$CONFFLAGS -n"
+				;;
+			H)
+				HOSTSCRIPT=1
 				;;
 			W)
 				REMOTEDSRC=1
@@ -460,6 +465,7 @@ start_click()
 
 	# create a click conf file from a template if necessary
 	create_click_config
+	printf "\nXIA using script: $SCRIPT\n"
 
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		SNAME=`basename $SCRIPT .click`
@@ -587,7 +593,12 @@ create_click_config()
 
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
 
-	if [ ! -f $CONFPATH/$SCRIPT ]; then
+	if [ $HOSTSCRIPT == 1 -a -e $CONFPATH/$HOSTNAME.click ]; then
+		# if a conf file specific to this host exists use it
+		SCRIPT=$HOSTNAME.click
+		printf "Switched to script: $SCRIPT\n"
+
+	elif [ ! -f $CONFPATH/$SCRIPT ]; then
 		echo "Building configuration from template"
 		python $XIADIR/bin/xconfig.py $CONFFLAGS
 	else
@@ -601,7 +612,6 @@ create_click_config()
 #
 setup $@
 shift $((OPTIND-1))
-printf "\nXIA using script: $SCRIPT\n"
 
 case $1 in
 	start)

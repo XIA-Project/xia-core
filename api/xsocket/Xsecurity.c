@@ -1,1 +1,1 @@
-../../click-2.0.1/lib/xiasecurity.cc
+../../click/lib/xiasecurity.cc

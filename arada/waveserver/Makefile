@@ -34,5 +34,5 @@ waveserver: waveserver.o configfile.o
 	$(CPP) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
 
 clean:
-	rm -f *.o
-	rm -f $(ALL)
+	/bin/rm -f *.o
+	/bin/rm -f $(ALL)

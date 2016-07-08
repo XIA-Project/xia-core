@@ -1,0 +1,12 @@
+Makefile
+*.d
+*.o
+@
+elements.conf
+elements.mk
+elements.cc
+machine
+click.ko
+vnode_if.h
+vnode_if_newproto.h
+vnode_if_typedef.h

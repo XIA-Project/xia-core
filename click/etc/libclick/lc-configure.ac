@@ -1,0 +1,765 @@
+dnl -*- mode: shell-script -*-
+dnl Process this file with autoconf to produce a configure script.
+dnl
+dnl Permission is hereby granted, free of charge, to any person obtaining a
+dnl copy of this software and associated documentation files (the "Software"),
+dnl to deal in the Software without restriction, subject to the conditions
+dnl listed in the Click LICENSE file. These conditions include: you must
+dnl preserve this copyright notice, and you cannot mention the copyright
+dnl holders in advertising related to the Software without their permission.
+dnl The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+dnl notice is a summary of the Click LICENSE file; the license in that file is
+dnl legally binding.
+
+AC_INIT([libclick], [2.1])
+AC_PREREQ(2.60)
+AC_CONFIG_HEADER([include/click/config.h:config.h.in include/click/pathvars.h:pathvars.h.in include/click/config-userlevel.h:config-userlevel.h.in])
+AC_CONFIG_SRCDIR([click-buildtool.in])
+
+CLICK_VERSION=$PACKAGE_VERSION
+
+AC_SUBST(ac_configure_args)
+AC_DEFINE_UNQUOTED([CLICK_VERSION], ["$CLICK_VERSION"])
+AC_SUBST(CLICK_VERSION)
+
+click_version_code_in=`echo "$CLICK_VERSION" | sed -e 's/[[a-z]].*//' | sed -e 's/$/.0/' | tr . , | sed -e 's/^\([[0-9]]*,[[0-9]]*,[[0-9]]\).*/\1/'`
+AC_DEFINE_UNQUOTED([CLICK_VERSION_CODE], [CLICK_MAKE_VERSION_CODE($click_version_code_in)])
+
+CLICK_INIT('$(top_srcdir)')
+
+dnl support for cross compiling
+AC_CANONICAL_SYSTEM
+
+dnl This is wrong!!
+AC_CHECK_TOOL(CC, gcc)
+AC_CHECK_TOOL(CXX, g++)
+
+CLICK_PROG_CC
+AC_PROG_CPP
+AC_C_INLINE
+
+CLICK_PROG_CXX
+AC_PROG_CXXCPP
+
+ac_preset_ar="$AR"
+AC_CHECK_TOOL(AR, ar)
+AC_CHECK_TOOL(LD, ld)
+AC_CHECK_TOOL(RANLIB, ranlib, :)
+AC_CHECK_TOOL(STRIP, strip, :)
+
+conf_auxdir='$(top_srcdir)'
+AC_SUBST(conf_auxdir)
+
+test -z "$AR_CREATEFLAGS" && AR_CREATEFLAGS=cru
+AC_SUBST(AR_CREATEFLAGS)
+
+
+dnl
+dnl drivers
+dnl
+
+dnl userlevel driver and features
+
+AC_ARG_ENABLE([user-multithread],
+    [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
+    [:], [enable_user_multithread=no])
+
+PTHREAD_LIBS=""
+AC_SUBST(PTHREAD_LIBS)
+
+if test "x$enable_user_multithread" = xyes; then
+    SAVE_LIBS="$LIBS"
+    AC_SEARCH_LIBS([pthread_create], [pthread], [ac_have_libpthread=yes], [ac_have_libpthread=no])
+    AC_CHECK_HEADERS([pthread.h], [ac_have_pthread_h=yes], [ac_have_pthread_h=no])
+    if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+        AC_DEFINE([HAVE_USER_MULTITHREAD])
+        AC_CHECK_DECLS([pthread_setaffinity_np], [], [], [#define _GNU_SOURCE
+#include <pthread.h>])
+        if echo "$LIBS" | grep -e -lpthread >/dev/null 2>&1; then
+            PTHREAD_LIBS="-lpthread"
+        fi
+    else
+        AC_MSG_ERROR([
+=========================================
+
+Can't find -lpthread and/or <pthread.h>, so I can't compile with
+--enable-user-multithread.
+
+=========================================])
+    fi
+    LIBS="$SAVE_LIBS"
+fi
+
+AC_ARG_ENABLE([select],
+    [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
+AS_HELP_STRING([  --disable-select], [do not use select()])],
+    [:], [enable_select="select poll kqueue"])
+AC_ARG_ENABLE([poll],
+    [AS_HELP_STRING([  --disable-poll], [do not use poll()])],
+    [:], [enable_poll=yes])
+AC_ARG_ENABLE([kqueue],
+    [AS_HELP_STRING([  --disable-kqueue], [do not use kqueue()])],
+    [:], [enable_kqueue=yes])
+
+if test "$enable_select" = yes; then
+    enable_select='select poll kqueue'
+elif test "$enable_select" = no; then
+    enable_select='poll kqueue'
+fi
+if echo "$enable_select" | grep select >/dev/null 2>&1; then
+    AC_DEFINE([HAVE_ALLOW_SELECT], [1], [Define if select() may be used to wait for file descriptor events.])
+fi
+if echo "$enable_select" | grep poll >/dev/null 2>&1 && test "$enable_poll" = yes; then
+    AC_DEFINE([HAVE_ALLOW_POLL], [1], [Define if poll() may be used to wait for file descriptor events.])
+fi
+if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" = yes; then
+    AC_DEFINE([HAVE_ALLOW_KQUEUE], [1], [Define if kqueue() may be used to wait for file descriptor events.])
+fi
+
+
+dnl
+dnl element collections
+dnl
+
+AC_ARG_ENABLE([all-elements], [AS_HELP_STRING([--enable-all-elements], [include all provided element groups])])
+
+dnl ELEMENTS_ARG_ENABLE(COLLECTION, HELP-STRING, DEFAULT-VALUE)
+element_groups=""
+AC_SUBST(element_groups)
+AC_DEFUN([ELEMENTS_ARG_ENABLE],
+[AC_ARG_ENABLE($1, [  --]builtin(substr, builtin(ifelse, [$3], yes, dis, en)[able-$1              ], 0, 21)[ ]builtin(ifelse, [$3], yes, [do not ], [])[$2], ,
+[enable_]patsubst([$1], -, _)=$3)dnl
+test "x$enable_all_elements" = xyes -a \( ["x$enable_]patsubst([$1], -, _)["] = xNO -o ["x$enable_]patsubst([$1], -, _)["] = x \) && [enable_]patsubst([$1], -, _)[=yes]
+if test ["x$enable_]patsubst([$1], -, _)["] = xyes; then
+    :
+    $4
+fi])
+
+ELEMENTS_ARG_ENABLE(ip6, [include IPv6 elements], NO, AC_DEFINE(HAVE_IP6))
+ELEMENTS_ARG_ENABLE(ipsec, [include IP security elements], NO, AC_DEFINE(HAVE_IPSEC))
+AC_ARG_ENABLE(experimental, [  --enable-experimental   enable experimental elements in normal groups], :, enable_experimental=no)
+
+
+dnl
+dnl check whether target is Linux
+dnl
+
+AC_CACHE_CHECK([whether we are compiling for Linux], [ac_cv_under_linux],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[#ifndef __linux__
+#error "fuckers! fuckers!"
+#endif
+return 0;]])], ac_cv_under_linux=yes, ac_cv_under_linux=no)])
+
+
+dnl
+dnl functions
+dnl
+
+AC_LANG_C
+AC_REPLACE_FUNCS(strerror)
+AC_CHECK_FUNCS(random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf)
+AC_LANG_CPLUSPLUS
+
+
+dnl
+dnl integer types, endianness, int64, addressable va_list
+dnl
+
+AC_ARG_ENABLE([smaller-code],
+    [AS_HELP_STRING([--enable-smaller-code], [generate smaller code (sometimes slower)])],
+    [:], [enable_smaller_code=no])
+if test "x$enable_smaller_code" = xyes; then
+    AC_DEFINE([CLICK_OPTIMIZE_SIZE], [1], [Define to generate smaller object files.])
+fi
+
+AC_ARG_ENABLE([int64],
+    [AS_HELP_STRING([--disable-int64], [disable 64-bit integer support])],
+    [:], [enable_int64=yes])
+
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(size_t)
+AC_CHECK_SIZEOF(ptrdiff_t)
+AC_CHECK_SIZEOF([void *])
+CLICK_CHECK_INTEGER_TYPES
+CLICK_CHECK_ALIGNMENT
+if test "x$enable_int64" = xyes; then
+    AC_CHECK_SIZEOF(long long)
+    CLICK_CHECK_INT64_TYPES
+fi
+CLICK_CHECK_ENDIAN
+CLICK_CHECK_SIGNED_SHIFT
+CLICK_CHECK_ADDRESSABLE_VA_LIST
+CLICK_CHECK_COMPILER_INTRINSICS
+
+
+dnl
+dnl timestamps
+dnl
+
+AC_CHECK_HEADERS_ONCE([time.h])
+AC_CHECK_SIZEOF([struct timeval])
+AC_CHECK_TYPES([struct timespec], [have_timespec=yes], [have_timespec=no],
+               [AC_INCLUDES_DEFAULT
+[#ifdef HAVE_TIME_H]
+[# include <time.h>]
+[#endif]])
+if test "x$have_timespec" = xyes; then
+    AC_CHECK_SIZEOF([struct timespec])
+fi
+CLICK_CHECK_POSIX_CLOCKS
+
+AC_ARG_ENABLE(nanotimestamp, [  --enable-nanotimestamp  enable nanosecond timestamps])
+# Default to nanosecond-precision timestamps if clock_gettime is available.
+if test "x$enable_nanotimestamp" = x -a "x$have_clock_gettime" = xyes; then
+    enable_nanotimestamp=yes
+fi
+if test "x$enable_nanotimestamp" = xyes; then
+    AC_DEFINE([HAVE_NANOTIMESTAMP_ENABLED], [1], [Define if nanosecond-granularity timestamps are enabled.])
+fi
+
+
+dnl
+dnl check forms of port transfer
+dnl
+
+AC_ARG_ENABLE(bound-port-transfer,
+  [[  --enable-bound-port-transfer  enable port transfer function ptr optimization]],
+  :, enable_bound_port_transfer=no)
+
+if test "$enable_bound_port_transfer" = yes; then
+  AC_DEFINE([HAVE_BOUND_PORT_TRANSFER], [1], [Define if Port::push/Port::pull should use bound function pointers.])
+  CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
+fi
+
+
+dnl
+dnl headers, event detection, dynamic linking
+dnl
+
+AC_CHECK_HEADERS_ONCE([termio.h netdb.h sys/event.h pwd.h grp.h execinfo.h])
+CLICK_CHECK_POLL_H
+AC_CHECK_FUNCS([pselect sigaction])
+
+AC_CHECK_FUNCS([kqueue], [have_kqueue=yes])
+if test "x$have_kqueue" = xyes; then
+    AC_CACHE_CHECK([whether EV_SET last argument is void *], [ac_cv_ev_set_udata_pointer],
+        [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>]], [[struct kevent kev; EV_SET(&kev, 1, EVFILT_WRITE, EV_ADD, 0, 0, (void *) &kev);]])], [ac_cv_ev_set_udata_pointer=yes], [ac_cv_ev_set_udata_pointer=no])])
+    if test $ac_cv_ev_set_udata_pointer = yes; then
+        AC_DEFINE([HAVE_EV_SET_UDATA_POINTER], [1], [Define if the last argument to EV_SET has pointer type.])
+    fi
+fi
+
+AC_ARG_ENABLE(dynamic-linking, [  --disable-dynamic-linking disable dynamic linking], :, enable_dynamic_linking=yes)
+
+if test "x$enable_dynamic_linking" = xyes; then
+    CLICK_CHECK_DYNAMIC_LINKING
+fi
+
+
+dnl
+dnl sockets
+dnl
+
+AC_LANG_C
+SOCKET_LIBS=
+dnl if test "$enable_userlevel" = yes; then
+    savelibs="$LIBS"; LIBS=
+    AC_SEARCH_LIBS(gethostbyname, nsl, , , $savelibs)
+    AC_SEARCH_LIBS(connect, socket, , , $savelibs)
+    SOCKET_LIBS="$LIBS"; LIBS="$savelibs"
+
+    AC_CACHE_CHECK([whether accept() uses socklen_t], [ac_cv_accept_socklen_t],
+            [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+#include <sys/socket.h>
+]], [[socklen_t sl; (void) accept(0, (struct sockaddr *) 0, &sl);]])],
+        ac_cv_accept_socklen_t=yes, ac_cv_accept_socklen_t=no)])
+    if test "$ac_cv_accept_socklen_t" = yes; then
+        AC_DEFINE([HAVE_ACCEPT_SOCKLEN_T], [1], [Define if accept() uses socklen_t.])
+    fi
+dnl fi
+AC_SUBST(SOCKET_LIBS)
+AC_LANG_CPLUSPLUS
+
+
+dnl
+dnl large file support
+dnl
+
+CLICK_CHECK_LARGE_FILE_SUPPORT
+
+
+dnl
+dnl mmap
+dnl
+
+AC_LANG_C
+AC_CHECK_HEADERS_ONCE([sys/mman.h])
+AC_FUNC_MMAP
+AC_LANG_CPLUSPLUS
+AC_CHECK_FUNCS(madvise)
+AC_CHECK_DECLS(madvise, [], [], [#if HAVE_SYS_MMAN_H
+#include <sys/types.h>
+#include <sys/mman.h>
+#endif])
+
+
+dnl
+dnl objects required by element collections
+dnl
+
+EXTRA_DRIVER_OBJS=
+EXTRA_TOOL_OBJS=
+if test "x$enable_ip6" = xyes; then
+    EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
+    EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"
+fi
+AC_SUBST(EXTRA_DRIVER_OBJS)
+AC_SUBST(EXTRA_TOOL_OBJS)
+
+
+dnl
+dnl more features
+dnl
+
+dnl statistics
+
+AC_ARG_ENABLE(stats, [[  --enable-stats[=LEVEL]  enable statistics collection]], :, enable_stats=no)
+if test "$enable_stats" = no; then enable_stats=0; fi
+if test "$enable_stats" = yes; then enable_stats=1; fi
+if test "$enable_stats" -ge 0 > /dev/null 2>&1; then
+    AC_DEFINE_UNQUOTED([CLICK_STATS], $enable_stats)
+else
+    AC_MSG_ERROR([
+=========================================
+
+--enable-stats takes an integer, "yes", or "no".
+
+=========================================])
+fi
+
+dnl type of scheduling
+
+AC_ARG_ENABLE(stride, [  --disable-stride        disable stride scheduler], :, enable_stride=yes)
+if test $enable_stride = yes; then
+    AC_DEFINE(HAVE_STRIDE_SCHED)
+fi
+
+AC_ARG_ENABLE(task-heap, [  --enable-task-heap      use heap for task list], :, enable_task_heap=no)
+if test $enable_task_heap = yes -a $enable_stride = yes; then
+    AC_DEFINE(HAVE_TASK_HEAP)
+elif test $enable_task_heap = yes; then
+        AC_MSG_WARN([
+=========================================
+
+Ignoring --enable-task-heap, which is incompatible with --disable-stride.
+
+=========================================])
+fi
+
+
+dnl debugging malloc
+
+AC_ARG_ENABLE(dmalloc, [  --enable-dmalloc        enable debugging malloc], :, enable_dmalloc=no)
+if test $enable_dmalloc = yes; then
+    AC_DEFINE([CLICK_DMALLOC], [1], [Define for Click memory allocation debugging.])
+fi
+
+
+dnl valgrind debugging support
+
+AC_ARG_ENABLE(valgrind, [  --enable-valgrind       extra support for debugging with valgrind], :, enable_valgrind=no)
+if test $enable_valgrind = yes; then
+    AC_CHECK_HEADERS(valgrind/memcheck.h, ac_found_valgrind_memcheck_h=yes, ac_found_valgrind_memcheck_h=no)
+    if test $ac_found_valgrind_memcheck_h = no; then
+        AC_MSG_ERROR([
+=========================================
+
+Can't find Valgrind header file 'valgrind/memcheck.h'.
+Try again without '--enable-valgrind'.
+
+=========================================])
+        dnl ' fix syntax highlighting
+    fi
+    AC_DEFINE([HAVE_VALGRIND], [1], [Define if Click should use Valgrind client requests.])
+fi
+
+
+dnl Click debugging support
+
+AC_ARG_ENABLE(schedule-debugging, [[  --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
+                          (no/yes/extra) [yes]]], :, enable_schedule_debugging=no)
+value=0
+if test "$enable_schedule_debugging" = yes; then
+    value=1
+elif test "$enable_schedule_debugging" = extra; then
+    value=2
+fi
+if test "$value" != 0; then
+    AC_DEFINE_UNQUOTED([CLICK_DEBUG_SCHEDULING], [$value], [Define to enable debugging support for Click scheduling.])
+fi
+
+
+dnl use Intel-specific machine instructions
+
+AC_ARG_ENABLE(intel-cpu, [  --enable-intel-cpu      enable Intel-specific machine instructions], :, enable_intel_cpu=no)
+if test $enable_intel_cpu = yes; then
+    AC_DEFINE(HAVE_INTEL_CPU)
+fi
+
+
+dnl
+dnl expand path variables
+dnl The "click" versions are expanded versions of the final install locations.
+dnl The "clickbuild_" versions are partially expanded versions, with an initial
+dnl "clickprefix" replaced by "${clickbuild_prefix}".
+dnl Do this here because variables like "CLICKLINUX_FIXINCLUDES_PROGRAM" need
+dnl the expanded versions.
+dnl
+
+shell_expand () {
+    val=`eval echo '$'"$1"`
+    while echo "x$val" | grep '\$' >/dev/null 2>&1; do val=`eval echo "$val"`; done
+    val=`echo "$val" | sed 's,//*,/,g'`
+    eval "$1='$val'"
+}
+
+shell_mkbuild () {
+    val=`eval echo '$'"$1"`
+    pval="$prefix"
+    while test -n "$pval" -a -n "$val"; do
+        component=`echo "$val" | sed 's,^\(/[[^/]]*\).*,\1,'`
+        pcomponent=`echo "$pval" | sed 's,^\(/[[^/]]*\).*,\1,'`
+        if test "$component" != "$pcomponent"; then break; fi
+        val=`echo "$val" | sed 's,^/[[^/]]*,,'`
+        pval=`echo "$pval" | sed 's,^/[[^/]]*,,'`
+    done
+    while test -n "$pval"; do
+        val="/..$val"
+        pval=`echo "$pval" | sed 's,^/[[^/]]*,,'`
+    done
+    eval "clickbuild_$1='"'$'"{clickbuild_prefix}$val'"
+}
+
+dnl Preset $prefix and $exec_prefix.
+test "x$prefix" = xNONE && prefix=$ac_default_prefix
+test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+
+clickdatadir="$datadir/click"
+
+for i in bin clickdata data dataroot include lib sbin; do
+    shell_expand ${i}dir
+    shell_mkbuild ${i}dir
+done
+
+
+dnl
+dnl kernel interfaces
+dnl
+
+AC_CHECK_HEADERS_ONCE([ifaddrs.h linux/if_tun.h net/if_dl.h net/if_tap.h net/if_tun.h net/if_types.h net/bpf.h netpacket/packet.h])
+
+
+dnl pcap library
+dnl note: no longer need pcap under Linux
+
+dnl if test "$enable_userlevel" = yes; then
+    CLICK_CHECK_LIBPCAP
+    CLICK_CHECK_NETMAP
+    if test "$HAVE_PCAP" != yes -a "$HAVE_NETMAP" != yes -a "$ac_cv_under_linux" != yes; then
+        AC_MSG_WARN([
+=========================================
+
+pcap.h and/or -lpcap not found; user-level driver can't steal packets.
+
+=========================================])
+        dnl ' fix syntax highlighting
+    fi
+    DRIVERS="$DRIVERS userlevel"
+    AC_DEFINE(HAVE_USERLEVEL_DRIVER)
+    HAVE_USERLEVEL_DRIVER=1
+dnl fi
+
+
+dnl other user-level specifics
+
+AC_CACHE_CHECK([whether struct if_data has ifi_datalen], [ac_cv_if_data_ifi_datalen],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <net/if.h>
+#include <net/if_var.h>
+]], [[struct if_msghdr ifm; ifm.ifm_data.ifi_datalen = 0;]])], ac_cv_if_data_ifi_datalen=yes, ac_cv_if_data_ifi_datalen=no)])
+if test "x$ac_cv_if_data_ifi_datalen" = xyes; then
+    AC_DEFINE([HAVE_IF_DATA_IFI_DATALEN], [1], [Define if 'struct if_data' has an 'ifi_datalen' member.])
+fi
+
+AC_CACHE_CHECK([whether struct sockaddr_in has sin_len], [ac_cv_sockaddr_in_sin_len],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/socket.h>
+#include <netinet/in.h>
+]], [[struct sockaddr_in sin; sin.sin_len = 0;]])], ac_cv_sockaddr_in_sin_len=yes, ac_cv_sockaddr_in_sin_len=no)])
+if test "x$ac_cv_sockaddr_in_sin_len" = xyes; then
+    AC_DEFINE([HAVE_SOCKADDR_IN_SIN_LEN], [1], [Define if 'struct sockaddr_in' has a 'sin_len' member.])
+fi
+
+
+dnl PlanetLab "Privileged Operations" library
+
+explicit_proper=yes
+AC_ARG_WITH(proper, [[  --with-proper[=PREFIX]  use PlanetLab Proper library (optional)]],
+  [properprefix=$withval; if test -z "$withval" -o "$withval" = yes; then properprefix=; fi],
+  [properprefix=no; explicit_proper=no])
+if test "$properprefix" != no; then
+    dnl Proper requires libcurl
+    dnl AC_CHECK_HEADER(curl/curl.h, have_curl_h=yes, have_curl_h=no)
+    dnl AC_CHECK_LIB(curl, curl_easy_init)
+
+    saveflags="$CPPFLAGS"; test -n "$properprefix" && CPPFLAGS="$CPPFLAGS -I$properprefix/include"
+    AC_CHECK_HEADER(prop.h, have_prop_h=yes, have_prop_h=no)
+    CPPFLAGS="$saveflags"
+
+    AC_LANG_C
+    saveflags="$LDFLAGS"; test -n "$properprefix" && LDFLAGS="$LDFLAGS -L$properprefix/lib"
+    AC_CHECK_LIB(proper, prop_open, have_libproper=yes, have_libproper=no)
+    LDFLAGS="$saveflags"
+    AC_LANG_CPLUSPLUS
+
+    if test $have_prop_h = yes -a $have_libproper = yes; then
+        AC_DEFINE(HAVE_PROPER)
+        test -n "$properprefix" && PROPER_INCLUDES="-I$properprefix/include" && PROPER_LIBS="-L$properprefix/lib"
+        PROPER_LIBS="$PROPER_LIBS -lproper"
+    elif test $explicit_proper = yes; then
+        PROPER_INCLUDES= PROPER_LIBS=
+        AC_MSG_ERROR([
+=========================================
+
+You explicitly specified --with-proper, but the proper headers and/or
+libraries are not where you said they would be.  Run again supplying
+--without-proper or --with-proper=PREFIX.
+
+=========================================])
+    fi
+fi
+AC_SUBST(PROPER_INCLUDES)
+AC_SUBST(PROPER_LIBS)
+
+
+dnl expat library
+
+explicit_expat=yes
+AC_ARG_WITH(expat, [[  --with-expat[=PREFIX]   locate expat XML library (optional)]],
+  [expatprefix=$withval; if test -z "$withval" -o "$withval" = yes; then expatprefix=; fi],
+  expatprefix=; explicit_expat=no)
+
+XML2CLICK=
+if test "$expatprefix" != no; then
+    saveflags="$CPPFLAGS"; test -n "$expatprefix" && CPPFLAGS="$CPPFLAGS -I$expatprefix/include"
+    AC_CHECK_HEADER(expat.h, have_expat_h=yes, have_expat_h=no)
+    CPPFLAGS="$saveflags"
+
+    AC_LANG_C
+    saveflags="$LDFLAGS"; test -n "$expatprefix" && LDFLAGS="$LDFLAGS -L$expatprefix/lib"
+    AC_CHECK_LIB(expat, XML_ParserCreateNS, have_libexpat=yes, have_libexpat=no)
+    LDFLAGS="$saveflags"
+
+    if test $have_expat_h = yes -a $have_libexpat = yes; then
+        AC_DEFINE(HAVE_EXPAT)
+        XML2CLICK=xml2click
+        test -n "$expatprefix" && EXPAT_INCLUDES="-I$expatprefix/include" && EXPAT_LIBS="-L$expatprefix/lib"
+        EXPAT_LIBS="$EXPAT_LIBS -lexpat"
+    elif test $explicit_expat = yes; then
+        EXPAT_INCLUDES= EXPAT_LIBS=
+        AC_MSG_ERROR([
+=========================================
+
+You explicitly specified --with-expat, but the expat headers and/or libraries
+are not where you said they would be.  Run again supplying --without-expat
+or --with-expat=PREFIX.
+
+=========================================])
+    fi
+fi
+AC_SUBST(XML2CLICK)
+AC_SUBST(EXPAT_INCLUDES)
+AC_SUBST(EXPAT_LIBS)
+
+
+dnl
+dnl programs needed for build process
+dnl
+
+CLICK_PROG_INSTALL
+CLICK_PROG_GMAKE
+CLICK_PROG_AUTOCONF
+CLICK_PROG_PERL5
+AC_PROG_AWK
+AC_PROG_GREP
+AC_PROG_EGREP
+AC_CHECK_PROGS([MD5SUM], [md5sum md5])
+
+if test -z "$GMAKE"; then
+    AC_MSG_ERROR([
+==============================================
+
+Can't find GNU make.  Either put 'gmake' on your PATH and
+rerun './configure', or set the GMAKE environment variable to
+GNU make's pathname.
+
+==============================================])
+fi
+
+
+dnl
+dnl Makeinfo, texi2dvi, install-info, pod2man
+dnl
+
+AC_MSG_CHECKING(for working makeinfo)
+MAKEINFO=${MAKEINFO-makeinfo}
+if ($MAKEINFO --version) < /dev/null > conftest.out 2>&1; then
+    if test `head -n 1 conftest.out | sed 's/^.* \([[0-9]][[0-9]]*\).*$/\1/'` -ge 4; then
+        AC_MSG_RESULT(found)
+    else
+        MAKEINFO='$(conf_auxdir)/missing makeinfo'
+        AC_MSG_RESULT(old)
+    fi
+else
+    MAKEINFO='$(conf_auxdir)/missing makeinfo'
+    AC_MSG_RESULT(missing)
+fi
+
+AC_MSG_CHECKING(for working texi2dvi)
+TEXI2DVI=${TEXI2DVI-texi2dvi}
+if ($TEXI2DVI --version) < /dev/null > conftest.out 2>&1; then
+    dnl Search for a good version of texi2dvi
+    if test `head -n 1 conftest.out | sed 's/.*Texinfo \([[0-9]][[0-9]]*\).*/\1/'` -ge 4; then
+        AC_MSG_RESULT(found)
+    else
+        TEXI2DVI='$(conf_auxdir)/missing texi2dvi'
+        AC_MSG_RESULT(old)
+    fi
+else
+    TEXI2DVI='$(conf_auxdir)/missing texi2dvi'
+    AC_MSG_RESULT(missing)
+fi
+
+dnl Assume any version of install-info is OK
+if test ${INSTALL_INFO-xxx} = xxx; then
+    AC_PATH_PROG(INSTALL_INFO, install-info, '$(conf_auxdir)/missing install-info',
+        $PATH:/sbin:/usr/sbin:/usr/local/sbin)
+fi
+AC_MSG_CHECKING(for working install-info)
+if ($INSTALL_INFO --version) < /dev/null > conftest.out 2>&1; then
+    AC_MSG_RESULT(found)
+else
+    INSTALL_INFO='$(conf_auxdir)/missing install-info'
+    AC_MSG_RESULT(missing)
+fi
+
+AC_MSG_CHECKING(for working pod2man)
+POD2MAN=${POD2MAN-pod2man}
+if ($POD2MAN --help) < /dev/null > conftest.out 2>&1 && grep pod2man conftest.out >/dev/null 2>&1; then
+    AC_MSG_RESULT(found)
+else
+    POD2MAN='$(conf_auxdir)/missing pod2man'
+    AC_MSG_RESULT(missing)
+fi
+
+
+AC_SUBST(MAKEINFO)
+AC_SUBST(TEXI2DVI)
+AC_SUBST(INSTALL_INFO)
+AC_SUBST(POD2MAN)
+
+
+dnl
+dnl substitute path variables
+dnl
+
+AC_DEFINE_UNQUOTED([CLICK_BINDIR], ["$bindir"], [Install directory for Click executables.])
+AC_DEFINE_UNQUOTED([CLICK_LIBDIR], ["$libdir"], [Install directory for Click libraries and packages.])
+AC_DEFINE_UNQUOTED([CLICK_DATADIR], ["$clickdatadir"], [Install directory for Click shared data.])
+
+AC_SUBST(clickdatadir)
+AC_SUBST(clickbuild_bindir)
+AC_SUBST(clickbuild_clickdatadir)
+AC_SUBST(clickbuild_datadir)
+AC_SUBST(clickbuild_includedir)
+AC_SUBST(clickbuild_libdir)
+AC_SUBST(clickbuild_sbindir)
+
+
+dnl
+dnl Provisions
+dnl
+
+dnl start out with CPU
+provisions="$target_cpu"
+case "$target_cpu" in
+    i386) :;;
+    i486|i586) provisions="$provisions i386";;
+    i686|i786) provisions="$provisions i386 i586";;
+esac
+
+dnl add 'analysis' if analysis elements are available
+if test "x$enable_analysis" = xyes; then
+    provisions="$provisions analysis"
+fi
+
+dnl add 'experimental' if --enable-experimental was supplied
+if test "x$enable_experimental" = xyes; then
+    provisions="$provisions experimental"
+fi
+
+dnl add 'int64' if 64-bit integers are available
+if test "x$have_int64_types" = xyes; then
+    provisions="$provisions int64"
+fi
+
+dnl add 'ip6' if ip6 elements are available
+if test "x$enable_ip6" = xyes; then
+    provisions="$provisions ip6"
+fi
+
+dnl add 'linux' if compiling under linux
+if test "x$ac_cv_under_linux" = xyes; then
+    provisions="$provisions linux"
+fi
+
+dnl add 'netmap' if netmap support is available
+if test "x$HAVE_NETMAP" = xyes; then
+    provisions="$provisions netmap"
+fi
+
+dnl add 'pcap' if libpcap is available
+if test "x$HAVE_PCAP" = xyes; then
+    provisions="$provisions pcap"
+fi
+
+dnl add 'umultithread' if compiled with --enable-user-multithread
+if test "x$enable_user_multithread" = xyes; then
+    provisions="$provisions umultithread"
+fi
+
+dnl add 'wifi' if wifi elements are available
+if test "x$enable_wifi" = xyes; then
+    provisions="$provisions wifi"
+fi
+
+AC_SUBST(provisions)
+
+dnl
+dnl Output
+dnl
+
+config_files="Makefile click-buildtool libsrc/Makefile"
+for ac_dir in include; do
+    test ! -d "$ac_dir" && mkdir "$ac_dir"
+done
+
+AC_OUTPUT_COMMANDS([for ac_file in $CONFIG_HEADERS; do
+    test $ac_file = include/click/config.h:config.h.in && echo > stamp-h
+done
+for ac_file in $CONFIG_FILES; do
+    test $ac_file = click-buildtool && chmod +x click-buildtool
+    test -z "$GMAKE" && echo $ac_file | grep Makefile >/dev/null && $ac_given_srcdir/missing gmake $ac_file
+done], GMAKE="$GMAKE")
+AC_OUTPUT($config_files)

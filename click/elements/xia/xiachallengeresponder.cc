@@ -127,8 +127,6 @@ XIAChallengeResponder::initialize(ErrorHandler *)
 void
 XIAChallengeResponder::processChallenge(Packet *p_in)
 {
-	int i;
-	char* pch;
 	uint16_t length;
 	char hash_str[XIA_SHA_DIGEST_STR_LEN];
 

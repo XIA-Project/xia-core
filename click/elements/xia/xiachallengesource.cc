@@ -185,8 +185,6 @@ XIAChallengeSource::digest_to_hex_string(unsigned char *digest, int digest_len, 
 void
 XIAChallengeSource::verify_response(Packet *p_in)
 {
-    int i, j;
-	char* pch;
 	uint16_t length;
 
 	// Get the src and dst addresses
@@ -310,9 +308,6 @@ XIAChallengeSource::is_verified(Packet *p)
 void
 XIAChallengeSource::send_challenge(Packet *p)
 {
-	int i;
-	char* pch;
-
 	// Get the src and dst addresses
 	XIAHeader xiah(p->xia_header());
 	XIAPath src_dag = xiah.src_path();

@@ -1,0 +1,112 @@
+# Warning: this file must be usable by regular make
+# (unlike the Makefiles in subdirectories).
+
+SHELL = @SHELL@
+@SUBMAKE@
+
+PACKAGE = libclick
+VERSION = @CLICK_VERSION@
+
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+top_builddir = .
+subdir = .
+conf_auxdir = @conf_auxdir@
+
+AUTOCONF = @AUTOCONF@
+PERL = @PERL@
+INSTALL = @INSTALL@
+INSTALL_IF_CHANGED = @INSTALL_IF_CHANGED@
+INSTALL_DATA = $(INSTALL) -m 644
+INSTALL_DATA_IF_CHANGED = $(INSTALL_IF_CHANGED) -m 644
+mkinstalldirs = $(conf_auxdir)/mkinstalldirs
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = @includedir@
+clickincludedir = $(includedir)/click
+netincludedir = $(includedir)/clicknet
+bindir = @bindir@
+datarootdir = @datarootdir@
+datadir = @datadir@
+clickdatadir = $(datadir)/click
+
+all: libsrc Makefile
+
+libsrc: Makefile always stamp-h
+	@cd libsrc && $(MAKE) all
+
+install: install-lib install-local install-include
+install-lib: stamp-h
+	@(cd libsrc && $(MAKE) install) || exit 1
+install-local: click-buildtool
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	$(INSTALL_IF_CHANGED) click-buildtool $(DESTDIR)$(bindir)/click-buildtool
+	$(INSTALL_IF_CHANGED) $(srcdir)/click-mkelemmap $(DESTDIR)$(bindir)/click-mkelemmap
+install-include: stamp-h
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.h $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.hh $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/*.cc $(DESTDIR)$(clickincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(top_builddir)/include/click/*.h $(DESTDIR)$(clickincludedir)
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/standard
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/standard/*.hh $(DESTDIR)$(clickincludedir)/standard
+	$(mkinstalldirs) $(DESTDIR)$(netincludedir)
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/clicknet/*.h $(DESTDIR)$(netincludedir)
+
+click-buildtool: $(srcdir)/click-buildtool.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+	@chmod +x click-buildtool; touch click-buildtool
+
+$(srcdir)/configure: $(srcdir)/configure.ac $(srcdir)/m4/click.m4
+	cd $(srcdir) && $(AUTOCONF)
+config.status: $(srcdir)/configure
+	$(SHELL) $(srcdir)/configure @ac_configure_args@
+Makefile: config.status $(srcdir)/Makefile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+config.h: stamp-h
+stamp-h: $(srcdir)/config.h.in $(srcdir)/config-userlevel.h.in config.status
+	cd $(top_builddir) && $(SHELL) ./config.status
+	echo > stamp-h
+
+always:
+	@:
+
+
+distdir = $(PACKAGE)-$(VERSION)
+top_distdir = $(distdir)
+
+dist: $(distdir).tar.gz
+	rm -rf $(distdir)
+$(distdir).tar.gz: always distdir
+	tar czf $(distdir).tar.gz $(distdir)
+distdir: $(srcdir)/configure
+	-rm -rf $(distdir)
+	mkdir $(distdir)
+	@-chmod 777 $(distdir)
+	@echo Copying library and configuration files...
+	@for file in `cat $(srcdir)/DISTFILES`; do \
+	  d=$(srcdir); \
+	  if test -d "$$d/$$file"; then \
+	    mkdir $(distdir)/$$file; \
+	    chmod 777 $(distdir)/$$file; \
+	  else \
+	    test -f "$(distdir)/$$file" \
+	    || ln $$d/$$file $(distdir)/$$file 2> /dev/null \
+	    || cp -p $$d/$$file $(distdir)/$$file \
+	    || echo "Could not copy $$d/$$file!" 1>&2; \
+	  fi; \
+	done
+
+clean:
+	@cd libsrc && $(MAKE) clean
+	-rm -rf elementmap.xml $(distdir) $(distdir).tar.gz
+distclean:
+	@cd libsrc && $(MAKE) distclean
+	-rm -f config.h Makefile config.status
+	-rm -f include/click/config.h include/click/config-userlevel.h include/click/pathvars.h
+	-rm -f config.cache config.log click-buildtool stamp-h
+
+
+.PHONY: all always libsrc clean distclean distdir dist \
+	install install-lib install-local install-include

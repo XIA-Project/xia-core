@@ -1,0 +1,64 @@
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+	modified:   .gitignore
+	modified:   click-buildtool.in
+	modified:   config.h.in
+	modified:   configure
+	modified:   configure.in
+	modified:   elements/userlevel/fromhost.cc
+	modified:   elements/userlevel/fromhost.hh
+	modified:   elements/userlevel/socket.cc
+	modified:   include/click/confparse.hh
+	modified:   include/click/nameinfo.hh
+	modified:   include/click/packet.hh
+	modified:   include/click/packet_anno.hh
+	modified:   include/clicknet/ether.h
+	modified:   lib/confparse.cc
+	modified:   linuxmodule/Makefile.in
+	modified:   tools/lib/Makefile.in
+	modified:   userlevel/.gitignore
+	modified:   userlevel/Makefile.in
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+	XIA_INTEGRATION
+	conf/xia_constants.click
+	conf/xia_router_lib.click
+	conf_user_click.sh
+	conf_user_click_nomt.sh
+	conf_xia
+	elements/standard/xiaxidinfo.cc
+	elements/xia/
+	include/click/error-syslog.hh
+	include/click/standard/xiaxidinfo.hh
+	include/click/xiacontentheader.hh
+	include/click/xiaextheader.hh
+	include/click/xiaheader.hh
+	include/click/xiamerkletree.hh
+	include/click/xiapath.hh
+	include/click/xiasecurity.hh
+	include/click/xiatransportheader.hh
+	include/click/xiautil.hh
+	include/click/xid.hh
+	include/click/xidpair.hh
+	include/clicknet/xia.h
+	lib/error-syslog.cc
+	lib/xiacontentheader.cc
+	lib/xiaextheader.cc
+	lib/xiaheader.cc
+	lib/xiapath.cc
+	lib/xiasecurity.cc
+	lib/xiatransportheader.cc
+	lib/xiautil.cc
+	lib/xid.cc
+	lib/xidpair.cc
+	userlevel/xia.proto
+	xia.patch
+
+no changes added to commit (use "git add" and/or "git commit -a")
