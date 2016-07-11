@@ -76,10 +76,7 @@ XIAChallengeResponder::run_timer(Timer *timer) // TODO: who calls this?
 int
 XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	XID local_hid;
-
     if (cp_va_kparse(conf, this, errh,
-			 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 		     "ACTIVE", 0, cpInteger, &_active,
 		     cpEnd) < 0)
         return -1;
@@ -88,10 +85,36 @@ XIAChallengeResponder::configure(Vector<String> &conf, ErrorHandler *errh)
     _timer.initialize(this);
     _timer.schedule_after_sec(SHUTOFF_RESET);*/
 
-	local_hid_str = local_hid.unparse().c_str();
-
 	outgoing_header = 0;
     return 0;
+}
+
+enum {DAG, HID};
+
+int XIAChallengeResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XIAChallengeResponder *f = static_cast<XIAChallengeResponder *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, f, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        f->local_hid_str = hid.unparse();
+        click_chatter("XIAChallengeResponder: HID assigned: %s", f->local_hid_str.c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+void XIAChallengeResponder::add_handlers()
+{
+    //add_write_handler("dag", write_param, (void *)DAG);
+    add_write_handler("hid", write_param, (void *)HID);
 }
 
 int

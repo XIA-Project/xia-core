@@ -37,7 +37,7 @@ so use the XIACheckDest element before using this element.
 #define UNREACHABLE -6
 #define FALLBACK -7
 
-enum { PRINCIPAL_TYPE_ENABLED };
+enum { PRINCIPAL_TYPE_ENABLED, ROUTE_TABLE_DAG, ROUTE_TABLE_HID };
 
 typedef struct {
 	int	port;

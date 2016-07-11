@@ -224,7 +224,7 @@ class XARPQuerier : public Element { public:
     static int write_handler(const String &, Element *, void *, ErrorHandler *);
 
     enum { h_table, h_table_xml, h_stats, h_insert, h_delete, h_clear,
-	   h_count, h_length };
+	   h_count, h_length, h_hid };
 
 };
 

@@ -28,6 +28,7 @@ using namespace std;
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 100
+#define MAX_DAG_SIZE 512
 
 #define HELLO 0
 #define LSA 1

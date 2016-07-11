@@ -9,9 +9,10 @@ LDFLAGS +=-lprotobuf -lc -ldl -lcrypto -lssl $(XLIB)/libdagaddr.so
 SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XgetDAGbyName.c Xinit.c  \
 	Xrecv.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
-	XupdateAD.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
+	XupdateDAG.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
 	XbindPush.c Xmsg.c Xfork.c Xnotify.c \
-	minini/minIni.c XsetXcacheSID.c Xkeys.c Xsecurity.c
+	minini/minIni.c XsetXcacheSID.c Xkeys.c Xsecurity.c \
+	Xgetifaddrs.c Xgethostname.c
 
 OBJS=$(SOURCES:.c=.o) xia.pb.o
 LIB=$(XLIB)/libXsocket.so

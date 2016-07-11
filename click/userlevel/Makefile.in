@@ -74,6 +74,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	archive.o userutils.o driver.o \
 	xid.o xidpair.o xiapath.o xiaheader.o xiaextheader.o xiatransportheader.o xiautil.o xia.pb.o \
 	xcache.pb.o xiasecurity.o \
+	xiaifacetable.o \
 	error-syslog.o \
 	$(EXTRA_DRIVER_OBJS)
 

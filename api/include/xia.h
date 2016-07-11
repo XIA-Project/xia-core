@@ -32,6 +32,9 @@
 #define EDGE_UNUSED 127u
 #define XID_SIZE	20
 #define NODES_MAX	20
+#define MAX_XID_TYPE_STR 8
+#define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
+#define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
 
 enum XID_TYPE {
 	XID_TYPE_AD = 0x10,  // TODO: why does swig complain when these are uint32_t?

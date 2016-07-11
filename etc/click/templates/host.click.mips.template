@@ -1,0 +1,20 @@
+require(library ../../click/conf/xia_router_lib.click);
+require(library xia_address.click);
+
+log::XLog(VERBOSE 0, LEVEL 6);
+
+// host instantiation
+$HNAME :: XIAEndHost (1500, ${HNAME}, 1501, 1502, $MAC0, $MAC1, $MAC2, $MAC3);
+
+waveDevice :: WaveDevice(ROLE user, CHANNEL 172);
+######
+sock_server${NUM}::Socket("UDP", 0.0.0.0, $PORT) -> [$NUM]${HNAME}[$NUM] -> sock_client${NUM}::Socket("UDP", $SOCK_IP, $PORT);
+######
+waveDevice -> Print(MAXLENGTH 512, LABEL received) -> [0]${HNAME}[0] -> Print(MAXLENGTH 512, LABEL sent) -> waveDevice;
+######
+Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
+######
+
+	ControlSocket(tcp, 7777);
+
+AlignmentInfo($HNAME/xrc/c 4 0, $HNAME/xlc0/c 4 0, $HNAME/xlc0/statsFilter 4 0, $HNAME/xlc0/xrespFilter 4 0,  $HNAME/xlc1/c 4 0, $HNAME/xlc1/statsFilter 4 0,  $HNAME/xlc1/xrespFilter 4 0, $HNAME/xlc2/c 4 0, $HNAME/xlc2/statsFilter 4 0, $HNAME/xlc2/xrespFilter 4 0, $HNAME/xlc3/c 4 0, $HNAME/xlc3/statsFilter 4 0, $HNAME/xlc3/xrespFilter 4 0);

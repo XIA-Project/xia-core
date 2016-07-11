@@ -87,27 +87,16 @@ XIAChallengeSource::~XIAChallengeSource()
 int
 XIAChallengeSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	XID local_hid;
-	String local_hid_str;
-
     if (cp_va_kparse(conf, this, errh,
-					 "LOCALHID", cpkP + cpkM, cpXID, &local_hid,
 					 "INTERFACE", cpkP + cpkM, cpInteger, &_iface,
-					 "SRC", cpkP+cpkM, cpXIAPath, &_src_path,
 					 "ACTIVE", 0, cpInteger, &_active,
                    cpEnd) < 0)
         return -1; // error config
-
 
 	if (!generate_secret()) {
 		errh->error("Unable to generate router_secret: %s\n", strerror(errno));
 		return -1;
 	}
-
-	local_hid_str = local_hid.unparse().c_str();
-
-	_name = new char [local_hid_str.length()+1];
-	strcpy(_name, local_hid_str.c_str());
 
     return 0;
 }
@@ -118,6 +107,49 @@ XIAChallengeSource::initialize(ErrorHandler *)
     return 0;
 }
 
+enum {DAG, HID};
+
+int XIAChallengeSource::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
+{
+    XIAChallengeSource *f = static_cast<XIAChallengeSource *>(e);
+    switch(reinterpret_cast<intptr_t>(vparam)) {
+    case DAG:
+    {
+        XIAPath dag;
+        if (cp_va_kparse(conf, f, errh,
+                         "DAG", cpkP + cpkM, cpXIAPath, &dag,
+                         cpEnd) < 0)
+            return -1;
+        f->_src_path = dag;
+        click_chatter("XIAChallengeSource: DAG is now %s", f->_src_path.unparse().c_str());
+        break;
+
+    }
+    case HID:
+    {
+        XID hid;
+        if (cp_va_kparse(conf, f, errh,
+                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+            return -1;
+        f->_hid = hid;
+        String local_hid_str = f->_hid.unparse();
+        f->_name = new char [local_hid_str.length()+1];
+        strcpy(f->_name, local_hid_str.c_str());
+        click_chatter("XIAChallengeSource: HID assigned: %s", f->_hid.unparse().c_str());
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+void XIAChallengeSource::add_handlers()
+{
+    //add_write_handler("src_path", write_param, (void *)H_MOVE);
+    add_write_handler("dag", write_param, (void *)DAG);
+    add_write_handler("hid", write_param, (void *)HID);
+}
 
 bool
 XIAChallengeSource::generate_secret()

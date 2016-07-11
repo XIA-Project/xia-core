@@ -16,6 +16,7 @@
 #include <clicknet/tcp.h>
 #include <click/string.hh>
 #include <click/xiatransportheader.hh>
+#include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
 
@@ -135,26 +136,27 @@ public:
 	int initialize(ErrorHandler *);
 	void run_timer(Timer *timer);
 
-	XID local_hid()	  { return _local_hid; };
+	XID local_hid()	  { return _hid; };
 	XIAPath local_addr() { return _local_addr; };
 	XID local_4id()	  { return _local_4id; };
 	void add_handlers();
 
 	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
-	ErrorHandler *error_handler()   { return _errhandler; }
+	//ErrorHandler *error_handler()   { return _errhandler; }
 
 private:
-	SyslogErrorHandler *_errh;
-
 	Timer _timer;
 
 	uint32_t _cid_type, _sid_type;
-	XID _local_hid;
 	XIAPath _local_addr;
+	String _hostname;
+	XID _hid;
 	XID _local_4id;
 	XID _null_4id;
 	XID _xcache_sid;
+	XIAInterfaceTable _interfaces;
 	bool _is_dual_stack_router;
+	int _num_ports;
 	XIAPath _nameserver_addr;
 	uint32_t _next_id;
 
@@ -249,10 +251,12 @@ public:
 	void Xlisten(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void XreadyToAccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xchangead(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgethostname(unsigned short _sport, uint32_t id,  xia::XSocketMsg *xia_socket_msg);
+	void Xgetifaddrs(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreadnameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xgetpeername(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xgetsockname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
@@ -314,6 +318,8 @@ public:
 
 	static String Netstat(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	int IfaceFromSIDPath(XIAPath sidPath);
+	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	XIAPath alterCIDDstPath(XIAPath dstPath);
 
@@ -390,6 +396,7 @@ class sock : public Element {
 	int so_error;				// used by non-blocking connect, accessed via getsockopt(SO_ERROR)
 	int so_debug;				// set/read via SO_DEBUG. could be used for tracing in the future
 	int interface_id;			// port of the interface the packets arrive on
+	int outgoing_iface;			// interface matching src path (if any)
 	unsigned polling;			// # of outstanding poll/select requests on this socket
 	bool recv_pending;			// true if API is waiting to receive data
 	bool timer_on;				// if true timer is enabled

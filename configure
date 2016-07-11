@@ -31,7 +31,60 @@ echo NPROCS=$(($CORES * 2)) >> $OUTPUT
 
 echo XIADIR=$(pwd) >> $OUTPUT
 
+if [ "$tarch" = "mips" ]; then
+
 cat >> $OUTPUT << EOF
+
+# OPTFLAGS is for building Click
+OPTFLAGS="--host=mips-linux --libdir=/opt/buildroot-2013.11/output/    host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include        prefix=/tmp/usb/bin/ --enable-wavelocal --disable-waveremote"
+
+APIDIR=\$(XIADIR)/api
+BINDIR=\$(XIADIR)/bin
+XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
+ETC=\$(XIADIR)/etc
+XLIB=\$(APIDIR)/lib
+XINC=\$(APIDIR)/include
+XCACHEINC=\$(XCACHEAPIDIR)
+
+TARCH=mips
+MIPSHOMEDIR=/opt/buildroot-2013.11/output/host
+MIPSINCDIR=\$(MIPSHOMEDIR)/usr/include/
+MIPSPYINCDIR=\$(MIPSHOMEDIR)/usr/include/python2.7/
+MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
+
+CC=mips-linux-g++
+LD=mips-linux-g++
+CFLAGS=-Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CXXFLAGS=\$(CFLAGS)
+
+LDFLAGS=-L\$(MIPSLIBDIR) -lpthread -lprotobuf -lXsocket -ldagaddr -lXssl -lxcache
+
+PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
+PYINCLUDES=-I\$(MIPSPYINCDIR)
+
+ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
+	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
+else
+	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf -lssl -lcrypto
+endif
+
+LIBS+=\$(XCACHEAPIDIR)/libxcache.a
+
+ifdef DEBUG
+CFLAGS +=-ggdb -DDEBUG
+else
+CFLAGS +=-O2
+endif
+
+EOF
+
+else # regular X86 case
+
+cat >> $OUTPUT << EOF
+
+# OPTFLAGS are for building Click
+OPTFLAGS=--enable-waveremote --disable-wavelocal
+
 APIDIR=\$(XIADIR)/api
 BINDIR=\$(XIADIR)/bin
 XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
@@ -44,13 +97,16 @@ CC=g++
 LD=g++
 CFLAGS=$CFLAGS
 CLICKFLAGS=$CLICKFLAGS
-ENV_LDFLAGS=-lpthread -lprotobuf
+LDFLAGS=-lpthread -lprotobuf -lXsocket -ldagaddr -lXssl -lxcache
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
-	ENV_LDFLAGS+=-lXsocket -ldagaddr -lXssl -lxcache
 else
 	LIBS=\$(XLIB)/libXsocket.a \$(XLIB)/libdagaddr.a \$(XLIB)/libXssl.a -Bstatic -lprotobuf
-	ENV_LDFLAGS+=-lXsocket -ldagaddr -lXssl -lxcache
 endif
 LIBS+=\$(XCACHEAPIDIR)/libxcache.a
+PYLDFLAGS=`python-config --ldflags`
+PYINCLUDES=`python-config --includes`
+
 EOF
+
+fi

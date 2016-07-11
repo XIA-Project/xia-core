@@ -4,7 +4,7 @@ endif
 
 
 # list of top level directories that need to be built
-MAKEDIRS=click api daemons applications tools
+MAKEDIRS=click api daemons applications arada # tools
 
 # make sure we run clean in anything we built in
 CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
@@ -25,6 +25,7 @@ static:
 # generate the click makefile optimized for XIA
 click/Makefile: click/Makefile.in xia.mk
 	cd click; CXXFLAGS="$(CLICKFLAGS)" CFLAGS="$(CLICKFLAGS)" ./configure \
+				$(OPTFLAGS) \
 				--enable-user-multithread \
 				--enable-warp9     \
 				--enable-userlevel \
@@ -60,9 +61,9 @@ xia.mk: configure
 xia.env:
 	echo "export CC=\"${CC}\"" > xia.env
 	echo "export LD=\"${LD}\"" >> xia.env
-	echo "export LDFLAGS=\"-lstdc++ ${ENV_LDFLAGS}\"" >> xia.env
+	echo "export LDFLAGS=\"-lstdc++ ${LDFLAGS}\"" >> xia.env
 	echo "export CFLAGS=\"${CFLAGS}\"" >> xia.env
-	echo "export LD_LIBRARY_PATH=\"${ENV_LD_LIBRARY_PATH}\"" >> xia.env
+	echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}\"" >> xia.env
 
 #### CLEAN RULES
 clean: $(CLEANDIRS)

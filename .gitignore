@@ -1,4 +1,5 @@
 # our things go here
+*_pb2.py
 *.pb.cc
 *.pb.h
 *.so
@@ -63,6 +64,7 @@ XIASocket/sample/chunkc
 XIASocket/sample/chunks
 click-2.0.1/autom4te.cache
 click-2.0.1/Makefile
+click-2.0.1/config.mk
 click-2.0.1/config.log
 click-2.0.1/bsdmodule/Makefile
 click-2.0.1/click-compile
@@ -125,13 +127,13 @@ example/tods
 example/xcmpping
 example/xcmptraceroute
 example/xecho
+arada/waveserver/waveserver
 
 # output from scripts
-etc/click/templates/xia_address.click
-etc/click/templates/host*.click
-etc/click/templates/router*.click
-etc/click/templates/dual_stack_host*.click
-etc/click/templates/dual_stack_router*.click
+etc/click/host*.click
+etc/click/router*.click
+etc/click/dual_stack_host*.click
+etc/click/dual_stack_router*.click
 
 # planetlab
 experiments/planetlab/logs/*.txt

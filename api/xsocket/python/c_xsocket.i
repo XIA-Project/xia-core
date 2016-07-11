@@ -60,10 +60,6 @@
         return NULL;
     }
     $2 = PyInt_AsLong($input);
-    if ($2<0) {
-        PyErr_SetString(PyExc_ValueError, "Positive integer expected");
-        return NULL;
-    }
     $1= (void*)malloc($2);
 }
 

@@ -1,0 +1,19 @@
+require(library ../../click/conf/xia_router_lib.click);
+require(library xia_address.click);
+
+log::XLog(VERBOSE 0, LEVEL 6);
+
+// router instantiation
+${HNAME} :: XIARouter4Port(1500, ${HNAME}, 1501, 1502, $EXTERNAL_IP, $MAC0, $MAC1, $MAC2, $MAC3);
+
+waveDevice :: WaveDeviceRemote(HOSTNAME $RIPADDR, PORT $RPORT, CHANNEL 172);
+
+######
+sock_server${NUM}::Socket("UDP", 0.0.0.0, $PORT) -> [$NUM]${HNAME}[$NUM] -> sock_client${NUM}::Socket("UDP", $SOCK_IP, $PORT);
+######
+waveDevice -> Print(MAXLENGTH 512, LABEL received) -> [0]${HNAME}[0] -> Print(MAXLENGTH 512, LABEL sent) -> waveDevice;
+######
+Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
+######
+
+	ControlSocket(tcp, 7777);

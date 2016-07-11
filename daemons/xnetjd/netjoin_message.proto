@@ -1,0 +1,17 @@
+import "ndap.proto";
+import "jacp.proto";
+
+message NetjoinMessage {
+	oneof message_type {
+		NetDescriptor net_descriptor = 1;
+		HandshakeOne handshake_one = 2;
+		HandshakeTwo handshake_two = 3;
+		HandshakeThree handshake_three = 4;
+		HandshakeFour handshake_four = 5;
+	}
+}
+
+message SignedMessage {
+	required bytes signature = 1;
+	required bytes message = 2;
+}

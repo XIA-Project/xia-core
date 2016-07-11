@@ -58,6 +58,8 @@ class XIAChallengeResponder : public Element { public:
     int initialize(ErrorHandler *);
 
     void push(int, Packet *);
+	void add_handlers();
+	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
   private:
 //	std::string hash(Packet *);

@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdint.h> // for uint8_t
 
 static const std::size_t vector_find_npos = std::size_t(-1);
 
@@ -171,8 +172,8 @@ Node::Node(int type, const std::string id_str)
 
 	for (std::size_t i = 0; i < ID_LEN; i++)
 	{
-		int num = stoi(id_str.substr(2*i, 2), 0, 16);
-		memcpy(&(ptr_->id[i]), &num, 1);
+		const uint8_t byte = (uint8_t) stoi(id_str.substr(2*i, 2), 0, 16);
+		memcpy(&(ptr_->id[i]), &byte, 1);
 	}
 }
 
@@ -325,8 +326,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 			int num = stoi(id_str.substr(2*i, 2), 0, 16);
 			if (num == -1)
 				printf("WARNING: Error parsing XID string (should be 20 hex digits): %s\n", id_str.c_str());
-			else
-				memcpy(&(ptr_->id[i]), &num, 1);
+			else {
+                const uint8_t byte = (uint8_t) num;
+				memcpy(&(ptr_->id[i]), &byte, 1);
+            }
 		}
 	}
 }
@@ -753,6 +756,62 @@ Graph::index_from_dag_string_index(int32_t dag_string_index, std::size_t source_
 	}
 
 	return real_index;
+}
+
+/**
+ * @brief Return the AD for the Graph's intent node
+ *
+ * Get the AD string on first path to intent node
+ * Note: This function is essentially identical to intent_HID_str()
+ *
+ * @return The AD if found, empty string otherwise
+ */
+std::string
+Graph::intent_AD_str() const
+{
+	std::string ad;
+	std::size_t curIndex;
+	std::size_t source = source_index();
+	std::size_t intent = final_intent_index();
+	printf("Graph::intent_AD_str called on %s.\n", this->dag_string().c_str());
+	// Build first_path by walking first hops from source to intent node
+	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+		// Save each node visited
+		Node n = get_node(curIndex);
+		if(n.type_string().compare(Node::XID_TYPE_AD_STRING) == 0) {
+			ad = n.to_string();
+			printf("Graph::intent_AD_str Found ad: %s\n", ad.c_str());
+		}
+	}
+	return ad;
+}
+
+/*
+ * @brief Return the HID for the Graph's intent node
+ *
+ * Get the HID string on first path to intent node
+ * Note: This function is essentially identical to intent_AD_str()
+ *
+ * @return The HID if found, empty string otherwise
+ */
+std::string
+Graph::intent_HID_str() const
+{
+	std::string hid;
+	std::size_t curIndex;
+	std::size_t source = source_index();
+	std::size_t intent = final_intent_index();
+	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
+	// Build first_path by walking first hops from source to intent node
+	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+		// Save each node visited
+		Node n = get_node(curIndex);
+		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
+			hid = n.to_string();
+			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+		}
+	}
+	return hid;
 }
 
 /**

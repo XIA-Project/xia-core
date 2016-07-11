@@ -87,6 +87,7 @@ class XARPResponder : public Element { public:
     int configure(Vector<String> &, ErrorHandler *);
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers();
+    static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 
     Packet *simple_action(Packet *);
 

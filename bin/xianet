@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 #
 # Copyright 2013 Carnegie Mellon University
 #
@@ -28,10 +28,9 @@ SCRIPT=xia_local_topology.click
 
 NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
-XIAADDRCLICK=$XIADIR/etc/click/xia_address.click
-RESOLVCONF=$XIADIR/etc/resolv.conf
+ADDRCONF=$XIADIR/etc/address.conf
 
-ALL_PROCESSES="click xrouted xhcp_serverd xhcp_clientd xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -42,13 +41,21 @@ CLICK_ONLY=0
 NO_CLICK=0
 NAMESERVER=0
 RENDEZVOUS=0
+REMOTEDSRC=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
 HOSTSCRIPT=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
-HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
+
+# On Arada boxes, don't use -s because /etc/hosts has no entry for hostname
+MACHINE=`uname -m`
+if [ "$MACHINE" == "mips" ]; then
+	HOSTNAME=$(hostname | tr -C -d 'a-zA-Z0-9')
+else
+	HOSTNAME=$(hostname -s | tr -C -d 'a-zA-Z0-9')
+fi
 
 # for debugging
 VALGRIND=""
@@ -62,6 +69,7 @@ Start or stop the XIA network services.
 
 usage: $NAME [-cvV4rtnZgH] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
+             [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
 where:
   -c only start click
@@ -82,6 +90,7 @@ where:
      (to ignore multiple interfaces, use a comma-separated list)
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
   -N start the nameserver on the specified host
+  -W connect via waveserver (ipaddr:port) on Arada box. MAC of DSRC Iface to use
   -H if running with -t or -r and a config in the form of hostname.click exists, use it
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)
@@ -102,7 +111,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:gH" opt; do
+	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:gW:H" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -170,6 +179,10 @@ setup()
 			H)
 				HOSTSCRIPT=1
 				;;
+			W)
+				REMOTEDSRC=1
+				CONFFLAGS="$CONFFLAGS -W $OPTARG"
+				;;
 			z)
 				RUN_VISUALIZER_CLIENT=1
 				VISUALIZER_SERVER=$OPTARG
@@ -226,9 +239,9 @@ get_pid()
 		# avoid false positives when editing a file with click in the name
 		[ $service == "click" ] && service="userlevel/click"
 
-		XPID=`ps aux | grep -v grep | grep $service | tr -s " " | cut -d\  -f2`
+		XPID=`ps -eo user,pid,args | grep -v grep | grep $service | tr -s " " | cut -d\  -f2`
 	else
-		XPID=`ps aux | grep -v grep | grep $1 | grep $2 | tr -s " " | cut -d\  -f2`
+		XPID=`ps -eo user,pid,args | grep -v grep | grep $1 | grep $2 | tr -s " " | cut -d\  -f2`
 	fi
 }
 
@@ -309,18 +322,18 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xhcp_serverd -h $host $LOG_FLAGS &
+			./xnetjd --accesspoint --hostname $host &
 			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xrouted"
-			kill_service $host "xhcp_serverd"
+			kill_service $host "xnetjd"
 			kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host "xrouted"
-			check_service $host "xhcp_serverd"
+			check_service $host "xnetjd"
 			check_service $host "xcache"
 			;;
 		*)
@@ -340,16 +353,16 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xhcp_clientd -h $host $LOG_FLAGS &
+			./xnetjd --client --hostname $host &
 			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
-			kill_service $host "xhcp_clientd"
+			kill_service $host "xnetjd"
 			kill_service $host "xcache"
 			;;
 		"check")
-			check_service $host "xhcp_clientd"
+			check_service $host "xnetjd"
 			check_service $host "xcache"
 			;;
 		*)
@@ -467,8 +480,8 @@ start_click()
 	fi
 
 	# create xsockconf.ini and nodes.conf from the click config file
-	echo "Reading topology and generating $XIAADDRCLICK"
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF $RESOLVCONF $XIAADDRCLICK
+	echo "Reading topology and generating $XSOCKCONF and $NODECONF"
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly
@@ -494,6 +507,9 @@ start_click()
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 2
+
+	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
+	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
 }
 
 #
@@ -509,11 +525,14 @@ clean_conf_and_keys()
 	# Delete all keys and config files
 	# NOTE: This deletes all application keys also
 	echo "Deleting config files"
-	rm -f $XIADIR/etc/click/templates/*.click
+	rm -f $XIADIR/etc/click/host*.click
+	rm -f $XIADIR/etc/click/router*.click
 	echo "Deleting key files"
 	rm -f $XIADIR/key/*
-	echo "Deleting resolv.conf"
-	rm -f $XIADIR/etc/resolv.conf
+	echo "Deleting config files in etc"
+	rm -f $XIADIR/etc/*.conf
+	rm -f $XIADIR/etc/xsockconf.ini
+
 }
 
 #
@@ -582,7 +601,6 @@ create_click_config()
 	esac
 
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
-	CONFPATH=$XIADIR/etc/click/templates
 
 	if [ $HOSTSCRIPT == 1 -a -e $CONFPATH/$HOSTNAME.click ]; then
 		# if a conf file specific to this host exists use it

@@ -36,16 +36,11 @@ XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
     _rtdata.flags = 0;
     _rtdata.nexthop = NULL;
 
-    XIAPath local_addr;
 
     if (cp_va_kparse(conf, this, errh,
-		"LOCAL_ADDR", cpkP+cpkM, cpXIAPath, &local_addr,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
 		cpEnd) < 0)
 	return -1;
-
-    _local_addr = local_addr;
-    _local_hid = local_addr.xid(local_addr.destination_node());
 
     String broadcast_xid(BHID);  // broadcast HID
     _bcast_xid.parse(broadcast_xid);
@@ -78,6 +73,8 @@ XIAXIDRouteTable::add_handlers()
 	add_data_handlers("drops", Handler::OP_READ, &_drops);
 	add_read_handler("list", list_routes_handler, 0);
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
+	add_write_handler("hid", write_handler, (void *)ROUTE_TABLE_HID);
+	add_write_handler("dag", write_handler, (void *)ROUTE_TABLE_DAG);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 }
 
@@ -95,13 +92,34 @@ XIAXIDRouteTable::read_handler(Element *e, void *thunk)
 }
 
 int
-XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler * /*errh*/)
+XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
+		case ROUTE_TABLE_DAG:
+		{
+			XIAPath dag;
+			if (cp_va_kparse(str, t, errh,
+							 "ROUTE_TABLE_DAG", cpkP + cpkM, cpXIAPath, &dag,
+							 cpEnd) < 0)
+				return -1;
+			t->_local_addr = dag;
+			click_chatter("XIAXIDRouteTable: DAG is now %s", t->_local_addr.unparse().c_str());
+			return 0;
 
+		}
+		case ROUTE_TABLE_HID:
+		{
+			XID hid;
+			if (cp_va_kparse(str, t, errh,
+						"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+				return -1;
+			t->_local_hid = hid;
+			click_chatter("XIAXIDRouteTable: HID assigned: %s", t->_local_hid.unparse().c_str());
+			return 0;
+		}
 		default:
 			return -1;
     }
@@ -447,12 +465,15 @@ XIAXIDRouteTable::push(int in_ether_port, Packet *p)
     	port = lookup_route(in_ether_port, p);
     }
 
+	//NITIN disable XCMP Redirect packets
+	/*
     if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
 	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
 	  output(4).push(q);
     }
+	*/
     if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);

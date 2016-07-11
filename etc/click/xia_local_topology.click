@@ -3,15 +3,15 @@ require(library xia_address.click);
 
 
 // host & router instantiation
-host0 :: XIAEndHost (RE AD0 HID0, HID0, 1500, 1501, 1502, 0, aa:aa:aa:aa:aa:aa);
-host1 :: XIAEndHost (RE AD1 HID1, HID1, 1600, 1601, 1602, 1, aa:aa:aa:aa:aa:aa);
+host0 :: XIAEndHost (1500, host0, 1501, 1502, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+host1 :: XIAEndHost (1600, host1, 1601, 1602, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
-router0 :: XIARouter2Port(RE AD0 RHID0, AD0, RHID0, 0.0.0.0, 1700, 1701, 1702, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
-router1 :: XIARouter2Port(RE AD1 RHID1, AD1, RHID1, 0.0.0.0, 1800, 1801, 1802, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router0 :: XIARouter4Port(1700, router0, 1701, 1702, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
+router1 :: XIARouter4Port(1800, router1, 1801, 1802, 0.0.0.0, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa, aa:aa:aa:aa:aa:aa);
 
 // The following line is required by the xianet script so it can determine the appropriate
 // host/router pair to run the nameserver on
-// host0 :: nameserver
+// router0 :: nameserver
 
 // interconnection -- host - ad
 host0[0] -> LinkUnqueue(0.005, 1 GB/s) -> [0]router0;
@@ -27,3 +27,7 @@ router1[1] -> LinkUnqueue(0.005, 1 GB/s) ->[1]router0;
 ControlSocket(tcp, 7777);
 log::XLog(VERBOSE 0, LEVEL 6);
 
+Idle -> [2]router0[2] -> Discard;
+Idle -> [3]router0[3] -> Discard;
+Idle -> [2]router1[2] -> Discard;
+Idle -> [3]router1[3] -> Discard;

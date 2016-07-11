@@ -19,7 +19,7 @@ enum XSocketCallType {
   XREMOVECHUNK =16;
   XREQUESTFAILED = 17;
   XRESULT = 18;
-  XCHANGEAD = 19;
+  XUPDATEDAG = 19;
   XREADLOCALHOSTADDR = 20;
   XUPDATENAMESERVERDAG = 21;
   XREADNAMESERVERDAG = 22;
@@ -34,11 +34,13 @@ enum XSocketCallType {
   XRECVCHUNKFROM = 31;
   XLISTEN = 32;
   XUPDATERV = 33;
-
   XSETXCACHESID = 34;
   XFORK = 35;
   XREPLAY = 36;
   XNOTIFY = 37;
+
+  XGETIFADDRS = 38;
+  XGETHOSTNAME = 39;
 }
 
 message XSocketMsg {
@@ -69,7 +71,7 @@ message XSocketMsg {
   optional X_Requestfailed_Msg x_requestfailed= 22;
   optional X_Result_Msg x_result = 23;
 
-  optional X_Changead_Msg x_changead = 24;
+  optional X_Updatedag_Msg x_updatedag = 24;
   optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 25;
   optional X_Updatenameserverdag_Msg x_updatenameserverdag = 26;
   optional X_ReadNameServerDag_Msg x_readnameserverdag = 27;
@@ -89,6 +91,9 @@ message XSocketMsg {
   optional X_Fork_Msg x_fork = 38;
   optional X_Replay_Msg x_replay = 39;
   optional X_Notify_Msg x_notify = 40;
+
+  optional X_GetIfAddrs_Msg x_getifaddrs = 41;
+  optional X_GetHostName_Msg x_gethostname = 42;
 }
 
 message X_Socket_Msg {
@@ -212,15 +217,31 @@ message X_Requestfailed_Msg {
   optional string temp = 2; // currently not used
 }
 
-message X_Changead_Msg {
-  required string ad = 1;
-  optional string ip4id = 2;
+message X_Updatedag_Msg {
+  required int32 interface = 1;
+  required string dag = 2;
+  optional string ip4id = 3;
 }
 
 message X_ReadLocalHostAddr_Msg {
-  optional string ad = 1;
-  optional string hid = 2;
-  optional string ip4id = 3;
+  optional string dag = 1;
+  optional string ip4id = 2;
+}
+
+message X_GetIfAddrs_Msg {
+
+  message IfAddr {
+    optional string iface_name = 1;
+    optional uint32 flags = 2;
+    optional string src_addr_str = 3;
+    optional string dst_addr_str = 4;
+  }
+
+  repeated IfAddr ifaddrs = 1;
+}
+
+message X_GetHostName_Msg {
+  required string hostname = 1;
 }
 
 message X_Updatenameserverdag_Msg {
@@ -262,6 +283,7 @@ message X_Poll_Msg {
 
 message X_Updaterv_Msg {
   required string rvdag = 1;
+  required int32 interface = 2;
 }
 
 /**************************************************/
