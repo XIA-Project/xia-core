@@ -505,11 +505,12 @@ start_click()
 
 	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
-	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 	sleep 2
 
 	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
 	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
+
+	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 }
 
 #
