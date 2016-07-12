@@ -271,11 +271,10 @@ void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, sock
 
 int initializeClient(const char *name)
 {
-	int sock, rc;
+	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
 	char sdag[1024];
-	char IP[MAX_XID_SIZE];
 
 	if (XcacheHandleInit(&h) < 0) {
 		printf("Xcache handle initialization failed.\n");
@@ -298,15 +297,6 @@ int initializeClient(const char *name)
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
-	}
-
-	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
-
-	if (rc < 0) {
-		Xclose(sock);
-		die(-1, "Unable to read local address.\n");
-	} else{
-		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
 
 	// save the AD and HID for later. This seems hacky
@@ -405,7 +395,9 @@ int main(int argc, char **argv)
 				strcpy(cmd, "get r.txt sr.txt\n");
 			i++;
 		}else{
-			fgets(cmd, 511, stdin);
+			if (fgets(cmd, 511, stdin) == NULL) {
+				die(errno, "%s", strerror(errno));
+			}
 		}
 
 //		enable this if you want to limit how many times this is done
