@@ -653,11 +653,6 @@ int xcache_controller::create_sender(void)
 	if ((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		return -1;
 
-	if (XreadLocalHostAddr(xcache_sock,
-			       myAD, sizeof(myAD), myHID, sizeof(myHID),
-			       my4ID, sizeof(my4ID)) < 0)
-		return -1;
-
 	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
 		LOG_CTRL_ERROR("XmakeNewSID failed\n");
 		return -1;

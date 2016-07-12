@@ -75,10 +75,6 @@ private:
 	int context_id;
 
 public:
-	char myAD[MAX_XID_SIZE];
-	char myHID[MAX_XID_SIZE];
-	char my4ID[MAX_XID_SIZE];
-
 	/**
 	 * A Constructor.
 	 * FIXME: What do we need to do in the constructor?
