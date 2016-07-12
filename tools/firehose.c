@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 	int peer = -1;
 	struct addrinfo hints, *ai;
 	char sid[50];
-	pid_t pid;
+	pid_t pid = 0;
 
 	memset (&sa_new, 0, sizeof (struct sigaction));
 	sigemptyset (&sa_new.sa_mask);
