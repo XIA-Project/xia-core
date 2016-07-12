@@ -91,10 +91,8 @@ int get_url(int sock, char *reply, int sz)
 
 int make_and_getchunk(int sock)
 {
-	int offset;
 	char cmd[5120];
 	char url[5120];
-	int status = 0;
 	sockaddr_x addr;
 	char buf[1024 * 1024];
 	int ret;
@@ -116,6 +114,7 @@ int make_and_getchunk(int sock)
 			       sizeof(addr))) < 0) {
 		die(-1, "XfetchChunk Failed\n");
 	}
+	return 0;
 }
 
 void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
@@ -142,11 +141,10 @@ void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, sock
 
 int initializeClient(const char *name)
 {
-	int sock, rc;
+	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
 	char sdag[1024];
-	char IP[MAX_XID_SIZE];
 
 	if (XcacheHandleInit(&h) < 0) {
 		printf("Xcache handle initialization failed.\n");
@@ -169,15 +167,6 @@ int initializeClient(const char *name)
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
-	}
-
-	rc = XreadLocalHostAddr(sock, my_ad, MAX_XID_SIZE, my_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
-
-	if (rc < 0) {
-		Xclose(sock);
-		die(-1, "Unable to read local address.\n");
-	} else{
-		warn("My AD: %s, My HID: %s\n", my_ad, my_hid);
 	}
 
 	// save the AD and HID for later. This seems hacky
@@ -221,9 +210,7 @@ int main(int argc, char **argv)
 
 	const char *name;
 	int sock = -1;
-	char fin[512], fout[512];
-	char cmd[512], reply[512];
-	int params = -1;
+	char cmd[512];
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
@@ -244,11 +231,10 @@ int main(int argc, char **argv)
 	while (1) {
 		say(">>");
 		cmd[0] = '\n';
-		fin[0] = '\n';
-		fout[0] = '\n';
-		params = -1;
 
-		fgets(cmd, 511, stdin);
+		if (fgets(cmd, 511, stdin) == NULL) {
+			die(errno, "%s", strerror(errno));
+		}
 
 		if (strncmp(cmd, "make", 4) == 0){
 			make_and_getchunk(sock);

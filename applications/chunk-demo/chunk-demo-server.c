@@ -13,9 +13,6 @@
 #include "Xkeys.h"
 
 int verbose = 1;
-char myAD[MAX_XID_SIZE];
-char myHID[MAX_XID_SIZE];
-char my4ID[MAX_XID_SIZE];
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -74,12 +71,11 @@ void die(int ecode, const char *fmt, ...)
 
 void *recvCmd(void *socketid)
 {
-	int i, n, count = 0;
+	int n;
 	sockaddr_x addr;
 	char command[XIA_MAXBUF];
 	char reply[XIA_MAXBUF];
 	int sock = *((int*)socketid);
-	char *fname;
 	XcacheHandle xcache;
 
 	XcacheHandleInit(&xcache);
@@ -132,10 +128,6 @@ int registerReceiver()
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-
-	// read the localhost AD and HID
-	if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 )
-		die(-1, "Reading localhost address\n");
 
 	struct addrinfo *ai;
 
