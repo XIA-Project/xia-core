@@ -42,8 +42,8 @@ public:
 
 		ret = 0;
 
-		if (write(fd, data->c_str(), data->length()) !=
-		    data->length()) {
+		int rc = write(fd, data->c_str(), data->length());
+		if ((unsigned)rc != data->length()) {
 			ret = -1;
 		}
 
@@ -82,7 +82,8 @@ public:
 
 	std::string get_partial(xcache_meta *meta, off_t off, size_t len)
 	{
-		int ret, fd, bytes;
+		unsigned bytes;
+		int ret, fd;
 		std::string path;
 		char buf[256];
 
