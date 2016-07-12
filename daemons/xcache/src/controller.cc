@@ -517,24 +517,28 @@ sockaddr_x xcache_controller::cid2addr(std::string cid)
 	sockaddr_x addr;
 	std::string myCid("CID:");
 	int xcache_sock;
-	char AD[MAX_XID_SIZE];
-	char HID[MAX_XID_SIZE];
-	char FourID[MAX_XID_SIZE];
+	char dag[XIA_MAX_DAG_STR_SIZE];
+	char root[XIA_MAX_DAG_STR_SIZE];
+	char _4id[MAX_XID_SIZE];
 
 	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		assert(0);
 
-	if(XreadLocalHostAddr(xcache_sock, AD, sizeof(AD), HID, sizeof(HID),
-			      FourID, sizeof(FourID)) < 0)
+	if(XreadLocalHostAddr(xcache_sock, root, sizeof(root),
+			      _4id, sizeof(_4id)) < 0)
 		assert(0);
 
 	Xclose(xcache_sock);
 
 	myCid += cid;
 
-	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
-	dag_set_intent(&addr, 2);
-	dag_add_path(&addr, 3, 0, 1, 2);
+	sprintf(dag, "RE ( %s ) %s", root, myCid.c_str());
+	Graph g(dag);
+	g.fill_sockaddr(&addr);
+
+//	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
+//	dag_set_intent(&addr, 2);
+//	dag_add_path(&addr, 3, 0, 1, 2);
 
 	return addr;
 }
