@@ -55,8 +55,7 @@ config: xia.mk click/Makefile
 # creates xia.mk
 xia.mk: configure
 	@./configure
-	@echo "xia.mk generated (ignore the error below & rerun make)"
-	@false
+	make -C .
 	
 xia.env:
 	echo "export CC=\"${CC}\"" > xia.env

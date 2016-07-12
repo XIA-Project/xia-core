@@ -1,4 +1,5 @@
 #!/bin/bash
+echo Creating xia.mk include file
 
 OUTPUT=xia.mk
 
@@ -57,7 +58,7 @@ LD=mips-linux-g++
 CFLAGS=-Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
 CXXFLAGS=\$(CFLAGS)
 
-LDFLAGS=-L\$(MIPSLIBDIR) -lpthread -lprotobuf -lXsocket -ldagaddr -lXssl -lxcache
+LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
 
 PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
 PYINCLUDES=-I\$(MIPSPYINCDIR)
@@ -97,7 +98,7 @@ CC=g++
 LD=g++
 CFLAGS=$CFLAGS
 CLICKFLAGS=$CLICKFLAGS
-LDFLAGS=-lpthread -lprotobuf -lXsocket -ldagaddr -lXssl -lxcache
+LDFLAGS=-lpthread
 ifeq (\$(wildcard \$(XLIB)/libXsocket.a),)
 	LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
 else
