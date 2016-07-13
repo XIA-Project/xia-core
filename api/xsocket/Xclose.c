@@ -71,7 +71,7 @@ int Xclose(int sockfd)
 		goto done;
 	}
 
-	if ((isTempSID(sockfd) || xcm->delkeys()) && xcm->refcount() <= 0) {
+	if (isTempSID(sockfd) && (xcm->delkeys() || xcm->refcount() <= 0)) {
 
 		LOGF("Deleting keys for %s", getTempSID(sockfd));
 
