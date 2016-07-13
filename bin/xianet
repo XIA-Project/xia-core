@@ -503,9 +503,9 @@ start_click()
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
 
-	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
-
 	sleep 2
+
+	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
 	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
 	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
