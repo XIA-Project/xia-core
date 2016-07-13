@@ -24,7 +24,7 @@ static:
 
 # generate the click makefile optimized for XIA
 click/Makefile: click/Makefile.in xia.mk
-	cd click; CXXFLAGS="$(CLICKFLAGS)" CFLAGS="$(CLICKFLAGS)" ./configure \
+	cd click; ./configure \
 				$(OPTFLAGS) \
 				--enable-user-multithread \
 				--enable-warp9     \
@@ -41,7 +41,7 @@ click/Makefile: click/Makefile.in xia.mk
 
 # treat click special since we want multi-proc compiles
 click: click/Makefile
-	CXXFLAGS="$(CLICKFLAGS)" CFLAGS="$(CLICKFLAGS)" make -j$(NPROCS) -C $@
+	make -j$(NPROCS) -C $@
 
 # rules for all of the other directories
 $(filter-out click, $(MAKEDIRS)):
@@ -56,7 +56,7 @@ config: xia.mk click/Makefile
 xia.mk: configure
 	@./configure
 	make -C .
-	
+
 xia.env:
 	echo "export CC=\"${CC}\"" > xia.env
 	echo "export LD=\"${LD}\"" >> xia.env
@@ -80,10 +80,10 @@ dump-% :
 fresh:
 	@echo deleting XIA runtime files and keys
 	@rm -rf key/*
-	@rm -f etc/resolv.conf
-	@rm -f etc/nodes.conf
+	@rm -f etc/*.conf
 	@rm -f etc/xsockconf.ini
-	@rm -f etc/click/templates/*.click
+	@rm -f etc/click/host*.click
+	@rm -f etc/click/router*.click
 
 
 #### TEST RULES
