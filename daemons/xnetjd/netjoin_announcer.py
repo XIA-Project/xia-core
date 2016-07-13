@@ -24,7 +24,7 @@ class NetjoinAnnouncer(object):
             return
 
         # Send beacon to XIANetJoin
-        logging.info("Sent beacon")
+        logging.debug("Sent beacon")
         net_descriptor = self.beacon.update_and_get_serialized_descriptor()
         beacon_message = NetjoinMessage()
         beacon_message.net_descriptor.ParseFromString(net_descriptor)
