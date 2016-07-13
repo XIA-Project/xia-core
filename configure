@@ -1,6 +1,6 @@
 #!/bin/bash
 echo Creating xia.mk include file
-
+echo $tarch
 OUTPUT=xia.mk
 
 if [ -z $DEBUG ]; then
@@ -38,7 +38,7 @@ if [ "$tarch" = "mips" ]; then
 cat >> $OUTPUT << EOF
 
 # OPTFLAGS is for building Click
-OPTFLAGS="--host=mips-linux --libdir=/opt/buildroot-2013.11/output/host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include        prefix=/tmp/usb/bin/ --enable-wavelocal --disable-waveremote"
+OPTFLAGS=--host=mips-linux --libdir=/opt/buildroot-2013.11/output/host/usr/lib --includedir=/opt/buildroot-2013.11/output/host/usr/include prefix=/tmp/usb/bin/ --enable-wavelocal --disable-waveremote
 
 APIDIR=\$(XIADIR)/api
 BINDIR=\$(XIADIR)/bin
