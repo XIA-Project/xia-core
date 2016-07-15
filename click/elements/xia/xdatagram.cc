@@ -10,7 +10,7 @@
 //#include <click/xiacontentheader.hh>
 #include "xdatagram.hh"
 #include "xtransport.hh"
-
+#include "xlog.hh"
 #include <click/xiatransportheader.hh>
 
 
@@ -21,11 +21,15 @@ XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port, uint32_t id, in
 	// cout << "\t\tCreatign a " << port << endl;
 	memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));
+	INFO("\n\n\n\nfoo!\n\n\n");
+	printf("\n\nbar\n\n");
 }
 
 void
 XDatagram::push(WritablePacket *p_in) {
 		// buffer packet if this is a DGRAM socket and we have room
+		//
+	INFO("PUSH");
 	if (should_buffer_received_packet(p_in)) {
 		add_packet_to_recv_buf(p_in);
 		interface_id = SRC_PORT_ANNO(p_in);

@@ -1603,6 +1603,7 @@ XStream::tcp_drop(int err)
 	XSocketMsg xsm;
 	xsm.set_type(xia::XCONNECT);
 	xsm.set_sequence(0); // TODO: what should This be?
+	xsm.set_id(get_id());
 	xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
 	connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
 	connect_msg->set_ddag(dst_path.unparse().c_str());
@@ -2089,6 +2090,7 @@ WritablePacket *XStream::unstage_data()
 		xia::XSocketMsg xsm;
 		xsm.set_type(xia::XRESULT);
 		xsm.set_sequence(_staged_seq);
+		xsm.set_id(get_id());
 		get_transport()->ReturnResult(port, &xsm, p->length());
 
 		_staged = NULL;

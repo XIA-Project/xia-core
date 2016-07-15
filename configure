@@ -1,6 +1,6 @@
 #!/bin/bash
 echo Creating xia.mk include file
-
+echo $tarch
 OUTPUT=xia.mk
 
 if [ -z $DEBUG ]; then
