@@ -1,5 +1,4 @@
 include ../../xia.mk
-CC=g++
 .PHONY: all clean
 
 XCACHE=$(BINDIR)/xcache
@@ -9,8 +8,9 @@ DAEMONS_COMMON_INCLUDE=$(DAEMONS_COMMON_PATH)
 CLICKDIR=$(XIADIR)/click/
 CLICKINCLUDE=$(CLICKDIR)/include
 
+CFLAGS+=-Wall -Wextra -I$(XINC) -I$(XCACHEINC) -L$(XLIB) -L$(XCACHEAPIDIR)
 CFLAGS+=-g -I$(CLICKINCLUDE) -I$(XCACHEDIR)/common -I$(DAEMONS_COMMON_INCLUDE) -I$(XCACHEDIR)/include -I$(XCACHEDIR)/bin -I$(XCACHEDIR) -I$(XCACHEDIR)/proto
-LDFLAGS= -lXsocket -lpthread -lssl -lcrypto -ldagaddr
+LDFLAGS+= -lXsocket -lpthread -lssl -lcrypto -ldagaddr
 XCACHE_BINDIR=$(XCACHEDIR)/bin/
 DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARouter.o
 

@@ -1,4 +1,3 @@
-CC=g++
 AR=ar
 CFLAGS+=-g -I../../click/include/click -shared
 OBJS=XcacheApis.o ../common/xcache_sock.o

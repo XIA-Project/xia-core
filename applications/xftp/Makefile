@@ -2,7 +2,7 @@ include ../../xia.mk
 
 .PHONY: clean
 
-CFLAGS+=-g -I../../../click/include/click
+CFLAGS+=-g -I../../../click/include/click -I$(XCACHEINC)
 LDFLAGS+=$(LIBS) -lpthread -lprotobuf
 
 TARGETS=xftp_basic_server xftp_basic_client
