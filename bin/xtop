@@ -14,15 +14,14 @@ fi
 x=$(pgrep -f xnetj)
 
 # get the rest of the click processes (replace \n in pgrep output with ,)
-[ "$x" != "" ] && x="$x,$(pgrep 'click|xroute|xcache|xname|statsserver|xstats' | tr '\n ' ',')"
+[ "$x" ] && x="$x,"
+x="$x$(pgrep 'click|xroute|xcache|xname|statsserver|xstats' | tr '\n ' ',')"
 
 # add anything from the command line
-#if [ "$*" ]; then
-	for p in $@; do
-		# pgrep may return multiple processes, so add commas if needed
-		x="$x$(pgrep $p | tr '\n ' ',')"
-	done
-#fi
+for p in $@; do
+	# pgrep may return multiple processes, so add commas if needed
+	x="$x$(pgrep $p | tr '\n ' ',')"
+done
 
 #strip the trailing ,
 x=${x%?}

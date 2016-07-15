@@ -1,0 +1,6 @@
+#!/bin/bash
+
+[ "$1" == "-h" ] && echo "list pids for XIA processes" && exit 0
+
+pgrep -l "click|xroute|xcache|xname|statsserver|xstats"
+pgrep -fa xnetj | cut -d\  -f1,3 | sed 's/\.\///'
