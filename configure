@@ -54,7 +54,7 @@ MIPSLIBDIR=\$(MIPSHOMEDIR)/usr/lib/
 
 CC=mips-linux-g++
 LD=mips-linux-g++
-CFLAGS=-Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
+CFLAGS=$CFLAGS -Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
 CXXFLAGS=\$(CFLAGS)
 
 LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
@@ -64,12 +64,6 @@ PYINCLUDES=-I\$(MIPSPYINCDIR)
 
 LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
 LIBS+=\$(XCACHEAPIDIR)/libxcache.a
-
-ifdef DEBUG
-CFLAGS +=-ggdb -DDEBUG
-else
-CFLAGS +=-O2
-endif
 
 EOF
 
