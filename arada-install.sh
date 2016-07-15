@@ -505,7 +505,7 @@ if [ $? -ne 0 ]; then
 	exit -1
 fi
 
-sudo cp -ax api applications bin click click-2.0.1 daemons etc $BUILDROOT/xia-core
+sudo cp -ax api applications bin click daemons etc $BUILDROOT/xia-core
 if [ $? -ne 0 ]; then
 	echo "Failed to copy necessary click stuff to $BUILDROOT/xia-core"
 	exit -1
