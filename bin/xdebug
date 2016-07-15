@@ -8,4 +8,4 @@ xpid=$(ps -eo pid,comm | grep click | awk '{ print $1}')
 
 [ "$xpid" == "" ] && echo "click process not found" && exit
 
-sudo gdb $xiadir/click-2.0.1/userlevel/click $xpid
+sudo gdb $xiadir/click/userlevel/click $xpid
