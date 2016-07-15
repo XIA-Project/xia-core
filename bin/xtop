@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# run top with xia related processes only
+#
+
+if [ "$1" == "-h" ]; then
+	echo "run top showing only the xia related processes"
+	echo "usage: xtop [name] [name] ..."
+	echo   "where name is/are the name(s) of any addition processes to monitor"
+	exit 0
+fi
+
+# because it's a python script, xnetj needs to be treated differently
+x=$(pgrep -f xnetj)
+
+# get the rest of the click processes (replace \n in pgrep output with ,)
+[ "$x" != "" ] && x="$x,$(pgrep 'click|xroute|xcache|xname|statsserver|xstats' | tr '\n ' ',')"
+
+# add anything from the command line
+#if [ "$*" ]; then
+	for p in $@; do
+		# pgrep may return multiple processes, so add commas if needed
+		x="$x$(pgrep $p | tr '\n ' ',')"
+	done
+#fi
+
+#strip the trailing ,
+x=${x%?}
+
+[ "$x" ] && top -p "$x"
