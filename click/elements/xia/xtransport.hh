@@ -54,9 +54,6 @@ using namespace xia;
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
-// SOCK_STREAM, etc from std socket definitions
-#define SOCK_CHUNK		4
-
 // TODO: switch these to bytes, not packets?
 #define MAX_SEND_WIN_SIZE	  256  // in packets, not bytes
 #define MAX_RECV_WIN_SIZE	  256
@@ -64,11 +61,6 @@ using namespace xia;
 #define DEFAULT_RECV_WIN_SIZE 128
 
 #define MAX_RETRANSMIT_TRIES 30
-
-#define REQUEST_FAILED	  0x00000001
-#define WAITING_FOR_CHUNK 0x00000002
-#define READY_TO_READ	  0x00000004
-#define INVALID_HASH	  0x00000008
 
 #define API_PORT	 0
 #define BAD_PORT	 1  // FIXME why do we still have this?
@@ -212,11 +204,6 @@ public:
 public:
 	void ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
-	void copy_common(struct sock *sk, XIAHeader &xiahdr, XIAHeaderEncap &xiah);
-	WritablePacket* copy_packet(Packet *, struct sock *);
-	WritablePacket* copy_cid_req_packet(Packet *, struct sock *);
-	WritablePacket* copy_cid_response_packet(Packet *, struct sock *);
-
 	char *random_xid(const char *type, char *buf);
 
 	uint32_t calc_recv_window(sock *sk);
@@ -233,7 +220,6 @@ public:
 
 	void ProcessAPIPacket(WritablePacket *p_in);
 	void ProcessNetworkPacket(WritablePacket *p_in);
-	void ProcessCachePacket(WritablePacket *p_in);
 	void ProcessXhcpPacket(WritablePacket *p_in);
 
 	void ProcessPollEvent(uint32_t id, unsigned int);
@@ -265,13 +251,6 @@ public:
 	void Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
 	void Xrecv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	//void XrequestChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	//void XgetChunkStatus(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	//void XreadChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	//void XremoveChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	//void XpushChunkto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	//void XbindPush(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	//void XputChunk(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
@@ -298,7 +277,6 @@ public:
 	void ProcessFinAckPacket(WritablePacket *p_in);
 
 	// timer retransmit handlers
-	void RetransmitCIDRequest(sock *sk, Timestamp &now, Timestamp &erlist_pending_expiry);
 	bool RetransmitDATA(sock *sk, uint32_t id, Timestamp &now);
 	bool RetransmitFIN(sock *sk, uint32_t id, Timestamp &now);
 	bool RetransmitFINACK(sock *sk, uint32_t id, Timestamp &now);
@@ -459,12 +437,6 @@ class sock : public Element {
 	 * Chunk States
 	* ========================= */
 	bool xcacheSock;
-	HashTable<XID, WritablePacket*> XIDtoCIDreqPkt;
-	HashTable<XID, Timestamp> XIDtoExpiryTime;
-	HashTable<XID, bool> XIDtoTimerOn;
-	HashTable<XID, int> XIDtoStatus;	// Content-chunk request status... 1: waiting to be read, 0: waiting for chunk response, -1: failed
-	HashTable<XID, bool> XIDtoReadReq;	// Indicates whether ReadCID() is called for a specific CID
-	HashTable<XID, WritablePacket*> XIDtoCIDresponsePkt;
 
 	bool reap;
 protected:

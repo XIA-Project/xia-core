@@ -145,10 +145,8 @@ int main()
 	// should all pass, using valid socktype
 	hints.ai_socktype = XSOCK_STREAM;
 	do_test(1, "7", HOST_NAME, NULL, &hints);
-	hints.ai_socktype = XSOCK_CHUNK;
-	do_test(1, "8", HOST_NAME, NULL, &hints);
 	hints.ai_socktype = XSOCK_DGRAM;
-	do_test(1, "9", HOST_NAME, NULL, &hints);
+	do_test(1, "8", HOST_NAME, NULL, &hints);
 
 	// should fail, raw not supported
 	hints.ai_socktype = XSOCK_RAW;

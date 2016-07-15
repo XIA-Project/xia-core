@@ -41,13 +41,6 @@ TEST(Xsocket, Dgram)
 	Xclose(sock);
 }
 
-TEST(Xsocket, Chunk)
-{
-	int sock = Xsocket(AF_XIA, XSOCK_CHUNK, 0);
-	EXPECT_GT(sock, -1);
-	Xclose(sock);
-}
-
 TEST(Xsocket, Raw)
 {
 	int sock = Xsocket(AF_XIA, SOCK_RAW, 0);
@@ -563,14 +556,6 @@ TEST_F(XgetaddrinfoTest, DgramHints)
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype = SOCK_DGRAM;
-	ASSERT_EQ(0, Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai));
-}
-
-TEST_F(XgetaddrinfoTest, ChunkHints)
-{
-	struct addrinfo hints;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_socktype = XSOCK_CHUNK;
 	ASSERT_EQ(0, Xgetaddrinfo(FULL_NAME, NULL, &hints, &ai));
 }
 
