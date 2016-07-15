@@ -1,4 +1,3 @@
-CC=g++
 OBJS = xcache.o
 OBJS += controller.o
 OBJS += meta.o

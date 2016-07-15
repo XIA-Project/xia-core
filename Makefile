@@ -25,6 +25,8 @@ static:
 # generate the click makefile optimized for XIA
 click/Makefile: click/Makefile.in xia.mk
 	cd click; ./configure \
+				'CXXFLAGS=$(CXXFLAGS)' \
+				'LDFLAGS=$(LDFLAGS)' \
 				$(OPTFLAGS) \
 				--enable-user-multithread \
 				--enable-warp9     \
