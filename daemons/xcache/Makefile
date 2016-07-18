@@ -20,8 +20,6 @@ TARGETS=proto src api bin
 
 .PHONY: all $(TARGETS)
 
-XCACHE=xcache
-
 $(XCACHE): $(TARGETS)
 	cp $(XCACHE_BINDIR)/xcache $(XCACHE)
 
