@@ -1,8 +1,0 @@
-g++
-protobuf-c-compiler
-libcurl4-openssl-dev 
-protobuf-compiler
-swig
-libprotobuf-dev
-python-dev
-python-crypto
