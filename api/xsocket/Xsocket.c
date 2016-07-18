@@ -41,7 +41,6 @@
 **	\n SOCK_STREAM for reliable communications (SID)
 **	\n SOCK_DGRAM for a ligher weight connection, but with
 **	unguranteed delivery (SID)
-**	\n XSOCK_CHUNK for getting/putting content chunks (CID)
 **	\n SOCK_RAW for a raw socket that can have direct edits made to the header
 **	\n SOCK_NONBLOCK may be or'd into the transport_type to create the socket in nonblocking mode
 ** @param for posix compatibility, currently ignored
@@ -84,7 +83,6 @@ int Xsocket(int family, int transport_type, int protocol)
 	switch (transport_type) {
 		case SOCK_STREAM:
 		case SOCK_DGRAM:
-		case XSOCK_CHUNK:
 		case SOCK_RAW:
 			break;
 		default:

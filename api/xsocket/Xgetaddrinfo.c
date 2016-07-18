@@ -198,8 +198,7 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 		if (socktype != 0 &&
 			socktype != SOCK_STREAM &&
-			socktype != SOCK_DGRAM &&
-			socktype != XSOCK_CHUNK) {
+			socktype != SOCK_DGRAM) {
 			// make sure it's one of our socket types.
 			// FIXME: should raw be allowed?
 			return EAI_SOCKTYPE;

@@ -10,7 +10,7 @@ SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XgetDAGbyName.c Xinit.c  \
 	Xrecv.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
 	XupdateDAG.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
-	XbindPush.c Xmsg.c Xfork.c Xnotify.c \
+	Xmsg.c Xfork.c Xnotify.c \
 	minini/minIni.c XsetXcacheSID.c Xkeys.c Xsecurity.c \
 	Xgetifaddrs.c Xgethostname.c
 
@@ -55,4 +55,3 @@ clean:
 	-rm -rf doc
 	-rm -f unittest
 	make -C python clean
-

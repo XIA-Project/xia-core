@@ -69,19 +69,13 @@ extern "C" {
 #define XSOCK_STREAM SOCK_STREAM	// Reliable transport (SID)
 #define XSOCK_DGRAM  SOCK_DGRAM		// Unreliable transport (SID)
 #define XSOCK_RAW	 SOCK_RAW		// Raw XIA socket
-#define XSOCK_CHUNK  4				// Content Chunk transport (CID)
-
-#define REQUEST_FAILED    0x00000001
-#define WAITING_FOR_CHUNK 0x00000002
-#define READY_TO_READ     0x00000004
-#define INVALID_HASH      0x00000008
 
 // Cache policy
-#define POLICY_LRU				0x00000001
-#define POLICY_FIFO				0x00000002
-#define POLICY_REMOVE_ON_EXIT	0x00001000
-#define POLICY_RETAIN_ON_EXIT	0x00002000
-#define POLICY_DEFAULT			(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
+//#define POLICY_LRU				0x00000001
+//#define POLICY_FIFO				0x00000002
+//#define POLICY_REMOVE_ON_EXIT	0x00001000
+//#define POLICY_RETAIN_ON_EXIT	0x00002000
+//#define POLICY_DEFAULT			(POLICY_LRU | POLICY_RETAIN_ON_EXIT)
 
 #define CID_HASH_SIZE 40
 
@@ -133,8 +127,6 @@ extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockad
 extern ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags);
 extern int Xsendto(int sockfd,const void *buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen);
 extern ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags);
-
-
 extern int Xclose(int sock);
 extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
@@ -142,25 +134,6 @@ extern int Xfcntl(int sockfd, int cmd, ...);
 extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
 extern int Xfork(void);
 extern int Xnotify(void);
-
-#if 0
-extern int XrequestChunk(int sockfd, char* dag, size_t dagLen);
-extern int XrequestChunks(int sockfd, const ChunkStatus *chunks, int numChunks);
-extern int XgetChunkStatus(int sockfd, char* dag, size_t dagLen);
-extern int XgetChunkStatuses(int sockfd, ChunkStatus *statusList, int numCids);
-extern int XreadChunk(int sockfd, void *rbuf, size_t len, int flags, char *cid, size_t cidLen);
-extern int XpushChunkto(const ChunkContext* ctx, const char* buf, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo* info);
-extern int XpushBufferto(const ChunkContext *ctx, const char *data, size_t len, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize);
-extern int XpushFileto(const ChunkContext *ctx, const char *fname, int flags, const struct sockaddr *addr, socklen_t addrlen, ChunkInfo **info, unsigned chunkSize);
-extern int XrecvChunkfrom(int sockfd, void* rbuf, size_t len, int flags, ChunkInfo* ci);
-extern int XbindPush(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-
-extern ChunkContext *XallocCacheSlice(unsigned policy, unsigned ttl, unsigned size);
-extern int XfreeCacheSlice(ChunkContext *ctx);
-extern int XputBuffer(ChunkContext *ctx, const char *, unsigned size, unsigned chunkSize, ChunkInfo **infoList);
-extern int XremoveChunk(ChunkContext *ctx, const char *cid);
-extern void XfreeChunkInfo(ChunkInfo *infoList);
-#endif
 
 extern void set_conf(const char *filename, const char *sectioname);
 extern void print_conf();
@@ -199,7 +172,7 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
-	
+
 extern int getXcacheInPort(void);
 extern int getXcacheOutPort(void);
 
@@ -208,4 +181,3 @@ extern int getXcacheOutPort(void);
 #endif
 
 #endif
-
