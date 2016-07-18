@@ -328,7 +328,7 @@ void *xcache_controller::__fetch_content(void *__args)
 int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 					    int flags)
 {
-	int ret;
+	int ret = 0;
 
 	if (flags & XCF_BLOCK) {
 		struct __fetch_content_args args;
@@ -477,7 +477,7 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 	return true;
 }
 
-int xcache_controller::__store(struct xcache_context *context,
+int xcache_controller::__store(struct xcache_context * /*context */,
 			       xcache_meta *meta, const std::string *data)
 {
 	lock_meta_map();
@@ -521,12 +521,16 @@ sockaddr_x xcache_controller::cid2addr(std::string cid)
 	char root[XIA_MAX_DAG_STR_SIZE];
 	char _4id[MAX_XID_SIZE];
 
-	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
+		LOG_CTRL_ERROR("Socket creation error.\n");
 		assert(0);
+	}
 
 	if(XreadLocalHostAddr(xcache_sock, root, sizeof(root),
-			      _4id, sizeof(_4id)) < 0)
+				_4id, sizeof(_4id)) < 0) {
+		LOG_CTRL_ERROR("Can't get local address.\n");
 		assert(0);
+	}
 
 	Xclose(xcache_sock);
 
