@@ -1,13 +1,19 @@
 AR=ar
 CFLAGS+=-g -I../../click/include/click -shared
-OBJS=XcacheApis.o ../common/xcache_sock.o
+OBJS=XcacheApis.o ../common/xcache_sock.o ../proto/xcache_cmd.pb.o
 
-lib: $(OBJS)
-	$(AR) -rcs libxcache.a $(OBJS) ../bin/xcache_cmd.pb.o
-	rm -f *.o
+.PHONY: all
+
+LIBXCACHE= libxcache.a
+
+$(LIBXCACHE): $(OBJS)
+	$(AR) -rcs libxcache.a $(OBJS)
+
+all: $(LIBXCACHE)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $^
+
 clean:
-	rm -f *.o
+	rm -f $(OBJS)
 	rm -f libxcache.a

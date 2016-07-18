@@ -5,12 +5,18 @@ OBJS += store_manager.o
 OBJS += logger.o
 OBJS += cache.o
 
-all: $(OBJS)
+LIBXCACHED=libxcached.a
+
+.PHONY: all
+
+all: $(LIBXCACHED)
+
+$(LIBXCACHED): $(OBJS)
+	ar rcs $@ $^
 
 %.o: %.cc
 	$(CC) $(CFLAGS) -o $@ -c $^
 
 
 clean:
-	rm -f xcache
-	rm -f *.o
+	rm -f *.o $(LIBXCACHED)

@@ -1,5 +1,21 @@
+VPATH=../../common
+
 LDFLAGS+=-lprotobuf
-all:
-	$(CC) $(CFLAGS) -o xcache *.o $(LDFLAGS)
+
+XCACHE=xcache
+XCACHELIBS=../src/libxcached.a ../proto/libxcacheproto.a ../api/libxcache.a
+
+.PHONY: all
+
+COMMONOBJS=csclient.o XIARouter.o
+
+$(XCACHE): $(COMMONOBJS) $(XCACHELIBS) $(COMMON)
+	$(CC) $(CFLAGS) -o xcache $(XCACHELIBS) $(COMMONOBJS) $(LDFLAGS)
+
+%.o: %.cc
+	$(CC) $(CFLAGS) -o $@ -c $^
+
+all: $(XCACHE)
+
 clean:
-	rm -f *.o xcache
+	rm -f $(COMMONOBJS) xcache

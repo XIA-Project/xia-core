@@ -16,33 +16,24 @@ DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARoute
 
 export ## Make variables available to subsequent makefiles
 
-TARGETS=proto src api common
+TARGETS=proto src api bin
 
-.PHONY: $(TARGETS) bin
+.PHONY: all $(TARGETS)
 
-all: bin
+XCACHE=xcache
+
+$(XCACHE): $(TARGETS)
 	cp $(XCACHE_BINDIR)/xcache $(XCACHE)
+
+all: $(XCACHE)
 
 %.o: %.cc
 	$(CC) $(CFLAGS) -o $@ -c $^
 
-daemons_common: $(DAEMONS_COMMON)
-	mv $(DAEMONS_COMMON_PATH)/*.o $(XCACHE_BINDIR)
-
 $(TARGETS):
-	make -C $@
-	for f in  $@/*.o; do \
-		if [ -e $$f ]; then \
-			mv -f $@/*.o $(XCACHE_BINDIR); \
-			break; \
-		fi; \
-	done
-
-bin: daemons_common $(TARGETS)
 	make -C $@
 
 clean:
 	for dir in ${TARGETS}; do \
 		make -C $$dir clean;	\
 	done
-	make -C bin clean
