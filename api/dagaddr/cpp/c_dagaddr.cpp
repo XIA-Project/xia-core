@@ -18,7 +18,7 @@ static struct {
 
 const char *get_xid_str(int id)
 {
-	int i;
+	unsigned i;
 
 	for(i = 0; i < sizeof(xidmap)/sizeof(xidmap[0]); i++) {
 		if(xidmap[i].xid_type == id)
@@ -31,12 +31,12 @@ const char *get_xid_str(int id)
 #define CHR2HEX(__chr) ((((__chr) >= '0') && ((__chr) <= '9')) ? ((__chr ) - '0') : \
 			((__chr >= 'a') ? (10 + (__chr - 'a')) : (10 + (__chr - 'A'))))
 
-#define HEX2CHR(__hex) ((((__hex) >= 0) && ((__hex) <= 9)) ? ((__hex) + '0') : ((__hex) + 'a' - 10))
+#define HEX2CHR(__hex) (((__hex) <= 9) ? ((__hex) + '0') : ((__hex) + 'a' - 10))
 
 
 static void str2hex(unsigned char *hexdst, size_t hexdstlen, char *strsrc, size_t strsrclen)
 {
-	int srci, dsti;
+	size_t srci, dsti;
 
 	for(srci = 0, dsti = 0; (srci < strsrclen) && (dsti < hexdstlen); srci += 2, dsti++) {
 		hexdst[dsti] = (CHR2HEX(strsrc[srci]) << 4) | CHR2HEX(strsrc[srci + 1]);
@@ -45,9 +45,9 @@ static void str2hex(unsigned char *hexdst, size_t hexdstlen, char *strsrc, size_
 
 void hex2str(char *strdst, size_t strdstlen, unsigned char *hexsrc, size_t hexsrclen)
 {
-	int srci, dsti;
+	size_t srci, dsti;
 
-	for(srci = 0, dsti = 0; (srci < hexsrclen) && (dsti < strdstlen); srci++, dsti += 2) {
+	for(srci = 0, dsti = 0; (srci < hexsrclen) && (dsti < strdstlen - 1); srci++, dsti += 2) {
 		strdst[dsti] = HEX2CHR((hexsrc[srci] & 0xF0) >> 4);
 		strdst[dsti + 1] = HEX2CHR(hexsrc[srci] & 0xF);
 	}
@@ -99,27 +99,12 @@ static node_t str_to_node(char *xidstr)
 	return node;
 }
 
-static char *node_to_str(char *xidstr, size_t xidstrlen, node_t *node)
-{
-	int xid_type;
-	const char *xidstrtype = get_xid_str(node->s_xid.s_type);
-
-	if(xidstr == NULL) {
-		return NULL;
-	}
-
-	snprintf(xidstr, xidstrlen, "%s:", xidstrtype);
-	hex2str(xidstr + strlen(xidstr), xidstrlen, node->s_xid.s_id, XID_SIZE);
-
-	return xidstr;
-}
 
 void dag_add_nodes(sockaddr_x *addr, int count, ...)
 {
 	int i = 0;
 	va_list ap;
 	va_start(ap, count);
-	node_t node;
 
 	memset(addr, 0, sizeof(sockaddr_x));
 	addr->sx_family = AF_XIA;
@@ -198,9 +183,8 @@ static int get_path_recursive(sockaddr_x *scratch, int path[], int *pathlen, int
 
 static int get_path(sockaddr_x *scratch, int path[])
 {
-	int i, ret, pathlen = 0;
-	node_t *last_node;
-	
+	int ret, pathlen = 0;
+
 	ret = get_path_recursive(scratch, path, &pathlen, scratch->sx_addr.s_count - 1);
 
 	if(ret < 0)
@@ -271,7 +255,7 @@ struct node {
 	int ref_count;
 };
 
-int url_to_dag(sockaddr_x *addr, char *url, size_t urlsize)
+int url_to_dag(sockaddr_x *addr, char *url, size_t /* urlsize */)
 {
 #define printf(...)
 	char *saveptr, *token;
@@ -301,7 +285,7 @@ int url_to_dag(sockaddr_x *addr, char *url, size_t urlsize)
 			Node *n;
 			node_iter = node_map.find(std::string(token));
 
-			
+
 			if(node_iter != node_map.end()) {
 				printf("Iter found\n");
 				n = node_iter->second;
@@ -319,15 +303,15 @@ int url_to_dag(sockaddr_x *addr, char *url, size_t urlsize)
 	g += *g_path;
 
 	g.fill_sockaddr(addr);
+	return 0;
 #undef printf
 }
 
 void dag_add_path(sockaddr_x *addr, int count, ...)
 {
-	int current, first, last, i = 0;
+	int current, first, last;
 	va_list ap;
 	va_start(ap, count);
-	node_t node;
 
 	last = va_arg(ap, int);
 
@@ -385,7 +369,7 @@ void print_sockaddr(sockaddr_x *a)
 // int main(void)
 // {
 // 	sockaddr_x addr, addr1;
-	
+
 // 	dag_add_nodes(&addr, 3, "AD:2122", "HID:00000", "CID:299292");
 // 	dag_add_path(&addr, 3, 0, 1, 2);
 // 	dag_add_path(&addr, 2, 0, 2);
