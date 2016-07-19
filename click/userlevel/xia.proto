@@ -12,11 +12,6 @@ enum XSocketCallType {
   XRECVFROM = 9;
   XSETSOCKOPT = 10;
   XGETSOCKOPT = 11;
-  XPUTCHUNK = 12;
-  XREQUESTCHUNK = 13;
-  XGETCHUNKSTATUS = 14;
-  XREADCHUNK = 15;
-  XREMOVECHUNK =16;
   XREQUESTFAILED = 17;
   XRESULT = 18;
   XUPDATEDAG = 19;
@@ -28,10 +23,7 @@ enum XSocketCallType {
   XGETSOCKNAME = 25;
   XGETMSG = 26;
   XREADYTOACCEPT = 27;
-  XPUSHCHUNKTO = 28;
-  XBINDPUSH = 29;
   XPOLL = 30;
-  XRECVCHUNKFROM = 31;
   XLISTEN = 32;
   XUPDATERV = 33;
   XSETXCACHESID = 34;
@@ -62,12 +54,6 @@ message XSocketMsg {
   optional X_Setsockopt_Msg x_setsockopt = 15;
   optional X_Getsockopt_Msg x_getsockopt = 16;
 
-  optional X_Putchunk_Msg x_putchunk = 17;
-  optional X_Requestchunk_Msg x_requestchunk = 18;
-  optional X_Getchunkstatus_Msg x_getchunkstatus = 19;
-  optional X_Readchunk_Msg x_readchunk = 20;
-  optional X_Removechunk_Msg x_removechunk = 21;
-
   optional X_Requestfailed_Msg x_requestfailed= 22;
   optional X_Result_Msg x_result = 23;
 
@@ -81,9 +67,6 @@ message XSocketMsg {
   optional X_GetSockname_Msg x_getsockname = 30;
 
   optional X_Poll_Msg x_poll = 31;
-  optional X_Pushchunkto_Msg x_pushchunkto= 32;
-  optional X_BindPush_Msg x_bindpush= 33;
-  optional X_Recvchunkfrom_Msg x_recvchunkfrom = 34;
 
   optional X_Updaterv_Msg x_updaterv = 35;
   optional X_Listen_Msg x_listen = 36;
@@ -172,39 +155,6 @@ message X_Getsockopt_Msg {
 	required int32 opt_type = 1;
 	optional int32 int_opt = 2;
 	// we will likely have to add other optional fields as we add options in the future
-}
-
-message X_Putchunk_Msg {
-  required int32 cachepolicy = 1;
-  required int32 cachesize = 2;
-  required int32 contextid = 3;
-  required int32 TTL = 4;
-  required bytes payload = 5; // data
-  optional string cid = 6;
-  optional int32 length = 7;
-  optional int64 timestamp = 8;
-}
-
-message X_Requestchunk_Msg {
-  repeated string dag = 1;
-  optional bytes payload = 2; // data
-}
-
-message X_Getchunkstatus_Msg {
-  repeated string dag = 1;
-  repeated string status = 2;
-  optional bytes payload = 3; // data
-}
-
-message X_Readchunk_Msg {
-  required string dag = 1;
-  optional bytes payload = 2;
-}
-
-message X_Removechunk_Msg {
-    required int32 contextid =1 ;
-	required string cid = 2;
-	optional int32 status = 3;
 }
 
 message X_Result_Msg {
@@ -314,38 +264,10 @@ message msg_response {
 }
 
 
-message X_Pushchunkto_Msg {
-  required string ddag = 1; // dest dag
-  required int32 cachepolicy = 2;
-  required int32 cachesize = 3;
-  required int32 contextid = 4;
-  required int32 TTL = 5;
-  required bytes payload = 6; // data
-  required string cid = 7;
-  required int32 length = 8;
-  optional int64 timestamp = 9;
-}
-
-message X_Recvchunkfrom_Msg {
-  optional string ddag = 1;
-  optional int32 cachepolicy = 2;
-  optional int32 cachesize = 3;
-  optional int32 contextid = 4;
-  optional int32 TTL = 5;
-  optional bytes payload = 6; // data
-  optional string cid = 7;
-  optional int32 length = 8;
-  optional int64 timestamp = 9;
-}
-
 message X_Fork_Msg {
   optional bool increment = 1;
   optional uint32 count = 2;
   repeated uint32 ids = 3;
-}
-
-message X_BindPush_Msg {
-  required string sdag = 1; // bind to src dag
 }
 
 message X_SetXcacheSid_Msg {
