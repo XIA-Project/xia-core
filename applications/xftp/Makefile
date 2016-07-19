@@ -5,7 +5,7 @@ include ../../xia.mk
 CFLAGS+=-g -I../../../click/include/click -I$(XCACHEINC)
 LDFLAGS+=$(LIBS) -lpthread -lprotobuf
 
-TARGETS=xftp_basic_server xftp_basic_client
+TARGETS=xftp xftpd
 
 all: $(TARGETS)
 

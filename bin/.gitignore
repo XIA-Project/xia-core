@@ -1,8 +1,8 @@
 xnameservice
 xrouted
-xhcp*
 xping
 xtraceroute
 xregister
 xnetcat
 xrendezvous
+xcache
