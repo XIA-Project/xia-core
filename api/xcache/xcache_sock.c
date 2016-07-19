@@ -21,8 +21,13 @@ int get_xcache_sock_name(char *sockname, int len)
 		printf("%s: Error while reading localhost addr\n", __func__);
 		return -1;
 	}
+
+// FIXME HERE!
 	Graph g(dag);
+	printf(" getting intent hid\n");
+	printf("get_xcache_sock_name: %s\n", g.intent_HID_str().c_str());
 	const char *p = g.intent_HID_str().c_str();
+printf("get_xcache_sock_name: %s\n", p);
 	hid = strstr(p, _HID);
 	if (hid == NULL) {
 		hid = p;

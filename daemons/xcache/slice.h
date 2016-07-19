@@ -5,7 +5,7 @@
 #include <map>
 #include "logger.h"
 #include "clicknet/xia.h"
-#include "policy.h"
+#include "policies/policy.h"
 #include <stdint.h>
 
 class xcache_meta;

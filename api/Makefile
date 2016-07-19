@@ -1,6 +1,7 @@
 all: 
 	make -C dagaddr
 	make -C xsocket
+	make -C xcache
 	make -C wrapper
 	make -C xssl
 
@@ -12,6 +13,7 @@ static:
 clean:
 	make -C dagaddr clean
 	make -C xsocket clean
+	make -C xcache clean
 	make -C wrapper clean
 	make -C xssl clean
 

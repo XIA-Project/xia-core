@@ -2,8 +2,7 @@ include ../../xia.mk
 
 .PHONY: clean
 
-CFLAGS+=-g -I../../../click/include/click -I$(XCACHEINC)
-LDFLAGS+=$(LIBS) -lpthread -lprotobuf
+LDFLAGS+=$(LIBS) -lprotobuf 
 
 TARGETS=chunk-demo-server chunk-demo-client
 

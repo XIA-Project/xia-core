@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <map>
-#include "meta.h"
+#include "../meta.h"
 
 /**
  * DiskStore:

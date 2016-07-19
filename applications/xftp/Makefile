@@ -2,8 +2,7 @@ include ../../xia.mk
 
 .PHONY: clean
 
-CFLAGS+=-g -I../../../click/include/click -I$(XCACHEINC)
-LDFLAGS+=$(LIBS) -lpthread -lprotobuf
+LDFLAGS+=$(LIBS) $(XLIB)/libxcache.so -lprotobuf
 
 TARGETS=xftp xftpd
 

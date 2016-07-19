@@ -4,7 +4,6 @@
 #include "Xsocket.h"
 #include <stddef.h>
 #include <stdint.h>
-#include "../common/xcache_events.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +40,13 @@ typedef struct {
 
 #define XCF_METACHUNK 0x10
 #define XCF_DATACHUNK 0x20
+
+/** EVENTS **/
+enum {
+	XCE_CHUNKARRIVED = 0,
+	XCE_CHUNKAVAILABLE,
+	XCE_MAX,
+};
 
 /**
  * XcacheHandleInit

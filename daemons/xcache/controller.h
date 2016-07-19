@@ -12,7 +12,7 @@
 #include "cache.h"
 #include "dagaddr.hpp"
 #include <errno.h>
-#include "api/xcache.h"
+#include "xcache.h"
 
 #define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100

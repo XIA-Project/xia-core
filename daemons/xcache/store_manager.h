@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <vector>
-#include "store.h"
+#include "stores/store.h"
 
 /**
  * Efficiently manage various content stores.

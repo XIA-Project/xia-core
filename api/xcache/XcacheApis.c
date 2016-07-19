@@ -6,12 +6,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "../proto/xcache_cmd.pb.h"
-#include "../common/xcache_sock.h"
+#include "xcache_cmd.pb.h"
+#include "xcache_sock.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include "../common/xcache_events.h"
 #include "dagaddr.hpp"
 
 static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, sockaddr_x *, socklen_t) = {
@@ -46,6 +45,7 @@ static int get_connected_socket(void)
 
 static int send_command(int xcache_sock, xcache_cmd *cmd)
 {
+	int ret;
 	int remaining, sent;
 	uint32_t msg_length;
 	std::string cmd_on_wire;
@@ -59,21 +59,26 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 
 	sent = 0;
 	do {
-		int to_send;
+		//int to_send;
 
-		to_send = remaining < 512 ? remaining : 512;
-		send(xcache_sock, cmd_on_wire.c_str() + sent, to_send, 0);
-
-		remaining -= to_send;
-		sent += to_send;
+		//to_send = remaining < 512 ? remaining : 512;
+		ret = send(xcache_sock, cmd_on_wire.c_str() + sent, remaining, 0);
+		if (ret <= 0) {
+			break;
+		}
+		remaining -= ret;
+		sent += ret;
 	} while(remaining > 0);
 
 	fprintf(stderr, "%s: Lib sent %d bytes\n", __func__, htonl(msg_length) + 4);
 
-	return htonl(msg_length) + 4;
+	if (ret < 0 || remaining > 0)
+		return -1;
+	else
+		return htonl(msg_length) + 4;
 }
 
-#define API_CHUNKSIZE 128
+#define API_CHUNKSIZE 62000
 
 static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 {
@@ -81,17 +86,17 @@ static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 	char buf[API_CHUNKSIZE] = {0};
 
 	while(remaining > 0) {
-		uint32_t to_read;
+		//uint32_t to_read;
 
-		to_read = MIN(API_CHUNKSIZE, remaining);
-		ret = read(fd, buf, to_read);
-		if(ret == 0)
+		//to_read = MIN(API_CHUNKSIZE, remaining);
+		ret = read(fd, buf, remaining);
+		if(ret <= 0)
 			return ret;
 
 		std::string temp(buf, ret);
 
 		buffer += temp;
-		memset(buf, 0, ret);
+		//memset(buf, 0, ret);
 		remaining -= ret;
 	}
 
@@ -510,4 +515,3 @@ int XreadChunk(XcacheHandle *h, sockaddr_x *addr, socklen_t addrlen, void *buf, 
 
 	return to_copy;
 }
-

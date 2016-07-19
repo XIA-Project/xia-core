@@ -46,7 +46,6 @@ XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
 ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
 XINC=\$(APIDIR)/include
-XCACHEINC=\$(XCACHEAPIDIR)
 
 TARCH=mips
 MIPSHOMEDIR=/opt/buildroot-2013.11/output/host
@@ -64,8 +63,7 @@ LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
 PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
 PYINCLUDES=-I\$(MIPSPYINCDIR)
 
-LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
-LIBS+=\$(XCACHEAPIDIR)/libxcache.a
+LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so \$(XLIB)/libxcache.so -lprotobuf -lssl -lcrypto
 
 EOF
 
@@ -82,15 +80,13 @@ XCACHEAPIDIR=\$(XIADIR)/daemons/xcache/api
 ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
 XINC=\$(APIDIR)/include
-XCACHEINC=\$(XCACHEAPIDIR)
 
 CC=g++
 LD=g++
 CFLAGS=$CFLAGS -I\$(XINC)
 CXXFLAGS=$CFLAGS
 LDFLAGS=-lpthread
-LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
-LIBS+=\$(XCACHEAPIDIR)/libxcache.a
+LIBS=\$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so \$(XLIB)/libxcache.so
 PYLDFLAGS=`python-config --ldflags`
 PYINCLUDES=`python-config --includes`
 

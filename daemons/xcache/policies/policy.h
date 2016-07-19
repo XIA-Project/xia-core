@@ -1,7 +1,7 @@
 #ifndef __POLICY_H__
 #define __POLICY_H__
 
-#include "meta.h"
+#include "../meta.h"
 
 /**
  * Abstract class that defines a eviction policy.
@@ -30,6 +30,6 @@ public:
  * All the policies are implemented c++ objects. The corresponding header files
  * must be included here.
  */
-#include "policies/fifo.h"
+#include "fifo.h"
 
 #endif /* __POLICY_H__ */
