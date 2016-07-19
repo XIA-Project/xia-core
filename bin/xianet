@@ -323,7 +323,7 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --hostname $host &
-			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
+			./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
@@ -354,7 +354,7 @@ host()
 	case $action in
 		"start")
 			./xnetjd --client --hostname $host &
-			LD_LIBRARY_PATH=${XIADIR}/api/lib ./xcache -h $host -l3 -m 0xFF&
+			./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
