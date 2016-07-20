@@ -287,6 +287,7 @@ kill_all_services()
 	echo "Killing all possible XIA related services..."
 	for p in $ALL_PROCESSES
 	do
+		echo $p
 		killall -9 $p &> /dev/null
 	done
 	check_all_services 1
@@ -525,14 +526,16 @@ clean_conf_and_keys()
 	fi
 	# Delete all keys and config files
 	# NOTE: This deletes all application keys also
-	echo "Deleting config files"
-	rm -f $XIADIR/etc/click/host*.click
+`	echo "Deleting config files"
+`	rm -f $XIADIR/etc/click/host*.click
 	rm -f $XIADIR/etc/click/router*.click
 	echo "Deleting key files"
 	rm -f $XIADIR/key/*
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/xsockconf.ini
+	echo "Deleting temp files"
+	rm -f /tmp/xcache.*
 
 }
 

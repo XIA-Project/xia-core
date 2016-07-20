@@ -86,6 +86,7 @@ fresh:
 	@rm -f etc/xsockconf.ini
 	@rm -f etc/click/host*.click
 	@rm -f etc/click/router*.click
+	@rm -rf /tmp/xcache.*
 
 
 #### TEST RULES
