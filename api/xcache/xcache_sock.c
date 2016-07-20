@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "Xsocket.h"
 #include "xcache_sock.h"
 #include "dagaddr.hpp"
@@ -7,9 +8,7 @@
 
 int get_xcache_sock_name(char *sockname, int len)
 {
-	#define _HID "HID:"
 	char dag[XIA_MAX_DAG_STR_SIZE], fourid[XIDLEN];
-	const char *hid;
 	int sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 
 	if(sock < 0) {
@@ -22,18 +21,19 @@ int get_xcache_sock_name(char *sockname, int len)
 		return -1;
 	}
 
-// FIXME HERE!
 	Graph g(dag);
-	printf(" getting intent hid\n");
-	printf("get_xcache_sock_name: %s\n", g.intent_HID_str().c_str());
-	const char *p = g.intent_HID_str().c_str();
-printf("get_xcache_sock_name: %s\n", p);
-	hid = strstr(p, _HID);
+	char buf[64];
+	strncpy(buf, g.intent_HID_str().c_str(), sizeof(buf));
+	char *hid = strchr(buf, ':');
+
 	if (hid == NULL) {
-		hid = p;
-	} else {
-		hid += sizeof(_HID);
+		printf("Unable to find HID to use in xcache sock name\n");
+		return -1;
 	}
 
-	return snprintf(sockname, len, "/tmp/xcache.%s", hid);
+	hid++;
+	int rc = snprintf(sockname, len, "/tmp/xcache.%s", hid);
+	printf("\n\n\nget_xcache_sock_name: %s\n\n\n", sockname);
+
+	return rc;
 }
