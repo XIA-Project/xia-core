@@ -337,7 +337,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 /**
 * @brief Return the node's type as a string
 *
-* The type string will either be one of the following built-in XID types or will match 
+* The type string will either be one of the following built-in XID types or will match
 * one of the entries in etc/xids.
 *			\n Node::XID_TYPE_AD_STRING
 *			\n Node::XID_TYPE_HID_STRING
@@ -773,14 +773,14 @@ Graph::intent_AD_str() const
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
-	printf("Graph::intent_AD_str called on %s.\n", this->dag_string().c_str());
+//	printf("Graph::intent_AD_str called on %s.\n", this->dag_string().c_str());
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
 		// Save each node visited
 		Node n = get_node(curIndex);
 		if(n.type_string().compare(Node::XID_TYPE_AD_STRING) == 0) {
 			ad = n.to_string();
-			printf("Graph::intent_AD_str Found ad: %s\n", ad.c_str());
+//			printf("Graph::intent_AD_str Found ad: %s\n", ad.c_str());
 		}
 	}
 	return ad;
@@ -801,14 +801,14 @@ Graph::intent_HID_str() const
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
-	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
+//	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
 		// Save each node visited
 		Node n = get_node(curIndex);
 		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
 			hid = n.to_string();
-			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+//			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
 		}
 	}
 	return hid;
@@ -1534,7 +1534,7 @@ Graph::get_nodes_of_type(unsigned int type) const
 	for (it = nodes_.begin(); it != nodes_.end(); ++it) {
 		if (it->type() == type) {
 			nodes.push_back(&*it);
-			printf("FOUND IT");
+//			printf("FOUND IT");
 		}
 	}
 
