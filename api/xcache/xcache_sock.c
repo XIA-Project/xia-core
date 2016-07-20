@@ -32,8 +32,6 @@ int get_xcache_sock_name(char *sockname, int len)
 	}
 
 	hid++;
-	int rc = snprintf(sockname, len, "/tmp/xcache.%s", hid);
-	printf("\n\n\nget_xcache_sock_name: %s\n\n\n", sockname);
 
-	return rc;
+	return snprintf(sockname, len, "/tmp/xcache.%s", hid);
 }
