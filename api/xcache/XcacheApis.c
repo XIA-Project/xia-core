@@ -80,27 +80,26 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 		return htonl(msg_length) + 4;
 }
 
-#define API_CHUNKSIZE 62000
-
 static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 {
 	int ret;
-	char buf[API_CHUNKSIZE] = {0};
+	char *buf = (char *)malloc(remaining);
+	int total = remaining;
+	char *p = buf;
 
 	while(remaining > 0) {
-		//uint32_t to_read;
 
-		//to_read = MIN(API_CHUNKSIZE, remaining);
-		ret = read(fd, buf, remaining);
+		ret = read(fd, p, remaining);
 		if(ret <= 0)
 			return ret;
-
-		std::string temp(buf, ret);
-
-		buffer += temp;
-		//memset(buf, 0, ret);
+		p += ret;
 		remaining -= ret;
 	}
+
+	// FIXME: there must be a better way of doing this!
+	std::string temp(buf, total);
+	buffer = temp;
+	free(buf);
 
 	return 1;
 }
@@ -124,7 +123,6 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 		cmd->set_cmd(xcache_cmd::XCACHE_ERROR);
 		return -1;
 	}
-
 	cmd->ParseFromString(buffer);
 
 	return 0;
@@ -436,7 +434,7 @@ int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x
 
 		to_copy = MIN(cmd.data().length(), buflen);
 		memcpy(buf, cmd.data().c_str(), to_copy);
-		fprintf(stderr, "Copying %lu bytes to buffer\n", to_copy);
+		fprintf(stderr, "Fetch: Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
 
 		return to_copy;
 	}
@@ -513,7 +511,7 @@ int XreadChunk(XcacheHandle *h, sockaddr_x *addr, socklen_t addrlen, void *buf, 
 
 	to_copy = MIN(cmd.data().length(), buflen);
 	memcpy(buf, cmd.data().c_str(), to_copy);
-	fprintf(stderr, "Copying %lu bytes to buffer\n", to_copy);
+	fprintf(stderr, "Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
 
 	return to_copy;
 }
