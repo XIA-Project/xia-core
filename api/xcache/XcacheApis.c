@@ -37,8 +37,10 @@ static int get_connected_socket(void)
 	xcache_addr.sun_family = AF_UNIX;
 	strcpy(xcache_addr.sun_path, sock_name);
 
-	if(connect(sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0)
+	if(connect(sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0) {
+		printf("%s:%d error:%s\n", __FILE__, __LINE__, strerror(errno));
 		return -1;
+	}
 
 	return sock;
 }
