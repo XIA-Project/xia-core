@@ -22,9 +22,6 @@
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
-#undef XIA_MAXBUF
-#define XIA_MAXBUF 500
-
 #define MAX_XID_SIZE 100
 
 enum {
@@ -512,39 +509,30 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	return RET_SENDRESP;
 }
 
-sockaddr_x xcache_controller::cid2addr(std::string cid)
+int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 {
-	sockaddr_x addr;
+	int rc = 0;
 	std::string myCid("CID:");
-	int xcache_sock;
-	char dag[XIA_MAX_DAG_STR_SIZE];
-	char root[XIA_MAX_DAG_STR_SIZE];
-	char _4id[MAX_XID_SIZE];
 
-	if((xcache_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
-		LOG_CTRL_ERROR("Socket creation error.\n");
-		assert(0);
-	}
-
-	if(XreadLocalHostAddr(xcache_sock, root, sizeof(root),
-				_4id, sizeof(_4id)) < 0) {
-		LOG_CTRL_ERROR("Can't get local address.\n");
-		assert(0);
-	}
-
-	Xclose(xcache_sock);
+	struct addrinfo *ai, hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_XIA;
+	hints.ai_flags = XAI_FALLBACK;
 
 	myCid += cid;
+	if (Xgetaddrinfo(NULL, myCid.c_str(), &hints, &ai) >= 0) {
+		if (ai->ai_addr) {
+			memcpy(sax, ai->ai_addr, sizeof(sockaddr_x));
+		} else {
+			rc = -1;
+		}
 
-	sprintf(dag, "RE ( %s ) %s", root, myCid.c_str());
-	Graph g(dag);
-	g.fill_sockaddr(&addr);
+		Xfreeaddrinfo(ai);
+	} else {
+		rc = -1;
+	}
 
-//	dag_add_nodes(&addr, 3, AD, HID, myCid.c_str());
-//	dag_set_intent(&addr, 2);
-//	dag_add_path(&addr, 3, 0, 1, 2);
-
-	return addr;
+	return rc;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
@@ -579,11 +567,16 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
-	sockaddr_x addr = cid2addr(cid);
-	resp->set_dag((char *)&addr, sizeof(sockaddr_x));
-	Graph g(&addr);
-	printf("--------------------\n");
-	g.print_graph();
+	sockaddr_x addr;
+
+	if (cid2addr(cid, &addr) == 0) {
+		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
+		Graph g(&addr);
+		printf("--------------------\n");
+		g.print_graph();
+	} else {
+		// FIXME: do some sort of error handling here
+	}
 
 	LOG_CTRL_INFO("Store Finished\n");
 
@@ -895,20 +888,20 @@ repeat:
 			continue;
 		}
 
-		char buf[512] = "";
+		char buf[XIA_MAXBUF];
 		std::string buffer("");
 		xcache_cmd resp, cmd;
 		int ret;
 		uint32_t msg_length, remaining;
 
-		ret = recv(*iter, &msg_length, 4, 0);
+		ret = recv(*iter, &msg_length, sizeof(msg_length), 0);
 		if(ret <= 0)
 			goto disconnected;
 
 		remaining = ntohl(msg_length);
 
 		while(remaining > 0) {
-			ret = recv(*iter, buf, MIN(512, remaining), 0);
+			ret = recv(*iter, buf, MIN(sizeof(buf), remaining), 0);
 			LOG_CTRL_INFO("Recv returned %d, remaining = %d\n", ret, remaining);
 			if(ret <= 0)
 				break;
