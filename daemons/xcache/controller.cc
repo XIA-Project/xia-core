@@ -90,6 +90,13 @@ static int xcache_create_lib_socket(void)
 	strcpy(my_addr.sun_path, socket_name);
 
 	bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr));
+
+	// FIXME: ! this is a bit of a security issue as it's making the xcache
+	// socket open to everyone. The alternate is to run client side apps as
+	// root which is a pain. It might be better to just change things to use
+	// normal sockets on localhost.
+	chmod(socket_name, 0x777);
+
 	listen(s, 100);
 
 	return s;
