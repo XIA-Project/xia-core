@@ -118,8 +118,8 @@ void *recvCmd(void *socketid)
 	while (1) {
 		say("waiting for command\n");
 
-		memset(command, '\0', strlen(command));
-		memset(reply, '\0', strlen(reply));
+		memset(command, '\0', sizeof(command));
+		memset(reply, '\0', sizeof(reply));
 
 		if ((n = Xrecv(sock, command, 1024, 0))  < 0) {
 			warn("socket error while waiting for data, closing connection\n");
@@ -128,6 +128,7 @@ void *recvCmd(void *socketid)
 			warn("Peer closed the connection\n");
  			break;
 		}
+
 		//Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
 			fname = &command[4];
