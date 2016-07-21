@@ -311,9 +311,20 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 		// Add a DAG for each interface to the results in pai
 		for(ifa=ifaddr; ifa!=NULL; ifa=ifa->ifa_next) {
 			sockaddr_x *iface_dag = (sockaddr_x *)ifa->ifa_addr;
-			Graph g(iface_dag);
+			Graph gif(iface_dag);
+			Graph g;
+
 			if(service) {
-				g = g * Node(stype, sname);
+				Node intent(stype, sname);
+
+				gif *= intent;
+
+				if (fallback) {
+					Graph gi = Node() * intent;
+					g = gi + gif;
+				} else {
+					g = gif;
+				}
 			}
 			g.fill_sockaddr(&sa);
 			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
