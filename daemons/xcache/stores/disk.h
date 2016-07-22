@@ -54,28 +54,35 @@ public:
 
 	std::string get(xcache_meta *meta)
 	{
+		const size_t READ_SIZE = 1024 * 1024;
 		int ret, fd, bytes;
 		std::string path;
-		char buf[256];
+		char *buf = (char *)malloc(READ_SIZE);
+
+		if (!buf) {
+			return "";
+		}
 
 		path = content_dir + meta->get_cid();
 
 		fd = open(path.c_str(), O_RDONLY);
 		if (fd < 0) {
 			std::cout << "Unexpected error.\n";
+			free(buf);
 			return "";
 		}
 
 		std::string data("");
 		bytes = 0;
 
-		while ((ret = read(fd, buf, 256)) != 0) {
+		while ((ret = read(fd, buf, READ_SIZE)) != 0) {
 			std::string temp(buf, ret);
 			data += temp;
 			bytes += ret;
 		}
 
 		close(fd);
+		free(buf);
 
 		return data;
 	}
