@@ -2942,7 +2942,48 @@ void XTRANSPORT::Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 	}
 }
 
+// Does sk correspond to a session that can be migrated?
+bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
+{
 
+    // Skip non-stream connections
+    if (sk->sock_type != SOCK_STREAM) {
+        return false;
+    }
+    // Skip inactive ports
+    if (sk->state != CONNECTED) {
+        INFO("skipping migration for non-connected port");
+        INFO("src_path:%s:", sk->src_path.unparse().c_str());
+        return false;
+    }
+    // Skip sockets not using the interface whose dag changed
+    if(sk->outgoing_iface != changed_iface) {
+        INFO("skipping migration for unchanged interface");
+        INFO("src_path:%s:", sk->src_path.unparse().c_str());
+        INFO("out_iface:%d:change_iface:%d", sk->outgoing_iface, interface);
+        return false;
+    }
+    return true;
+}
+
+bool XTRANSPORT::update_src_path(sk, new_host_dag)
+{
+    // Retrieve dest XID from old src_path
+    XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
+
+    // Append XID to the new host dag
+    XIAPath new_dag = new_host_dag;
+    INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
+    INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
+    XIAPath::handle_t hid_handle = new_dag.destination_node();
+    XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
+    new_dag.add_edge(hid_handle, xid_handle);
+    new_dag.set_destination_node(xid_handle);
+    INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
+    INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
+    sk->src_path = new_dag;
+    return true;
+}
 
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
@@ -3090,44 +3131,25 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		NOTICE("new system address is - %s", _local_addr.unparse().c_str());
 	}
 
-#if 0
-	// Inform all active stream connections about this change
+	// Migrate sessions that can be migrated
 	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
 		uint32_t _migrateid = iter->first;
 		sock *sk = idToSock.get(_migrateid);
-		// Skip non-stream connections
-		if (sk->sock_type != SOCK_STREAM) {
-			continue;
-		}
-		// Skip inactive ports
-		if (sk->state != CONNECTED) {
-			INFO("skipping migration for non-connected port");
-			INFO("src_path:%s:", sk->src_path.unparse().c_str());
-			continue;
-		}
-		// Skip sockets not using the interface whose dag changed
-		if(sk->outgoing_iface != interface) {
-			INFO("skipping migration for unchanged interface");
-			INFO("src_path:%s:", sk->src_path.unparse().c_str());
-			INFO("out_iface:%d:change_iface:%d", sk->outgoing_iface, interface);
-			continue;
-		}
+        if (! migratable_sock(sk, changed_iface)) {
+            continue;
+        }
 
-		// Retrieve SID from old src_path (unless available in sk already)
-		XID sid = sk->src_path.xid(sk->src_path.destination_node());
+        if (! update_src_path(sk, new_dag)) {
+            click_chatter("Migration skipped. Failed updating src path");
+            continue;
+        }
 
-		// Append SID to the new dag
-		XIAPath new_sid_dag = new_dag;
-		click_chatter("Xtransport::Xupdatedag new iface dag:%s", new_sid_dag.unparse().c_str());
-		click_chatter("Xtransport::Xupdatedag appending:%s", sid.unparse().c_str());
-		XIAPath::handle_t hid_handle = new_sid_dag.destination_node();
-		XIAPath::handle_t sid_handle = new_sid_dag.add_node(sid);
-		new_sid_dag.add_edge(hid_handle, sid_handle);
-		new_sid_dag.set_destination_node(sid_handle);
-		click_chatter("Xtransport::Xupdatedag new SID DAG:%s", new_sid_dag.unparse().c_str());
-		INFO("Updating %s to %s in sk", sk->src_path.unparse().c_str(), new_sid_dag.unparse().c_str());
-		sk->src_path = new_sid_dag;
-
+        XIASecurityBuffer migrate_msg(512);
+        if (! build_migrate_message(migrate_msg, sk)) {
+            INFO("Failed to build migrate message");
+            continue;
+        }
+#if 0
 		// Send MIGRATE message to each corresponding endpoint
 		// src_DAG, dst_DAG, timestamp - Signed by private key
 		// plus the public key (Should really exchange at SYN/SYNACK)
@@ -3235,8 +3257,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 			ERROR("ERROR _sport %d, sk->port %d", _migrateid, sk->id);
 		}
 		output(NETWORK_PORT).push(p);
-	}
 #endif
+	}
 
 	ReturnResult(_sport, xia_socket_msg);
 
