@@ -216,6 +216,7 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	}
 
 	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+		printf("%s received an error from xcache\n", __func__);
 		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
 			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
 			return xcache_cmd::XCACHE_ERR_EXISTS;
@@ -225,9 +226,8 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	fprintf(stderr, "%s: Got a response from server\n", __func__);
 	memcpy(addr, cmd.dag().c_str(), cmd.dag().length());
 
-	Graph g(addr);
-
-	g.print_graph();
+	//Graph g(addr);
+	//g.print_graph();
 
 	return xcache_cmd::XCACHE_OK;
 }
@@ -319,9 +319,13 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 	while (!feof(fp)) {
 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
 			rc = XputChunk(h, buf, count, &addrlist[i]);
-			if(rc < 0)
+			if(rc < 0) {
+				printf("Xputchunk failed in XputFile\n");
 				break;
+			}
 			if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {
+				// TODO: does this cause us to not add the chunk to the list of what we send to the other end???
+				printf("chunk already exists in the cache\n");
 				continue;
 			}
 			i++;
