@@ -1107,8 +1107,6 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
-	//std::cout << "Recevied a STREAM packet from network\n";
-
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
@@ -1590,7 +1588,7 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 		return sk;
 
 	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-		std::cout << "Searching for xcacheSID\n";
+		DBG("Dest = CID, look up the sk for the xcache SID instead\n");
 		// Packet destined to a CID. Handling it specially.
 		// FIXME: This is hackish. Maybe give users the ability to
 		// register their own rules?
@@ -1607,6 +1605,7 @@ XIAPath XTRANSPORT::alterCIDDstPath(XIAPath dstPath)
 	// FIXME: If the address is not altered, there's a chance that CID packets
 	// of a live download may get diverted to the origin server who does not
 	// know about it
+	//   WHAT DOES THAT MEAN??? And do we need this anymore if it's all ifdef'd out?
 #if 0
 	XID CID(dstPath.xid(dstPath.destination_node()));
 	XIAPath newPath;
@@ -2408,7 +2407,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		addRoute(source_xid);
 		tcp_conn->usropen();
 		ChangeState(tcp_conn, SYN_SENT);
-		//std::cout << "SYN-SENT\n";
 		ChangeState(sk, SYN_SENT);
 
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
@@ -2442,7 +2440,6 @@ void XTRANSPORT::Xlisten(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		return;
 	}
 
-	//std::cout << id << " xcache = " << sk->xcacheSock << " Listen\n";
 	if (sk->state == INACTIVE || sk->state == LISTEN) {
 		ChangeState(sk, LISTEN);
 		sk->backlog = x_listen_msg->backlog();
@@ -2595,8 +2592,9 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 		// Get remote DAG to return to app
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
-		if(xia_socket_msg->x_accept().has_sendmypath()) {
-			std::cout << "Flag sendremotepath set " << new_sk->src_path.unparse().c_str() << "\n";
+
+		if (xia_socket_msg->x_accept().has_sendmypath()) {
+			DBG("Flag sendremotepath set for: %s\n", new_sk->src_path.unparse().c_str());
 			x_accept_msg->set_self_dag(new_sk->src_path.unparse().c_str());
 		}
 	} else {
