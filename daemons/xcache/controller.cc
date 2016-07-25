@@ -322,8 +322,10 @@ void *xcache_controller::__fetch_content(void *__args)
 		if (c)
 			args->ctrl->xcache_notify(c, &addr, daglen, XCE_CHUNKARRIVED);
 
+		// FIXME: mixing allocation methods is troublesome and prone to weird errors
+		//   when you delete instead of free something that was malloc'd
 		delete args->cmd;
-		delete args;
+		free(args);
 	}
 
 	return NULL;
@@ -678,6 +680,7 @@ int xcache_controller::create_sender(void)
 
 	if (Xbind(xcache_sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
 		Xclose(xcache_sock);
+		Xfreeaddrinfo(ai);
 		return -1;
 	}
 
@@ -686,6 +689,7 @@ int xcache_controller::create_sender(void)
 	Graph g(dag);
 	LOG_CTRL_INFO("Listening on dag: %s\n", g.dag_string().c_str());
 
+	Xfreeaddrinfo(ai);
 	return xcache_sock;
 }
 
@@ -765,6 +769,18 @@ void xcache_controller::process_req(xcache_req *req)
 		break;
 	}
 
+
+	if (req->type == xcache_cmd::XCACHE_SENDCHUNK) {
+		if (req->data) {
+			free(req->data);
+		}
+	} else {
+		if (req->data) {
+			delete (xcache_cmd*)req->data;
+		}
+	}
+	delete req;
+
 	if(req->flags & XCFI_REMOVEFD) {
 		LOG_CTRL_INFO("Closing Socket\n");
 		Xclose(req->to_sock);
@@ -785,8 +801,9 @@ void *xcache_controller::worker_thread(void *arg)
 		xcache_req *req;
 
 		req = ctrl->dequeue_request_safe();
-		if(req)
+		if(req) {
 			ctrl->process_req(req);
+		}
 	}
 
 	return NULL;
