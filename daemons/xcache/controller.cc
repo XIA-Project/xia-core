@@ -8,10 +8,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <string.h>
+#include <syslog.h>
 #include <errno.h>
 #include "controller.h"
 #include <iostream>
-#include "logger.h"
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
@@ -21,7 +21,7 @@
 #include <openssl/sha.h>
 
 #define IGNORE_PARAM(__param) ((void)__param)
-
+#define IO_BUF_SIZE (1024 * 1024)
 #define MAX_XID_SIZE 100
 
 enum {
@@ -32,8 +32,6 @@ enum {
 	RET_REMOVEFD,
 	RET_ENQUEUE,
 };
-
-DEFINE_LOG_MACROS(CTRL)
 
 static int send_response(int fd, const char *buf, size_t len)
 {
@@ -99,9 +97,10 @@ static int xcache_create_lib_socket(void)
 	return s;
 }
 
+// FIXME: unused?
 void xcache_controller::status(void)
 {
-	LOG_CTRL_INFO("[Status]\n");
+	syslog(LOG_INFO, "[Status]");
 }
 
 int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
@@ -111,24 +110,24 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	int to_recv, recvd, sock;
 	Graph g(addr);
 
-	LOG_CTRL_INFO("Fetching content from remote DAG = %s\n",
-		      g.dag_string().c_str());
+	syslog(LOG_NOTICE, "Fetching content from remote DAG = %s\n", g.dag_string().c_str());
 
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
-		LOG_CTRL_INFO("Can't create socket\n");
+		syslog(LOG_ERR, "Unable to create socket: %s", strerror(errno));
 		return RET_FAILED;
 	}
 
 	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
-		LOG_CTRL_INFO("Errno = %d\n", errno);
+		syslog(LOG_ERR, "connect failed: %s\n", strerror(errno));
+		Xclose(sock);
 		return RET_FAILED;
 	}
 
-	LOG_CTRL_INFO("Xcache client now connected with remote\n");
+	syslog(LOG_INFO, "Xcache client now connected with remote");
 
 	std::string data;
-	char buf[1024*1024] = {0};
+	char buf[IO_BUF_SIZE];
 	struct cid_header header;
 	size_t remaining;
 	size_t offset;
@@ -142,13 +141,13 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	offset = 0;
 
 	while (remaining > 0) {
-		LOG_CTRL_ERROR("1 Remaining = %d\n", remaining);
+		syslog(LOG_DEBUG, "Remaining(1) = %lu\n", remaining);
 		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
 		if (recvd < 0) {
-			LOG_CTRL_ERROR("Sender Closed the connection - Header"
-				       ".\n");
-			assert(0);
+			syslog(LOG_ALERT, "Sender Closed the connection: %s", strerror(errno));
 			Xclose(sock);
+			assert(0);
+			break;
 		} else if (recvd == 0) {
 			break;
 		}
@@ -160,21 +159,21 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 
 	while (remaining > 0) {
-		to_recv = remaining > 1024*1024 ? 1024 * 1024 : remaining;
+		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
 
-		LOG_CTRL_ERROR("2 Remaining = %d\n", remaining);
+		syslog(LOG_DEBUG, "Remaining(2) = %lu\n", remaining);
 
 		recvd = Xrecv(sock, buf, to_recv, 0);
-		LOG_CTRL_ERROR("recvd = %d, to_recv = %d\n", recvd, to_recv);
 		if (recvd < 0) {
-			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
-				       ".\n");
-			assert(0);
+			syslog(LOG_ERR, "Receiver Closed the connection; %s", strerror(errno));
 			Xclose(sock);
+			assert(0);
+			break;
 		} else if (recvd == 0) {
-			LOG_CTRL_ERROR("Xrecv returned 0.\n");
+			syslog(LOG_WARNING, "Xrecv returned 0");
 			break;
 		}
+		syslog(LOG_INFO, "recvd = %d, to_recv = %d\n", recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);
@@ -186,7 +185,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	struct xcache_context *context = lookup_context(cmd->context_id());
 
 	if (!context) {
-		LOG_CTRL_ERROR("Context Lookup Failed\n");
+		syslog(LOG_WARNING, "Context Lookup Failed");
 		delete meta;
 		Xclose(sock);
 		return RET_FAILED;
@@ -211,7 +210,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_data(data);
 	}
 
-	LOG_CTRL_ERROR("%s: Xclosing\n", __func__);
 	Xclose(sock);
 
 	return RET_OK;
@@ -232,24 +230,20 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	IGNORE_PARAM(cmd);
 
 	meta = acquire_meta(cid);
-	LOG_CTRL_INFO("Fetching content %s from local\n",
-		      expected_cid.id_string().c_str());
+	syslog(LOG_INFO, "Fetching content %s from local\n", expected_cid.id_string().c_str());
 
-	LOG_CTRL_INFO("Here %d", __LINE__);
 	if(!meta) {
-		LOG_CTRL_INFO("Here %d", __LINE__);
+		syslog(LOG_WARNING, "meta not found");
 		/* We could not find the content locally */
 		return RET_FAILED;
 	}
 
 	if(!meta->is_AVAILABLE()) {
-		LOG_CTRL_INFO("Here %d", __LINE__);
 		release_meta(meta);
-		LOG_CTRL_INFO("Here %d", __LINE__);
 		return RET_FAILED;
 	}
 
-	LOG_CTRL_INFO("Getting data by calling meta->get()\n");
+	syslog(LOG_INFO, "Getting data by calling meta->get()\n");
 	data = meta->get();
 
 	if(resp) {
@@ -257,11 +251,11 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_data(data);
 	}
 
-	LOG_CTRL_INFO("Releasing meta\n");
+	syslog(LOG_INFO, "Releasing meta\n");
 
 	release_meta(meta);
 
-	LOG_CTRL_INFO("Fetching content from local DONE\n");
+	syslog(LOG_INFO, "Fetching content from local DONE\n");
 
 	return RET_OK;
 }
@@ -276,7 +270,7 @@ int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 	notif.set_dag(addr, addrlen);
 	notif.SerializeToString(&buffer);
 
-	LOG_CTRL_INFO("Sent Notification to %d\n", c->notifSock);
+	syslog(LOG_INFO, "Sent Notification to %d\n", c->notifSock);
 
 	return send_response(c->notifSock, buffer.c_str(), buffer.length());
 }
@@ -306,7 +300,7 @@ void *xcache_controller::__fetch_content(void *__args)
 		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp,
 						       args->cmd, args->flags);
 		if (ret == RET_FAILED) {
-			LOG_CTRL_INFO("Remote content fetch failed: %d\n", ret);
+			syslog(LOG_ERR, "Remote content fetch failed: %d", ret);
 			args->resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 		}
 	}
@@ -400,7 +394,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 
 	switch(cmd->cmd()) {
 	case xcache_cmd::XCACHE_ALLOC_CONTEXT:
-		LOG_CTRL_INFO("Received ALLOC_CONTEXTID\n");
+		syslog(LOG_INFO, "Received ALLOC_CONTEXTID\n");
 		ret = alloc_context(resp, cmd);
 		break;
 
@@ -408,7 +402,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 		c = lookup_context(cmd->context_id());
 
 		if (!c)
-			LOG_CTRL_ERROR("Should Not Happen.\n");
+			syslog(LOG_ALERT, "Should Not Happen");
 		else
 			c->xcacheSock = fd;
 
@@ -417,7 +411,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_FLAG_NOTIFSOCK:
 		c = lookup_context(cmd->context_id());
 		if(!c) {
-			LOG_CTRL_ERROR("Should Not Happen.\n");
+			syslog(LOG_ALERT, "Should Not Happen");
 		} else {
 			c->notifSock = fd;
 			ret = RET_REMOVEFD;
@@ -431,7 +425,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 		break;
 
 	default:
-		LOG_CTRL_ERROR("Unknown message received\n");
+		syslog(LOG_WARNING, "Unknown message received\n");
 	}
 
 	return ret;
@@ -443,10 +437,9 @@ struct xcache_context *xcache_controller::lookup_context(int context_id)
 	std::map<uint32_t, struct xcache_context *>::iterator i = context_map.find(context_id);
 
 	if(i != context_map.end()) {
-		LOG_CTRL_INFO("Context found.\n");
 		return i->second;
 	} else {
-		LOG_CTRL_INFO("Context %d NOT found.\n", context_id);
+		syslog(LOG_WARNING, "Context %d NOT found.\n", context_id);
 		return NULL;
 	}
 }
@@ -463,7 +456,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 	memset(c, 0, sizeof(struct xcache_context));
 	c->contextID = context_id;
 	context_map[context_id] = c;
-	LOG_CTRL_INFO("Allocated Context %d\n", resp->context_id());
+	syslog(LOG_INFO, "Allocated Context %d\n", resp->context_id());
 
 	return RET_SENDRESP;
 }
@@ -493,7 +486,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		/*
 		 * Content Verification Failed
 		 */
-		LOG_CTRL_ERROR("Content Verification Failed\n");
+		syslog(LOG_ERR, "Content Verification Failed");
 		meta->unlock();
 		unlock_meta_map();
 		return RET_FAILED;
@@ -502,7 +495,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	meta_map[meta->get_cid()] = meta;
 
 	if (__store_policy(meta) < 0) {
-		LOG_CTRL_ERROR("Context store failed\n");
+		syslog(LOG_ERR, "Context store failed\n");
 		meta->unlock();
 		unlock_meta_map();
 		return RET_FAILED;
@@ -581,13 +574,12 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 	if (cid2addr(cid, &addr) == 0) {
 		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
 		Graph g(&addr);
-		printf("--------------------\n");
-		g.print_graph();
+		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());
 	} else {
 		// FIXME: do some sort of error handling here
 	}
 
-	LOG_CTRL_INFO("Store Finished\n");
+	syslog(LOG_INFO, "Store Finished\n");
 
 	return RET_SENDRESP;
 }
@@ -599,10 +591,10 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	Node cid(g.get_final_intent());
 	xcache_cmd resp;
 
-	LOG_CTRL_INFO("CID = %s\n", cid.id_string().c_str());
+	syslog(LOG_INFO, "CID = %s\n", cid.id_string().c_str());
 
 	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0) != RET_OK) {
-		LOG_CTRL_ERROR("This should not happen.\n");
+		syslog(LOG_ALERT, "This should not happen");
 		assert(0);
 	}
 
@@ -615,42 +607,40 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	remaining = sizeof(header);
 	offset = 0;
 
-	LOG_CTRL_INFO("Header Send Start\n");
+	syslog(LOG_INFO, "Header Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
 		if (sent < 0) {
-			LOG_CTRL_ERROR("Receiver Closed the connection - Header"
-				       ".\n");
+			syslog(LOG_ALERT, "Receiver Closed the connection %s", strerror(errno));
 			assert(0);
 			Xclose(sock);
 		}
 		remaining -= sent;
 		offset += sent;
-		LOG_CTRL_INFO("Header Send Remaining %d\n", remaining);
+		syslog(LOG_INFO, "Header Send Remaining %lu\n", remaining);
 
 	}
 
 	remaining = resp.data().length();
 	offset = 0;
 
-	LOG_CTRL_INFO("Content Send Start\n");
+	syslog(LOG_INFO, "Content Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
-		LOG_CTRL_INFO("Sent = %d\n", sent);
+		syslog(LOG_INFO, "Sent = %d\n", sent);
 		if (sent < 0) {
-			LOG_CTRL_ERROR("Receiver Closed the connection - Data"
-				       ".\n");
+			syslog(LOG_ALERT, "Receiver Closed the connection: %s", strerror(errno));
 			assert(0);
 			Xclose(sock);
 		}
 		remaining -= sent;
 		offset += sent;
-		LOG_CTRL_INFO("Content Send Remaining %d\n", remaining);
+		syslog(LOG_INFO, "Content Send Remaining %lu\n", remaining);
 	}
-	LOG_CTRL_INFO("Send Done\n");
+	syslog(LOG_INFO, "Send Done\n");
 
 }
 
@@ -664,14 +654,16 @@ int xcache_controller::create_sender(void)
 		return -1;
 
 	if (XmakeNewSID(sid_string, sizeof(sid_string))) {
-		LOG_CTRL_ERROR("XmakeNewSID failed\n");
+		syslog(LOG_ERR, "XmakeNewSID failed\n");
 		return -1;
 	}
 
-	if (XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0)
+	if (XsetXcacheSID(xcache_sock, sid_string, strlen(sid_string)) < 0) {
+		syslog(LOG_ERR, "XsetXcacheSID failed\n");
 		return -1;
+	}
 
-	LOG_CTRL_DEBUG("XcacheSID is %s\n", sid_string);
+	syslog(LOG_INFO, "XcacheSID is %s\n", sid_string);
 
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
 		return -1;
@@ -687,7 +679,7 @@ int xcache_controller::create_sender(void)
 	Xlisten(xcache_sock, 5);
 
 	Graph g(dag);
-	LOG_CTRL_INFO("Listening on dag: %s\n", g.dag_string().c_str());
+	syslog(LOG_INFO, "Listening on dag: %s\n", g.dag_string().c_str());
 
 	Xfreeaddrinfo(ai);
 	return xcache_sock;
@@ -701,9 +693,8 @@ int xcache_controller::register_meta(xcache_meta *meta)
 
 	temp_cid += meta->get_cid();
 
-	LOG_CTRL_DEBUG("Setting Route for %s.\n", temp_cid.c_str());
+	syslog(LOG_DEBUG, "Setting Route for %s.\n", temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	LOG_CTRL_DEBUG("Route Setting Returned %d\n", rv);
 
 	return rv;
 }
@@ -750,7 +741,7 @@ void xcache_controller::process_req(xcache_req *req)
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
-		LOG_CTRL_INFO("xcache_fetch_content returned %d\n", ret);
+		syslog(LOG_INFO, "xcache_fetch_content returned %d", ret);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
@@ -779,12 +770,12 @@ void xcache_controller::process_req(xcache_req *req)
 			delete (xcache_cmd*)req->data;
 		}
 	}
-	delete req;
 
 	if(req->flags & XCFI_REMOVEFD) {
-		LOG_CTRL_INFO("Closing Socket\n");
+		syslog(LOG_INFO, "Closing Socket");
 		Xclose(req->to_sock);
 	}
+	delete req;
 }
 
 /**
@@ -795,7 +786,7 @@ void *xcache_controller::worker_thread(void *arg)
 {
 	xcache_controller *ctrl = (xcache_controller *)arg;
 
-	LOG_CTRL_INFO("Worker started working.\n");
+	syslog(LOG_INFO, "Worker started working");
 
 	while(1) {
 		xcache_req *req;
@@ -834,14 +825,14 @@ void xcache_controller::run(void)
 	cache.spawn_thread(&args);
 
 	if((rc = xr.connect()) != 0) {
-		LOG_CTRL_ERROR("Unable to connect to click %d \n", rc);
+		syslog(LOG_ERR, "Unable to connect to click %d \n", rc);
 		return;
 	}
 
 	xr.setRouter(hostname);
 	sendersocket = create_sender();
 
-	FD_ZERO(&fds);
+	FD_ZERO(&allfds);
 	FD_SET(libsocket, &allfds);
 	FD_SET(sendersocket, &allfds);
 
@@ -850,20 +841,19 @@ void xcache_controller::run(void)
 		pthread_create(&threads[i], NULL, worker_thread, (void *)this);
 	}
 
-	LOG_CTRL_INFO("Entering The Loop\n");
+	syslog(LOG_INFO, "Entering The Loop\n");
 
 repeat:
 	memcpy(&fds, &allfds, sizeof(fd_set));
 
-	max = libsocket;
+	max = MAX(libsocket, sendersocket);
 
 	/* FIXME: do something better */
 	for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
 		max = MAX(max, *iter);
 	}
 
-	Xselect(max + 1, &fds, NULL, NULL, NULL);
-//	LOG_CTRL_INFO("Broken\n");
+	rc = Xselect(max + 1, &fds, NULL, NULL, NULL);
 
 	if(FD_ISSET(libsocket, &fds)) {
 		int new_connection = accept(libsocket, NULL, 0);
@@ -872,7 +862,6 @@ repeat:
 
 			active_conns.push_back(new_connection);
 			FD_SET(new_connection, &allfds);
-			LOG_CTRL_INFO("HEREH\n");
 		}
 	}
 
@@ -881,14 +870,14 @@ repeat:
 		sockaddr_x mypath;
 		socklen_t mypath_len = sizeof(mypath);
 
-		LOG_CTRL_INFO("Accepting!\n");
+		syslog(LOG_INFO, "Accepting!");
 		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath,
 									&mypath_len, NULL, NULL)) < 0) {
-			LOG_CTRL_ERROR("XacceptAs failed\n");
+			syslog(LOG_ERR, "XacceptAs failed");
 		} else {
 			xcache_req *req = new xcache_req();
 
-			LOG_CTRL_INFO("XacceptAs Succeeded\n");
+			syslog(LOG_INFO, "XacceptAs Succeeded\n");
 			/* Create a request to add to worker queue */
 
 			/* Send chunk Request */
@@ -902,7 +891,7 @@ repeat:
 			req->flags = XCFI_REMOVEFD;
 
 			enqueue_request_safe(req);
-			LOG_CTRL_INFO("Request Enqueued\n");
+			syslog(LOG_INFO, "Request Enqueued\n");
 		}
 	}
 
@@ -926,7 +915,7 @@ repeat:
 
 		while(remaining > 0) {
 			ret = recv(*iter, buf, MIN(sizeof(buf), remaining), 0);
-			LOG_CTRL_INFO("Recv returned %d, remaining = %d\n", ret, remaining);
+			syslog(LOG_DEBUG, "Recv returned %d, remaining = %d\n", ret, remaining);
 			if(ret <= 0)
 				break;
 
@@ -939,9 +928,9 @@ repeat:
 		} else {
 			bool parse_success = cmd.ParseFromString(buffer);
 
-			LOG_CTRL_INFO("Controller received %lu bytes\n", buffer.length());
+			syslog(LOG_INFO, "Controller received %lu bytes\n", buffer.length());
 			if(!parse_success) {
-				LOG_CTRL_ERROR("[ERROR] Protobuf could not parse\n");
+				syslog(LOG_ERR, "Protobuf could not parse\n");
 				goto next;
 			}
 		}
@@ -957,9 +946,9 @@ repeat:
 			 */
 			resp.SerializeToString(&buffer);
 			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
-				LOG_CTRL_ERROR("FIXME: handle return value of write\n");
+				syslog(LOG_ERR, "FIXME: handle failed return from write\n");
 			} else {
-				LOG_CTRL_INFO("Data sent to client\n");
+				syslog(LOG_INFO, "Data sent to client\n");
 			}
 		} else if(ret == RET_REMOVEFD) {
 			/* Remove this fd from the pool */
@@ -985,7 +974,7 @@ next:
 		continue;
 
 disconnected:
-		LOG_CTRL_DEBUG("Client %d disconnected.\n", *iter);
+		syslog(LOG_INFO, "Client %d disconnected.\n", *iter);
 		close(*iter);
 removefd:
 		FD_CLR(*iter, &allfds);

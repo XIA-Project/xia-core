@@ -72,7 +72,7 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 		sent += ret;
 	} while(remaining > 0);
 
-	fprintf(stderr, "%s: Lib sent %d bytes\n", __func__, htonl(msg_length) + 4);
+	//fprintf(stderr, "%s: Lib sent %d bytes\n", __func__, htonl(msg_length) + 4);
 
 	if (ret < 0 || remaining > 0)
 		return -1;
@@ -116,7 +116,7 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 	}
 
 	remaining = ntohl(msg_length);
-	fprintf(stderr, "Lib received msg of length %d\n", remaining);
+	//fprintf(stderr, "Lib received msg of length %d\n", remaining);
 	ret = read_bytes_to_buffer(xcache_sock, buffer, remaining);
 
 	if (ret == 0) {

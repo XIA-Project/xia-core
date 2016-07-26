@@ -413,10 +413,6 @@ int main(int argc, char **argv)
 				continue;
 			}
 
-			if(strcmp(fin, fout) == 0){
-				warn("Since both applications write to the same folder (local case) the names should be different.\n");
-				continue;
-			}
 			getFile(sock, fin, fout);
 		}
 	}

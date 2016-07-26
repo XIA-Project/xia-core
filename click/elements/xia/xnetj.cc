@@ -28,6 +28,7 @@
 #include <click/xiaheader.hh>
 #include <click/xiasecurity.hh>
 #include <click/packet_anno.hh>
+#include "xlog.hh"
 
 CLICK_DECLS
 
@@ -71,7 +72,7 @@ XNetJ::push(int in_port, Packet *p_in)
 			{
 			// Received a packet destined for this host
 			uint16_t iface = SRC_PORT_ANNO(p_in);
-			click_chatter("XNetJ: Dev: Interface %d: Got packet", (int)iface);
+			DBG("XNetJ: Dev: Interface %d: Got packet", (int)iface);
 			click_ether *e = (click_ether *)p_in->data();
 			std::string p_buf;
 
@@ -104,17 +105,17 @@ XNetJ::push(int in_port, Packet *p_in)
 			p_buf.assign((const char *)p_in->data()+8,
 					(const char *)p_in->end_data());
 
-			click_chatter("XNetJ: Outgoing pkt: Iface: %d (255==ALL):", iface);
-			click_chatter("XNetJ: dest: %s", dest_ether_addr.unparse().c_str());
-			click_chatter("XNetJ: src: %s", _my_en.unparse().c_str());
-			click_chatter("XNetJ: size: %d", p_buf.size());
+			DBG("XNetJ: Outgoing pkt: Iface: %d (255==ALL):", iface);
+			DBG("XNetJ: dest: %s", dest_ether_addr.unparse().c_str());
+			DBG("XNetJ: src: %s", _my_en.unparse().c_str());
+			DBG("XNetJ: size: %d", p_buf.size());
 
 			WritablePacket *p = WritablePacket::make(1024, p_buf.c_str(),
 					p_buf.size(), 0);
 
 			WritablePacket *q = p->push_mac_header(sizeof(click_ether));
 			if(!q) {
-				click_chatter("XNetJ: ERROR: dropping API packet");
+				ERROR("XNetJ: ERROR: dropping API packet");
 				return;
 			}
 

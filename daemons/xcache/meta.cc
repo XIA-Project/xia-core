@@ -2,8 +2,6 @@
 #include "meta.h"
 #include "stores/store.h"
 
-DEFINE_LOG_MACROS(META)
-
 #define IGNORE_PARAM(__param) ((void)__param)
 
 xcache_meta::xcache_meta(std::string cid)
@@ -42,6 +40,5 @@ xcache_meta::xcache_meta()
 
 void xcache_meta::status(void)
 {
-	std::cout << "[" << cid << "]\n";
-	std::cout << "\tDATA: [" << store->get(this) << "]\n";
+	syslog(LOG_INFO, "[%s] %s", cid.c_str(), store->get(this).c_str());
 }
