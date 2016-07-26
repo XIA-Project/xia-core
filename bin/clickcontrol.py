@@ -37,7 +37,7 @@ srcdirpattern = re.compile('.+\/.*xia-core')
 
 # Find the source directory 'xia-core' for this source tree
 def get_srcdir():
-    match = srcdirpattern.match(os.getcwd())
+    match = srcdirpattern.match("/users/zihaol1/xia-core")
     return match.group(0)
 
 def getxiaconstants():

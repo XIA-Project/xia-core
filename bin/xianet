@@ -30,7 +30,7 @@ NODECONF=$XIADIR/etc/nodes.conf
 XSOCKCONF=$XIADIR/etc/xsockconf.ini
 ADDRCONF=$XIADIR/etc/address.conf
 
-ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xnetjd xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -324,18 +324,18 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --hostname $host &
-			./xcache -h $host -l3 -m 0xFF&
+			#./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xrouted"
 			kill_service $host "xnetjd"
-			kill_service $host "xcache"
+			#kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host "xrouted"
 			check_service $host "xnetjd"
-			check_service $host "xcache"
+			#check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -355,16 +355,16 @@ host()
 	case $action in
 		"start")
 			./xnetjd --client --hostname $host &
-			./xcache -h $host -l3 -m 0xFF&
+			#./xcache -h $host -l3 -m 0xFF&
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xnetjd"
-			kill_service $host "xcache"
+			#kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host "xnetjd"
-			check_service $host "xcache"
+			#check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
