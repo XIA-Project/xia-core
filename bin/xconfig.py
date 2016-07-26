@@ -23,8 +23,8 @@ if os.uname()[-1] == 'mips':
 	ext = 'mips.template'
 
 # Find where we are running out of
-srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
-#srcdir = os.path.join(os.getcwd(), "xia-core")
+#srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+srcdir = os.path.join(os.getcwd(), "xia-core")
 
 # Update complete paths for template and config dirs
 # NOTE: Must be done before calls to get_config/template_path functions
