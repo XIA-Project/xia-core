@@ -3,16 +3,14 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <syslog.h>
 #include "Xsocket.h"
-#include "logger.h"
 #include <iostream>
 #include "controller.h"
 #include "cache.h"
 #include "cid.h"
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
-
-DEFINE_LOG_MACROS(CACHE)
 
 void xcache_cache::spawn_thread(struct cache_args *args)
 {
@@ -39,7 +37,7 @@ int xcache_cache::create_click_socket(int port)
 	if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me)) == -1)
 		return -1;
 
-	LOG_CACHE_INFO("Created cache socket\n");
+	syslog(LOG_INFO, "Created cache socket on %d\n", port);
 
 	return s;
 }
@@ -49,17 +47,17 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	int total_nodes, i;
 	struct click_xia *xiah = (struct click_xia *)pkt;
 	struct xtcp *tcp;
-	std::string cid;
+	std::string cid = "";
 	int payload_len;
 	xcache_meta *meta;
 	struct cache_download *download;
 	std::map<std::string, struct cache_download *>::iterator iter;
-	off_t offset;
+	size_t offset;
 
-	LOG_CACHE_ERROR("      CACHE RECVD PKT\n");
-	LOG_CACHE_ERROR("      XIA version = %d\n", xiah->ver);
-	LOG_CACHE_ERROR("      XIA plen = %d\n", htons(xiah->plen));
-	LOG_CACHE_ERROR("      XIA nxt = %d\n", xiah->nxt);
+	syslog(LOG_INFO, "CACHE RECVD PKT\n");
+	syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
+	syslog(LOG_INFO, "XIA plen = %d\n", htons(xiah->plen));
+	syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
 
 	total_nodes = xiah->dnode + xiah->snode;
 
@@ -84,52 +82,54 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		((char *)xiah + sizeof(struct click_xia) +
 		 (total_nodes) * sizeof(struct click_xia_xid_node));
 
-	LOG_CACHE_ERROR("tcp->th_ack = %d\n", ntohl(tcp->th_ack));
-	LOG_CACHE_ERROR("tcp->th_seq = %d\n", ntohl(tcp->th_seq));
-	LOG_CACHE_ERROR("tcp->th_flags = %x\n", ntohs(tcp->th_flags));
-	LOG_CACHE_ERROR("tcp->th_off = %d\n", tcp->th_off);
+	syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
+	syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
+	syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
+	syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
+
+	syslog(LOG_INFO, "CID=%s\n", cid.c_str());
 
 	char *payload = (char *)tcp + tcp->th_off * 4;
 	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
-	LOG_CACHE_ERROR("Payload length = %d\n", payload_len);
+	syslog(LOG_INFO, "Payload length = %d\n", payload_len);
 
 	meta = ctrl->acquire_meta(cid);
 	if (!meta) {
-		LOG_CACHE_INFO("ACCEPTING: New Meta\n");
+		syslog(LOG_INFO, "ACCEPTING: New Meta\n");
 		meta = new xcache_meta(cid);
 		meta->set_OVERHEARING();
 		ctrl->add_meta(meta);
 		ctrl->acquire_meta(cid);
 	} else if (meta->is_DENY_PENDING()) {
-		LOG_CACHE_INFO("DENYING: Already Denied Meta\n");
+		syslog(LOG_INFO, "DENYING: Already Denied Meta\n");
 		ctrl->release_meta(meta);
 		return;
 	} else if (meta->is_AVAILABLE()) {
-		LOG_CACHE_INFO("DENYING: I Have this already\n");
+		syslog(LOG_INFO, "DENYING: I Have this already\n");
 		ctrl->release_meta(meta);
 		// DENY CID
 		return;
 	} else if (meta->is_FETCHING()) {
-		LOG_CACHE_INFO("DENYING: I am fetching it\n");
+		syslog(LOG_INFO, "DENYING: I am fetching it\n");
 		ctrl->release_meta(meta);
 		// DENY CID
 		return;
 	} else if (!meta->is_OVERHEARING()) {
-		LOG_CACHE_INFO("Some Unknown STATE FIX IT\n");
+		syslog(LOG_INFO, "Some Unknown STATE FIX IT\n");
 	}
 	ctrl->release_meta(meta);
 
 	iter = ongoing_downloads.find(cid);
 	if (iter == ongoing_downloads.end()) {
-		LOG_CACHE_INFO("New Download\n");
+		syslog(LOG_INFO, "New Download\n");
 		/* This is a new chunk */
 		download = (struct cache_download *)
 			malloc(sizeof(struct cache_download));
 		memset(download, 0, sizeof(struct cid_header));
 		ongoing_downloads[cid] = download;
 	} else {
-		LOG_CACHE_INFO("Download Found\n");
+		syslog(LOG_INFO, "Download Found\n");
 		download = iter->second;
 	}
 
@@ -166,7 +166,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	}
 
 
-	LOG_CACHE_INFO("Header: off = %d, len = %d, total_len = %d\n",
+	syslog(LOG_INFO, "Header: off = %d, len = %d, total_len = %d\n",
 		       ntohl(download->header.offset),
 		       ntohl(download->header.length),
 		       ntohl(download->header.total_length));
@@ -200,19 +200,19 @@ void *xcache_cache::run(void *arg)
 	(void)args;
 
 	if ((s = create_click_socket(args->cache_out_port)) < 0) {
-		LOG_CACHE_ERROR("Failed to create a socket on %d\n", args->cache_out_port);
+		syslog(LOG_ALERT, "Failed to create a socket on %d\n", args->cache_out_port);
 		pthread_exit(NULL);
 	}
 
 	do {
-		LOG_CACHE_ERROR("Cache listening for data on port %d\n", args->cache_out_port);
+		syslog(LOG_NOTICE, "Cache listening for data on port %d\n", args->cache_out_port);
 		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, (struct sockaddr *)&fromaddr, &len);
 		if(ret <= 0) {
-			LOG_CACHE_ERROR("Error while reading from socket\n");
+			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
 			continue;
 		}
 
-		LOG_CACHE_ERROR("Cache received a message of size = %d\n", ret);
+		syslog(LOG_INFO, "Cache received a message of size = %d\n", ret);
 
 		args->cache->process_pkt(args->ctrl, buffer, ret);
 
@@ -222,7 +222,7 @@ void *xcache_cache::run(void *arg)
 		//FIXME: Send meaningful messages
 		ret = sendto(s, "Something", strlen("Something") + 1, 0, (struct sockaddr *)&toaddr, sizeof(toaddr));
 		if(ret <= 0) {
-			LOG_CACHE_ERROR("Error while sending to click\n");
+			syslog(LOG_ERR, "Error while sending to click: %s", strerror(errno));
 			continue;
 		}
 	} while(1);
