@@ -22,4 +22,10 @@
 bool build_migrate_message(XIASecurityBuffer &migrate_msg,
         XIAPath &src_path, XIAPath &dst_path);
 
+bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
+        XIAPath their_addr, XIAPath our_addr,
+        XIAPath &accepted_addr);
+
+bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
+        XIAPath &our_addr, XIAPath &their_addr, String timestamp);
 #endif // XIA_MIGRATE_H

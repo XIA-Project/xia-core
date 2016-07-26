@@ -110,7 +110,8 @@ bool _unpack_migrate_payload(const char *payload, uint16_t payloadlen,
 }
 
 bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
-        XIAPath their_addr, XIAPath our_addr)
+        XIAPath their_addr, XIAPath our_addr,
+        XIAPath &their_new_addr)
 {
     uint16_t payloadlen = 1024;
     char payload[payloadlen];
@@ -183,18 +184,57 @@ bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
         return false;
     }
 
+    their_new_addr = their_dag;
     return true;
 }
 
-bool process_migrate_message(XIASecurityBuffer &migrate_msg,
-        XIAPath their_addr, XIAPath our_addr)
+bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
+        XIAPath their_addr, XIAPath our_addr,
+        XIAPath &accepted_addr)
 {
+    XIAPath their_new_addr;
+
     // Unpack and verify
-    if (! _unpack_and_verify_migrate(migrate_msg, their_addr, our_addr)) {
+    if (! _unpack_and_verify_migrate(migrate_msg, their_addr, our_addr,
+                their_new_addr)) {
         click_chatter("Failed to unpack or verify migrate message");
         return false;
     }
-    // Create migrate ack
 
+    // Update their address with new one in migrate packet
+    accepted_addr = their_new_addr;
+
+    return true;
+}
+
+bool _build_migrateack_payload(XIASecurityBuffer &migrateack_payload,
+        XIAPath our_addr, XIAPath their_addr, String timestamp)
+{
+    // their_addr is the new DAG we have accepted
+    if(!_pack_String(migrateack_payload, their_addr.unparse())) {
+        click_chatter("Failed packing their addr into migrateack message");
+        return false;
+    }
+
+    if(!_pack_String(migrateack_payload, timestamp)) {
+        click_chatter("Failed to pack timestamp into migrateack message");
+        return false;
+    }
+    return true;
+}
+
+bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
+        XIAPath our_addr, XIAPath their_addr, String timestamp)
+{
+    XIASecurityBuffer migrateack_payload(512);
+
+    // Build the payload
+    if(!_build_migrateack_payload(migrateack_payload,
+                our_addr, their_addr, timestamp)) {
+        click_chatter("ERROR: Failed building migrateack payload");
+        return false;
+    }
+
+    // Sign and include public key
     return true;
 }
