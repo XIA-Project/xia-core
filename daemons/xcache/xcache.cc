@@ -129,22 +129,3 @@ int main(int argc, char *argv[])
 	ctrl.run();
 	return 0;
 }
-/*
-bool operator<(const struct click_xia_xid& x, const struct click_xia_xid& y)
-{
-	if(x.type < y.type) {
-		return true;
-	} else if(x.type > y.type) {
-		return false;
-	}
-
-	for(int i = 0; i < CLICK_XIA_XID_ID_LEN; i++) {
-		if(x.id[i] < y.id[i])
-			return true;
-		else if(x.id[i] > y.id[i])
-			return false;
-	}
-
-	return false;
-}
-*/
