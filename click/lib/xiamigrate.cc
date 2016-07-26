@@ -34,6 +34,47 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
     return true;
 }
 
+bool _sign_and_pack(XIASecurityBuffer &buf,
+        unsigned char *payload, uint16_t payloadlen,
+        XID xid)
+{
+
+    // Find the src XID whose credentials will be used for signing
+    String xid_str = xid.unparse();
+
+    // Sign the migrate message
+    uint8_t signature[MAX_SIGNATURE_SIZE];
+    uint16_t siglen = MAX_SIGNATURE_SIZE;
+    if(xs_sign(xid_str.c_str(), payload, payloadlen, signature, &siglen)) {
+        click_chatter("click_chatter: Signing migrate message");
+        return false;
+    }
+
+    // Extract the pubkey for inclusion in migrate message
+    char pubkey[MAX_PUBKEY_SIZE];
+    uint16_t pubkeylen = MAX_PUBKEY_SIZE;
+    if(xs_getPubkey(xid_str.c_str(), pubkey, &pubkeylen)) {
+        click_chatter("click_chatter: Pubkey not found:%s", xid_str.c_str());
+        return false;
+    }
+
+    // Fill in the migrate message
+    if(buf.pack((const char *) payload, payloadlen)) {
+        click_chatter("Failed packing migrate payload into migrate message");
+        return false;
+    }
+    if(buf.pack((const char *) signature, siglen)) {
+        click_chatter("Failed packing signature into migrate message");
+        return false;
+    }
+    if(buf.pack((const char *) pubkey, pubkeylen)) {
+        click_chatter("Failed packing pubkey into migrate message");
+        return false;
+    }
+
+    return true;
+}
+
 bool build_migrate_message(XIASecurityBuffer &migrate_msg,
         XIAPath &src_path, XIAPath &dst_path)
 {
@@ -44,40 +85,14 @@ bool build_migrate_message(XIASecurityBuffer &migrate_msg,
         click_chatter("Failed building migrate message payload");
         return false;
     }
-    uint8_t *payload = (uint8_t *) migrate_payload.get_buffer();
+
+    // Sign and include pubkey into migrate message
+    unsigned char *payload = (unsigned char *)migrate_payload.get_buffer();
     uint16_t payloadlen = migrate_payload.size();
-
-    // Find the src XID whose credentials will be used for signing
     XID src_xid = src_path.xid(src_path.destination_node());
-    String src_xid_str = src_xid.unparse();
 
-    // Sign the migrate message
-    uint8_t signature[MAX_SIGNATURE_SIZE];
-    uint16_t siglen = MAX_SIGNATURE_SIZE;
-    if(xs_sign(src_xid_str.c_str(), payload, payloadlen, signature, &siglen)) {
-        click_chatter("click_chatter: Signing migrate message");
-        return false;
-    }
-
-    // Extract the pubkey for inclusion in migrate message
-    char pubkey[MAX_PUBKEY_SIZE];
-    uint16_t pubkeylen = MAX_PUBKEY_SIZE;
-    if(xs_getPubkey(src_xid_str.c_str(), pubkey, &pubkeylen)) {
-        click_chatter("click_chatter: Pubkey not found:%s", src_xid_str.c_str());
-        return false;
-    }
-
-    // Fill in the migrate message
-    if(migrate_msg.pack((const char *) payload, payloadlen)) {
-        click_chatter("Failed packing migrate payload into migrate message");
-        return false;
-    }
-    if(migrate_msg.pack((const char *) signature, siglen)) {
-        click_chatter("Failed packing signature into migrate message");
-        return false;
-    }
-    if(migrate_msg.pack((const char *) pubkey, pubkeylen)) {
-        click_chatter("Failed packing pubkey into migrate message");
+    if(!_sign_and_pack(migrate_msg, payload, payloadlen, src_xid)) {
+        click_chatter("Failed to sign and create migrate message");
         return false;
     }
 
@@ -235,6 +250,14 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
         return false;
     }
 
+    unsigned char *payload = (unsigned char *)migrateack_payload.get_buffer();
+    uint16_t payloadlen = migrateack_payload.size();
+    XID my_xid = our_addr.xid(our_addr.destination_node());
     // Sign and include public key
+    if(!_sign_and_pack(migrateack_msg, payload, payloadlen, my_xid)) {
+        click_chatter("Failed to sign and create migrate message");
+        return false;
+    }
+
     return true;
 }
