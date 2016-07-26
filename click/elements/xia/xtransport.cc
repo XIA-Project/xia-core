@@ -14,6 +14,7 @@
 #include "xdatagram.hh"
 #include "xstream.hh"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
+#include <click/xiamigrate.hh>
 
 /*
 ** FIXME:
@@ -2958,13 +2959,14 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
     if(sk->outgoing_iface != changed_iface) {
         INFO("skipping migration for unchanged interface");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
-        INFO("out_iface:%d:change_iface:%d", sk->outgoing_iface, interface);
+        INFO("out_iface:%d:", sk->outgoing_iface);
+        INFO("changed_iface:%d", changed_iface);
         return false;
     }
     return true;
 }
 
-bool XTRANSPORT::update_src_path(sk, new_host_dag)
+bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
 {
     // Retrieve dest XID from old src_path
     XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
@@ -3133,7 +3135,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
 		uint32_t _migrateid = iter->first;
 		sock *sk = idToSock.get(_migrateid);
-        if (! migratable_sock(sk, changed_iface)) {
+        if (! migratable_sock(sk, interface)) {
             continue;
         }
 
@@ -3143,7 +3145,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
         }
 
         XIASecurityBuffer migrate_msg(512);
-        if (! build_migrate_message(migrate_msg, sk)) {
+        if (! build_migrate_message(migrate_msg, sk->src_path, sk->dst_path)) {
             INFO("Failed to build migrate message");
             continue;
         }

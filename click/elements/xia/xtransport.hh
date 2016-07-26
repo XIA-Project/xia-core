@@ -153,6 +153,8 @@ private:
 	uint32_t _next_id;
 
 	Packet* UDPIPPrep(Packet *, int);
+    bool migratable_sock(sock *, int);
+    bool update_src_path(sock *, XIAPath&);
 
 public:
 	/* TCP related fields */
