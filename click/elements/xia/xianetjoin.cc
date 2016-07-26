@@ -28,6 +28,7 @@
 #include <click/xiaheader.hh>
 #include <click/xiasecurity.hh>
 #include <click/packet_anno.hh>
+#include "xlog.hh"
 
 CLICK_DECLS
 
@@ -72,7 +73,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 		case XIANETJOINDEVPORT:
 			{
 			// Received a packet destined for this host
-			click_chatter("XIANetJoin: Received a packet from XNetJ");
+			INFO("XIANetJoin: Received a packet from XNetJ");
 			std::string p_buf;
 			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);
@@ -90,7 +91,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 
 			// Broadcast the packet on all interfaces, if requested
 			if(iface == XNETJ_BROADCAST_IFACE) {
-				click_chatter("XIANetJoin: Broadcasting API packet to XNetjs");
+				DBG("XIANetJoin: Broadcasting API packet to XNetjs");
 				//TODO: Hardcoded number of ports. Pass down from click conf
 				for(int i=0; i<4; i++) {
 					Packet *q = p_in->clone();
@@ -103,7 +104,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 
 			// Or send it to the specifically requested interface
 			SET_XIA_PAINT_ANNO(p_in, iface);
-			click_chatter("XIANetJoin: Sending pkt to Iface %d XNetj", iface);
+			DBG("XIANetJoin: Sending pkt to Iface %d XNetj", iface);
 
 			output(XIANETJOINDEVPORT).push(p_in);
 			}
