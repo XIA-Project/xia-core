@@ -120,6 +120,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
 		syslog(LOG_ERR, "connect failed: %s\n", strerror(errno));
+		Xclose(sock);
 		return RET_FAILED;
 	}
 
@@ -769,12 +770,12 @@ void xcache_controller::process_req(xcache_req *req)
 			delete (xcache_cmd*)req->data;
 		}
 	}
-	delete req;
 
 	if(req->flags & XCFI_REMOVEFD) {
 		syslog(LOG_INFO, "Closing Socket");
 		Xclose(req->to_sock);
 	}
+	delete req;
 }
 
 /**
@@ -845,7 +846,7 @@ void xcache_controller::run(void)
 repeat:
 	memcpy(&fds, &allfds, sizeof(fd_set));
 
-	max = libsocket;
+	max = MAX(libsocket, sendersocket);
 
 	/* FIXME: do something better */
 	for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
