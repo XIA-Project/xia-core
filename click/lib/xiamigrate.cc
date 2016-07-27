@@ -287,3 +287,86 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
 
     return true;
 }
+
+bool _unpack_migrateack_payload(XIASecurityBuffer &migrateack_payload,
+        char *our_dag, uint16_t *our_dag_len,
+        char *timestamp, uint16_t *timestamplen)
+{
+
+    if(! migrateack_payload.unpack(our_dag, our_dag_len)) {
+        click_chatter("Failed to find our dag in migrateack payload");
+        return false;
+    }
+
+    if(! migrateack_payload.unpack(timestamp, timestamplen)) {
+        click_chatter("Failed to find timestamp in migrateack payload");
+        return false;
+    }
+
+    return true;
+}
+
+bool _verify_migrateack(XIASecurityBuffer &migrateack_payload,
+        XIAPath our_addr, String timestamp)
+{
+    // The payload contains [our_new_dag, timestamp]
+    uint16_t our_dag_len = XIA_MAX_DAG_STR_SIZE;
+    uint16_t timestamplen = MAX_TIMESTAMP_STR_SIZE;
+
+    char our_dag_str[our_dag_len];
+    char msgtimestamp[timestamplen];
+
+    if(! _unpack_migrateack_payload(migrateack_payload,
+                our_dag_str, &our_dag_len,
+                msgtimestamp, &timestamplen)) {
+        click_chatter("Failed to extract migrateack payload");
+        return false;
+    }
+
+    // Our intent XID from our address in XIP header
+    XID our_xid = our_addr.xid(our_addr.destination_node());
+
+    // must match intent XID in our_dag included in migrateack
+    XIAPath our_dag;
+    if(our_dag.parse(our_dag_str) == false) {
+        click_chatter("ERROR: Unable to parse our dag in migrateack message");
+        return false;
+    }
+    XID our_xid_in_migrateack = our_dag.xid(our_dag.destination_node());
+    if(our_xid_in_migrateack != our_xid) {
+        click_chatter("ERROR: Mismatched XID for us");
+        return false;
+    }
+
+    // Verify that the timestamp matches the one from migrateack
+    String msgtimestampstr(msgtimestamp);
+    if(timestamp.compare(msgtimestampstr)) {
+        click_chatter("ERROR: Mismatched timestamp");
+        return false;
+    }
+
+    return true;
+}
+
+bool valid_migrateack_message(XIASecurityBuffer &migrateack_msg,
+        XIAPath their_addr, XIAPath our_addr, String timestamp)
+{
+    uint16_t payloadlen = 1024;
+    char payload[payloadlen];
+    XID their_xid = their_addr.xid(their_addr.destination_node());
+
+    // Unpack and verify signature, then return payload
+    if(! _unpack_and_verify(migrateack_msg, their_xid, payload, &payloadlen)) {
+        click_chatter("Failed to unpack/verify migrateack payload");
+        return false;
+    }
+    XIASecurityBuffer migrateack_payload(payload, payloadlen);
+
+    // Unpack and verify
+    if (! _verify_migrateack(migrateack_payload, our_addr, timestamp)) {
+        click_chatter("Failed to unpack or verify migrateack message");
+        return false;
+    }
+
+    return true;
+}
