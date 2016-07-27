@@ -31,6 +31,7 @@ void help(const char *name) {
 
 void getLocalAddr() {
     int sock;
+    char dag[MAX_DAG_SIZE];
 
     // create a socket, and listen for incoming connections
     if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
@@ -38,9 +39,13 @@ void getLocalAddr() {
     }
 
     // read the localhost AD and HID
-    if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 ){
+    if (XreadLocalHostAddr(sock, dag, MAX_DAG_SIZE, my4ID, MAX_XID_SIZE) < 0 ){
         die(-1, "Reading localhost address\n");
     }
+
+    Graph g_localhost(dag);
+    strcpy(myAD, g_localhost.intent_AD_str().c_str());
+    strcpy(myHID, g_localhost.intent_HID_str().c_str());
 }
 
 void print_dash_info(ServerVideoInfo* videoInfo){

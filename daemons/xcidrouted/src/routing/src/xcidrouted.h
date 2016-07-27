@@ -30,6 +30,7 @@
 #define HELLO 0
 
 #define MAX_XID_SIZE 100
+#define MAX_DAG_SIZE 512
 #define CID_MAX_BUF_SIZE 1024
 #define HELLO_MAX_BUF_SIZE 60000
 #define MAX_SEQNUM 1000000

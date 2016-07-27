@@ -14,6 +14,9 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Video Publisher"
 
+#define MAX_XID_SIZE 100
+#define MAX_DAG_SIZE 512
+
 #define MAX_INPUT_SIZE 1000
 #define CHUNKSIZE 3500000
 

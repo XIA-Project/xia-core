@@ -17,6 +17,7 @@ static vector<ChunkInfo> chunks;
 
 void registerServer(){
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+    char cdag[MAX_DAG_SIZE];
 
 	// create a socket, and listen for incoming connections
 	if ((serverSock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
@@ -24,11 +25,15 @@ void registerServer(){
 		exit(0);
 	}
 
-	// read the localhost AD and HID
-	if (XreadLocalHostAddr(serverSock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 ){
-		printf("Reading localhost address\n");
-		exit(0);
-	}
+    // read the localhost AD and HID
+    if (XreadLocalHostAddr(serverSock, cdag, MAX_DAG_SIZE, my4ID, MAX_XID_SIZE) < 0 ){
+        printf("Reading localhost address\n");
+    	exit(0);
+    }
+
+    Graph g_localhost(cdag);
+    strcpy(myAD, g_localhost.intent_AD_str().c_str());
+    strcpy(myHID, g_localhost.intent_HID_str().c_str());
 
 	cout << "local host address: " << endl;
 	cout << "\t AD:" << myAD << endl;

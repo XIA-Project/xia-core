@@ -68,7 +68,11 @@ protected:
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+    static int set_handler4CID(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+    static int remove_handlerCID(const String &conf, Element *e, void *, ErrorHandler *errh);
+
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 	static String read_handler(Element *e, void *thunk);

@@ -15,10 +15,6 @@
 
 using namespace std;
 
-char myAD[MAX_XID_SIZE];
-char myHID[MAX_XID_SIZE];
-char my4ID[MAX_XID_SIZE];
-
 /*
  ** display cmd line options and exit
  */
@@ -140,11 +136,6 @@ int register_receiver(){
     // create a socket, and listen for incoming connections
     if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
         die(-1, "Unable to create the listening socket\n");
-    }
-
-    // reading the AID and HID for the localhost
-    if (XreadLocalHostAddr(sock, myAD, sizeof(myAD), myHID, sizeof(myHID), my4ID, sizeof(my4ID)) < 0 ){
-        die(-1, "Reading localhost address\n");
     }
 
     if(XmakeNewSID(sid_string, sizeof(sid_string))) {

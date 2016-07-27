@@ -356,17 +356,23 @@ void registerReceiver() {
 }
 
 void initRouteState(){
+    char cdag[MAX_DAG_SIZE];
+
 	routeState.helloSock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (routeState.helloSock < 0) {
    		printf("Unable to create a socket\n");
    		exit(-1);
    	}
 
-	// read the localhost AD and HID
-	if (XreadLocalHostAddr(routeState.helloSock, routeState.myAD, MAX_XID_SIZE, routeState.myHID, MAX_XID_SIZE, routeState.my4ID, MAX_XID_SIZE) < 0 ) {
-		syslog(LOG_ALERT, "Unable to read local XIA address");
-		exit(-1);
-	}
+   	// read the localhost AD and HID
+    if (XreadLocalHostAddr(routeState.helloSock, cdag, MAX_DAG_SIZE, routeState.my4ID, MAX_XID_SIZE) < 0 ){
+        printf("Reading localhost address\n");
+    	exit(0);
+    }
+
+    Graph g_localhost(cdag);
+    strcpy(routeState.myAD, g_localhost.intent_AD_str().c_str());
+    strcpy(routeState.myHID, g_localhost.intent_HID_str().c_str());
 
 	// make the src DAG (the one the routing process listens on)
 	struct addrinfo *ai;

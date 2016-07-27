@@ -86,6 +86,8 @@ public:
 	// returns 0 success, < 0 on error
 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int setRouteCIDRouting(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int delRouteCIDRouting(const std::string &xid);
 	int delRoute(const std::string &xid);
 
 	const char *cserror();
