@@ -41,7 +41,6 @@ api/session
 applications/example/session
 daemons/session
 applications/example/videos/
-applications/video-use-case/
 daemons/xroute/xrouted
 arada/waveserver/waveserver
 

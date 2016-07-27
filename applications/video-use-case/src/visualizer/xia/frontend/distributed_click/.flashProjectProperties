@@ -1,0 +1,32 @@
+<projectDescription>
+  <id>1325007533021</id>
+  <name>ClickVisualizer</name>
+  <asVersion>0</asVersion>
+  <boundTemplate>file:///Macintosh HD/Users/dnaylor/Library/Application Support/Adobe/Flash CS4/en/Configuration/Project/templates/boundClass_as3.as</boundTemplate>
+  <classTemplate>file:///Macintosh HD/Users/dnaylor/Library/Application Support/Adobe/Flash CS4/en/Configuration/Project/templates/standardClass_as3.as</classTemplate>
+  <classPath>.</classPath>
+  <defaultApp/>
+  <rootURI>file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/</rootURI>
+  <flexSDK/>
+  <sources editable="false"/>
+  <libraries editable="false"/>
+  <externalLibraries editable="false"/>
+  <compileList editable="false"/>
+  <recentFiles editable="false">
+    <uri label="ClickConfigParser.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/ClickConfigParser.as</uri>
+    <uri label="Router.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/Router.as</uri>
+    <uri label="MyGlobal.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/MyGlobal.as</uri>
+    <uri label="LayoutManager.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/LayoutManager.as</uri>
+    <uri label="LineLayout.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/LineLayout.as</uri>
+    <uri label="Visualizer.fla">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/Visualizer.fla</uri>
+    <uri label="SimpleLayout.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/SimpleLayout.as</uri>
+    <uri label="LinkInfoPanel.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/LinkInfoPanel.as</uri>
+    <uri label="Connection.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/Connection.as</uri>
+    <uri label="NetworkElement.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/NetworkElement.as</uri>
+    <uri label="RandomLayout.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/RandomLayout.as</uri>
+    <uri label="Host.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/Host.as</uri>
+    <uri label="TestHost.as">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/TestHost.as</uri>
+    <uri label="Visualizer.swf">file:///Macintosh HD/Users/dnaylor/Dropbox/CMU/XIA/ClickVisualizer/Visualizer.swf</uri>
+  </recentFiles>
+  <locations editable="false"/>
+</projectDescription>
