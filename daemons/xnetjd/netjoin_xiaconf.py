@@ -13,10 +13,7 @@ from netjoin_message_pb2 import SignedMessage
 
 class NetjoinXIAConf(object):
     def __init__(self, hostname=socket.gethostname()):
-        idx = hostname.find(".")
-	if idx != -1:
-	    hostname=hostname[0:idx]
-	self.hostname = hostname
+        self.hostname = hostname.split('.')[0]
         cwd = os.getcwd()
         self.src_dir = cwd[:cwd.rindex('xia-core')+len('xia-core')]
         self.conf_dir = os.path.join(self.src_dir, "etc")
