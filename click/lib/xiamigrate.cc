@@ -99,12 +99,11 @@ bool build_migrate_message(XIASecurityBuffer &migrate_msg,
     return true;
 }
 
-bool _unpack_migrate_payload(const char *payload, uint16_t payloadlen,
+bool _unpack_migrate_payload(XIASecurityBuffer &migrate_payload,
         char *our_dag, uint16_t *our_dag_len,
         char *their_dag, uint16_t *their_dag_len,
         char *timestamp, uint16_t *timestamplen)
 {
-    XIASecurityBuffer migrate_payload(payload, payloadlen);
 
     if(! migrate_payload.unpack(their_dag, their_dag_len)) {
         click_chatter("Failed to find their dag in migrate payload");
@@ -124,13 +123,9 @@ bool _unpack_migrate_payload(const char *payload, uint16_t payloadlen,
     return true;
 }
 
-bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
-        XIAPath their_addr, XIAPath our_addr,
-        XIAPath &their_new_addr)
+bool _unpack_and_verify(XIASecurityBuffer &buf, XID xid,
+        char *payload, uint16_t *payloadlen)
 {
-    uint16_t payloadlen = 1024;
-    char payload[payloadlen];
-
     uint16_t siglen = MAX_SIGNATURE_SIZE;
     char signature[siglen];
 
@@ -138,21 +133,42 @@ bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
     char pubkey[pubkeylen];
     bzero((void *)pubkey, (size_t)pubkeylen);
 
-    if(! migrate_msg.unpack(payload, &payloadlen)) {
+    if(! buf.unpack(payload, payloadlen)) {
         click_chatter("Failed to unpack payload from migrate message");
         return false;
     }
 
-    if(! migrate_msg.unpack(signature, &siglen)) {
+    if(! buf.unpack(signature, &siglen)) {
         click_chatter("Failed to extract signature from migrate message");
         return false;
     }
 
-    if(! migrate_msg.unpack(pubkey, &pubkeylen)) {
+    if(! buf.unpack(pubkey, &pubkeylen)) {
         click_chatter("Failed to extract public key from migrate message");
         return false;
     }
 
+    // Public key must match the XID
+    if(!xs_pubkeyMatchesXID(pubkey, xid.unparse().c_str())) {
+        click_chatter("ERROR: Mismatched migrate XID and pubkey");
+        return false;
+    }
+
+    // and signature is valid against the pubkey
+    if(!xs_isValidSignature((const unsigned char *)payload, *payloadlen,
+                (unsigned char *)signature, siglen,
+                pubkey, pubkeylen)) {
+        click_chatter("ERROR: Invalid signature in migrate message");
+        return false;
+    }
+
+    return true;
+}
+
+bool _verify_migrate(XIASecurityBuffer &migrate_payload,
+        XIAPath their_addr, XIAPath our_addr,
+        XIAPath &their_new_addr)
+{
     // The payload contains [their_new_dag, our_dag, timestamp]
     uint16_t our_dag_len = XIA_MAX_DAG_STR_SIZE;
     uint16_t their_dag_len = XIA_MAX_DAG_STR_SIZE;
@@ -162,7 +178,7 @@ bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
     char their_dag_str[their_dag_len];
     char timestamp[timestamplen];
 
-    if(! _unpack_migrate_payload(payload, payloadlen,
+    if(! _unpack_migrate_payload(migrate_payload,
                 our_dag_str, &our_dag_len,
                 their_dag_str, &their_dag_len,
                 timestamp, &timestamplen)) {
@@ -180,22 +196,23 @@ bool _unpack_and_verify_migrate(XIASecurityBuffer &migrate_msg,
         return false;
     }
     XID migrate_xid = their_dag.xid(their_dag.destination_node());
-    if (migrate_xid.unparse().compare(their_xid.unparse())) {
+    if(migrate_xid != their_xid) {
         click_chatter("ERROR: Mismatched migrate XID");
         return false;
     }
 
-    // and should match the public key included in migrate
-    if(!xs_pubkeyMatchesXID(pubkey, their_xid.unparse().c_str())) {
-        click_chatter("ERROR: Mismatched migrate XID and pubkey");
+    // Our intent XID from our address in XIP header
+    XID our_xid = our_addr.xid(our_addr.destination_node());
+
+    // must match intent XID in our_dag included in migrate
+    XIAPath our_dag;
+    if(our_dag.parse(our_dag_str) == false) {
+        click_chatter("ERROR: Unable to parse our dag in migrate message");
         return false;
     }
-
-    // and signature is valid
-    if(!xs_isValidSignature((const unsigned char *)payload, payloadlen,
-                (unsigned char *)signature, siglen,
-                their_xid.unparse().c_str() )) {
-        click_chatter("ERROR: Invalid signature in migrate message");
+    XID our_xid_in_migrate = our_dag.xid(our_dag.destination_node());
+    if(our_xid_in_migrate != our_xid) {
+        click_chatter("ERROR: Mismatched XID for us");
         return false;
     }
 
@@ -209,8 +226,19 @@ bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
 {
     XIAPath their_new_addr;
 
+    uint16_t payloadlen = 1024;
+    char payload[payloadlen];
+    XID sender_xid = their_addr.xid(their_addr.destination_node());
+
+    // Unpack and verify signature, then return payload
+    if(! _unpack_and_verify(migrate_msg, sender_xid, payload, &payloadlen)) {
+        click_chatter("Failed to unpack/verify migrate payload");
+        return false;
+    }
+    XIASecurityBuffer migrate_payload(payload, payloadlen);
+
     // Unpack and verify
-    if (! _unpack_and_verify_migrate(migrate_msg, their_addr, our_addr,
+    if (! _verify_migrate(migrate_payload, their_addr, our_addr,
                 their_new_addr)) {
         click_chatter("Failed to unpack or verify migrate message");
         return false;
@@ -223,7 +251,7 @@ bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
 }
 
 bool _build_migrateack_payload(XIASecurityBuffer &migrateack_payload,
-        XIAPath our_addr, XIAPath their_addr, String timestamp)
+        XIAPath their_addr, String timestamp)
 {
     // their_addr is the new DAG we have accepted
     if(!_pack_String(migrateack_payload, their_addr.unparse())) {
@@ -245,7 +273,7 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
 
     // Build the payload
     if(!_build_migrateack_payload(migrateack_payload,
-                our_addr, their_addr, timestamp)) {
+                their_addr, timestamp)) {
         click_chatter("ERROR: Failed building migrateack payload");
         return false;
     }
