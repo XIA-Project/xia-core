@@ -34,10 +34,12 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
     return true;
 }
 
-bool _sign_and_pack(XIASecurityBuffer &buf,
-        unsigned char *payload, uint16_t payloadlen,
+bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
         XID xid)
 {
+
+    unsigned char *payload = (unsigned char *)payloadbuf.get_buffer();
+    uint16_t payloadlen = payloadbuf.size();
 
     // Find the src XID whose credentials will be used for signing
     String xid_str = xid.unparse();
@@ -87,11 +89,9 @@ bool build_migrate_message(XIASecurityBuffer &migrate_msg,
     }
 
     // Sign and include pubkey into migrate message
-    unsigned char *payload = (unsigned char *)migrate_payload.get_buffer();
-    uint16_t payloadlen = migrate_payload.size();
     XID src_xid = src_path.xid(src_path.destination_node());
 
-    if(!_sign_and_pack(migrate_msg, payload, payloadlen, src_xid)) {
+    if(!_sign_and_pack(migrate_msg, migrate_payload, src_xid)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }
@@ -250,11 +250,9 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
         return false;
     }
 
-    unsigned char *payload = (unsigned char *)migrateack_payload.get_buffer();
-    uint16_t payloadlen = migrateack_payload.size();
     XID my_xid = our_addr.xid(our_addr.destination_node());
     // Sign and include public key
-    if(!_sign_and_pack(migrateack_msg, payload, payloadlen, my_xid)) {
+    if(!_sign_and_pack(migrateack_msg, migrateack_payload, my_xid)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }
