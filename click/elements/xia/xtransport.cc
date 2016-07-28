@@ -3682,19 +3682,19 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, xia::XSocketMsg *xia_socket_m
 
 		// Set default AD to point to new RHID
 		cmd = ad_table_str + ".set4";
-		cmdargs = default_AD + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_AD + "," + interface + "," + new_rhid.unparse() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default HID to point to new RHID
 		cmd = hid_table_str + ".set4";
-		cmdargs = default_HID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_HID + "," + interface + "," + new_rhid.unparse() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default AD to point to new RHID
 		cmd = ip_table_str + ".set4";
-		cmdargs = default_4ID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_4ID + "," + interface + "," + new_rhid.unparse() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 	}
