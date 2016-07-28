@@ -54,10 +54,10 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	std::map<std::string, struct cache_download *>::iterator iter;
 	size_t offset;
 
-	syslog(LOG_INFO, "CACHE RECVD PKT\n");
-	syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
-	syslog(LOG_INFO, "XIA plen = %d\n", htons(xiah->plen));
-	syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
+	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
+	syslog(LOG_DEBUG, "XIA version = %d\n", xiah->ver);
+	syslog(LOG_DEBUG, "XIA plen = %d\n", htons(xiah->plen));
+	syslog(LOG_DEBUG, "XIA nxt = %d\n", xiah->nxt);
 
 	total_nodes = xiah->dnode + xiah->snode;
 
@@ -82,41 +82,41 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		((char *)xiah + sizeof(struct click_xia) +
 		 (total_nodes) * sizeof(struct click_xia_xid_node));
 
-	syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
-	syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
-	syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
-	syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
+	syslog(LOG_DEBUG, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
+	syslog(LOG_DEBUG, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
+	syslog(LOG_DEBUG, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
+	syslog(LOG_DEBUG, "tcp->th_off = %d\n", tcp->th_off);
 
-	syslog(LOG_INFO, "CID=%s\n", cid.c_str());
+	syslog(LOG_DEBUG, "CID=%s\n", cid.c_str());
 
 	char *payload = (char *)tcp + tcp->th_off * 4;
 	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
-	syslog(LOG_INFO, "Payload length = %d\n", payload_len);
+	syslog(LOG_DEBUG, "Payload length = %d\n", payload_len);
 
 	meta = ctrl->acquire_meta(cid);
 	if (!meta) {
-		syslog(LOG_INFO, "ACCEPTING: New Meta\n");
+		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
 		meta = new xcache_meta(cid);
 		meta->set_OVERHEARING();
 		ctrl->add_meta(meta);
 		ctrl->acquire_meta(cid);
 	} else if (meta->is_DENY_PENDING()) {
-		syslog(LOG_INFO, "DENYING: Already Denied Meta\n");
+		syslog(LOG_INFO, "DENYING: Already Denied Meta CID=%s", cid.c_str());
 		ctrl->release_meta(meta);
 		return;
 	} else if (meta->is_AVAILABLE()) {
-		syslog(LOG_INFO, "DENYING: I Have this already\n");
+		syslog(LOG_INFO, "DENYING: I Have this already CID=%s", cid.c_str());
 		ctrl->release_meta(meta);
 		// DENY CID
 		return;
 	} else if (meta->is_FETCHING()) {
-		syslog(LOG_INFO, "DENYING: I am fetching it\n");
+		syslog(LOG_INFO, "DENYING: I am fetching it CID=%s", cid.c_str());
 		ctrl->release_meta(meta);
 		// DENY CID
 		return;
 	} else if (!meta->is_OVERHEARING()) {
-		syslog(LOG_INFO, "Some Unknown STATE FIX IT\n");
+		syslog(LOG_INFO, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
 	}
 	ctrl->release_meta(meta);
 
@@ -166,7 +166,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	}
 
 
-	syslog(LOG_INFO, "Header: off = %d, len = %d, total_len = %d\n",
+	syslog(LOG_DEBUG, "Header: off = %d, len = %d, total_len = %d\n",
 		       ntohl(download->header.offset),
 		       ntohl(download->header.length),
 		       ntohl(download->header.total_length));
