@@ -102,6 +102,10 @@ check_nodes()
 	do
 		[ $node != $NS_ROUTER ] && check_node $node "ROUTER"
 	done
+	for node in $HOSTS
+	do
+		check_node $node "HOST"
+	done
 }
 
 help ()

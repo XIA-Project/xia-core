@@ -7,4 +7,3 @@ HOSTS="pc295 pc314"
 ROUTERS="pc318 pc310"
 
 NS_ROUTER="pc318"
-NS_HOST="pc295"
