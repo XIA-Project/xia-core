@@ -18,9 +18,8 @@ NAME=`basename $0`
 
 # xianet startup flags
 # host flags may need to change if flack changes which interfaces it allocates
-H_FLAGS="-t"
-R_FLAGS="-rf eth0"
-H_NS_FLAGS="-n $H_FLAGS"
+H_FLAGS="-t -feth0"
+R_FLAGS="-r -feth0"
 R_NS_FLAGS="-n $R_FLAGS"
 
 # NOTE: xiahosts must contain the name sof the nodes on the XIA network.
@@ -36,7 +35,7 @@ stop_node()
 stop_nodes()
 {
 	echo "Stopping Click and all XIA daemons"
-	for node in $HOSTS $NS_HOST $NS_ROUTER $ROUTERS
+	for node in $HOSTS $NS_ROUTER $ROUTERS
 	do
 		stop_node $node
 	done
@@ -44,14 +43,7 @@ stop_nodes()
 
 start_host()
 {
-	# hosts are usually, but not always configured with eth2 on geni
-	# get the interface to be sure
-	iface=`ssh -o "StrictHostKeyChecking no" -A $1 -f ifconfig | awk '/^eth[^0]/ {print $1}'`
-
-	f="-tI"
-	[ "$2" == "NAMESERVER" ] && f="-ntI"
-	flags="$f $iface"
-
+	flags=$H_FLAGS
 	printf "\nstarting $1 as an XIA $2 HOST with flags $flags\n"
 
 	ssh -o "StrictHostKeyChecking no" -A $1 -f "sudo ~/xia-core/bin/xianet $flags start"
@@ -71,14 +63,13 @@ start_router()
 start_nodes()
 {
 	start_router $NS_ROUTER "NAMESERVER"
-	start_host $NS_HOST "NAMESERVER"
 	for node in $ROUTERS
 	do
 		[ $node != $NS_ROUTER ] && start_router $node
 	done
 	for node in $HOSTS
 	do
-		[ $node != $NS_HOST ] && start_host $node
+		start_host $node
 	done
 }
 
@@ -96,7 +87,6 @@ check_node() {
 	flags="bad flags"
 	[ "$2" == "HOST" ] && flags=$H_FLAGS
 	[ "$2" == "ROUTER" ] && flags=$R_FLAGS
-	[ "$2" == "NAMESERVER HOST" ] && flags=$H_NS_FLAGS
 	[ "$2" == "NAMESERVER ROUTER" ] && flags=$R_NS_FLAGS
 
 	printf "\nchecking node: $1\n"
@@ -108,14 +98,9 @@ check_node() {
 check_nodes()
 {
 	check_node $NS_ROUTER "NAMESERVER ROUTER"
-	check_node $NS_HOST "NAMESERVER HOST"
 	for node in $ROUTERS
 	do
 		[ $node != $NS_ROUTER ] && check_node $node "ROUTER"
-	done
-	for node in $HOSTS
-	do
-		[ $node != $NS_HOST ] && check_node $node "HOST"
 	done
 }
 
