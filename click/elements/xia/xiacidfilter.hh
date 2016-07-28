@@ -11,7 +11,7 @@ CLICK_DECLS
 
 
 #define PORT_IN_XCACHE 0
-#define PORT_IN_XTRANSPORT 1
+#define PORT_IN_NETWORK 1
 #define PORT_OUT_XCACHE 0
 
 
@@ -30,9 +30,8 @@ public:
 	int configure(Vector<String> &, ErrorHandler *);
 	void push(int port, Packet *);
 	void handleXcachePacket(Packet *p);
-	void handleXtransportPacket(Packet *p);
+	void handleNetworkPacket(Packet *p);
 };
 
 CLICK_ENDDECLS
 #endif
-
