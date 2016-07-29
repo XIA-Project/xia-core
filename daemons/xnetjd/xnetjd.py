@@ -6,6 +6,7 @@ import sys
 import logging
 import argparse
 import threading
+import logging.handlers
 
 # Include daemons/xnetjd in path so network joining py modules can be loaded
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
@@ -23,6 +24,16 @@ from netjoin_announcer import NetjoinAnnouncer
 from netjoin_authsession import NetjoinAuthsession
 
 # Setup logging for this application
+loglevel = {
+        0:logging.CRITICAL,
+        1:logging.INFO, #logging.ERROR,
+        2:logging.INFO, #logging.WARNING,
+        3:logging.INFO,
+        4:logging.INFO,
+        5:logging.INFO,
+        6:logging.INFO,
+        7:logging.DEBUG
+        }
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(module)s %(levelname)s: %(message)s')
 
 # Argument parser
@@ -36,6 +47,12 @@ def parse_args():
             help="beacon interval in seconds(float)", type=float, default=0.5)
     parser.add_argument("--hostname",
             help="click hostname", type=str)
+    parser.add_argument("-l", "--loglevel",
+            help="logging level [0-7]", type=int, default=6)
+    parser.add_argument("-v", "--verbose",
+            help="verbosity on stderr", action="store_true")
+    parser.add_argument("-q", "--quiet",
+            help="reduced verbosity", action="store_true")
     return parser.parse_args()
 
 # Parse arguments and launch necessary threads
@@ -43,6 +60,16 @@ def main():
 
     # Parse user provided arguments
     args = parse_args()
+
+    # Set up logging
+    logger = logging.getLogger()
+    logger.setLevel(loglevel[args.loglevel])
+    print "logger level: {} in response to loglevel {}".format(loglevel[args.loglevel], args.loglevel)
+    sysloghandler = logging.handlers.SysLogHandler(address="/dev/log")
+    logger.addHandler(sysloghandler)
+    if args.verbose:
+        stdouthandler = logging.StreamHandler(stream=sys.stderr)
+        logger.addHandler(stdouthandler)
 
     # All threads must listen for this event and exit gracefully when set
     shutdown_event = threading.Event()
