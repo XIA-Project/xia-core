@@ -322,7 +322,7 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xnetjd --accesspoint --hostname $host &
+			./xnetjd --accesspoint --hostname $host -l $LOG_LEVEL $V_FLAG &
 			sleep 0.5
 			;;
 		"stop")
@@ -350,7 +350,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnetjd --client --hostname $host &
+			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
 			sleep 0.5
 			;;
 		"stop")

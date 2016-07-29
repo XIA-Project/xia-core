@@ -74,13 +74,13 @@ class NetjoinHandshakeOne(object):
         return protobuf_text_format.MessageToString(self.handshake_one)
 
     def print_handshake_one(self):
-        print self.handshake_one_str()
+        logging.info(self.handshake_one_str())
 
     def payload_str(self):
         return protobuf_text_format.MessageToString(self.payload)
 
     def print_payload(self):
-        print self.payload_str()
+        logging.info(self.payload_str())
 
     # wire_handshake_one is actually a serialized jacp_pb2.HandshakeOne
     def from_wire_handshake_one(self, wire_handshake_one):

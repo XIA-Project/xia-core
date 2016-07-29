@@ -24,7 +24,7 @@ class NetjoinBeacon(object):
         return protobuf_text_format.MessageToString(self.net_descriptor)
 
     def print_beacon(self):
-        print self.beacon_str()
+        logging.debug(self.beacon_str())
 
     def get_ID(self):
         # Copy net_descriptor without nonce and hash it
