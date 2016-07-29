@@ -23,7 +23,7 @@ class NetjoinPolicy:
         #TODO Load list of XIP networks we can join?
 
     def print_known_beacons(self):
-        print self.known_beacons.keys()
+        logging.info(self.known_beacons.keys())
 
     def keep_known_beacon_id(self, beacon_ID, iface, state):
 
