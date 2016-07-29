@@ -22,7 +22,7 @@ import hashlib
 from subprocess import check_call
 
 # Directory where all the keys will be dumped
-keydir = 'key'
+keydir = '~/xia-core/key'
 
 def generate_rsa_key():
     private = None
