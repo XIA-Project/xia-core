@@ -27,6 +27,9 @@ private:
 	 */
 	uint64_t len;
 
+	// initial sequence number
+	uint32_t initial_seq;
+
 	xcache_content_store *store;
 	std::string cid;
 
@@ -35,6 +38,15 @@ public:
 	 * A Constructor.
 	 */
 	xcache_meta();
+
+	void set_seq(uint32_t seq) {
+		// account for the tcp overhead in initial pkt
+		initial_seq = seq + 1;
+	}
+
+	uint32_t seq() {
+		return initial_seq;
+	}
 
 	/**
 	 * Another Constructor.
