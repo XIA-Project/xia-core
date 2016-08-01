@@ -47,6 +47,42 @@ void HelloMessage::deserialize(string data) {
   	}
 }
 
+int HelloMessage::send(){
+	char buffer[HELLO_MAX_BUF_SIZE];
+	int buflen;
+	bzero(buffer, HELLO_MAX_BUF_SIZE);
+
+	string msgStr = serialize();
+	strcpy (buffer, msgStr.c_str());
+	buflen = strlen(buffer);
+
+	// send the broadcast
+	if(Xsendto(routeState.helloSock, buffer, buflen, 0, (struct sockaddr*)&routeState.ddag, sizeof(sockaddr_x)) < 0){
+		printf("HelloMessage: Xsendto broadcast failed\n");
+		return -1;
+	}
+
+	return 1;
+}
+
+int HelloMessage::recv(){
+	int n;
+	char recvMessage[HELLO_MAX_BUF_SIZE];
+    sockaddr_x theirDAG;
+    socklen_t dlen;
+
+    dlen = sizeof(sockaddr_x);
+	n = Xrecvfrom(routeState.helloSock, recvMessage, HELLO_MAX_BUF_SIZE, 0, (struct sockaddr*)&theirDAG, &dlen);	
+	if (n < 0) {
+		printf("Xrecvfrom failed\n");
+		return -1;
+	} else {
+		deserialize(recvMessage);
+	}
+
+	return 1;
+}
+
 AdvertisementMessage::AdvertisementMessage(){};
 AdvertisementMessage::~AdvertisementMessage(){};
 
@@ -151,6 +187,75 @@ void AdvertisementMessage::deserialize(string data){
   	}
 }
 
+int AdvertisementMessage::send(int sock){
+	if(sock < 0){
+		printf("CID advertisement send failed: sock < 0\n");
+		return -1;
+	}
+
+	string advertisement = serialize();
+	int size = advertisement.size();
+	advertisement = to_string(size) + "^" + advertisement;
+
+	char* start = (char*)advertisement.c_str();
+	int remaining = strlen(start);
+	int sent = -1, offset = 0;
+	
+	while(remaining > 0){
+		sent = Xsend(sock, start + offset, remaining, 0);
+		if (sent < 0) {
+			printf("Xsend failed\n");
+			return -1;
+		}
+
+		remaining -= sent;
+		offset += sent;
+	}
+
+	return 1;
+}
+
+int AdvertisementMessage::recv(int sock){
+	int n, remaining = 0, offset = 0;
+	char recvMessage[CID_MAX_BUF_SIZE];
+
+	n = Xrecv(sock, recvMessage, CID_MAX_BUF_SIZE, 0);
+	if (n < 0) {
+		printf("Xrecv failed\n");
+		return n;
+	}
+
+	string recvMessageStr = recvMessage;
+	size_t found = recvMessageStr.find("^");
+  	if (found == string::npos) {
+  		return -1;
+  	}
+	
+	remaining = atoi(recvMessageStr.substr(0, found).c_str());
+	char total[remaining];
+
+	recvMessageStr = recvMessageStr.substr(found);
+	strcpy(total, recvMessageStr.c_str());
+
+	offset = recvMessageStr.size();
+	remaining -= offset;
+
+	while(remaining > 0){
+		n = Xrecv(sock, total + offset, remaining, 0);
+		if (n < 0) {
+			printf("Xrecv failed\n");
+			return n;
+		} else if (n == 0) {
+			break;
+		}
+
+		remaining -= n;
+		offset += n;
+	}
+
+	return 1;
+}
+
 NeighborInfo::NeighborInfo(){};
 NeighborInfo::~NeighborInfo(){};
 
@@ -252,28 +357,7 @@ void CIDAdvertisementHandler(int signum){
 	ualarm((int)ceil(1000000*nextTimeInSecond),0); 	
 }
 
-void broadcastHello(){
-	HelloMessage msg;
-	msg.AD = routeState.myAD;
-	msg.HID = routeState.myHID;
-	msg.SID = routeState.mySID;
-
-	char buffer[HELLO_MAX_BUF_SIZE];
-	int buflen;
-	bzero(buffer, HELLO_MAX_BUF_SIZE);
-
-	string msgStr = msg.serialize();
-	strcpy (buffer, msgStr.c_str());
-	buflen = strlen(buffer);
-
-	// send the broadcast
-	if(Xsendto(routeState.helloSock, buffer, buflen, 0, (struct sockaddr*)&routeState.ddag, sizeof(sockaddr_x)) < 0){
-		printf("Xsendto broadcast failed\n");
-	}
-}
-
 void advertiseCIDs(){
-	int n;
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
 	msg.currSenderHID = routeState.myHID;
@@ -309,13 +393,9 @@ void advertiseCIDs(){
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
-		// serialize the advertisement message
-		string advertisement = msg.serialize();
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-			if (it->second.sendSock != -1 && (n = Xsend(it->second.sendSock, advertisement.c_str(), strlen(advertisement.c_str()), 0)) < 0) {
-				printf("Xsend failed\n");
-			}
+			msg.send(it->second.sendSock);
 		}
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
@@ -440,34 +520,22 @@ void printNeighborInfo(){
 }
 
 void processHelloMessage(){
-	int n, sock, interface;
-    char recvMessage[HELLO_MAX_BUF_SIZE];
-    sockaddr_x theirDAG;
-    socklen_t dlen;
+	HelloMessage msg;
+	msg.recv();
 
-    dlen = sizeof(sockaddr_x);
-
-	n = Xrecvfrom(routeState.helloSock, recvMessage, HELLO_MAX_BUF_SIZE, 0, (struct sockaddr*)&theirDAG, &dlen);	
-	if (n < 0) {
-		printf("Xrecvfrom failed\n");
-	} else {
-		HelloMessage msg;
-		msg.deserialize(recvMessage);
-
-		string key = msg.AD + msg.HID;
-		if(routeState.neighbors[key].sendSock == -1) {
-			sock = connectToNeighbor(msg.AD, msg.HID, msg.SID);
-			if(sock == -1){
-				return;
-			}
-			
-			interface = interfaceNumber("HID", msg.HID);
-		
-			routeState.neighbors[key].AD = msg.AD;
-			routeState.neighbors[key].HID = msg.HID;
-			routeState.neighbors[key].port = interface;
-			routeState.neighbors[key].sendSock = sock;
+	string key = msg.AD + msg.HID;
+	if(routeState.neighbors[key].sendSock == -1) {
+		int sock = connectToNeighbor(msg.AD, msg.HID, msg.SID);
+		if(sock == -1){
+			return;
 		}
+			
+		int interface = interfaceNumber("HID", msg.HID);
+		
+		routeState.neighbors[key].AD = msg.AD;
+		routeState.neighbors[key].HID = msg.HID;
+		routeState.neighbors[key].port = interface;
+		routeState.neighbors[key].sendSock = sock;
 	}
 }
 
@@ -505,16 +573,9 @@ void processNeighborJoin(){
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
-	int n;
-	char recvMessage[CID_MAX_BUF_SIZE];
-
-	if ((n = Xrecv(neighbor.recvSock, recvMessage, CID_MAX_BUF_SIZE, 0))  < 0) {
-		printf("Xrecv failed\n");
-	}
-
 	// deseralize the message
 	AdvertisementMessage msg;
-	msg.deserialize(recvMessage);
+	msg.recv(neighbor.recvSock);
 
 	// check the if the seq number is valid
 	if(msg.seq < routeState.HID2Seq[msg.senderHID] 
@@ -573,10 +634,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.HID != neighbor.HID){
-
-				if (it->second.sendSock != -1 && (n = Xsend(it->second.sendSock, msg2OthersStr.c_str(), strlen(msg2OthersStr.c_str()), 0)) < 0) {
-					printf("Xsend failed\n");
-				}
+				msg2Others.send(it->second.sendSock);
 			}
 		}
 	}
@@ -602,12 +660,16 @@ int main(int argc, char *argv[]) {
    	registerReceiver();
 
    	// broadcast hello first
-   	broadcastHello();
+   	HelloMessage msg;
+	msg.AD = routeState.myAD;
+	msg.HID = routeState.myHID;
+	msg.SID = routeState.mySID;
+	msg.send();
 
 	while(1){
 		iteration++;
 		if(iteration % 400 == 0){
-			broadcastHello();
+			msg.send();
 		}
 
 		FD_ZERO(&socks);

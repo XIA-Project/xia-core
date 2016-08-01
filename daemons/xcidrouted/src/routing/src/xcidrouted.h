@@ -31,8 +31,8 @@
 
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
-#define CID_MAX_BUF_SIZE 1024
-#define HELLO_MAX_BUF_SIZE 60000
+#define CID_MAX_BUF_SIZE 60000 		// this needs to be larger
+#define HELLO_MAX_BUF_SIZE 4096
 #define MAX_SEQNUM 1000000
 #define MAX_TTL 1
 
@@ -61,6 +61,8 @@ public:
 
 	string serialize() const override;
 	void deserialize(string data) override;
+	int send();
+	int recv();
 
 	string AD;
 	string HID;
@@ -72,8 +74,10 @@ public:
 	AdvertisementMessage();
 	~AdvertisementMessage();
 
-	string serialize() const;
+	string serialize() const override;
 	void deserialize(string data) override;
+	int send(int sock);
+	int recv(int sock);
 
 	string senderHID;			// who is the original sender
 	string currSenderHID;		// who is the neighbor that forward the message
@@ -134,7 +138,6 @@ double nextWaitTimeInSecond(double ratePerSecond);
 int interfaceNumber(string xidType, string xid);
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result);
 
-void broadcastHello();
 void advertiseCIDs();
 void CIDAdvertisementHandler(int signum);
 
@@ -146,6 +149,5 @@ void printNeighborInfo();
 void processHelloMessage();
 void processNeighborJoin();
 void processNeighborMessage(const NeighborInfo &neighbor);
-
 
 #endif 
