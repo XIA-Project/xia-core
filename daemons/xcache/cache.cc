@@ -119,6 +119,11 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		return;
 	} else if (!meta->is_OVERHEARING()) {
 		syslog(LOG_INFO, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
+	} else {
+		// we are reentering here
+		// meta has never been deleted after using it before, is that correct?
+		// or should we set it to available?
+		syslog(LOG_INFO, "didn't match anything overhearing = %s\n", meta->is_OVERHEARING() ? "true" : "false");
 	}
 
 	uint32_t initial_seq = meta->seq();
@@ -133,6 +138,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		ongoing_downloads[cid] = download;
 	} else {
 		syslog(LOG_INFO, "Download Found\n");
+		// check to see if we already got a synack?
 		download = iter->second;
 	}
 
