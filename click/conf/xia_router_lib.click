@@ -129,7 +129,7 @@ elementclass RouteEngine {
 	srcCidClassifier::XIAXIDTypeClassifier(src CID, -);
 	cidFilter::XIACidFilter();
 
-	input[0] -> proc
+	input[0] -> proc;
 	input[1] -> proc;
 
 	proc[0] -> srcCidClassifier;
