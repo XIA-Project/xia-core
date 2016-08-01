@@ -20,6 +20,7 @@
 struct xcache_conf {
 	char hostname[128];
 	int threads;
+	uint64_t capacity;
 };
 
 struct xcache_req {
@@ -70,6 +71,7 @@ private:
 	 */
 	xcache_store_manager store_manager;
 	xcache_cache cache;
+	LruPolicy* policy;
 
 	XIARouter xr;
 	int context_id;
@@ -174,6 +176,7 @@ public:
 	inline int unlock_meta_map(void);
 
 	int register_meta(xcache_meta *);
+	int unregister_meta(xcache_meta*);
 	void add_meta(xcache_meta *meta);
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);

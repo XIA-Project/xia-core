@@ -463,8 +463,27 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::__store_policy(xcache_meta *meta)
 {
-	IGNORE_PARAM(meta);
-	//FIXME: Add code
+	int status = policy->get(meta);
+	// get failed, meta new so store
+	if(status == -1){
+		status = policy->store(meta);
+		// don't have enough capacity, return failure
+		if(status == -1){
+			return -1;
+		}
+
+		// else got the evicted meta
+		xcache_meta* evicted = policy->evict();
+		if(evicted){
+			evicted->lock();
+			// already have the lock to meta_map so it's ok to just delete here
+			meta_map.erase(evicted->get_cid());
+			unregister_meta(evicted);
+
+			evicted->unlock();
+		}
+	}
+
 	return 0;
 }
 
@@ -492,7 +511,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
-	meta_map[meta->get_cid()] = meta;
+	meta->set_length(sizeof(data->c_str()));	// size of the data in bytes
 
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
@@ -500,6 +519,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		unlock_meta_map();
 		return RET_FAILED;
 	}
+
+	meta_map[meta->get_cid()] = meta;
 
 	register_meta(meta);
 	store_manager.store(meta, data);
@@ -699,6 +720,20 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	return rv;
 }
 
+int xcache_controller::unregister_meta(xcache_meta *meta)
+{
+	int rv;
+	std::string empty_str("");
+	std::string temp_cid("CID:");
+
+	temp_cid += meta->get_cid();
+
+	syslog(LOG_DEBUG, "Removing Route for %s.\n", temp_cid.c_str());
+	rv = xr.delRoute(temp_cid);
+
+	return rv;
+}
+
 void xcache_controller::enqueue_request_safe(xcache_req *req)
 {
 	pthread_mutex_lock(&request_queue_lock);
@@ -826,6 +861,7 @@ void xcache_controller::run(void)
 
 	if((rc = xr.connect()) != 0) {
 		syslog(LOG_ERR, "Unable to connect to click %d \n", rc);
+		delete policy;
 		return;
 	}
 
@@ -1030,6 +1066,7 @@ void xcache_controller::set_conf(struct xcache_conf *conf)
 {
 	hostname = std::string(conf->hostname);
 
+	policy = new LruPolicy(conf->capacity);
 	n_threads = conf->threads;
 	threads = (pthread_t *)malloc(sizeof(pthread_t) * conf->threads);
 }

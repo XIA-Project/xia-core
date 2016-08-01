@@ -12,6 +12,8 @@
 
 class xcache_eviction_policy  {
 public:
+	virtual ~xcache_eviction_policy(){};
+
 	virtual int store(xcache_meta *) {
 		return 0;
 	};
@@ -31,5 +33,6 @@ public:
  * must be included here.
  */
 #include "fifo.h"
+#include "lru.h"
 
 #endif /* __POLICY_H__ */
