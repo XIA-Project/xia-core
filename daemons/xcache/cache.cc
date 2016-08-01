@@ -82,17 +82,17 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		((char *)xiah + sizeof(struct click_xia) +
 		 (total_nodes) * sizeof(struct click_xia_xid_node));
 
-	syslog(LOG_DEBUG, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
-	syslog(LOG_DEBUG, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
-	syslog(LOG_DEBUG, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
-	syslog(LOG_DEBUG, "tcp->th_off = %d\n", tcp->th_off);
+	syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
+	syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
+	syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
+	syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
 
-	syslog(LOG_DEBUG, "CID=%s\n", cid.c_str());
+	syslog(LOG_INFO, "CID=%s\n", cid.c_str());
 
 	char *payload = (char *)tcp + tcp->th_off * 4;
 	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
-	syslog(LOG_DEBUG, "Payload length = %d\n", payload_len);
+	syslog(LOG_INFO, "Payload length = %d\n", payload_len);
 
 	meta = ctrl->acquire_meta(cid);
 
@@ -128,9 +128,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	if (iter == ongoing_downloads.end()) {
 		syslog(LOG_INFO, "New Download\n");
 		/* This is a new chunk */
-		download = (struct cache_download *)
-			malloc(sizeof(struct cache_download));
-		memset(download, 0, sizeof(struct cid_header));
+		download = (struct cache_download *)malloc(sizeof(struct cache_download));
+		memset(download, 0, sizeof(struct cache_download));
 		ongoing_downloads[cid] = download;
 	} else {
 		syslog(LOG_INFO, "Download Found\n");
@@ -150,9 +149,15 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	/*
 	 * FIXME: this doesn't deal with the case where the sequence number wraps.
 	 */
+
+	// factor out the random start value of the seq #
 	offset = ntohl(tcp->th_seq) - initial_seq;
+	printf("download %p length:%lu data:%p\n", download, download->length, download->data);
+
+printf("initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
+
 	if (offset < sizeof(struct cid_header)) {
-		len = offset + payload_len > sizeof(struct cid_header) ?
+		len = (offset + payload_len) > sizeof(struct cid_header) ?
 			sizeof(struct cid_header) : offset + payload_len;
 		memcpy((char *)&download->header + offset, payload, len);
 
@@ -162,33 +167,42 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	}
 
 	if (offset >= sizeof(struct cid_header)) {
-		if (download->data == NULL)
-			download->data = (char *)
-				malloc(ntohl(download->header.length));
-		memcpy(download->data + offset - sizeof(struct cid_header),
-		       payload, payload_len);
+		if (download->data == NULL) {
+			download->data = (char *)malloc(ntohl(download->header.length));
+		}
+		memcpy(download->data + offset - sizeof(struct cid_header), payload, payload_len);
+		download->length += payload_len;
 	}
 
-
-	syslog(LOG_DEBUG, "Header: off = %d, len = %d, total_len = %d\n",
+	syslog(LOG_INFO, "Header: off = %d, len = %d, total_len = %d\n",
 		       ntohl(download->header.offset),
 		       ntohl(download->header.length),
 		       ntohl(download->header.total_length));
 
-
 skip_data:
-	if (htons(tcp->th_flags) & XTH_FIN) {
-		/* FIN Received */
-		std::string *data = new std::string(download->data,
-						    ntohl(download->header.length));
+printf("total len = %u current len = %lu", ntohl(download->header.length), download->length);
+	// This should work when we get a FIN, but due to oddities ion how
+	// CIDs are transmitted, we may not see one. So look for the following in addition
+	//   flags don't contain SYN
+	//   download->length > 0 (guards against 0 == 0 test)
+	//   download->length == size of data being sent
+	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
+		printf("not a syn\n");
+		if ((ntohs(tcp->th_flags) & XTH_FIN) ||
+			(download->length > 0 && (download->length == ntohl(download->header.length)))) {
 
-		/* FIXME: Verify CID */
+printf("we've got data!\n");
+			/* FIN Received or we have the correct # of bytes */
+			std::string *data = new std::string(download->data, ntohl(download->header.length));
 
-		ctrl->__store(NULL, meta, data);
-		/* Perform cleanup */
-		delete data;
-		ongoing_downloads.erase(iter);
-		free(download);
+			/* FIXME: Verify CID */
+
+			ctrl->__store(NULL, meta, data);
+			/* Perform cleanup */
+			delete data;
+			ongoing_downloads.erase(iter);
+			free(download);
+		}
 	}
 }
 
