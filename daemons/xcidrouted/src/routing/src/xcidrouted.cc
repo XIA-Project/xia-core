@@ -253,6 +253,8 @@ int AdvertisementMessage::recv(int sock){
 		offset += n;
 	}
 
+	deserialize(total);
+
 	return 1;
 }
 
