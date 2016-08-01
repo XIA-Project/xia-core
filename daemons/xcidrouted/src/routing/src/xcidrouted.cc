@@ -2,6 +2,7 @@
 
 using namespace std;
 
+static int ttl = -1;
 static char *ident = NULL;
 static char* hostname = NULL;
 
@@ -155,11 +156,12 @@ NeighborInfo::NeighborInfo(){};
 NeighborInfo::~NeighborInfo(){};
 
 void help(const char *name) {
-	printf("\nusage: %s [-l level] [-v] [-t] [-h hostname]\n", name);
+	printf("\nusage: %s [-l level] [-v] [-t] [-h hostname] [-t TTL]\n", name);
 	printf("where:\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
 	printf(" -v          : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=router0)\n");
+	printf(" -t TTL    	 : TTL for the CID advertisement, default is 1\n");
 	printf("\n");
 	exit(0);
 }
@@ -171,7 +173,7 @@ void config(int argc, char** argv) {
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "h:l:v")) != -1) {
+	while ((c = getopt(argc, argv, "h:l:v:t:")) != -1) {
 		switch (c) {
 			case 'h':
 				hostname = strdup(optarg);
@@ -181,6 +183,9 @@ void config(int argc, char** argv) {
 				break;
 			case 'v':
 				verbose = LOG_PERROR;
+				break;
+			case 't':
+				ttl = atoi(optarg);
 				break;
 			case '?':
 			default:
@@ -193,6 +198,12 @@ void config(int argc, char** argv) {
 	if (!hostname){
 		hostname = strdup(DEFAULT_NAME);
 	}
+
+	if(ttl == -1){
+		ttl = MAX_TTL;
+	}
+
+	printf("ttl is: %d\n", ttl);
 
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
@@ -278,7 +289,7 @@ void advertiseCIDs(){
 	msg.senderHID = routeState.myHID;
 	msg.currSenderHID = routeState.myHID;
 	msg.seq = routeState.lsaSeq;
-	msg.ttl = MAX_TTL;
+	msg.ttl = ttl;
 	msg.distance = 0;
 
 	vector<XIARouteEntry> routeEntries;
