@@ -95,10 +95,12 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	syslog(LOG_DEBUG, "Payload length = %d\n", payload_len);
 
 	meta = ctrl->acquire_meta(cid);
+
 	if (!meta) {
 		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
 		meta = new xcache_meta(cid);
 		meta->set_OVERHEARING();
+		meta->set_seq(ntohl(tcp->th_seq));
 		ctrl->add_meta(meta);
 		ctrl->acquire_meta(cid);
 	} else if (meta->is_DENY_PENDING()) {
@@ -118,6 +120,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	} else if (!meta->is_OVERHEARING()) {
 		syslog(LOG_INFO, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
 	}
+
+	uint32_t initial_seq = meta->seq();
 	ctrl->release_meta(meta);
 
 	iter = ongoing_downloads.find(cid);
@@ -144,9 +148,9 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		goto skip_data;
 
 	/*
-	 * FIXME: Why offset 2?
+	 * FIXME: this doesn't deal with the case where the sequence number wraps.
 	 */
-	offset = ntohl(tcp->th_seq) - 2;
+	offset = ntohl(tcp->th_seq) - initial_seq;
 	if (offset < sizeof(struct cid_header)) {
 		len = offset + payload_len > sizeof(struct cid_header) ?
 			sizeof(struct cid_header) : offset + payload_len;
@@ -212,7 +216,7 @@ void *xcache_cache::run(void *arg)
 			continue;
 		}
 
-		syslog(LOG_INFO, "Cache received a message of size = %d\n", ret);
+		syslog(LOG_DEBUG, "Cache received a message of size = %d\n", ret);
 
 		args->cache->process_pkt(args->ctrl, buffer, ret);
 

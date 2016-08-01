@@ -9,6 +9,7 @@ xcache_meta::xcache_meta(std::string cid)
 	store = NULL;
 	this->cid = cid;
 	len = 0;
+	initial_seq = 0;
 	pthread_mutex_init(&meta_lock, NULL);
 }
 
