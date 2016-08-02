@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <math.h>
+#include <algorithm>    // std::find
 #include <pthread.h>
 #include <string>
 #include <string.h>
@@ -22,6 +23,9 @@ using namespace std;
 #define APPNAME "xnameservice"
 
 map<std::string, std::string> name_to_dag_db_table; // map name to dag
+
+map<std::string, std::vector<std::string> > name_to_dags_db_table; // map name to dags
+map<std::string, unsigned> name_to_rr_pointer;
 
 char *hostname = NULL;
 char *ident = NULL;
@@ -274,7 +278,26 @@ int main(int argc, char *argv[]) {
 			}
 			rtype = NS_TYPE_RESPONSE_REGISTER;
 			break;
+		case NS_TYPE_ANYCAST_REGISTER:
+		{
+			syslog(LOG_INFO, "new entry: %s = %s", req_pkt.name, req_pkt.dag);
+			if(name_to_dags_db_table[req_pkt.name].size() != 0){
+				vector<std::string>::iterator it;
+				it = std::find(name_to_dags_db_table[req_pkt.name].begin(), name_to_dags_db_table[req_pkt.name].end(), req_pkt.dag);
 
+				// if we have already register the name -> name mapping
+				// don't register again
+				if(it == name_to_dags_db_table[req_pkt.name].end()){
+					name_to_dags_db_table[req_pkt.name].push_back(req_pkt.dag);
+				}
+			} else {
+				name_to_dags_db_table[req_pkt.name].push_back(req_pkt.dag);
+				name_to_rr_pointer[req_pkt.name] = 0;
+			}
+
+			rtype = NS_TYPE_ANYCAST_RESPONSE_REGISTER;
+			break;
+		}
 		case NS_TYPE_QUERY:
 		{
 			map<std::string, std::string>::iterator it;
@@ -290,7 +313,26 @@ int main(int argc, char *argv[]) {
 			}
 			break;
 		}
+		case NS_TYPE_ANYCAST_QUERY:
+		{
+			map<std::string, std::vector<std::string> >::iterator it;
+			it = name_to_dags_db_table.find(req_pkt.name);
 
+			if(it != name_to_dags_db_table.end()) {
+				unsigned currRRPointer = name_to_rr_pointer[req_pkt.name];
+
+				response_str = it->second[currRRPointer%it->second.size()];
+				name_to_rr_pointer[req_pkt.name]++;
+
+				rtype = NS_TYPE_ANYCAST_RESPONSE_QUERY;
+				syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
+			} else {
+				rtype = NS_TYPE_ANYCAST_RESPONSE_ERROR;
+				syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
+			}
+
+			break;
+		}
 		case NS_TYPE_RQUERY:
 		{
 			map<std::string, std::string>::iterator it;
@@ -318,8 +360,7 @@ int main(int argc, char *argv[]) {
 		response_pkt.type = rtype;
 		response_pkt.flags = 0;
 		response_pkt.name = (rtype == NS_TYPE_RESPONSE_RQUERY) ? response_str.c_str(): NULL;
-		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY) ? response_str.c_str() : NULL;
-		// pack it up to go on the wire
+		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY || rtype == NS_TYPE_ANYCAST_RESPONSE_QUERY) ? response_str.c_str() : NULL;		// pack it up to go on the wire
 		int len = make_ns_packet(&response_pkt, pkt_out, sizeof(pkt_out));
 
 		//Send the response packet back to the query node
