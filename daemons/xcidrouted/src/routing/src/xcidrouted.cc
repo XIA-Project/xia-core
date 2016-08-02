@@ -632,8 +632,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		msg2Others.newCIDs = advertiseAddition;
 		msg2Others.delCIDs = msg.delCIDs;
 
-		string msg2OthersStr = msg2Others.serialize();
-
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.HID != neighbor.HID){
 				msg2Others.send(it->second.sendSock);
