@@ -237,7 +237,7 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
         return -1;
     }
 
-    printf("proxy pick CDN: %s, host within CDN %s\n", cname, dagUrls);
+    printf("proxy pick CDN: %s, host within CDN %s\n", cname, dagUrls[0]);
 
     int numChunks = dagUrls.size();
     sockaddr_x chunkAddresses[numChunks];
