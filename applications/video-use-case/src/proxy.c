@@ -241,6 +241,12 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 
     std::cout << "proxy pick CDN: " << cname << ", host within CDN: " << dagUrls[0] << std::endl;
 
+    for(auto it = cdns.begin(); it != cdns.end(); it++){
+        std::cout << "CDN name: " << it->first << std::endl;
+        std::cout << "\tCDN num requests: " << it->second.num_reqs << std::endl;
+        std::cout << "\tCDN average throughput: " << it->second.avg_throughput << std::endl;
+    }
+
     int numChunks = dagUrls.size();
     sockaddr_x chunkAddresses[numChunks];
     process_urls_to_DAG(dagUrls, chunkAddresses);
@@ -718,7 +724,7 @@ string multicdn_select_cdn_strategy(string origin, const vector<string> & option
     string c_max_s;
     double c_max = -DBL_MAX;
     for(unsigned i = 0; i < options.size(); i++){
-        if(cdns[options[i]].num_reqs <= BOOTSTRAP_NUM_REQS){
+        if(cdns[options[i]].num_reqs < BOOTSTRAP_NUM_REQS){
             originCDNCache[origin] = options[i];
             return options[i];
         } else {
