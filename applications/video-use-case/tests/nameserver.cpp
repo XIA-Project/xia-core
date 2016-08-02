@@ -57,39 +57,6 @@ void testSingleCDNNameMapping(std::string CDN_Name, sockaddr_x addr1, sockaddr_x
     }
 }
 
-void testMultiCDNNameMapping(std::string MULTI_CDN_NAME){
-	std::string NAMES[3];
-	NAMES[0] = CDN1_NAME;
-	NAMES[1] = CDN2_NAME;
-	NAMES[2] = CDN3_NAME;
-
-	for(int i = 0; i < 3; i++){
-		// register CDN name to multi-CDN name
-    	if(XregisterNameToAnycastName(MULTI_CDN_NAME.c_str(), NAMES[i].c_str()) < 0){
-        	die(-1, "cannot register multi-cdn anycast name\n");
-    	}
-	}
-
-	for(int i = 207; i >= 0; i--){
-		// register server DAG to CDN name
-    	if(XregisterNameToAnycastName(MULTI_CDN_NAME.c_str(), NAMES[i%3].c_str()) < 0){
-        	die(-1, "cannot register anycast name\n");
-    	}
-	}
-
-	for(int i = 0; i < 113; i++){
-		char retname[XIA_MAXBUF];
-        // get the DNS DAG associated with the CDN service name
-        if (XgetNamebyAnycastName(MULTI_CDN_NAME.c_str(), retname) < 0){
-            die(-1, "unable to locate CDN DNS service name: %s\n", MULTI_CDN_NAME.c_str());
-        }
-
-        if(strcmp(NAMES[i%3].c_str(), retname) != 0){
-        	die(-1, "look up %s expected name %s doesn't match lookup name %s!\n", MULTI_CDN_NAME.c_str(), NAMES[i%3].c_str(), retname);
-        }
-	}
-}
-
 int main()
 {
 	Node n_src;
@@ -136,15 +103,6 @@ int main()
 
 	for(int i = 0; i < 3; i++){
 		testSingleCDNNameMapping(CDN_NAMES[i], addr0, addr1, addr2, addr3);
-	}
-
-	std::string MULTI_CDN_NAMES[3];
-	MULTI_CDN_NAMES[0] = MULTI_CDN1_NAME;
-	MULTI_CDN_NAMES[1] = MULTI_CDN2_NAME;
-	MULTI_CDN_NAMES[2] = MULTI_CDN3_NAME;
-
-	for(int i = 0; i < 3; i++){
-		testMultiCDNNameMapping(MULTI_CDN_NAMES[i]);
 	}
 
 	return 0;
