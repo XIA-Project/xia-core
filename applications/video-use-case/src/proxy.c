@@ -5,6 +5,7 @@
 #include <cctype>
 #include <time.h>
 #include <stdarg.h>
+#include <iostream>
 #include "proxy.h"
 
 static int port = 0;                    // port this server runs on
@@ -27,7 +28,8 @@ void usage(){
 }
 
 void cleanup(int sig) {
-        
+    UNUSED(sig);    
+
     // try to close the listening socket
     if (close(list_s) < 0) {
         fprintf(stderr, "Error calling close()\n");
@@ -237,7 +239,7 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
         return -1;
     }
 
-    printf("proxy pick CDN: %s, host within CDN %s\n", cname, (dagUrls[0]).c_str());
+    std::cout << "proxy pick CDN: " << cname << ", host within CDN: " << dagUrls[0] << std::endl;
 
     int numChunks = dagUrls.size();
     sockaddr_x chunkAddresses[numChunks];
