@@ -114,6 +114,8 @@ void processClient(int sock){
     memset(buf, 0, sizeof(buf));
     unsigned long long ntotalBytes = 0;
     time_t startTime = time(NULL);
+    
+    unsigned long nmsgs = 0;
 
    	while (1) {
 
@@ -142,9 +144,10 @@ void processClient(int sock){
 			printf("%d client closed the connection\n", pid);
 			break;
 		}
-
+        nmsgs += 1;
         if (verbose){
-            printf("Xsock %4d received %d bytes\n", sock, nrcvdBytes);
+            printf("Xsock %4d received %d bytes (%u msgs)\n", sock, nrcvdBytes,
+                nmsgs);
         }
         
         ntotalBytes += nrcvdBytes;
