@@ -27,9 +27,7 @@ void usage(){
 }
 
 void cleanup(int sig) {
-    
-    printf("Cleaning up connections and exiting with sig %d\n", sig);
-    
+        
     // try to close the listening socket
     if (close(list_s) < 0) {
         fprintf(stderr, "Error calling close()\n");
@@ -63,8 +61,6 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
     for (unsigned i = 0; i < dagUrls.size(); ++i) {
         string dagUrl = dagUrls[i];
 
-        say("dag url: %s\n", dagUrl.c_str());
-
         size_t found = dagUrl.find("http://");
         if(found == string::npos){
             dagUrl = "http://" + capitalize_XID(dagUrl);
@@ -83,8 +79,6 @@ void job(int browser_sock, fd_set *set, int i) {
         warn("warning: something wrong with the xia_proxy_handle_request, close the browser socket\n");
     }
 
-    say("closing browser socket %d\n", browser_sock);
-
     close_fd(browser_sock);
     FD_CLR(browser_sock, set);
     client_sockets[i] = 0;
@@ -92,7 +86,6 @@ void job(int browser_sock, fd_set *set, int i) {
 
 int send_command(ProxyRequestCtx *ctx, const char *cmd) {
     int n;
-    say("Sending Command: %s \n", cmd);
     if ((n = Xsend(ctx->xia_sock, cmd, strlen(cmd), 0)) < 0) {
         Xclose(ctx->xia_sock);
         warn("Unable to communicate\n");
@@ -196,8 +189,6 @@ int handle_manifest_requests(ProxyRequestCtx *ctx){
     sockaddr_x chunkAddresses[numChunks];
     process_urls_to_DAG(dagUrls, chunkAddresses);
 
-    say("proxy process reply for manifest: %s\n", reply);
-
     if (forward_http_header_to_client(ctx, CONTENT_MANIFEST) < 0){
         warn("unable to forward manifest to client\n");
         return -1;
@@ -212,7 +203,6 @@ int handle_manifest_requests(ProxyRequestCtx *ctx){
 }
 
 int handle_stream_requests(ProxyRequestCtx *ctx){
-    say("proxy got video request: %s\n", ctx->remote_host);
     string cname;
     vector<string> dagUrls;
 
@@ -252,8 +242,6 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
     int numChunks = dagUrls.size();
     sockaddr_x chunkAddresses[numChunks];
     process_urls_to_DAG(dagUrls, chunkAddresses);
-
-    say("proxy process request for video: %s\n", ctx->remote_host);
 
     if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0){
         warn("unable to forward manifest to client\n");
@@ -417,7 +405,6 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 }
 
 int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
-    say("start sending the http response header back to server\n");
     // forward status line (should be OK if chunk is retrieved correctly) 
     if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_status_ok, strlen(http_chunk_header_status_ok)) == -1) {
         warn("unable to forward the http status ok\n");
@@ -474,8 +461,6 @@ int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
         return -1;
     }
 
-    say("http header sent complete\n");
-
     return 0;
 }
 
@@ -485,7 +470,6 @@ int forward_http_response_body_to_client(ProxyRequestCtx *ctx, char* data, int l
         return -1;
     }
 
-    say("finished forwarding the http response body for this run\n");
     return 0;
 }
 
