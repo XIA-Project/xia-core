@@ -103,7 +103,6 @@ void *process_request (void *socketid){
     char message[XIA_MAXBUF];
 
     while(1){
-        say("waiting for request...\n");
 
         memset(message, '\0', sizeof(message));
 
@@ -112,14 +111,16 @@ void *process_request (void *socketid){
             break;
         }
 
-        // if the request is a manifest request, handle it
-        if (strncmp(message, XHTTP_INITIAL, strlen(XHTTP_INITIAL)) == 0){
-            status = handle_xhttp_request(sock, message);
-        }
+        if(n != 0){
+            // if the request is a manifest request, handle it
+            if (strncmp(message, XHTTP_INITIAL, strlen(XHTTP_INITIAL)) == 0){
+                status = handle_xhttp_request(sock, message);
+            }
 
-        if(status == -1){
-            warn("problem with handling request. Connection exit\n");
-            break;
+            if(status == -1){
+                warn("problem with handling request. Connection exit\n");
+                break;
+            }
         }
     }
 
