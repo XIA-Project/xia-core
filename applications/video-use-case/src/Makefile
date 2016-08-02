@@ -11,13 +11,13 @@ csapp.o: csapp.c csapp.h
 		$(CC) $(CFLAGS) -Wno-write-strings -Wno-sign-compare -c csapp.c
 
 manifest.o: manifest.c manifest.h
-		$(CC) $(CFLAGS) -I/usr/include/libxml2 -Wno-write-strings -Wno-sign-compare -c manifest.c
+		$(CC) $(CFLAGS) -I/usr/local/include/libxml2 -Wno-write-strings -Wno-sign-compare -c manifest.c
 
 utils.o: utils.c utils.h
 		$(CC) $(CFLAGS) -Wno-write-strings -Wno-sign-compare -c utils.c
 
 video_publisher.o: video_publisher.c video_publisher.h utils.h manifest.h
-		$(CC) $(CFLAGS) -c video_publisher.c -I/usr/include/libxml2 -Wno-unused-parameter
+		$(CC) $(CFLAGS) -c video_publisher.c -I/usr/local/include/libxml2 -Wno-unused-parameter
 
 manifest_server.o: manifest_server.c manifest_server.h utils.h 
 		$(CC) $(CFLAGS) -c manifest_server.c

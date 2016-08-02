@@ -18,7 +18,6 @@
 #define MAX_DAG_SIZE 512
 
 #define MAX_INPUT_SIZE 1000
-#define CHUNKSIZE 3500000
 
 using namespace std;
 

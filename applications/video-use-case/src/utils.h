@@ -6,6 +6,10 @@
 #define MAX_XID_SIZE 100
 #define MAX_PATH_SIZE 1024
 
+#define MB(__mb) (KB(__mb) * 1024)
+#define KB(__kb) ((__kb) * 1024)
+#define CHUNKSIZE MB(4)
+
 const char MANIFEST_EXTENSION[] = "mpd";
 const char XHTTP_INITIAL[] = "xhttp";
 

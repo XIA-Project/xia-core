@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <vector>
 
-
 #include "csapp.h"
 #include "utils.h"
 #include "Xsocket.h"
@@ -29,8 +28,6 @@
 
 #define CONTENT_MANIFEST 0
 #define CONTENT_STREAM 1
-
-#define CHUNKSIZE 3500000
 
 // if the current throughput is 40% lower than the average for a CDN, then need 
 // to reselect a CDN
