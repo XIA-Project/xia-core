@@ -32,20 +32,18 @@ int main(int argc, char const *argv[])
 	int rc;
 	XIARouter xr;
 
-	if(argc != 2){
-		printf("must have host name arg\n");
+	if(argc < 2 || argc > 3){
+		printf("invalid argument \n");
 		exit(-1);
+	} else if(argc == 3){
+		numCIDs = atoi(argv[2]);
 	}
 
+	xr.setRouter(argv[1]);
 	// connect to router
 	if ((rc = xr.connect()) != 0) {
 		printf("unable to connect to click (%d)", rc);
 		exit(-1);
-	}
-	xr.setRouter(argv[1]);
-
-	if(argc == 3){
-		numCIDs = atoi(argv[2]);
 	}
 
 	for(int i = 0; i < numCIDs; i++){
