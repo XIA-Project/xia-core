@@ -245,7 +245,7 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 }
 
 int
-XIAXIDRouteTable::set_handler4CID(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+XIAXIDRouteTable::set_handler4CID(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
