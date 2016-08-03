@@ -39,9 +39,9 @@
 #define CID_MAX_BUF_SIZE 60000 		// this needs to be larger
 #define HELLO_MAX_BUF_SIZE 4096
 #define MAX_SEQNUM 1000000
-#define MAX_TTL 1
+#define MAX_TTL 2
 
-#define INIT_WAIT_TIME_SEC 10
+#define INIT_WAIT_TIME_SEC 15
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
 #define DEFAULT_NAME "router0"
