@@ -388,6 +388,8 @@ void CIDAdvertiseTimer(){
 }
 
 void advertiseCIDs(){
+	printf("advertising CIDs...\n");
+
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
 	msg.currSenderHID = routeState.myHID;
@@ -434,8 +436,6 @@ void advertiseCIDs(){
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
 	}
-
-	printf("finished advertising CIDs\n");
 }
 
 void registerReceiver() {
@@ -511,7 +511,6 @@ void initRouteState(){
 
    	Graph g = Node() * Node(BHID) * Node(SID_XCIDROUTE);
 	g.fill_sockaddr(&routeState.ddag);
-
 }
 
 int connectToNeighbor(string AD, string HID, string SID){
@@ -629,7 +628,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
 			CIDRouteEntry currEntry = routeState.CIDRoutes[*it];
 
-			// remove an entry if it is from the same host
+			// remove an entry only if it is from the same host
 			if(currEntry.dest == msg.senderHID){
 				routeState.CIDRoutes.erase(*it);
 				xr.delRouteCIDRouting(*it);
@@ -751,8 +750,6 @@ int main(int argc, char *argv[]) {
 					}
 				}
 			}
-
-			//printNeighborInfo();
 		}
 	}
 
