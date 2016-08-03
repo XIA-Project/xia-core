@@ -57,7 +57,7 @@ int main(int argc, char const *argv[])
 			printf("status code %d error message %s\n", rc, xr.cserror());
 		} else {
 			printf("deleting route localhost: %s\n", cids[i].c_str());
-			rc = xr.delRouteCIDRouting(cids[i]);
+			rc = xr.delRoute(cids[i]);
 			printf("status code %d error message %s\n", rc, xr.cserror());
 		}
 	}
