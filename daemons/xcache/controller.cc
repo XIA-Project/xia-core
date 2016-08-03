@@ -110,7 +110,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	int to_recv, recvd, sock;
 	Graph g(addr);
 
-	syslog(LOG_NOTICE, "Fetching content from remote DAG = %s\n", g.dag_string().c_str());
+	syslog(LOG_INFO, "Fetching content from remote DAG = %s\n", g.dag_string().c_str());
 
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if(sock < 0) {
@@ -149,6 +149,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			assert(0);
 			break;
 		} else if (recvd == 0) {
+			syslog(LOG_INFO, "Xrecv returned 0\n");
 			break;
 		}
 		remaining -= recvd;
@@ -878,6 +879,9 @@ repeat:
 			xcache_req *req = new xcache_req();
 
 			syslog(LOG_INFO, "XacceptAs Succeeded\n");
+			Graph g(&mypath);
+			g.print_graph();
+
 			/* Create a request to add to worker queue */
 
 			/* Send chunk Request */

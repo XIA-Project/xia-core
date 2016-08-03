@@ -73,7 +73,7 @@ XIANetJoin::push(int in_port, Packet *p_in)
 		case XIANETJOINDEVPORT:
 			{
 			// Received a packet destined for this host
-			INFO("XIANetJoin: Received a packet from XNetJ");
+			DBG("XIANetJoin: Received a packet from XNetJ");
 			std::string p_buf;
 			p_buf.assign((const char *)p_in->data(), (const char *)p_in->end_data());
 			WritablePacket *apiPacket = WritablePacket::make(256, p_buf.c_str(), p_buf.size(), 0);

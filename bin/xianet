@@ -535,7 +535,9 @@ clean_conf_and_keys()
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/xsockconf.ini
 	echo "Deleting temp files"
-	rm -f /tmp/xcache.*
+	sudo rm -f /tmp/xcache*
+	echo "Deleting content files"
+	sudo rm /tmp/content/*
 
 }
 
@@ -640,7 +642,7 @@ case $1 in
 		[ $NO_CLICK != 1 ] && kill_service "click"
 		visualizer "stop"
 		check_all_services
-		rm /tmp/xcache.*
+		rm /tmp/xcache*
 		;;
 	restart|reload)
 		echo "Stopping XIA"

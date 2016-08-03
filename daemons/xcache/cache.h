@@ -23,6 +23,7 @@ struct cache_download {
 	std::string cid;
 	struct cid_header header;
 	char *data;
+	size_t length;
 };
 
 class xcache_cache {
@@ -39,7 +40,7 @@ public:
 
 	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
 	static void *run(void *);
-	static int create_click_socket(int);
+	static int create_click_socket();
 	static void spawn_thread(struct cache_args *);
 };
 
