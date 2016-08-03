@@ -284,6 +284,7 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	printf("before deserialize the message\n");
+	printf("%s\n", total);
 
 	deserialize(total);
 
