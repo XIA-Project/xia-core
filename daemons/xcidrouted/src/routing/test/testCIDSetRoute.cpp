@@ -13,7 +13,6 @@ using namespace std;
 static vector<string> cids;
 
 static int NUM_CIDS = 1000;
-static int NUM_LOCAL_CIDS = 5;
 static int NUM_THREADS = 2;
 
 static char* HOST_NAME = "router1";
@@ -48,14 +47,14 @@ void setRoute(int n) {
 		for(int i = 0; i < NUM_CIDS; i++){
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
-			printf("status code %d\n", rc);
+			printf("status code %d error message %s\n", rc, xr.cserror());
 		}
 	} else {
 		// set normal
 		for(int i = NUM_CIDS - 1; i >= 0; i--){
 			printf("setting route non-localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], 1, cids[i], 0xffff);
-			printf("status code %d\n", rc);
+			printf("status code %d error message %s\n", rc, xr.cserror());
 		}
 	}
 }
@@ -78,7 +77,7 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 	}
 }
 
-int main(int argc, char *argv[]) {
+int main() {
 	initCIDs();
 
 	thread t[NUM_THREADS];
