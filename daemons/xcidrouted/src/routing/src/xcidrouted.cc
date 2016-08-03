@@ -367,7 +367,7 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 			}
 		}
 	} else {
-		syslog(LOG_ALERT, "unable to get routes from click (%d)", rc);
+		syslog(LOG_ALERT, "unable to get routes from click (%d) %s", rc, xr.cserror());
 	}
 }
 
