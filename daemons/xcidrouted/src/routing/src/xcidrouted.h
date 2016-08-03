@@ -57,6 +57,7 @@ class Message{
 public:
 	virtual void deserialize(string data) = 0;
 	virtual string serialize() const = 0;
+	virtual void print() const = 0;
 };
 
 class HelloMessage: Message{
@@ -66,6 +67,7 @@ public:
 
 	string serialize() const override;
 	void deserialize(string data) override;
+	void print() const override;
 	int send();
 	int recv();
 
@@ -81,6 +83,7 @@ public:
 
 	string serialize() const override;
 	void deserialize(string data) override;
+	void print() const override;
 	int send(int sock);
 	int recv(int sock);
 

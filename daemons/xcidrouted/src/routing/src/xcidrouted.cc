@@ -47,6 +47,11 @@ void HelloMessage::deserialize(string data) {
   	}
 }
 
+void HelloMessage::print() const{
+	printf("HelloMessage: \n");
+	printf("\tAD: %s HID %s SID %s\n", this->AD.c_str(), this->HID.c_str(), this->SID.c_str());
+}
+
 int HelloMessage::send(){
 	char buffer[HELLO_MAX_BUF_SIZE];
 	int buflen;
@@ -187,11 +192,33 @@ void AdvertisementMessage::deserialize(string data){
   	}
 }
 
+void AdvertisementMessage::print() const{
+	printf("AdvertisementMessage: \n");
+	printf("\tsenderHID: %s\n", this->senderHID.c_str());
+	printf("\tcurrSenderHID: %s\n", this->currSenderHID.c_str());
+	printf("\tseq: %d\n", this->seq);
+	printf("\tttl: %d\n", this->ttl);
+	printf("\tdistance: %d\n", this->distance);
+
+	printf("\tnewCIDs:\n");
+	for(auto it = this->newCIDs.begin(); it != this->newCIDs.end(); it++){
+		printf("\t\t%s\n", it->c_str());
+	}
+
+	printf("\tdelCIDs:\n");
+	for(auto it = this->delCIDs.begin(); it != this->delCIDs.end(); it++){
+		printf("\t\t%s\n", it->c_str());
+	}
+}
+
 int AdvertisementMessage::send(int sock){
 	if(sock < 0){
 		printf("CID advertisement send failed: sock < 0\n");
 		return -1;
 	}
+
+	printf("sending CID advertisement:\n");
+	this->print();
 
 	string advertisement = serialize();
 	int size = advertisement.size();
@@ -254,6 +281,9 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	deserialize(total);
+
+	printf("receiving CID advertisement:\n");
+	this->print();
 
 	return 1;
 }
@@ -366,8 +396,6 @@ void CIDAdvertiseTimer(){
 }
 
 void advertiseCIDs(){
-	printf("advertising CIDs: ...\n");
-
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
 	msg.currSenderHID = routeState.myHID;
@@ -405,7 +433,7 @@ void advertiseCIDs(){
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
-		
+
 		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			msg.send(it->second.sendSock);
@@ -727,7 +755,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			printNeighborInfo();
+			//printNeighborInfo();
 		}
 	}
 
