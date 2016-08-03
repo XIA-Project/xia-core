@@ -11,6 +11,7 @@
 using namespace std;
 
 static int numCIDs = 10;
+static bool del = false;
 static vector<string> cids;
 
 static XIARouter xr;
@@ -32,11 +33,13 @@ int main(int argc, char const *argv[])
 	int rc;
 	XIARouter xr;
 
-	if(argc < 2 || argc > 3){
+	if(argc < 2 || argc > 4){
 		printf("invalid argument \n");
 		exit(-1);
 	} else if(argc == 3){
 		numCIDs = atoi(argv[2]);
+	} else if (argc == 4){
+		del = !strcmp(argv[3], "del");
 	}
 
 	xr.setRouter(argv[1]);
@@ -48,9 +51,15 @@ int main(int argc, char const *argv[])
 
 	initCIDs();
 	for(int i = 0; i < numCIDs; i++){
-		printf("setting route localhost: %s\n", cids[i].c_str());
-		rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
-		printf("status code %d error message %s\n", rc, xr.cserror());
+		if(!del){
+			printf("setting route localhost: %s\n", cids[i].c_str());
+			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
+			printf("status code %d error message %s\n", rc, xr.cserror());
+		} else {
+			printf("deleting route localhost: %s\n", cids[i].c_str());
+			rc = xr.delRouteCIDRouting(cids[i]);
+			printf("status code %d error message %s\n", rc, xr.cserror());
+		}
 	}
 
 	return 0;
