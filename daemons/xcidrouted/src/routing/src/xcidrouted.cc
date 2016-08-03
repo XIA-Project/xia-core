@@ -225,8 +225,6 @@ int AdvertisementMessage::send(int sock){
 	int remaining = strlen(start);
 	int sent = -1, offset = 0;
 	
-	printf("sending raw advertisement: %s\n", start);
-
 	while(remaining > 0){
 		sent = Xsend(sock, start + offset, remaining, 0);
 		if (sent < 0) {
@@ -253,8 +251,6 @@ int AdvertisementMessage::recv(int sock){
 		printf("Xrecv failed\n");
 		return n;
 	}
-
-	printf("receive raw message: %s\n", recvMessage);
 
 	string recvMessageStr = recvMessage;
 	size_t found = recvMessageStr.find("^");
@@ -626,9 +622,11 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	msg.recv(neighbor.recvSock);
 
 	// check the if the seq number is valid
-	if(msg.seq <= routeState.HID2Seq[msg.senderHID] 
+	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end()){
+		if(msg.seq <= routeState.HID2Seq[msg.senderHID] 
 			&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
-		return;
+			return;
+		}
 	}
 	routeState.HID2Seq[msg.senderHID] = msg.seq;
 
