@@ -619,7 +619,7 @@ void processNeighborJoin(){
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
-	printf("my neighbor %s sent me a message\n", neighbor.HID);
+	printf("my neighbor %s sent me a message\n", neighbor.HID.c_str());
 
 	// deseralize the message
 	AdvertisementMessage msg;
