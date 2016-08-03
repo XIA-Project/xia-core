@@ -668,7 +668,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	routeState.mtx.unlock();
 
 	// update the message and broadcast to other neighbor
-	if(msg.ttl > 0){
+	if(msg.ttl - 1 > 0){
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
