@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <syslog.h>
 #include "Xsocket.h"
 #include <iostream>
@@ -12,6 +13,8 @@
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
 
+#define CACHE_SOCK_NAME "/tmp/xcache-click.sock"
+
 void xcache_cache::spawn_thread(struct cache_args *args)
 {
 	pthread_t cache;
@@ -19,25 +22,26 @@ void xcache_cache::spawn_thread(struct cache_args *args)
 	pthread_create(&cache, NULL, run, (void *)args);
 }
 
-int xcache_cache::create_click_socket(int port)
+int xcache_cache::create_click_socket()
 {
-	struct sockaddr_in si_me;
-	int s, optval = 1;
+	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((s = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+		syslog(LOG_ERR, "can't create click socket: %s", strerror(errno));
 		return -1;
+	}
 
-	memset((char *)&si_me, 0, sizeof(si_me));
-	si_me.sin_family = AF_INET;
-	si_me.sin_port = htons(port);
-	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+	sockaddr_un sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sun_family = AF_UNIX;
+	strcpy(sa.sun_path, CACHE_SOCK_NAME);
 
-	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-
-	if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me)) == -1)
+	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1) {
+		syslog(LOG_ERR, "unable to bind: %s", strerror(errno));
 		return -1;
+	}
 
-	syslog(LOG_INFO, "Created cache socket on %d\n", port);
+	syslog(LOG_INFO, "Created cache socket on %s\n", CACHE_SOCK_NAME);
 
 	return s;
 }
@@ -54,13 +58,15 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	std::map<std::string, struct cache_download *>::iterator iter;
 	size_t offset;
 
-	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
-	syslog(LOG_DEBUG, "XIA version = %d\n", xiah->ver);
-	syslog(LOG_DEBUG, "XIA plen = %d\n", htons(xiah->plen));
-	syslog(LOG_DEBUG, "XIA nxt = %d\n", xiah->nxt);
+	//syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
+	//syslog(LOG_DEBUG, "XIA version = %d\n", xiah->ver);
+	//syslog(LOG_DEBUG, "XIA plen = %d\n", htons(xiah->plen));
+	//syslog(LOG_DEBUG, "XIA nxt = %d\n", xiah->nxt);
 
 	total_nodes = xiah->dnode + xiah->snode;
 
+	// FIXME: this should walk the dags to make sure we get the correct CID
+	// in case we have complex dags
 	for (i = 0; i < total_nodes; i++) {
 		uint8_t id[20];
 		char hex_string[41];
@@ -69,9 +75,12 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 			case CLICK_XIA_XID_TYPE_CID:
 				memcpy(id, xiah->node[i].xid.id, 20);
 				for(int j = 0; j < 20; j++)
-					sprintf(&hex_string[2*j], "%02x",
-						(unsigned int)id[j]);
+					sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
 				cid = std::string(hex_string);
+				break;
+			case CLICK_XIA_XID_TYPE_SID:
+				// FIXME: save SID in the meta struct if not already there so we
+				//  don't try to cache from 2 different streams
 				break;
 			default:
 				break;
@@ -82,17 +91,15 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		((char *)xiah + sizeof(struct click_xia) +
 		 (total_nodes) * sizeof(struct click_xia_xid_node));
 
-	syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
+	//syslog(LOG_DEBUG, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
 	syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
-	syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
-	syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
-
-	syslog(LOG_INFO, "CID=%s\n", cid.c_str());
+	//syslog(LOG_DEBUG, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
+	//syslog(LOG_DEBUG, "tcp->th_off = %d\n", tcp->th_off);
 
 	char *payload = (char *)tcp + tcp->th_off * 4;
 	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
-	syslog(LOG_INFO, "Payload length = %d\n", payload_len);
+	syslog(LOG_INFO, "%s: Payload length = %d\n", cid.c_str(), payload_len);
 
 	meta = ctrl->acquire_meta(cid);
 
@@ -103,27 +110,36 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		meta->set_seq(ntohl(tcp->th_seq));
 		ctrl->add_meta(meta);
 		ctrl->acquire_meta(cid);
+
 	} else if (meta->is_DENY_PENDING()) {
-		syslog(LOG_INFO, "DENYING: Already Denied Meta CID=%s", cid.c_str());
+		syslog(LOG_INFO, "Already Denied Meta CID=%s", cid.c_str());
 		ctrl->release_meta(meta);
 		return;
+
 	} else if (meta->is_AVAILABLE()) {
-		syslog(LOG_INFO, "DENYING: I Have this already CID=%s", cid.c_str());
+		syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
 		ctrl->release_meta(meta);
-		// DENY CID
 		return;
+
 	} else if (meta->is_FETCHING()) {
-		syslog(LOG_INFO, "DENYING: I am fetching it CID=%s", cid.c_str());
+		syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
 		ctrl->release_meta(meta);
-		// DENY CID
 		return;
-	} else if (!meta->is_OVERHEARING()) {
-		syslog(LOG_INFO, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
+
+	} else if (meta->is_OVERHEARING()) {
+		// if (meta->SID != SID) {
+		// Another stream is getting the same chunk.
+		// Ignore it and only cache from the first stream we saw
+		// otherwise we'll have memory overrun issues due to different sequence #s
+		// 	syslog("don't cross the streams!");
+		// 	ctrl->release_meta(meta);
+		//	return;
+		// }
+
 	} else {
-		// we are reentering here
-		// meta has never been deleted after using it before, is that correct?
-		// or should we set it to available?
-		syslog(LOG_INFO, "didn't match anything overhearing = %s\n", meta->is_OVERHEARING() ? "true" : "false");
+		syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
+		ctrl->release_meta(meta);
+		return;
 	}
 
 	uint32_t initial_seq = meta->seq();
@@ -131,14 +147,13 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	iter = ongoing_downloads.find(cid);
 	if (iter == ongoing_downloads.end()) {
-		syslog(LOG_INFO, "New Download\n");
+		//syslog(LOG_INFO, "New Download\n");
 		/* This is a new chunk */
 		download = (struct cache_download *)malloc(sizeof(struct cache_download));
 		memset(download, 0, sizeof(struct cache_download));
 		ongoing_downloads[cid] = download;
 	} else {
-		syslog(LOG_INFO, "Download Found\n");
-		// check to see if we already got a synack?
+		//syslog(LOG_INFO, "Download Found\n");
 		download = iter->second;
 	}
 
@@ -152,15 +167,12 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	if (payload_len == 0)
 		goto skip_data;
 
-	/*
-	 * FIXME: this doesn't deal with the case where the sequence number wraps.
-	 */
+	// FIXME: this doesn't deal with the case where the sequence number wraps.
 
 	// factor out the random start value of the seq #
 	offset = ntohl(tcp->th_seq) - initial_seq;
-	printf("download %p length:%lu data:%p\n", download, download->length, download->data);
 
-printf("initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
+	//syslog(LOG_INFO, "initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
 
 	if (offset < sizeof(struct cid_header)) {
 		len = (offset + payload_len) > sizeof(struct cid_header) ?
@@ -174,41 +186,34 @@ printf("initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), o
 
 	if (offset >= sizeof(struct cid_header)) {
 		if (download->data == NULL) {
-			download->data = (char *)malloc(ntohl(download->header.length));
+			download->data = (char *)calloc(ntohl(download->header.length), 1);
 		}
 		memcpy(download->data + offset - sizeof(struct cid_header), payload, payload_len);
+
+		// FIXME: this is a hack to work around the problem with FINs getting eaten
+		// we'll miscalculate the length if any packets are retransmitted
 		download->length += payload_len;
 	}
 
-	syslog(LOG_INFO, "Header: off = %d, len = %d, total_len = %d\n",
-		       ntohl(download->header.offset),
-		       ntohl(download->header.length),
-		       ntohl(download->header.total_length));
-
 skip_data:
-printf("total len = %u current len = %lu", ntohl(download->header.length), download->length);
-	// This should work when we get a FIN, but due to oddities ion how
+	// This should work when we get a FIN, but due to oddities in how
 	// CIDs are transmitted, we may not see one. So look for the following in addition
-	//   flags don't contain SYN
 	//   download->length > 0 (guards against 0 == 0 test)
 	//   download->length == size of data being sent
-	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
-		printf("not a syn\n");
-		if ((ntohs(tcp->th_flags) & XTH_FIN) ||
-			(download->length > 0 && (download->length == ntohl(download->header.length)))) {
+	if ((ntohs(tcp->th_flags) & XTH_FIN) ||
+		(download->length > 0 && (download->length == ntohl(download->header.length)))) {
 
-printf("we've got data!\n");
-			/* FIN Received or we have the correct # of bytes */
-			std::string *data = new std::string(download->data, ntohl(download->header.length));
+		/* FIN Received or we have the correct # of bytes */
+		std::string *data = new std::string(download->data, ntohl(download->header.length));
 
-			/* FIXME: Verify CID */
+		/* FIXME: Verify CID */
 
-			ctrl->__store(NULL, meta, data);
-			/* Perform cleanup */
-			delete data;
-			ongoing_downloads.erase(iter);
-			free(download);
-		}
+		ctrl->__store(NULL, meta, data);
+		/* Perform cleanup */
+		delete data;
+		ongoing_downloads.erase(iter);
+		free(download->data);
+		free(download);
 	}
 }
 
@@ -219,11 +224,10 @@ void *xcache_cache::run(void *arg)
 	char buffer[XIA_MAXBUF];
 	struct sockaddr_in fromaddr;
 	socklen_t len = sizeof(fromaddr);
-	struct sockaddr_in toaddr;
 
 	(void)args;
 
-	if ((s = create_click_socket(args->cache_out_port)) < 0) {
+	if ((s = create_click_socket()) < 0) {
 		syslog(LOG_ALERT, "Failed to create a socket on %d\n", args->cache_out_port);
 		pthread_exit(NULL);
 	}
@@ -231,23 +235,17 @@ void *xcache_cache::run(void *arg)
 	do {
 		syslog(LOG_NOTICE, "Cache listening for data on port %d\n", args->cache_out_port);
 		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, (struct sockaddr *)&fromaddr, &len);
-		if(ret <= 0) {
+		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
+			pthread_exit(NULL);
+		} else if (ret == 0) {
+			// we should probably error out here too
+			syslog(LOG_ERR, "no data: %s\n", strerror(errno));
 			continue;
 		}
 
 		syslog(LOG_DEBUG, "Cache received a message of size = %d\n", ret);
-
 		args->cache->process_pkt(args->ctrl, buffer, ret);
 
-		toaddr = fromaddr;
-		toaddr.sin_port = htons(args->cache_in_port);
-
-		//FIXME: Send meaningful messages
-		ret = sendto(s, "Something", strlen("Something") + 1, 0, (struct sockaddr *)&toaddr, sizeof(toaddr));
-		if(ret <= 0) {
-			syslog(LOG_ERR, "Error while sending to click: %s", strerror(errno));
-			continue;
-		}
 	} while(1);
 }

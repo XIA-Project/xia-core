@@ -20,17 +20,6 @@ elementclass GenericPostRouteProc {
 	input -> XIADecHLIM[0,1] => output;
 };
 
-elementclass ToXcache {
-	$cache_out_port |
-	input -> Socket("UDP", 127.0.0.1, $cache_out_port, SNAPLEN 65536);
-};
-
-elementclass FromXcache {
-	$cache_in_port |
-	Socket("UDP", 127.0.0.1, $cache_in_port, SNAPLEN 65536) -> output;
-};
-
-
 elementclass XIAPacketRoute {
 	$num_ports |
 
@@ -139,14 +128,12 @@ elementclass RouteEngine {
 	// All source CID packets are considered for caching. So,
 	// sending one copy of CID to other interface
 	srcCidClassifier[0] -> cidFork::Tee(2) -> [0]output;
-
-	FromXcache($cache_in_port)->cidFilter;
 	// And the other to CIDfilter
 	cidFork[1]->[1]cidFilter;
 
-
-	cidFilter->ToXcache($cache_out_port);
-
+	// there is no useful info from xcache to the filter, we canremove this linkage at some point
+	XcacheSock :: Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true, SNAPLEN 65536);
+	XcacheSock -> cidFilter -> XcacheSock;
 
 	proc[1] -> [1]output;  // To RPC / Application
 
