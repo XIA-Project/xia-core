@@ -349,18 +349,25 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 	}
 }
 
-void CIDAdvertisementHandler(int signum){
-	UNUSED(signum);
+void CIDAdvertiseTimer(){
+	thread([](){
+    	// sleep for 10 seconds for hello message to propagate
+		this_thread::sleep_for(chrono::seconds(INIT_WAIT_TIME_SEC));
+        while (true)
+        {
+            double nextTimeInSecond = nextWaitTimeInSecond(CID_ADVERT_UPDATE_RATE_PER_SEC);
+            int nextTimeMilisecond = (int) ceil(nextTimeInSecond * 1000);
 
-	//advertiseCIDs();
-	printf("inside CID advertisement handler\n");
+            advertiseCIDs();
 
-	double nextTimeInSecond = nextWaitTimeInSecond(CID_ADVERT_UPDATE_RATE_PER_SEC);
-	signal(SIGALRM, CIDAdvertisementHandler);
-	ualarm((int)ceil(1000000*nextTimeInSecond),0); 	
+            this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
+        }
+    }).detach();
 }
 
 void advertiseCIDs(){
+	printf("advertising CIDs: ...\n");
+
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
 	msg.currSenderHID = routeState.myHID;
@@ -392,14 +399,18 @@ void advertiseCIDs(){
 		}
 	}
 
+	routeState.mtx.lock();
 	routeState.localCIDs = currLocalCIDs;
+	routeState.mtx.unlock();
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
-
+		
+		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			msg.send(it->second.sendSock);
 		}
+		routeState.mtx.unlock();
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
 	}
@@ -479,9 +490,6 @@ void initRouteState(){
    	Graph g = Node() * Node(BHID) * Node(SID_XCIDROUTE);
 	g.fill_sockaddr(&routeState.ddag);
 
-   	// wait sending the CID advertisement first
-   	signal(SIGALRM, CIDAdvertisementHandler);
-	ualarm((int)ceil(INIT_WAIT_TIME_SEC*1000000),0); 	
 }
 
 int connectToNeighbor(string AD, string HID, string SID){
@@ -527,6 +535,7 @@ void processHelloMessage(){
 	msg.recv();
 
 	string key = msg.AD + msg.HID;
+
 	if(routeState.neighbors[key].sendSock == -1) {
 		int sock = connectToNeighbor(msg.AD, msg.HID, msg.SID);
 		if(sock == -1){
@@ -535,10 +544,12 @@ void processHelloMessage(){
 			
 		int interface = interfaceNumber("HID", msg.HID);
 		
+		routeState.mtx.lock();
 		routeState.neighbors[key].AD = msg.AD;
 		routeState.neighbors[key].HID = msg.HID;
 		routeState.neighbors[key].port = interface;
 		routeState.neighbors[key].sendSock = sock;
+		routeState.mtx.unlock();
 	}
 }
 
@@ -569,10 +580,12 @@ void processNeighborJoin(){
 	int	interface = interfaceNumber("HID", HID);
 	string key = AD + HID;
 
+	routeState.mtx.lock();
 	routeState.neighbors[key].recvSock = acceptSock;
 	routeState.neighbors[key].AD = AD;
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
+	routeState.mtx.unlock();
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
@@ -600,13 +613,14 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		}
 	}
 
+	routeState.mtx.lock();
 	// then check for each CID if it is the closest for current router
 	set<string> advertiseAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
 
 		// if the CID is not stored locally
-		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
+		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){			
 			advertiseAddition.insert(currNewCID);
 			// and the CID is not encountered before or it is encountered before 
 			// but the distance is longer then
@@ -621,6 +635,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 			}
 		}
 	}
+	routeState.mtx.unlock();
 
 	// update the message and broadcast to other neighbor
 	if(msg.ttl > 0){
@@ -667,6 +682,8 @@ int main(int argc, char *argv[]) {
 	msg.SID = routeState.mySID;
 	msg.send();
 
+	CIDAdvertiseTimer();
+
 	while(1){
 		iteration++;
 		if(iteration % 400 == 0){
@@ -678,7 +695,6 @@ int main(int argc, char *argv[]) {
 		FD_SET(routeState.masterSock, &socks);
 
 		highSock = max(routeState.helloSock, routeState.masterSock);
-		/*
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.recvSock > highSock){
 				highSock = it->second.recvSock;
@@ -688,7 +704,6 @@ int main(int argc, char *argv[]) {
 				FD_SET(it->second.recvSock, &socks);
 			}
 		}
-		 */
 		
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000;
@@ -698,19 +713,18 @@ int main(int argc, char *argv[]) {
 			if (FD_ISSET(routeState.helloSock, &socks)) {
 				// if we received a hello packet from neighbor, check if it is a new neighbor
 				// and then establish connection state with them
+
 				processHelloMessage();
 			} else if (FD_ISSET(routeState.masterSock, &socks)) {
 				// if a new neighbor connects, add to the recv list
 				processNeighborJoin();
 			} else {
-				/*
 				for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 					// if we recv a message from one of our established neighbor, procees the message
 					if(it->second.recvSock != -1 && FD_ISSET(it->second.recvSock, &socks)){
 						processNeighborMessage(it->second);
 					}
 				}
-				 */
 			}
 
 			printNeighborInfo();

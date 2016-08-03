@@ -6,20 +6,25 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <string>
-#include <vector>
 #include <sys/types.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
-#include <map>
-#include <set>
-#include <iostream>
 #include <math.h>
 #include <fcntl.h>
 #include <syslog.h>
+
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
+#include <iostream>
+#include <chrono>
+#include <thread>
+#include <functional>
+#include <mutex>
 
 #include "Xkeys.h"
 #include "Xsocket.h"
@@ -129,6 +134,8 @@ typedef struct {
  	map<string, uint32_t> HID2Seq;
  	map<string, CIDRouteEntry> CIDRoutes;
 
+ 	mutex mtx;           // mutex for critical section
+
 } RouteState;
 
 void help(const char* name);
@@ -139,7 +146,7 @@ int interfaceNumber(string xidType, string xid);
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result);
 
 void advertiseCIDs();
-void CIDAdvertisementHandler(int signum);
+void CIDAdvertiseTimer();
 
 void registerReceiver();
 void initRouteState();
