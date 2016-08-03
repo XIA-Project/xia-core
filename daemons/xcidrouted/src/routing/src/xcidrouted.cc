@@ -265,7 +265,7 @@ int AdvertisementMessage::recv(int sock){
 	remaining = atoi(recvMessageStr.substr(0, found).c_str());
 	char total[remaining];
 
-	recvMessageStr = recvMessageStr.substr(found);
+	recvMessageStr = recvMessageStr.substr(found+1);
 	strcpy(total, recvMessageStr.c_str());
 
 	offset = recvMessageStr.size();
