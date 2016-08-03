@@ -48,12 +48,14 @@ void setRoute(int n) {
 		for(int i = 0; i < NUM_CIDS; i++){
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
+			printf("status code %d\n", rc);
 		}
 	} else {
 		// set normal
 		for(int i = NUM_CIDS - 1; i >= 0; i--){
 			printf("setting route non-localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], 1, cids[i], 0xffff);
+			printf("status code %d\n", rc);
 		}
 	}
 }
