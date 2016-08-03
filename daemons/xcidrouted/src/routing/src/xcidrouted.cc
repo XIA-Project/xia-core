@@ -218,13 +218,18 @@ int AdvertisementMessage::send(int sock){
 	}
 
 	string advertisement = serialize();
-	int size = advertisement.size();
-	advertisement = to_string(size) + "^" + advertisement;
-
 	char* start = (char*)advertisement.c_str();
-	int remaining = strlen(start);
-	int sent = -1, offset = 0;
+	int sent = -1;
+	size_t remaining = strlen(start), offset = 0;
 	
+	// first send the size of the message
+	sent = Xsend(sock, (char*)&remaining, sizeof(size_t), 0);
+	if(sent < 0){
+		printf("Xsend send size failed\n");
+		return -1;
+	}
+
+	// then send the actual message
 	while(remaining > 0){
 		sent = Xsend(sock, start + offset, remaining, 0);
 		if (sent < 0) {
@@ -243,32 +248,19 @@ int AdvertisementMessage::send(int sock){
 }
 
 int AdvertisementMessage::recv(int sock){
-	int n, remaining = 0, offset = 0;
-	char recvMessage[CID_MAX_BUF_SIZE];
+	int n;
+	size_t remaining = 0, offset = 0;
+	printf("before receiving the size of the message\n");
 
-	printf("before receiving the initial message\n");
-	n = Xrecv(sock, recvMessage, CID_MAX_BUF_SIZE, 0);
+	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
 		printf("Xrecv failed\n");
 		return n;
 	}
 
-	printf("raw recv message: %s\n", recvMessage);
-
-	string recvMessageStr = recvMessage;
-	size_t found = recvMessageStr.find("^");
-  	if (found == string::npos) {
-  		return -1;
-  	}
+	printf("size of message: %lu\n", remaining);
 	
-	remaining = atoi(recvMessageStr.substr(0, found).c_str());
 	char total[remaining];
-
-	recvMessageStr = recvMessageStr.substr(found+1);
-	strcpy(total, recvMessageStr.c_str());
-
-	offset = recvMessageStr.size();
-	remaining -= offset;
 
 	printf("before receiving the rest of the message\n");
 
