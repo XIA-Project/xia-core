@@ -442,6 +442,8 @@ void advertiseCIDs(){
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
 	}
+
+	printf("finished advertising CIDs\n");
 }
 
 void registerReceiver() {
@@ -617,6 +619,8 @@ void processNeighborJoin(){
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
+	printf("my neighbor %s sent me a message\n", neighbor.HID);
+
 	// deseralize the message
 	AdvertisementMessage msg;
 	msg.recv(neighbor.recvSock);
@@ -630,6 +634,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 	routeState.HID2Seq[msg.senderHID] = msg.seq;
 
+	printf("sequence number check pass\n");
+
 	// remove the entries that need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
@@ -642,6 +648,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 			}
 		}
 	}
+
+	printf("delete routes check pass\n");
 
 	routeState.mtx.lock();
 	// then check for each CID if it is the closest for current router
@@ -667,8 +675,12 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 	routeState.mtx.unlock();
 
+	printf("set routes check pass\n");
+
 	// update the message and broadcast to other neighbor
 	if(msg.ttl - 1 > 0){
+		printf("ttl valid, send to my neighbor\n");
+
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
@@ -683,6 +695,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 				msg2Others.send(it->second.sendSock);
 			}
 		}
+
+		printf("sent finished\n");
 	}
 }
 
