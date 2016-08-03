@@ -253,6 +253,8 @@ int AdvertisementMessage::recv(int sock){
 		return n;
 	}
 
+	printf("raw recv message: %s\n", recvMessage);
+
 	string recvMessageStr = recvMessage;
 	size_t found = recvMessageStr.find("^");
   	if (found == string::npos) {
