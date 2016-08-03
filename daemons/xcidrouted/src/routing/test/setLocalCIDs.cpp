@@ -43,7 +43,10 @@ int main(int argc, char const *argv[])
 		exit(-1);
 	}
 	xr.setRouter(argv[1]);
-	numCIDs = atoi(argv[2]);
+
+	if(argc == 3){
+		numCIDs = atoi(argv[2]);
+	}
 
 	for(int i = 0; i < numCIDs; i++){
 		printf("setting route localhost: %s\n", cids[i].c_str());
