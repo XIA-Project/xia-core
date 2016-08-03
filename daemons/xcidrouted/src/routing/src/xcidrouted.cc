@@ -217,9 +217,6 @@ int AdvertisementMessage::send(int sock){
 		return -1;
 	}
 
-	printf("sending CID advertisement:\n");
-	this->print();
-
 	string advertisement = serialize();
 	int size = advertisement.size();
 	advertisement = to_string(size) + "^" + advertisement;
@@ -228,6 +225,8 @@ int AdvertisementMessage::send(int sock){
 	int remaining = strlen(start);
 	int sent = -1, offset = 0;
 	
+	printf("sending raw advertisement: %s\n", start);
+
 	while(remaining > 0){
 		sent = Xsend(sock, start + offset, remaining, 0);
 		if (sent < 0) {
@@ -238,6 +237,9 @@ int AdvertisementMessage::send(int sock){
 		remaining -= sent;
 		offset += sent;
 	}
+
+	printf("sending CID advertisement:\n");
+	this->print();
 
 	return 1;
 }
@@ -251,6 +253,8 @@ int AdvertisementMessage::recv(int sock){
 		printf("Xrecv failed\n");
 		return n;
 	}
+
+	printf("receive raw message: %s\n", recvMessage);
 
 	string recvMessageStr = recvMessage;
 	size_t found = recvMessageStr.find("^");
