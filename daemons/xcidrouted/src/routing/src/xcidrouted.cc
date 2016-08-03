@@ -352,7 +352,8 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 void CIDAdvertisementHandler(int signum){
 	UNUSED(signum);
 
-	advertiseCIDs();
+	//advertiseCIDs();
+	printf("inside CID advertisement handler\n");
 
 	double nextTimeInSecond = nextWaitTimeInSecond(CID_ADVERT_UPDATE_RATE_PER_SEC);
 	signal(SIGALRM, CIDAdvertisementHandler);
@@ -479,8 +480,8 @@ void initRouteState(){
 	g.fill_sockaddr(&routeState.ddag);
 
    	// wait sending the CID advertisement first
-   	//signal(SIGALRM, CIDAdvertisementHandler);
-	//ualarm((int)ceil(INIT_WAIT_TIME_SEC*1000000),0); 	
+   	signal(SIGALRM, CIDAdvertisementHandler);
+	ualarm((int)ceil(INIT_WAIT_TIME_SEC*1000000),0); 	
 }
 
 int connectToNeighbor(string AD, string HID, string SID){
@@ -580,7 +581,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	msg.recv(neighbor.recvSock);
 
 	// check the if the seq number is valid
-	if(msg.seq < routeState.HID2Seq[msg.senderHID] 
+	if(msg.seq <= routeState.HID2Seq[msg.senderHID] 
 			&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
 		return;
 	}
