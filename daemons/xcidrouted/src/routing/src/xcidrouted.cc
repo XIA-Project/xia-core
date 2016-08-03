@@ -246,6 +246,7 @@ int AdvertisementMessage::recv(int sock){
 	int n, remaining = 0, offset = 0;
 	char recvMessage[CID_MAX_BUF_SIZE];
 
+	printf("before receiving the initial message\n");
 	n = Xrecv(sock, recvMessage, CID_MAX_BUF_SIZE, 0);
 	if (n < 0) {
 		printf("Xrecv failed\n");
@@ -267,6 +268,8 @@ int AdvertisementMessage::recv(int sock){
 	offset = recvMessageStr.size();
 	remaining -= offset;
 
+	printf("before receiving the rest of the message\n");
+
 	while(remaining > 0){
 		n = Xrecv(sock, total + offset, remaining, 0);
 		if (n < 0) {
@@ -279,6 +282,8 @@ int AdvertisementMessage::recv(int sock){
 		remaining -= n;
 		offset += n;
 	}
+
+	printf("before deserialize the message\n");
 
 	deserialize(total);
 
