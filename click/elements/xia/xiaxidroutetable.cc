@@ -286,7 +286,7 @@ XIAXIDRouteTable::set_handler4CID(const String &conf, Element *e, void *thunk, E
 		return errh->error("invalid XID: ", xid_str.c_str());
 	}
 
-	if(xid.type() != CLICK_XIA_XID_TYPE_CID){
+	if(ntohl(xid.type()) != CLICK_XIA_XID_TYPE_CID){
 		if (nexthop) delete nexthop;
 		return errh->error("invalid CID: ", xid_str.c_str());
 	}
@@ -361,7 +361,7 @@ XIAXIDRouteTable::remove_handlerCID(const String &xid_str, Element *e, void *, E
 		return errh->error("invalid XID: ", xid_str.c_str());
 	}
 
-	if(xid.type() != CLICK_XIA_XID_TYPE_CID){
+	if(ntohl(xid.type()) != CLICK_XIA_XID_TYPE_CID){
 		return errh->error("invalid CID: ", xid_str.c_str());
 	}
 
