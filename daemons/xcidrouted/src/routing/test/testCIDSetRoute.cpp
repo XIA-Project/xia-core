@@ -15,7 +15,7 @@ static vector<string> cids;
 static int NUM_CIDS = 1000;
 static int NUM_THREADS = 2;
 
-static char* HOST_NAME = "router1";
+static char* hostName;
 
 static XIARouter xr;
 
