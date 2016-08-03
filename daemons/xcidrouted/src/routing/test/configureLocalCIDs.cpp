@@ -39,6 +39,7 @@ int main(int argc, char const *argv[])
 	} else if(argc == 3){
 		numCIDs = atoi(argv[2]);
 	} else if (argc == 4){
+		numCIDs = atoi(argv[2]);
 		del = !strcmp(argv[3], "del");
 	}
 
