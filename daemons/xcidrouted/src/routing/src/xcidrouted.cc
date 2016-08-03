@@ -250,19 +250,14 @@ int AdvertisementMessage::send(int sock){
 int AdvertisementMessage::recv(int sock){
 	int n;
 	size_t remaining = 0, offset = 0;
-	printf("before receiving the size of the message\n");
 
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
 		printf("Xrecv failed\n");
 		return n;
 	}
-
-	printf("size of message: %lu\n", remaining);
 	
 	char total[remaining];
-
-	printf("before receiving the rest of the message\n");
 
 	while(remaining > 0){
 		n = Xrecv(sock, total + offset, remaining, 0);
@@ -276,9 +271,6 @@ int AdvertisementMessage::recv(int sock){
 		remaining -= n;
 		offset += n;
 	}
-
-	printf("before deserialize the message\n");
-	printf("%s\n", total);
 
 	deserialize(total);
 
@@ -619,8 +611,6 @@ void processNeighborJoin(){
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
-	printf("my neighbor %s sent me a message\n", neighbor.HID.c_str());
-
 	// deseralize the message
 	AdvertisementMessage msg;
 	msg.recv(neighbor.recvSock);
@@ -634,8 +624,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 	routeState.HID2Seq[msg.senderHID] = msg.seq;
 
-	printf("sequence number check pass\n");
-
 	// remove the entries that need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
@@ -648,8 +636,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 			}
 		}
 	}
-
-	printf("delete routes check pass\n");
 
 	routeState.mtx.lock();
 	// then check for each CID if it is the closest for current router
@@ -675,12 +661,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 	routeState.mtx.unlock();
 
-	printf("set routes check pass\n");
-
 	// update the message and broadcast to other neighbor
 	if(msg.ttl - 1 > 0){
-		printf("ttl valid, send to my neighbor\n");
-
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
@@ -695,8 +677,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 				msg2Others.send(it->second.sendSock);
 			}
 		}
-
-		printf("sent finished\n");
 	}
 }
 
