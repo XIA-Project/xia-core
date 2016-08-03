@@ -46,6 +46,7 @@ int main(int argc, char const *argv[])
 		exit(-1);
 	}
 
+	initCIDs();
 	for(int i = 0; i < numCIDs; i++){
 		printf("setting route localhost: %s\n", cids[i].c_str());
 		rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
