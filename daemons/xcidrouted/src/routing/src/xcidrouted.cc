@@ -352,7 +352,7 @@ int interfaceNumber(string xidType, string xid) {
 }
 
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
-	if(result.size() != 0){
+	if(result.size() != 0){x
 		result.clear();
 	}
 
@@ -397,8 +397,12 @@ void advertiseCIDs(){
 	msg.ttl = MAX_TTL;
 	msg.distance = 0;
 
+	// C++ socket is generally not thread safe. So talking to click here means we 
+	// need to lock it.
+	routeState.mtx.lock();
 	vector<XIARouteEntry> routeEntries;
 	getRouteEntries("CID", routeEntries);
+	routeState.mtx.unlock();
 
 	set<string> currLocalCIDs;
 	for(unsigned i = 0; i < routeEntries.size(); i++){
@@ -563,9 +567,8 @@ void processHelloMessage(){
 			return;
 		}
 			
-		int interface = interfaceNumber("HID", msg.HID);
-		
 		routeState.mtx.lock();
+		int interface = interfaceNumber("HID", msg.HID);
 		routeState.neighbors[key].AD = msg.AD;
 		routeState.neighbors[key].HID = msg.HID;
 		routeState.neighbors[key].port = interface;
@@ -598,10 +601,10 @@ void processNeighborJoin(){
         }
 	}
 
-	int	interface = interfaceNumber("HID", HID);
 	string key = AD + HID;
 
 	routeState.mtx.lock();
+	int	interface = interfaceNumber("HID", HID);
 	routeState.neighbors[key].recvSock = acceptSock;
 	routeState.neighbors[key].AD = AD;
 	routeState.neighbors[key].HID = HID;
@@ -623,6 +626,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 	routeState.HID2Seq[msg.senderHID] = msg.seq;
 
+	routeState.mtx.lock();
 	// remove the entries that need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
@@ -636,7 +640,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		}
 	}
 
-	routeState.mtx.lock();
 	// then check for each CID if it is the closest for current router
 	set<string> advertiseAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
