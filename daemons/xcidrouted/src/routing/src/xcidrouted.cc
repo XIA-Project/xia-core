@@ -269,6 +269,7 @@ int AdvertisementMessage::recv(int sock){
 	size = remaining;
 
 	printf("before receiving the entire message with size: %lu\n", remaining);
+	printf("print size as char: %s\n", (char*)&remaining);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -645,6 +646,7 @@ void processNeighborJoin(){
 }
 
 void processNeighborMessage(const NeighborInfo &neighbor){
+	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
 	// deseralize the message
 	AdvertisementMessage msg;
 	int status = msg.recv(neighbor.recvSock);
