@@ -218,10 +218,11 @@ int AdvertisementMessage::send(int sock){
 	}
 
 	string advertisement = serialize();
-	char* start = (char*)advertisement.c_str();
 	int sent = -1;
-	size_t remaining = strlen(start), offset = 0;
-	
+	size_t remaining = advertisement.size(), offset = 0;
+	char start[remaining];
+	strcpy(start, advertisement.c_str());
+
 	// first send the size of the message
 	sent = Xsend(sock, (char*)&remaining, sizeof(size_t), 0);
 	if(sent < 0){
@@ -259,9 +260,10 @@ int AdvertisementMessage::recv(int sock){
 		return n;
 	}
 	
-	printf("before receiving the entire message with size: %lu\n", remaining);
+	printf("before receiving the entire message with size: %d\n", (int)remaining);
 
 	char total[remaining];
+	memset(total, '\0', remaining);
 
 	while(remaining > 0){
 		n = Xrecv(sock, total + offset, remaining, 0);
