@@ -10,6 +10,7 @@
 
 using namespace std;
 
+static int offset = 0;
 static int numCIDs = 10;
 static bool del = false;
 static vector<string> cids;
@@ -35,12 +36,17 @@ int main(int argc, char const *argv[])
 
 	if(argc < 2 || argc > 4){
 		printf("invalid argument \n");
+		printf("./configureLocalCIDs hostname [numcids=10] [offset=0] [del]\n");
 		exit(-1);
 	} else if(argc == 3){
 		numCIDs = atoi(argv[2]);
 	} else if (argc == 4){
 		numCIDs = atoi(argv[2]);
-		del = !strcmp(argv[3], "del");
+		offset = atoi(argv[3]);
+	} else if (argc == 5){
+		numCIDs = atoi(argv[2]);
+		offset = atoi(argv[3]);
+		del = !strcmp(argv[4], "del");
 	}
 
 	xr.setRouter(argv[1]);
@@ -51,7 +57,7 @@ int main(int argc, char const *argv[])
 	}
 
 	initCIDs();
-	for(int i = 0; i < numCIDs; i++){
+	for(int i = offset; i < numCIDs; i++){
 		if(!del){
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
