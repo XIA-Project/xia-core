@@ -352,7 +352,7 @@ int interfaceNumber(string xidType, string xid) {
 }
 
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
-	if(result.size() != 0){x
+	if(result.size() != 0){
 		result.clear();
 	}
 
