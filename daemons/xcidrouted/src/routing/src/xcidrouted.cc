@@ -274,9 +274,7 @@ int AdvertisementMessage::recv(int sock){
 		n = Xrecv(sock, total + offset, remaining, 0);
 		if (n < 0) {
 			printf("Xrecv failed\n");
-			return n;
-		} else if (n == 0) {
-			break;
+			return -1;
 		}
 
 		remaining -= n;
@@ -645,18 +643,16 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.recv(neighbor.recvSock);
 
-	// if we have seen message from this original sender
+	// need to check both the sequence number and ttl since message with lower
+	// sequence number but higher ttl need to be propagated further
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end()){
-		// if the message has less sequence number (seen the same message before)
 		if(msg.seq < routeState.HID2Seq[msg.senderHID] 
 				&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
 			
-			if(routeState.HID2Seq2TTL[msg.senderHID].find(msg.seq) != routeState.HID2Seq2TTL[msg.senderHID].end()){
-				if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
-					return;
-				} else {
-					routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
-				}
+			// we must have seen this sequence number before since all messages 
+			// are sent in order
+			if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
+				return;
 			} else {
 				routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 			}
