@@ -251,12 +251,16 @@ int AdvertisementMessage::recv(int sock){
 	int n;
 	size_t remaining = 0, offset = 0;
 
+	printf("before receiving the size of the message\n");
+
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
 		printf("Xrecv failed\n");
 		return n;
 	}
 	
+	printf("before receiving the entire message\n");
+
 	char total[remaining];
 
 	while(remaining > 0){
@@ -274,6 +278,7 @@ int AdvertisementMessage::recv(int sock){
 
 	printf("received a raw advertisement message: %s\n", total);
 
+	printf("before deserialize the messaage\n");
 	deserialize(total);
 
 	printf("receiving CID advertisement:\n");
@@ -399,6 +404,8 @@ void advertiseCIDs(){
 	msg.ttl = MAX_TTL;
 	msg.distance = 0;
 
+	printf("before getting current CID routes\n");
+
 	// C++ socket is generally not thread safe. So talking to click here means we 
 	// need to lock it.
 	routeState.mtx.lock();
@@ -406,6 +413,8 @@ void advertiseCIDs(){
 	getRouteEntries("CID", routeEntries);
 	routeState.mtx.unlock();
 
+	printf("before getting the local CIDS\n");
+	
 	set<string> currLocalCIDs;
 	for(unsigned i = 0; i < routeEntries.size(); i++){
 		if(routeEntries[i].port == (unsigned short)DESTINED_FOR_LOCALHOST){
@@ -413,12 +422,16 @@ void advertiseCIDs(){
 		}
 	}
 	
+	printf("before getting the deleted CIDS\n");
+
 	// then find the deleted local CIDs
 	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); it++){
 		if(currLocalCIDs.find(*it) == currLocalCIDs.end()){
 			msg.delCIDs.insert(*it);
 		}
 	}
+
+	printf("before getting the new CIDS\n");
 
 	// find all the new local CIDs first
 	for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
@@ -427,9 +440,13 @@ void advertiseCIDs(){
 		}
 	}
 
+	printf("before setting the new local CIDS\n");
+
 	routeState.mtx.lock();
 	routeState.localCIDs = currLocalCIDs;
 	routeState.mtx.unlock();
+
+	printf("before sending message to neighbors\n");
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
@@ -442,6 +459,8 @@ void advertiseCIDs(){
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
 	}
+
+	printf("done\n");
 }
 
 void registerReceiver() {
