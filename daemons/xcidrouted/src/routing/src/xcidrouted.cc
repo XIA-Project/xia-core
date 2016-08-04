@@ -619,7 +619,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 
 	// check the if the seq number is valid
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end()){
-		if(msg.seq <= routeState.HID2Seq[msg.senderHID] 
+		if(msg.seq < routeState.HID2Seq[msg.senderHID] 
 			&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
 			return;
 		}
@@ -652,7 +652,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 			// but the distance is longer then
 			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end() 
 				|| routeState.CIDRoutes[currNewCID].cost > msg.distance){
-				
 				routeState.CIDRoutes[currNewCID].cost = msg.distance;
 				routeState.CIDRoutes[currNewCID].port = neighbor.port;
 				routeState.CIDRoutes[currNewCID].nextHop = neighbor.HID;
