@@ -17,9 +17,9 @@ static vector<string> cids;
 
 static XIARouter xr;
 
-void initCIDs(){
+void initCIDs(int offset){
 	for(int i = 0; i < numCIDs; i++){
-		string t = to_string(i);
+		string t = to_string(i+offset);
 		string currCID = "CID:";
 		for(int j = 0; j < 40 - (int)t.size(); j++){
 			currCID += "0";
@@ -58,8 +58,8 @@ int main(int argc, char const *argv[])
 		exit(-1);
 	}
 
-	initCIDs();
-	for(int i = offset; i < offset+numCIDs; i++){
+	initCIDs(offset);
+	for(int i = 0; i < numCIDs; i++){
 		if(!del){
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
