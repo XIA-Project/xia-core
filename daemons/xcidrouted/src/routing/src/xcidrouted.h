@@ -32,6 +32,8 @@
 #include "dagaddr.hpp"
 #include "XIARouter.hh"
 
+#define IO_BUF_SIZE (1024 * 1024)
+
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
 #define HELLO_MAX_BUF_SIZE 4096
