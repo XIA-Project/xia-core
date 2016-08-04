@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
 	int rc;
 	XIARouter xr;
 
-	if(argc < 2 || argc > 4){
+	if(argc < 2 || argc > 5){
 		printf("invalid argument \n");
 		printf("./configureLocalCIDs hostname [numcids=10] [offset=0] [del]\n");
 		exit(-1);
@@ -49,6 +49,8 @@ int main(int argc, char const *argv[])
 		del = !strcmp(argv[4], "del");
 	}
 
+	printf("hostname: %s numcids: %d offset: %d del: %d\n", argv[1], numCIDs, offset, del);
+
 	xr.setRouter(argv[1]);
 	// connect to router
 	if ((rc = xr.connect()) != 0) {
@@ -57,7 +59,7 @@ int main(int argc, char const *argv[])
 	}
 
 	initCIDs();
-	for(int i = offset; i < numCIDs; i++){
+	for(int i = offset; i < offset+numCIDs; i++){
 		if(!del){
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
