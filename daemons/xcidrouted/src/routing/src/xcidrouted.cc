@@ -645,14 +645,29 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.recv(neighbor.recvSock);
 
-	// check the if the seq number is valid
+	// if we have seen message from this original sender
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end()){
+		// if the message has less sequence number (seen the same message before)
 		if(msg.seq < routeState.HID2Seq[msg.senderHID] 
-			&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
-			return;
+				&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
+			
+			if(routeState.HID2Seq2TTL[msg.senderHID].find(msg.seq) != routeState.HID2Seq2TTL[msg.senderHID].end()){
+				if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
+					return;
+				} else {
+					routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
+				}
+			} else {
+				routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
+			}
+		} else {
+			routeState.HID2Seq[msg.senderHID] = msg.seq;
+			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 		}
+	} else {
+		routeState.HID2Seq[msg.senderHID] = msg.seq;
+		routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 	}
-	routeState.HID2Seq[msg.senderHID] = msg.seq;
 
 	routeState.mtx.lock();
 	// remove the entries that need to be removed

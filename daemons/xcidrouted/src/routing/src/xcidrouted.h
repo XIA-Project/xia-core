@@ -132,6 +132,7 @@ typedef struct {
  	map<string, NeighborInfo> neighbors;
 
  	map<string, uint32_t> HID2Seq;
+ 	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
  	map<string, CIDRouteEntry> CIDRoutes;
 
  	mutex mtx;           // mutex for critical section
