@@ -266,8 +266,8 @@ int AdvertisementMessage::recv(int sock){
 	remaining = ntohl(remaining);
 	
 	printf("before receiving the entire message with size: %lu\n", remaining);
-
 	if(remaining > XIA_MAXBUF){
+		printf("size exceeds the maximum allowed in XIA, not possible\n");
 		return -1;
 	}
 
@@ -289,6 +289,9 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	printf("received a raw advertisement message: %s with size %lu\n", total, strlen(total));
+	if(remaining != strlen(total)){
+		printf("remaining size different from actual received size\n");
+	}
 
 	printf("before deserialize the messaage\n");
 	deserialize(total);
@@ -650,6 +653,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	int status = msg.recv(neighbor.recvSock);
 	if(status < 0){
+		printf("message receive failed\n");
 		return;
 	}
 
