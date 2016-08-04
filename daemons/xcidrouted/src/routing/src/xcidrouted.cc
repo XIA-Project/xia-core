@@ -249,7 +249,7 @@ int AdvertisementMessage::send(int sock){
 
 int AdvertisementMessage::recv(int sock){
 	int n;
-	size_t remaining = 0, offset = 0;
+	size_t remaining, offset = 0;
 
 	printf("before receiving the size of the message\n");
 
@@ -259,7 +259,7 @@ int AdvertisementMessage::recv(int sock){
 		return n;
 	}
 	
-	printf("before receiving the entire message\n");
+	printf("before receiving the entire message with size: %lu\n", remaining);
 
 	char total[remaining];
 
