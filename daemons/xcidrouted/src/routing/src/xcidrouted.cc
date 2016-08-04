@@ -267,6 +267,10 @@ int AdvertisementMessage::recv(int sock){
 	
 	printf("before receiving the entire message with size: %lu\n", remaining);
 
+	if(remaining > XIA_MAXBUF){
+		return -1;
+	}
+
 	char total[remaining];
 	memset(total, '\0', remaining);
 
@@ -644,7 +648,10 @@ void processNeighborJoin(){
 void processNeighborMessage(const NeighborInfo &neighbor){
 	// deseralize the message
 	AdvertisementMessage msg;
-	msg.recv(neighbor.recvSock);
+	int status = msg.recv(neighbor.recvSock);
+	if(status < 0){
+		return;
+	}
 
 	// need to check both the sequence number and ttl since message with lower
 	// sequence number but higher ttl need to be propagated further
