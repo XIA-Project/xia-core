@@ -266,10 +266,6 @@ int AdvertisementMessage::recv(int sock){
 	remaining = ntohl(remaining);
 	
 	printf("before receiving the entire message with size: %lu\n", remaining);
-	if(remaining > XIA_MAXBUF){
-		printf("size exceeds the maximum allowed in XIA, not possible\n");
-		return -1;
-	}
 
 	char total[remaining];
 	memset(total, '\0', remaining);
@@ -279,21 +275,15 @@ int AdvertisementMessage::recv(int sock){
 		if (n < 0) {
 			printf("Xrecv failed\n");
 			return -1;
-		} else if (n == 0){
-			printf("Xrecv returned 0\n");
-			break;
 		}
 
 		remaining -= n;
 		offset += n;
 	}
 
-	printf("received a raw advertisement message: %s with size %lu\n", total, strlen(total));
-	if(remaining != strlen(total)){
-		printf("remaining size different from actual received size\n");
-	}
+	printf("received a raw advertisement message: %s\n", total);
+	printf("remaining size: %lu, actual received size: %lu\n", remaining, strlen(total));
 
-	printf("before deserialize the messaage\n");
 	deserialize(total);
 
 	printf("receiving CID advertisement:\n");
