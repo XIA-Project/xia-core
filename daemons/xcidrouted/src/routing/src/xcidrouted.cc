@@ -275,6 +275,9 @@ int AdvertisementMessage::recv(int sock){
 		if (n < 0) {
 			printf("Xrecv failed\n");
 			return -1;
+		} else if (n == 0){
+			printf("Xrecv returned 0\n");
+			break;
 		}
 
 		remaining -= n;
@@ -740,13 +743,14 @@ int main(int argc, char *argv[]) {
 	initRouteState();
    	registerReceiver();
 
-   	// broadcast hello first
+	// broadcast hello first
    	HelloMessage msg;
 	msg.AD = routeState.myAD;
 	msg.HID = routeState.myHID;
 	msg.SID = routeState.mySID;
 	msg.send();
 
+	// start cid advertisement timer
 	CIDAdvertiseTimer();
 
 	while(1){
