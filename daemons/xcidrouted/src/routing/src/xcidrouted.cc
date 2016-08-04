@@ -220,11 +220,12 @@ int AdvertisementMessage::send(int sock){
 	string advertisement = serialize();
 	int sent = -1;
 	size_t remaining = advertisement.size(), offset = 0;
+	size_t length = htonl(remaining);
 	char start[remaining];
 	strcpy(start, advertisement.c_str());
 
 	// first send the size of the message
-	sent = Xsend(sock, (char*)&remaining, sizeof(size_t), 0);
+	sent = Xsend(sock, (char*)&length, sizeof(size_t), 0);
 	if(sent < 0){
 		printf("Xsend send size failed\n");
 		return -1;
@@ -259,8 +260,10 @@ int AdvertisementMessage::recv(int sock){
 		printf("Xrecv failed\n");
 		return n;
 	}
+
+	remaining = ntohl(remaining);
 	
-	printf("before receiving the entire message with size: %d\n", (int)remaining);
+	printf("before receiving the entire message with size: %lu\n", remaining);
 
 	char total[remaining];
 	memset(total, '\0', remaining);
