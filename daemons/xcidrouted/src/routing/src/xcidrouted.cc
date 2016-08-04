@@ -284,7 +284,7 @@ int AdvertisementMessage::recv(int sock){
 		offset += n;
 	}
 
-	printf("received a raw advertisement message: %s\n", total);
+	printf("received a raw advertisement message: %s with size %d\n", total, strlen(total));
 
 	printf("before deserialize the messaage\n");
 	deserialize(total);
