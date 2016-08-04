@@ -219,7 +219,7 @@ int AdvertisementMessage::send(int sock){
 
 	string advertisement = serialize();
 	int sent = -1;
-	size_t remaining = advertisement.size(), offset = 0;
+	size_t remaining = strlen(advertisement.c_str()), offset = 0;
 	size_t length = htonl(remaining);
 	char start[remaining];
 	strcpy(start, advertisement.c_str());
@@ -242,6 +242,8 @@ int AdvertisementMessage::send(int sock){
 		remaining -= sent;
 		offset += sent;
 	}
+
+	printf("sending raw CID advertisement: %s\n", start);
 
 	printf("sending CID advertisement:\n");
 	this->print();
