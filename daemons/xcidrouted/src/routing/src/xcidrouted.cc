@@ -365,6 +365,8 @@ void config(int argc, char** argv) {
 void cleanup(int) {
 	logger->end();
 	delete logger;
+
+	exit(1);
 }
 
 double nextWaitTimeInSecond(double ratePerSecond){

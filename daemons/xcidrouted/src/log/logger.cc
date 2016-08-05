@@ -19,6 +19,7 @@ Logger::~Logger(){
 	if(this->logfile.is_open()){
 		this->logfile.close();
 	}
+	printf("logger closed\n");
 };
 
 void Logger::log(const char* data){
@@ -33,4 +34,5 @@ void Logger::end(){
 	time_t currTime = time(0);
 	double sinceThen = difftime(currTime, this->startTime);
 	this->logfile << sinceThen << endl;
+	this->logfile.flush();
 }
