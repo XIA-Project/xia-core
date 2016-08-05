@@ -292,7 +292,7 @@ int AdvertisementMessage::recv(int sock){
 
 	printf("received a raw advertisement message:\n");
 	for(int i = 0; i < (int)data.size(); i++){
-		printf("%d", data[i]);
+		printf("%c", data[i]);
 	}
 	printf("\n");
 
