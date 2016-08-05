@@ -289,7 +289,12 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
-	printf("received a raw advertisement message: %s\n", data.c_str());
+
+	printf("received a raw advertisement message:\n");
+	for(int i = 0; i < data.size(); i++){
+		printf("%c", data[i]);
+	}
+	printf("\n");
 
 	deserialize(data);
 
