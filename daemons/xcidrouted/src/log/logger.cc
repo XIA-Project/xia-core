@@ -7,7 +7,7 @@ Logger::Logger(const char* hostname){
 	logFileName += hostname;
 	logFileName += "_";
 	logFileName += ctime(&startTime);
-	logFileName.pop_back();
+	logFileName = logFileName.substr(0, logFileName.length() - 1);
 	logFileName += ".dat";
 
 	this->logfile.open(logFileName.c_str());

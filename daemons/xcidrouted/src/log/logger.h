@@ -2,6 +2,7 @@
 #define __LOGGER_H
 
 #include <fstream>
+#include <string>
 #include <ctime>
 
 using namespace std;
