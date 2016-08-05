@@ -43,6 +43,7 @@ daemons/session
 applications/example/videos/
 daemons/xroute/xrouted
 daemons/xcidrouted/bin/
+daemons/xcidrouted/src/log
 arada/waveserver/waveserver
 
 # output from scripts

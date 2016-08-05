@@ -32,6 +32,8 @@
 #include "dagaddr.hpp"
 #include "XIARouter.hh"
 
+#include "../../log/logger.h"
+
 #define IO_BUF_SIZE (1024 * 1024)
 
 #define MAX_XID_SIZE 100
@@ -143,6 +145,7 @@ typedef struct {
 
 void help(const char* name);
 void config(int argc, char** argv);
+void cleanup(int);
 
 double nextWaitTimeInSecond(double ratePerSecond);
 int interfaceNumber(string xidType, string xid);

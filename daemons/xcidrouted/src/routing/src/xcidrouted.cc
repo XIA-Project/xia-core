@@ -6,6 +6,7 @@ static char *ident = NULL;
 static char* hostname = NULL;
 
 static XIARouter xr;
+static Logger* logger;
 static RouteState routeState;
 
 HelloMessage::HelloMessage(){};
@@ -244,9 +245,11 @@ int AdvertisementMessage::send(int sock){
 	}
 
 	printf("sending raw CID advertisement: %s\n", start);
-
 	printf("sending CID advertisement:\n");
-	this->print();
+	print();
+
+	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	logger->log(logStr.c_str());
 
 	return 1;
 }
@@ -256,8 +259,6 @@ int AdvertisementMessage::recv(int sock){
 	size_t remaining, size;
 	char buf[IO_BUF_SIZE];
 	string data;
-
-	printf("before receiving the size of the message\n");
 
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
@@ -269,7 +270,6 @@ int AdvertisementMessage::recv(int sock){
 	size = remaining;
 
 	printf("before receiving the entire message with size: %lu\n", remaining);
-	printf("print size as char: %s\n", (char*)&remaining);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -297,9 +297,11 @@ int AdvertisementMessage::recv(int sock){
 	printf("\n");
 
 	deserialize(data);
+	print();
 
-	printf("receiving CID advertisement:\n");
-	this->print();
+	// log the number of advertised CIDs received.
+	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	logger->log(logStr.c_str());
 
 	return 1;
 }
@@ -352,6 +354,17 @@ void config(int argc, char** argv) {
 	sprintf(ident, "%s:%s", APPNAME, hostname);
 	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
+}
+
+void cleanup(int) {
+	logger->end();
+	delete logger;
+
+	routeState.mtx.lock();
+	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
+		Xclose(it->second.recvSock);
+	}
+	routeState.mtx.unlock();
 }
 
 double nextWaitTimeInSecond(double ratePerSecond){
@@ -421,16 +434,12 @@ void advertiseCIDs(){
 	msg.ttl = MAX_TTL;
 	msg.distance = 0;
 
-	printf("before getting current CID routes\n");
-
 	// C++ socket is generally not thread safe. So talking to click here means we 
 	// need to lock it.
 	routeState.mtx.lock();
 	vector<XIARouteEntry> routeEntries;
 	getRouteEntries("CID", routeEntries);
 	routeState.mtx.unlock();
-
-	printf("before getting the local CIDS\n");
 	
 	set<string> currLocalCIDs;
 	for(unsigned i = 0; i < routeEntries.size(); i++){
@@ -439,16 +448,12 @@ void advertiseCIDs(){
 		}
 	}
 	
-	printf("before getting the deleted CIDS\n");
-
 	// then find the deleted local CIDs
 	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); it++){
 		if(currLocalCIDs.find(*it) == currLocalCIDs.end()){
 			msg.delCIDs.insert(*it);
 		}
 	}
-
-	printf("before getting the new CIDS\n");
 
 	// find all the new local CIDs first
 	for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
@@ -457,13 +462,13 @@ void advertiseCIDs(){
 		}
 	}
 
-	printf("before setting the new local CIDS\n");
-
 	routeState.mtx.lock();
 	routeState.localCIDs = currLocalCIDs;
 	routeState.mtx.unlock();
 
-	printf("before sending message to neighbors\n");
+	// log the number of advertised CIDs received.
+	string logStr = "local " + to_string(currLocalCIDs.size());
+	logger->log(logStr.c_str());
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
@@ -750,6 +755,7 @@ int main(int argc, char *argv[]) {
 
 	initRouteState();
    	registerReceiver();
+   	logger = new Logger(hostname);
 
 	// broadcast hello first
    	HelloMessage msg;
@@ -760,6 +766,9 @@ int main(int argc, char *argv[]) {
 
 	// start cid advertisement timer
 	CIDAdvertiseTimer();
+
+	// clean up resources
+	(void) signal(SIGINT, cleanup);
 
 	while(1){
 		iteration++;

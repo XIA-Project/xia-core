@@ -1,5 +1,5 @@
 all:
-	mkdir -p bin tmp stats workload conf
+	mkdir -p bin tmp stats workload conf log
 	make -C src
 
 static: all
