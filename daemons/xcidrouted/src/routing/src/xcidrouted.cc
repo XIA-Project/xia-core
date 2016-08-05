@@ -662,19 +662,13 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 
 	// need to check both the sequence number and ttl since message with lower
 	// sequence number but higher ttl need to be propagated further
-	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end()){
-		if(msg.seq < routeState.HID2Seq[msg.senderHID] 
-				&& routeState.HID2Seq[msg.senderHID] - msg.seq < 100000){
-			
-			// we must have seen this sequence number before since all messages 
-			// are sent in order
-			if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
-				return;
-			} else {
-				routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
-			}
+	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end() &&
+		msg.seq < routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
+		// we must have seen this sequence number before since all messages 
+		// are sent in order
+		if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
+			return;
 		} else {
-			routeState.HID2Seq[msg.senderHID] = msg.seq;
 			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 		}
 	} else {
