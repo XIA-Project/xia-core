@@ -7,6 +7,8 @@ Logger::Logger(const char* hostname){
 	logFileName += hostname;
 	logFileName += "_";
 	logFileName += ctime(&startTime);
+	logFileName.pop_back();
+	logFileName += ".dat";
 
 	this->logfile.open(logFileName.c_str());
 	// print out the start time
@@ -24,6 +26,7 @@ void Logger::log(const char* data){
 	double sinceThen = difftime(currTime, this->startTime);
 
 	this->logfile << sinceThen << " " << data << endl;
+	this->logfile.flush();
 }
 
 void Logger::end(){
