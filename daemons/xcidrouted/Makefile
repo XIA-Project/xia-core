@@ -6,6 +6,7 @@ static: all
 
 clean:
 	make -C src clean
+	rm -f ./log/*
 	rm -f ./bin/XIACIDWGen
 	rm -f ./bin/client
 	rm -f ./bin/server
