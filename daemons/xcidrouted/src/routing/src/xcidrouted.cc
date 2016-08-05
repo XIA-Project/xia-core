@@ -366,6 +366,12 @@ void cleanup(int) {
 	logger->end();
 	delete logger;
 
+	routeState.mtx.lock();
+	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
+		Xclose(it->second.recvSock);
+	}
+	routeState.mtx.unlock();
+
 	exit(1);
 }
 
