@@ -218,6 +218,8 @@ int AdvertisementMessage::send(int sock){
 		return -1;
 	}
 
+	printf("sending CID advertisement...\n");
+
 	string advertisement = serialize();
 	int sent = -1;
 	size_t remaining = strlen(advertisement.c_str()), offset = 0;
@@ -244,12 +246,14 @@ int AdvertisementMessage::send(int sock){
 		offset += sent;
 	}
 
-	printf("sending raw CID advertisement: %s\n", start);
-	printf("sending CID advertisement:\n");
-	print();
+	//printf("sending raw CID advertisement: %s\n", start);
+	//printf("sending CID advertisement:\n");
+	//print();
 
 	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
 	logger->log(logStr.c_str());
+
+	printf("sent CID advertisement\n");
 
 	return 1;
 }
@@ -260,6 +264,8 @@ int AdvertisementMessage::recv(int sock){
 	char buf[IO_BUF_SIZE];
 	string data;
 
+	printf("receiving CID advertisement...\n");
+
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
 		printf("Xrecv failed\n");
@@ -269,7 +275,7 @@ int AdvertisementMessage::recv(int sock){
 	remaining = ntohl(remaining);
 	size = remaining;
 
-	printf("before receiving the entire message with size: %lu\n", remaining);
+	//printf("before receiving the entire message with size: %lu\n", remaining);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -288,6 +294,7 @@ int AdvertisementMessage::recv(int sock){
 		data += temp;
 	}
 
+	/*
 	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
 
 	printf("received a raw advertisement message:\n");
@@ -295,13 +302,16 @@ int AdvertisementMessage::recv(int sock){
 		printf("%c", data[i]);
 	}
 	printf("\n");
-
+	 */
+	
 	deserialize(data);
-	print();
+	//print();
 
 	// log the number of advertised CIDs received.
 	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
 	logger->log(logStr.c_str());
+
+	printf("received CID advertisement\n");
 
 	return 1;
 }
