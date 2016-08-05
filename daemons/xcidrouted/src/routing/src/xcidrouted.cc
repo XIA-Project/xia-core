@@ -246,9 +246,9 @@ int AdvertisementMessage::send(int sock){
 		offset += sent;
 	}
 
-	//printf("sending raw CID advertisement: %s\n", start);
-	//printf("sending CID advertisement:\n");
-	//print();
+	printf("sending raw CID advertisement: %s\n", start);
+	printf("sending CID advertisement:\n");
+	print();
 
 	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
 	logger->log(logStr.c_str());
@@ -275,8 +275,6 @@ int AdvertisementMessage::recv(int sock){
 	remaining = ntohl(remaining);
 	size = remaining;
 
-	//printf("before receiving the entire message with size: %lu\n", remaining);
-
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
 
@@ -294,7 +292,6 @@ int AdvertisementMessage::recv(int sock){
 		data += temp;
 	}
 
-	/*
 	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
 
 	printf("received a raw advertisement message:\n");
@@ -302,10 +299,9 @@ int AdvertisementMessage::recv(int sock){
 		printf("%c", data[i]);
 	}
 	printf("\n");
-	 */
 	
 	deserialize(data);
-	//print();
+	print();
 
 	// log the number of advertised CIDs received.
 	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
@@ -369,12 +365,6 @@ void config(int argc, char** argv) {
 void cleanup(int) {
 	logger->end();
 	delete logger;
-
-	routeState.mtx.lock();
-	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-		Xclose(it->second.recvSock);
-	}
-	routeState.mtx.unlock();
 }
 
 double nextWaitTimeInSecond(double ratePerSecond){
