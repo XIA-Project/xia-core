@@ -293,6 +293,9 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
+	if(data.size() == 0){
+		return -1;
+	}
 
 	printf("received a raw advertisement message:\n");
 	for(int i = 0; i < (int)data.size(); i++){
