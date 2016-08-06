@@ -448,7 +448,7 @@ void advertiseCIDs(){
 	vector<XIARouteEntry> routeEntries;
 	getRouteEntries("CID", routeEntries);
 	routeState.mtx.unlock();
-	
+
 	set<string> currLocalCIDs;
 	for(unsigned i = 0; i < routeEntries.size(); i++){
 		if(routeEntries[i].port == (unsigned short)DESTINED_FOR_LOCALHOST){

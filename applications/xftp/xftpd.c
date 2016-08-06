@@ -41,7 +41,7 @@
 
 #define MB(__mb) (KB(__mb) * 1024)
 #define KB(__kb) ((__kb) * 1024)
-#define CHUNKSIZE MB(1)
+#define CHUNKSIZE KB(60)
 #define NUM_CHUNKS	10
 #define REREQUEST 3
 

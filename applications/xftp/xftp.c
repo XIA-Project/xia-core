@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sys/time.h>
 #include "Xsocket.h"
 #include "xcache.h"
 #include "dagaddr.hpp"
@@ -43,6 +44,8 @@
 // global configuration options
 int verbose = 1;
 bool quick = false;
+
+double totalElapseTime = 0.0;
 
 char s_ad[MAX_XID_SIZE];
 char s_hid[MAX_XID_SIZE];
@@ -170,6 +173,8 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 int getListedChunks(FILE *fd, char *url)
 {
 	char *saveptr, *token;
+	double elapsedTime;
+    struct timeval t1, t2;
 
 	printf("Received url = %s\n", url);
 	token = strtok_r(url, " ", &saveptr);
@@ -187,10 +192,19 @@ int getListedChunks(FILE *fd, char *url)
 		g.print_graph();
 		printf("------------------------\n");
 
+        gettimeofday(&t1, NULL);
 		if ((ret = XfetchChunk(&h, buf, 1024 * 1024, XCF_BLOCK, &addr,
 				       sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
+		gettimeofday(&t2, NULL);
+
+		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+        elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+
+        say("current elapsedTime: %f\n", elapsedTime);
+
+        totalElapseTime += elapsedTime; 		// in ms
 
 		printf("Got Chunk\n");
 		fwrite(buf, 1, ret, fd);
@@ -256,6 +270,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	}
 
 	say("Received file %s\n", fout);
+	say("Total elapsedTime: %f\n", totalElapseTime);
 	sendCmd(sock, "done");
 	return status;
 }
