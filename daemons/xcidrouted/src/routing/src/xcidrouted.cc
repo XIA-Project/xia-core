@@ -713,10 +713,10 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		// 		if current router have the local CIDs, same brocast message does not
 		// 		even pass through during route addition.
 		// 	b) local CIDs don't exists during the route addition but added later on:
-		// 		if current router have the local CIDs, it must have been broadcast 
-		// 		already AND it is shorter than CID routes from other routers through 
-		// 		this router. So routers receiving the broadcast have a shorter routes
-		// 		already
+		// 		if current router have the local CIDs, it must have been broadcasted 
+		// 		already AND broadcast is reliable and in-order AND it is shorter 
+		// 		than CID routes from other routers through this router. So routers 
+		// 		receiving the broadcast don't have routes in the deletion message.
 
 		if(routeState.localCIDs.find(*it) == routeState.localCIDs.end()){			
 			advertiseDeletion.insert(*it);
