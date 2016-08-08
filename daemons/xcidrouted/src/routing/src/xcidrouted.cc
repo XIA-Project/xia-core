@@ -1,13 +1,18 @@
 #include "xcidrouted.h"
 
+//#define LOG
+
 using namespace std;
 
 static char *ident = NULL;
 static char* hostname = NULL;
 
 static XIARouter xr;
-//static Logger* logger;
 static RouteState routeState;
+
+#ifdef LOG
+static Logger* logger;
+#endif
 
 HelloMessage::HelloMessage(){};
 HelloMessage::~HelloMessage(){};
@@ -250,8 +255,10 @@ int AdvertisementMessage::send(int sock){
 	printf("sending CID advertisement:\n");
 	print();
 
-	//string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	//logger->log(logStr.c_str());
+#ifdef LOG
+	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	logger->log(logStr.c_str());
+#endif
 
 	printf("sent CID advertisement\n");
 
@@ -306,9 +313,11 @@ int AdvertisementMessage::recv(int sock){
 	deserialize(data);
 	print();
 
+#ifdef LOG
 	// log the number of advertised CIDs received.
-	//string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	//logger->log(logStr.c_str());
+	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	logger->log(logStr.c_str());
+#endif
 
 	printf("received CID advertisement\n");
 
@@ -366,8 +375,10 @@ void config(int argc, char** argv) {
 }
 
 void cleanup(int) {
-	//logger->end();
-	//delete logger;
+#ifdef LOG
+	logger->end();
+	delete logger;
+#endif
 
 	routeState.mtx.lock();
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
@@ -477,9 +488,11 @@ void advertiseCIDs(){
 	routeState.localCIDs = currLocalCIDs;
 	routeState.mtx.unlock();
 
+#ifdef LOG
 	//log the number of advertised CIDs received.
-	//string logStr = "local " + to_string(currLocalCIDs.size());
-	//logger->log(logStr.c_str());
+	string logStr = "local " + to_string(currLocalCIDs.size());
+	logger->log(logStr.c_str());
+#endif
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
@@ -785,7 +798,10 @@ int main(int argc, char *argv[]) {
 
 	initRouteState();
    	registerReceiver();
-   	//logger = new Logger(hostname);
+
+#ifdef LOG
+   	logger = new Logger(hostname);
+#endif
 
 	// broadcast hello first
    	HelloMessage msg;
