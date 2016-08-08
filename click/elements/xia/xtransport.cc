@@ -1116,6 +1116,8 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
+
+	// FIXME: why are these different??
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
@@ -1130,10 +1132,20 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	if ((handler = XIDpairToSock.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the normal case");
+
+		// FIXME: is this ok?
+		// switch over to use the DAG given to us by the other end
+		handler->dst_path = src_path;
+
 		((XStream *)handler) -> push(p_in);
 	} else if ((handler = XIDpairToConnectPending.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the second case");
+
+		// FIXME: is this ok?
+		// switch over to use the DAG given to us by the other end
+		handler->dst_path = src_path;
+
 		((XStream *)handler) -> push(p_in);
 	}
 	else {
@@ -1168,6 +1180,13 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
+
+				// FIXME: is this the right place/right way to do this???
+				// we have received a syn, flatten the dag so all future packets come to us
+				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+					// flatten CID DAG to remove fallback (it it exists) and save in new_sk->src_path
+					dst_path.flatten();
+				}
 
 				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);

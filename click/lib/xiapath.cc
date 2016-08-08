@@ -791,6 +791,14 @@ XIAPath::set_destination_node(handle_t node)
     _dst = node;
 }
 
+bool
+XIAPath::flatten()
+{
+	// if the first edge of the source node points to the intent node,
+	// remove it so the first fallback becomes the primary path
+	return remove_edge(source_node(), destination_node());
+}
+
 int
 XIAPath::compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad)
 {
