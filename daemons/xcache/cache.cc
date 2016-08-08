@@ -189,21 +189,11 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 			download->data = (char *)calloc(ntohl(download->header.length), 1);
 		}
 		memcpy(download->data + offset - sizeof(struct cid_header), payload, payload_len);
-
-		// FIXME: this is a hack to work around the problem with FINs getting eaten
-		// we'll miscalculate the length if any packets are retransmitted
-		download->length += payload_len;
 	}
 
 skip_data:
-	// This should work when we get a FIN, but due to oddities in how
-	// CIDs are transmitted, we may not see one. So look for the following in addition
-	//   download->length > 0 (guards against 0 == 0 test)
-	//   download->length == size of data being sent
-	if ((ntohs(tcp->th_flags) & XTH_FIN) ||
-		(download->length > 0 && (download->length == ntohl(download->header.length)))) {
-
-		/* FIN Received or we have the correct # of bytes */
+	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
+		// FIN Received, cache the chunk
 		std::string *data = new std::string(download->data, ntohl(download->header.length));
 
 		/* FIXME: Verify CID */

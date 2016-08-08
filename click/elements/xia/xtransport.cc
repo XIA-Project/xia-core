@@ -1116,6 +1116,8 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
+
+	// FIXME: why are these different??
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
@@ -1130,10 +1132,20 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	if ((handler = XIDpairToSock.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the normal case");
+
+		// FIXME: is this ok?
+		// switch over to use the DAG given to us by the other end
+		handler->dst_path = src_path;
+
 		((XStream *)handler) -> push(p_in);
 	} else if ((handler = XIDpairToConnectPending.get(xid_pair)) != NULL)
 	{
 		// INFO("We are in the second case");
+
+		// FIXME: is this ok?
+		// switch over to use the DAG given to us by the other end
+		handler->dst_path = src_path;
+
 		((XStream *)handler) -> push(p_in);
 	}
 	else {
@@ -1168,6 +1180,22 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
+
+				// FIXME: is this the right place/right way to do this???
+				// we have received a syn, flatten the dag so all future packets come to us
+				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+					 // we've received a request for a CID which usually contains a fallback
+					 // we need to strip out the direct path to the content and only use the
+					 // AD->HID->CID path.
+					 // Additionally, we may be a router which can service the request, so
+					 // don't just flatten the DAG, but make sure it points to us.
+					 // FIXME: are there any implications for multihoming here?
+					 // FIXME: can we do this without having to convert to strings?
+					String str_local_addr = _local_addr.unparse_re();
+					str_local_addr += " ";
+					str_local_addr += _destination_xid.unparse().c_str();
+					sk->dst_path.parse_re(str_local_addr);
+				}
 
 				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);
@@ -1599,25 +1627,6 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	return NULL;
 }
 
-
-XIAPath XTRANSPORT::alterCIDDstPath(XIAPath dstPath)
-{
-	// FIXME: If the address is not altered, there's a chance that CID packets
-	// of a live download may get diverted to the origin server who does not
-	// know about it
-	//   WHAT DOES THAT MEAN??? And do we need this anymore if it's all ifdef'd out?
-#if 0
-	XID CID(dstPath.xid(dstPath.destination_node()));
-	XIAPath newPath;
-	String dagString(_local_addr.unparse().c_str());
-	dagString += " ";
-	dagString += CID.unparse().c_str();
-
-	std::cout << "FORMED: " << dagString.c_str() << "\n";
-	newPath.parse(dagString);
-#endif
-	return dstPath;
-}
 
 #if 0
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)

@@ -23,7 +23,6 @@ struct cache_download {
 	std::string cid;
 	struct cid_header header;
 	char *data;
-	size_t length;
 };
 
 class xcache_cache {
