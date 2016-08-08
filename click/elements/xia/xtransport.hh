@@ -299,8 +299,6 @@ public:
 	int IfaceFromSIDPath(XIAPath sidPath);
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
-	XIAPath alterCIDDstPath(XIAPath dstPath);
-
 	// modify routing table
 	void addRoute(const XID &sid) {
 		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);

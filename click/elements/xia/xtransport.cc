@@ -1184,8 +1184,17 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				// FIXME: is this the right place/right way to do this???
 				// we have received a syn, flatten the dag so all future packets come to us
 				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-					// flatten CID DAG to remove fallback (it it exists) and save in new_sk->src_path
-					dst_path.flatten();
+					 // we've received a request for a CID which usually contains a fallback
+					 // we need to strip out the direct path to the content and only use the
+					 // AD->HID->CID path.
+					 // Additionally, we may be a router which can service the request, so
+					 // don't just flatten the DAG, but make sure it points to us.
+					 // FIXME: are there any implications for multihoming here?
+					 // FIXME: can we do this without having to convert to strings?
+					String str_local_addr = _local_addr.unparse_re();
+					str_local_addr += " ";
+					str_local_addr += _destination_xid.unparse().c_str();
+					sk->dst_path.parse_re(str_local_addr);
 				}
 
 				// send SYNACK to client
@@ -1618,25 +1627,6 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	return NULL;
 }
 
-
-XIAPath XTRANSPORT::alterCIDDstPath(XIAPath dstPath)
-{
-	// FIXME: If the address is not altered, there's a chance that CID packets
-	// of a live download may get diverted to the origin server who does not
-	// know about it
-	//   WHAT DOES THAT MEAN??? And do we need this anymore if it's all ifdef'd out?
-#if 0
-	XID CID(dstPath.xid(dstPath.destination_node()));
-	XIAPath newPath;
-	String dagString(_local_addr.unparse().c_str());
-	dagString += " ";
-	dagString += CID.unparse().c_str();
-
-	std::cout << "FORMED: " << dagString.c_str() << "\n";
-	newPath.parse(dagString);
-#endif
-	return dstPath;
-}
 
 #if 0
 void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
