@@ -438,7 +438,7 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 
 void CIDAdvertiseTimer(){
 	thread([](){
-    	// sleep for 10 seconds for hello message to propagate
+    	// sleep for INIT_WAIT_TIME_SEC seconds for hello message to propagate
 		this_thread::sleep_for(chrono::seconds(INIT_WAIT_TIME_SEC));
         while (true)
         {
