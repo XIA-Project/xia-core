@@ -6,7 +6,7 @@ static char *ident = NULL;
 static char* hostname = NULL;
 
 static XIARouter xr;
-static Logger* logger;
+//static Logger* logger;
 static RouteState routeState;
 
 HelloMessage::HelloMessage(){};
@@ -223,8 +223,8 @@ int AdvertisementMessage::send(int sock){
 	string advertisement = serialize();
 	int sent = -1;
 	size_t remaining = strlen(advertisement.c_str()), offset = 0;
-	size_t length = htonl(remaining);
 	char start[remaining];
+	size_t length = htonl(remaining);
 	strcpy(start, advertisement.c_str());
 
 	// first send the size of the message
@@ -250,8 +250,8 @@ int AdvertisementMessage::send(int sock){
 	printf("sending CID advertisement:\n");
 	print();
 
-	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	logger->log(logStr.c_str());
+	//string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	//logger->log(logStr.c_str());
 
 	printf("sent CID advertisement\n");
 
@@ -292,12 +292,12 @@ int AdvertisementMessage::recv(int sock){
 		data += temp;
 	}
 
-	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
 	if(data.size() == 0){
 		return -1;
 	}
 
 	printf("received a raw advertisement message:\n");
+	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
 	for(int i = 0; i < (int)data.size(); i++){
 		printf("%c", data[i]);
 	}
@@ -307,8 +307,8 @@ int AdvertisementMessage::recv(int sock){
 	print();
 
 	// log the number of advertised CIDs received.
-	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	logger->log(logStr.c_str());
+	//string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
+	//logger->log(logStr.c_str());
 
 	printf("received CID advertisement\n");
 
@@ -366,8 +366,8 @@ void config(int argc, char** argv) {
 }
 
 void cleanup(int) {
-	logger->end();
-	delete logger;
+	//logger->end();
+	//delete logger;
 
 	routeState.mtx.lock();
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
@@ -477,9 +477,9 @@ void advertiseCIDs(){
 	routeState.localCIDs = currLocalCIDs;
 	routeState.mtx.unlock();
 
-	// log the number of advertised CIDs received.
-	string logStr = "local " + to_string(currLocalCIDs.size());
-	logger->log(logStr.c_str());
+	//log the number of advertised CIDs received.
+	//string logStr = "local " + to_string(currLocalCIDs.size());
+	//logger->log(logStr.c_str());
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
@@ -693,6 +693,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 
 	routeState.mtx.lock();
+
+	set<string> advertiseDeletion;
 	// remove the entries that need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
@@ -703,6 +705,21 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 				routeState.CIDRoutes.erase(*it);
 				xr.delRouteCIDRouting(*it);
 			}
+		}
+
+		// only send the delete message if current router don't have local CIDs.
+		// since
+		// 	a) local CIDs also exists during route addition of current broadcast message:
+		// 		if current router have the local CIDs, same brocast message does not
+		// 		even pass through during route addition.
+		// 	b) local CIDs don't exists during the route addition but added later on:
+		// 		if current router have the local CIDs, it must have been broadcast 
+		// 		already AND it is shorter than CID routes from other routers through 
+		// 		this router. So routers receiving the broadcast have a shorter routes
+		// 		already
+
+		if(routeState.localCIDs.find(*it) == routeState.localCIDs.end()){			
+			advertiseDeletion.insert(*it);
 		}
 	}
 
@@ -738,13 +755,15 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		msg2Others.ttl = msg.ttl - 1;
 		msg2Others.distance = msg.distance + 1;
 		msg2Others.newCIDs = advertiseAddition;
-		msg2Others.delCIDs = msg.delCIDs;
+		msg2Others.delCIDs = advertiseDeletion;
 
+		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.HID != neighbor.HID){
 				msg2Others.send(it->second.sendSock);
 			}
 		}
+		routeState.mtx.unlock();
 	}
 }
 
@@ -766,7 +785,7 @@ int main(int argc, char *argv[]) {
 
 	initRouteState();
    	registerReceiver();
-   	logger = new Logger(hostname);
+   	//logger = new Logger(hostname);
 
 	// broadcast hello first
    	HelloMessage msg;
