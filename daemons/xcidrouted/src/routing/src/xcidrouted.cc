@@ -279,6 +279,11 @@ int AdvertisementMessage::recv(int sock){
 		return n;
 	}
 
+	if(remaining <= 0){
+		printf("received size have invalid size. Exit\n");
+		cleanup(0);
+	}
+
 	remaining = ntohl(remaining);
 	size = remaining;
 
@@ -299,8 +304,9 @@ int AdvertisementMessage::recv(int sock){
 		data += temp;
 	}
 
-	if(data.size() == 0){
-		return -1;
+	if(data.size() == 0 || data.size() != size){
+		printf("received data have invalid size. Exit\n");
+		cleanup(0);
 	}
 
 	printf("received a raw advertisement message:\n");
