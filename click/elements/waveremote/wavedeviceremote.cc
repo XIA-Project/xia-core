@@ -42,7 +42,6 @@
 
 #define WSMP_MTU 1024 // in theory up to 4096 bytes given 12 bit length field
                       // but arada only supports up to 1400 bytes at the moment
-#define NETJOIN_ETHERTPYE 0x9999 //0x9991
 
 CLICK_DECLS
 
@@ -608,22 +607,9 @@ pthread_mutex_lock(pipeMutex), strerror=%s",
                                 wdrInst->declaration().c_str(), \
                                 strerror(errno));
 
-                        // have a complete packet, write it out on the pipe
-                        int dataLen;
-                        void *dataStart;
-                        
-                        // if its a netjoin packet, we let the RSSI through,
-                        // otherwise strip it
-                        uint16_t *etherType = (uint16_t*) &pktBuf[14];
-                        if (*etherType == NETJOIN_ETHERTPYE){
-                            dataLen = pktLen-2;
-                            dataStart = &pktBuf[2];
-                        } else{
-                            dataLen = pktLen-3;
-                            dataStart = &pktBuf[3];
-                        }
-                        
-                        if (write(pipeFd, dataStart, dataLen) != dataLen)
+                        // write the received data on the pipe
+                        const int dataLen = pktLen-2;
+                        if (write(pipeFd, &pktBuf[2], dataLen) != dataLen)
                             errh->error("%s, receiver_thread(): write(pipeFd), \
 strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
 

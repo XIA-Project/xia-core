@@ -124,18 +124,16 @@ void* receiver_thread(void */*arg*/){
                 assert(rxPkt.data.length < FOURK);
 
                 // copy length
-                uint16_t totalPktLen = rxPkt.data.length+3;
+                uint16_t totalPktLen = rxPkt.data.length+2;
                 const uint16_t totalPktLenNet = htons(totalPktLen);
-
+                
                 memcpy(&rcvBuf[0], &totalPktLenNet, 2);
-                memcpy(&rcvBuf[2], &rxPkt.rssi, 1);
-                // copy data contents
-                memcpy(&rcvBuf[3], &rxPkt.data.contents, rxPkt.data.length);
+                // copy data contents 
+                memcpy(&rcvBuf[2], &rxPkt.data.contents, rxPkt.data.length);
 
 #ifdef DEBUG
                 std::cout << "Received wsm, " << std::dec << rxPkt.data.length \
-                    << " bytes, rssi " << (short) rxPkt.rssi-95 \
-                    << " dBm, from mac: ";
+                << " bytes, from mac: ";
 
                 for (int i=0; i < IEEE80211_ADDR_LEN; i++){
                     const uint8_t byte = rxPkt.macaddr[i];
