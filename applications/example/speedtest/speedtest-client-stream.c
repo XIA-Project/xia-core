@@ -145,6 +145,7 @@ char *randomString(char *buf, int size){
 void *mainLoopThread(void * /*arg*/){
 
 	int ssock;
+    unsigned long nmsgs = 0;
 
     if ((ssock = Xsocket(AF_XIA, XSOCK_STREAM, 0)) < 0){
 		die(-2, "unable to create the server socket\n");
@@ -172,10 +173,11 @@ void *mainLoopThread(void * /*arg*/){
         if ((nsntBytes = Xsend(ssock, sndBuf, pktSize, 0)) < 0){
             die(-4, "Send error %s on socket %d\n", strerror(errno), ssock);
         }
+        nmsgs += 1;
 
         if (verbose){
-            printf("Xsock %4d sent %d of %d bytes\n", ssock, nsntBytes, \
-                pktSize);
+            printf("Xsock %4d sent %d of %d bytes (%u msgs)\n", ssock, \
+                nsntBytes, pktSize, nmsgs);
         }
         usleep(sleepTime);
 	}
