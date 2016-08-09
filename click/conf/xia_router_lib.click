@@ -14,6 +14,32 @@ elementclass XIAToHost {
 	input -> Socket("UDP", 0.0.0.0, 0, SNAPLEN 65536);
 };
 
+elementclass CacheFilter {
+	// Filter packets coming in from the network and if they contain
+	//  CID data, tee the data off to the Xcache daemon as well as
+	// forwarding it on.
+	// CUrrently the filter is only installed in the Router elements, but
+	// can be used in hosts if necessary
+
+	XcacheSock::Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true, SNAPLEN 65536);
+	srcCidClassifier::XIAXIDTypeClassifier(src CID, -);
+	cidFilter::XIACidFilter();
+
+	input -> srcCidClassifier;
+
+	// just send non CID packets on
+	srcCidClassifier[1] -> output;
+
+	// All source CID packets are considered for caching. So,
+	// sending one copy of CID out
+	srcCidClassifier[0] -> cidFork::Tee(2) -> output;
+	// And the other to CIDfilter
+	cidFork[1]->[1]cidFilter;
+
+	// there is no useful info from xcache to the filter, we can remove this linkage at some point
+	XcacheSock -> cidFilter -> XcacheSock;
+};
+
 elementclass GenericPostRouteProc {
 	// output[0]: forward (decremented)
 	// output[1]: hop limit reached (should send back a TTL expry packet)
@@ -115,26 +141,11 @@ elementclass RouteEngine {
 	// output[2]: arrived at destination node; go to cache
 
 	proc :: XIAPacketRoute($num_ports);
-	srcCidClassifier::XIAXIDTypeClassifier(src CID, -);
-	cidFilter::XIACidFilter();
 
 	input[0] -> proc;
 	input[1] -> proc;
 
-	proc[0] -> srcCidClassifier;
-	// All the non-CID packets are forwarded to other interface
-	srcCidClassifier[1] -> [0]output;
-
-	// All source CID packets are considered for caching. So,
-	// sending one copy of CID to other interface
-	srcCidClassifier[0] -> cidFork::Tee(2) -> [0]output;
-	// And the other to CIDfilter
-	cidFork[1]->[1]cidFilter;
-
-	// there is no useful info from xcache to the filter, we canremove this linkage at some point
-	XcacheSock :: Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true, SNAPLEN 65536);
-	XcacheSock -> cidFilter -> XcacheSock;
-
+	proc[0] -> [0]output;
 	proc[1] -> [1]output;  // To RPC / Application
 
 	proc[2] -> XIAPaint($UNREACHABLE) -> x::XCMP() -> proc;
@@ -349,7 +360,7 @@ elementclass XIARouter2Port {
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
 
 	input => xlc0, xlc1 => output;
-	xrc -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
+	xrc -> CacheFilter -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
 };
 
 // 4-port router node
@@ -376,7 +387,7 @@ elementclass XIARouter4Port {
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
 
 	input => xlc0, xlc1, xlc2, xlc3 => output;
-	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+	xrc -> CacheFilter -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
 	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
 	XIAFromHost(9882) -> [1]xianetjoin[1] -> XIAToHost(9882);
@@ -432,7 +443,7 @@ elementclass XIADualRouter4Port {
 	dlc3 :: XIADualLineCard($mac3, 3, $ip3, $gw3, $ip_active3, 0, 0);
 
     input => dlc0, dlc1, dlc2, dlc3 => output;
-	xrc -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
+	xrc -> CacheFilter -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
 };
 
 // endhost node with sockets
