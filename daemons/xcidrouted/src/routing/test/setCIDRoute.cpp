@@ -67,8 +67,9 @@ int main(int argc, char *argv[])
 
 	for(int i = 0; i < (int)cids.size(); i++){
 		if(!local){
-			string cid = split_string_on_delimiter((char*)cids[i].c_str(), "-")[0];
-			string hid = split_string_on_delimiter((char*)cids[i].c_str(), "-")[1];
+			vector<string> curr = split_string_on_delimiter((char*)cids[i].c_str(), "-");
+			string cid = curr[0];
+			string hid = curr[1];
 			int port = interfaceNumber("HID", hid);
 
 			printf("setting route cid: %s nexthop: %s port: %d\n", cid.c_str(), hid.c_str(), port);
