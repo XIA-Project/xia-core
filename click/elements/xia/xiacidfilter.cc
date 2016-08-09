@@ -34,7 +34,7 @@ void XIACidFilter::handleNetworkPacket(Packet *p)
 {
 	WritablePacket *pIn = p->uniqueify();
 
-	INFO("CID FILTER sending content packet to xcache\n");
+	DBG("CID FILTER sending content packet to xcache\n");
 	checked_output_push(PORT_OUT_XCACHE, pIn);
 }
 
