@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	}
 
 	for(int i = 0; i < (int)cids.size(); i++){
-		if(!local){
+		if(!local && !del){
 			vector<string> curr = split_string_on_delimiter((char*)cids[i].c_str(), "-");
 			string cid = curr[0];
 			string hid = curr[1];
@@ -79,13 +79,11 @@ int main(int argc, char *argv[])
 			printf("setting route cid: %s nexthop: %s port: %d\n", cid.c_str(), hid.c_str(), port);
 			rc = xr.setRoute(cid, port, hid, 0xffff);
 			printf("status code %d error message %s\n", rc, xr.cserror());
-		} else {
+		} else if (local && !del) {
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
 			printf("status code %d error message %s\n", rc, xr.cserror());
-		}
-
-		if(del){
+		} else if (del){
 			printf("deleting route: %s\n", cids[i].c_str());
 			rc = xr.delRoute(cids[i]);
 			printf("status code %d error message %s\n", rc, xr.cserror());
