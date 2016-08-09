@@ -28,7 +28,7 @@ int main(int argc, char *argv[]){
 	}
 
 	Graph g(addrs);
-	say("CID dag: %s\n", g.dag_string().c_str());
+	printf("CID dag: %s\n", g.dag_string().c_str());
 
 	while(1){};
 	return 0;
