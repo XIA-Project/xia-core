@@ -41,6 +41,8 @@ int interfaceNumber(string xidType, string xid) {
 			}
 		}
 	}
+
+	printf("rc: %d\n", rc);
 	return -1;
 }
 
