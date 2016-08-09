@@ -8,7 +8,7 @@ DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARoute
 
 CFLAGS+=-g -I$(DAEMONS_COMMON_INCLUDE)
 LDFLAGS+=$(LIBS) -lprotobuf -lpthread -lm
-TARGETS= daemons_common configureLocalCIDs setCIDRoute
+TARGETS= daemons_common setCIDRoute putChunk.cpp
 
 all: $(TARGETS)
 
@@ -39,6 +39,13 @@ setCIDRoute.o: setCIDRoute.cpp
 setCIDRoute: setCIDRoute.o
 	$(CC) -o setCIDRoute setCIDRoute.o csclient.o XIARouter.o $(LDFLAGS) -std=c++11
 
+putChunk.o: putChunk.cpp
+	$(CC) $(CFLAGS) -c putChunk.cpp -std=c++11
+
+putChunk: putChunk.o
+	$(CC) -o putChunk putChunk.o csclient.o XIARouter.o $(LDFLAGS) -std=c++11
+
+
 clean:
-	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute
+	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute putChunk
 	rm -f *.o
