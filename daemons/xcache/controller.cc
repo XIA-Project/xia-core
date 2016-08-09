@@ -153,7 +153,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			syslog(LOG_WARNING, "Xrecv returned 0");
 			break;
 		}
-		syslog(LOG_INFO, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+		syslog(LOG_DEBUG, "recvd = %d, to_recv = %d\n", recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);
@@ -587,7 +587,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	remaining = sizeof(header);
 	offset = 0;
 
-	syslog(LOG_INFO, "Header Send Start\n");
+	syslog(LOG_DEBUG, "Header Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
@@ -598,19 +598,19 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
-		syslog(LOG_INFO, "Header Send Remaining %lu\n", remaining);
+		syslog(LOG_DEBUG, "Header Send Remaining %lu\n", remaining);
 
 	}
 
 	remaining = resp.data().length();
 	offset = 0;
 
-	syslog(LOG_INFO, "Content Send Start\n");
+	syslog(LOG_DEBUG, "Content Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
-		syslog(LOG_INFO, "Sent = %d\n", sent);
+		syslog(LOG_DEBUG, "Sent = %d\n", sent);
 		if (sent < 0) {
 			syslog(LOG_ALERT, "Receiver Closed the connection: %s", strerror(errno));
 			assert(0);
@@ -618,9 +618,9 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
-		syslog(LOG_INFO, "Content Send Remaining %lu\n", remaining);
+		syslog(LOG_DEBUG, "Content Send Remaining %lu\n", remaining);
 	}
-	syslog(LOG_INFO, "Send Done\n");
+	syslog(LOG_DEBUG, "Send Done\n");
 
 }
 

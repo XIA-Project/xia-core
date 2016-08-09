@@ -232,7 +232,7 @@ void *xcache_cache::run(void *arg)
 	}
 
 	do {
-		syslog(LOG_NOTICE, "Cache listening for data on port %d\n", args->cache_out_port);
+		syslog(LOG_DEBUG, "Cache listening for data on port %d\n", args->cache_out_port);
 		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, (struct sockaddr *)&fromaddr, &len);
 		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
