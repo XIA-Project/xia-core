@@ -43,7 +43,7 @@ putChunk.o: putChunk.cpp
 	$(CC) $(CFLAGS) -c putChunk.cpp -std=c++11
 
 putChunk: putChunk.o
-	$(CC) -o putChunk putChunk.o csclient.o XIARouter.o $(LDFLAGS) -std=c++11
+	$(CC) -o putChunk putChunk.o $(LDFLAGS) -std=c++11
 
 clean:
 	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute putChunk

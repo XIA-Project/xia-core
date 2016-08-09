@@ -2,11 +2,11 @@
 #include <vector>
 #include <iostream>
 #include <thread>
+#include "xcache.h"
 #include "Xkeys.h"
 #include "Xsocket.h"
 #include "dagaddr.h"
 #include "dagaddr.hpp"
-#include "XIARouter.hh"
 
 #define MB(__mb) (KB(__mb) * 1024)
 #define KB(__kb) ((__kb) * 1024)
@@ -20,10 +20,13 @@ int main(int argc, char *argv[]){
 		exit(-1);
 	}
 
+	XcacheHandle xcache;
+	XcacheHandleInit(&xcache);
+
 	int count;
 	sockaddr_x *addrs = NULL;
 	if ((count = XputFile(&xcache, argv[1], CHUNKSIZE, &addrs)) < 0) {
-		warn("unable to serve the file: %s\n", argv[1]);
+		printf("unable to serve the file: %s\n", argv[1]);
 		exit(-1);
 	}
 
