@@ -49,7 +49,6 @@ int interfaceNumber(string xidType, string xid) {
 int main(int argc, char *argv[])
 {
 	int rc;
-	XIARouter xr;
 
 	if(argc < 3 || argc > 4){
 		printf("invalid argument \n");
@@ -76,7 +75,7 @@ int main(int argc, char *argv[])
 			int port = interfaceNumber("HID", hid);
 
 			printf("setting route cid: %s nexthop: %s port: %d\n", cid.c_str(), hid.c_str(), port);
-			rc = xr.setRouteCIDRouting(cid, port, hid, 0xffff);
+			rc = xr.setRoute(cid, port, hid, 0xffff);
 			printf("status code %d error message %s\n", rc, xr.cserror());
 		} else {
 			printf("setting route localhost: %s\n", cids[i].c_str());
