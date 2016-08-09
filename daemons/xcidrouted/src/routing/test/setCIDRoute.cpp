@@ -42,7 +42,7 @@ int interfaceNumber(string xidType, string xid) {
 		}
 	}
 
-	printf("rc: %d\n", rc);
+	printf("rc: %d error message: %s\n", rc, xr.cserror());
 	return -1;
 }
 
