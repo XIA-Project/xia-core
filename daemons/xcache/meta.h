@@ -32,7 +32,7 @@ private:
 
 	xcache_content_store *store;
 	std::string cid;
-
+	std::string sid;
 public:
 	/**
 	 * A Constructor.
@@ -46,6 +46,14 @@ public:
 
 	uint32_t seq() {
 		return initial_seq;
+	}
+
+	void set_dest_sid(std::string _sid) {
+		sid = _sid;
+	}
+
+	std::string dest_sid() {
+		return sid;
 	}
 
 	/**
