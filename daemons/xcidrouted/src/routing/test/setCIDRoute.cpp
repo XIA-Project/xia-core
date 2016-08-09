@@ -11,6 +11,7 @@
 using namespace std;
 
 static bool local = false;
+static bool del = false;
 static vector<string> cids;
 
 static XIARouter xr;
@@ -52,10 +53,11 @@ int main(int argc, char *argv[])
 
 	if(argc < 3 || argc > 4){
 		printf("invalid argument \n");
-		printf("./setCIDRoute hostname CID1-HID1,CID2-HID2 [local]\n");
+		printf("./setCIDRoute hostname CID1-HID1,CID2-HID2 [local|del] \n");
 		exit(-1);
 	} else if (argc == 4){
 		local = !strcmp(argv[3], "local");
+		del = !strcmp(argv[3], "del");
 	}
 
 	cids = split_string_on_delimiter(argv[2], ",");
@@ -80,6 +82,12 @@ int main(int argc, char *argv[])
 		} else {
 			printf("setting route localhost: %s\n", cids[i].c_str());
 			rc = xr.setRouteCIDRouting(cids[i], DESTINED_FOR_LOCALHOST, "", 0);
+			printf("status code %d error message %s\n", rc, xr.cserror());
+		}
+
+		if(del){
+			printf("deleting route: %s\n", cids[i].c_str());
+			rc = xr.delRoute(cids[i]);
 			printf("status code %d error message %s\n", rc, xr.cserror());
 		}
 	}
