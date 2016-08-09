@@ -35,6 +35,7 @@ int interfaceNumber(string xidType, string xid) {
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
+			printf("r.xid: %s xid: %s\n", r.xid.c_str(), xid.c_str());
 			if ((r.xid).compare(xid) == 0) {
 				return (int)(r.port);
 			}
