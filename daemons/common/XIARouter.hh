@@ -14,6 +14,8 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
+#ifndef _XIARouter_hh
+#define _XIARouter_hh
 
 #include <string>
 #include <vector>
@@ -57,7 +59,7 @@ typedef struct {
 
 class XIARouter {
 public:
-	XIARouter(const char *_rtr = "router0") { _connected = false; 
+	XIARouter(const char *_rtr = "router0") { _connected = false;
 		_cserr = ControlSocketClient::no_err; _router = _rtr; };
 	~XIARouter() { if (connected()) close(); };
 
@@ -99,3 +101,4 @@ private:
 	string itoa(signed);
 };
 
+#endif
