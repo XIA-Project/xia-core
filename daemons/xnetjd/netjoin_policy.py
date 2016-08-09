@@ -6,6 +6,7 @@ import hashlib
 import networkx
 import ndap_pb2
 from netjoin_beacon import NetjoinBeacon
+from netjoin_affinity import NetjoinAffinity
 from google.protobuf import text_format as protobuf_text_format
 
 class NetjoinPolicy:
@@ -18,6 +19,10 @@ class NetjoinPolicy:
         # Beacons seen before. One set for each policy instance
         # (beacon_ID, iface) = <current state>
         self.known_beacons = {}
+
+        # Affinity to each beacon on a given interface
+        self.affinity = NetjoinAffinity()
+        self.affinity.periodic_decrement()
 
         #TODO Load list of available auth providers from config file
         #TODO Load list of XIP networks we can join?
@@ -137,6 +142,12 @@ class NetjoinPolicy:
             return True
         return False
 
+    def currently_joined_to(self, interface):
+        for ((beacon_id, iface), state) in self.known_beacons.items():
+            if iface == interface and state == self.JOINED:
+                return beacon_id
+        return None
+
     # Main entry point for the policy module
     def join_sender_of_beacon(self, beacon, iface):
         join_network = False
@@ -148,6 +159,21 @@ class NetjoinPolicy:
 
         # Retrieve ID of beacon so we can test against known beacons
         beacon_ID = beacon.get_ID()
+
+        # Irrespective of decision on beacon, update its affinity
+        self.affinity.update(beacon_ID, iface)
+
+        # Are we currently joined to another network on this interface?
+        # TODO: We should do this check after ensuring new beacon is joinable
+        old_beacon = self.currently_joined_to(iface)
+        if old_beacon:
+            oldtuple = (old_beacon, iface)
+            newtuple = (beacon_ID, iface)
+            if not self.affinity.prefer_over(newtuple, oldtuple):
+                return False
+            else:
+                # TODO: end existing session: it notifies existing router also
+                pass
 
         # If this beacon has been processed before, drop it
         if self.is_known_beacon_id(beacon_ID, iface):
