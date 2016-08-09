@@ -36,6 +36,8 @@ int main(int argc, char *argv[]){
 	sockaddr_x addr;
 	Graph g = cid2addr(argv[1], argv[2], argv[3]);
 	g.fill_sockaddr(&addr);
+	printf("dag: %s\n", g.dag_string().c_str());
+
 
 	XcacheHandle xcache;
 	XcacheHandleInit(&xcache);
