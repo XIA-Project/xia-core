@@ -5,7 +5,7 @@ VPATH=../common
 
 XCACHE=$(BINDIR)/xcache
 
-SOURCES=xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
+SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 	XIARouter.cc csclient.cc
 OBJS=xcache_cache_click.proto $(SOURCES:.cc=.o)
 
@@ -23,4 +23,3 @@ xcache_cache_click.pb.cc: xcache_cache_click.proto
 clean:
 	@-rm *.pb.*
 	@-rm $(XCACHE)
-

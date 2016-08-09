@@ -196,14 +196,19 @@ skip_data:
 		// FIN Received, cache the chunk
 		std::string *data = new std::string(download->data, ntohl(download->header.length));
 
-		/* FIXME: Verify CID */
+		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
+			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
 
-		ctrl->__store(NULL, meta, data);
-		/* Perform cleanup */
-		delete data;
-		ongoing_downloads.erase(iter);
-		free(download->data);
-		free(download);
+			ctrl->__store(NULL, meta, data);
+
+			/* Perform cleanup */
+			delete data;
+			ongoing_downloads.erase(iter);
+			free(download->data);
+			free(download);
+		} else {
+			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
+		}
 	}
 }
 
