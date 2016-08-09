@@ -99,7 +99,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	char *payload = (char *)tcp + tcp->th_off * 4;
 	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
 
-	syslog(LOG_INFO, "%s Payload length = %d\n", cid.c_str(), payload_len);
+	syslog(LOG_DEBUG, "%s Payload length = %d\n", cid.c_str(), payload_len);
 
 	meta = ctrl->acquire_meta(cid);
 
