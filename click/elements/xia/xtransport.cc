@@ -1181,21 +1181,26 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
-				// FIXME: is this the right place/right way to do this???
-				// we have received a syn, flatten the dag so all future packets come to us
-				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-					 // we've received a request for a CID which usually contains a fallback
-					 // we need to strip out the direct path to the content and only use the
-					 // AD->HID->CID path.
-					 // Additionally, we may be a router which can service the request, so
-					 // don't just flatten the DAG, but make sure it points to us.
-					 // FIXME: are there any implications for multihoming here?
-					 // FIXME: can we do this without having to convert to strings?
+				/*
+				// we have received a syn for CID,
+				if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+				 	// but there is no DESTINED_FOR_LOCAL_HOST route for the destination CID, 
+				 	// which means the CID is evicted, flatten the destination DAG.
+				 	// 
+					// we've received a request for a CID which usually contains a fallback
+					// we need to strip out the direct path to the content and only use the
+					// AD->HID->CID path.
+
+					// Additionally, we may be a router which can service the request, so
+					// don't just flatten the DAG, but make sure it points to us.
+					// FIXME: are there any implications for multihoming here?
+					// FIXME: can we do this without having to convert to strings?
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
 					str_local_addr += _destination_xid.unparse().c_str();
 					sk->dst_path.parse_re(str_local_addr);
 				}
+				 */
 
 				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);
