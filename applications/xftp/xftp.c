@@ -34,7 +34,7 @@
 #define VERSION "v1.0"
 #define TITLE "XIA Basic FTP client"
 #define NAME "www_s.basicftp.aaa.xia"
-#define CHUNKSIZE 1024
+#define MAX_CHUNKSIZE 10000000
 #define REREQUEST 3
 
 #define NUM_CHUNKS	1
@@ -170,11 +170,11 @@ int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid
 int getListedChunks(FILE *fd, char *url)
 {
 	char *saveptr, *token;
+	char *buf = (char*)malloc(MAX_CHUNKSIZE);
 
 	printf("Received url = %s\n", url);
 	token = strtok_r(url, " ", &saveptr);
 	while(token) {
-		char buf[1024 * 1024];
 		int ret;
 		sockaddr_x addr;
 		printf("Calling XgetChunk\n");
@@ -187,7 +187,7 @@ int getListedChunks(FILE *fd, char *url)
 		g.print_graph();
 		printf("------------------------\n");
 
-		if ((ret = XfetchChunk(&h, buf, 1024 * 1024, XCF_BLOCK, &addr,
+		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr,
 				       sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
@@ -197,6 +197,7 @@ int getListedChunks(FILE *fd, char *url)
 		token = strtok_r(NULL, " ", &saveptr);
 	}
 
+	free(buf);
 	return 0;
 }
 
