@@ -14,7 +14,7 @@ class NetjoinL2Handler(object):
     l2_type_info = {
             LayerTwoIdentifier.ETHERNET:L2Info(rate=0.1, iterations=50),
             LayerTwoIdentifier.WIFI    :L2Info(rate=0.1, iterations=5),
-            LayerTwoIdentifier.DSRC    :L2Info(rate=0.2, iterations=3),
+            LayerTwoIdentifier.DSRC    :L2Info(rate=0.2, iterations=50),
             }
 
     # Table to convert string type to LayerTwoIdentifier.l2_type

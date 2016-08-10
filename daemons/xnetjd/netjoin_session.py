@@ -130,6 +130,8 @@ class NetjoinSession(threading.Thread):
 
         if l2_type == LayerTwoIdentifier.ETHERNET:
             l2_handler = NetjoinEthernetHandler()
+        elif l2_type == LayerTwoIdentifier.DSRC:
+            l2_handler = NetjoinDSRCHandler()
         else:
             logging.error("Invalid l2_type: {}".format(l2_type))
 
