@@ -135,7 +135,7 @@ public:
 			this->tail = ptr->prev;
 		}
 
-		this->size -= sizeof(meta);
+		this->size -= meta->get_length();
 		meta2Node.erase(meta);
 		delete ptr;
 
