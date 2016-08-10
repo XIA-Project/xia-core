@@ -464,7 +464,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 int xcache_controller::__store_policy(xcache_meta *meta)
 {
 	int status = policy->get(meta);
-	// get failed, meta new so store
+	// get failed, meta new so store it
 	if(status == -1){
 		status = policy->store(meta);
 		// don't have enough capacity, return failure
@@ -472,14 +472,13 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 			return -1;
 		}
 
-		// else got the evicted meta
+		// else got the evicted meta, if any
 		xcache_meta* evicted = policy->evict();
 		if(evicted){
 			evicted->lock();
 			// already have the lock to meta_map so it's ok to just delete here
-			meta_map.erase(evicted->get_cid());
 			unregister_meta(evicted);
-
+			meta_map.erase(evicted->get_cid());
 			evicted->unlock();
 		}
 	}
