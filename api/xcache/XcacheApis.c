@@ -223,7 +223,7 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 		}
 	}
 
-	fprintf(stderr, "%s: Got a response from server\n", __func__);
+	//fprintf(stderr, "%s: Got a response from server\n", __func__);
 	memcpy(addr, cmd.dag().c_str(), cmd.dag().length());
 
 	//Graph g(addr);
