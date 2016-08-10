@@ -53,6 +53,8 @@ def parse_args():
             help="verbosity on stderr", action="store_true")
     parser.add_argument("-q", "--quiet",
             help="reduced verbosity", action="store_true")
+    parser.add_argument("--layer2",
+            help="layer 2 type", type=str)
     return parser.parse_args()
 
 # Parse arguments and launch necessary threads
@@ -85,8 +87,11 @@ def main():
     announcer = None
     if args.accesspoint:
         logging.debug("Announcing network and listening for join requests")
+        # Determine the Layer2 type for retransmission rate and attempts
+        l2_type = NetjoinL2Handler.l2_str_to_type[args.layer2]
         # Start an auth session for announcer
-        announcer = NetjoinAnnouncer(args.beacon_interval, shutdown_event)
+        announcer = NetjoinAnnouncer(l2_type, args.beacon_interval,
+                shutdown_event)
         announcer.announce()
 
     if args.client:

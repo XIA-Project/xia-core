@@ -39,7 +39,7 @@ class NetjoinAnnouncer(object):
         # Call ourselves from a new thread after some time
         threading.Timer(self.beacon_interval, self.announce).start()
 
-    def __init__(self, beacon_interval, shutdown_event):
+    def __init__(self, l2_type, beacon_interval, shutdown_event):
         self.beacon_interval = beacon_interval
         self.auth = NetjoinAuthsession()
         self.xianetjoin = ("127.0.0.1", 9882)
@@ -51,7 +51,7 @@ class NetjoinAnnouncer(object):
 
         # A beacon object we will send to announce the network
         self.beacon = NetjoinBeacon()
-        self.beacon.initialize(self.auth.get_raw_verify_key())
+        self.beacon.initialize(self.auth.get_raw_verify_key(), l2_type)
 
         # TODO: Find a better place to setup ns_dag in click
         # Inform click about the nameserver dag we will be advertising
