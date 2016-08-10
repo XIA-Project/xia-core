@@ -41,11 +41,11 @@
 
 #define MB(__mb) (KB(__mb) * 1024)
 #define KB(__kb) ((__kb) * 1024)
-#define CHUNKSIZE MB(1)
 #define NUM_CHUNKS	10
 #define REREQUEST 3
 
 int verbose = 1;
+unsigned chunksize = MB(1);
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -139,7 +139,7 @@ void *recvCmd(void *socketid)
 			say("chunking file %s\n", fname);
 
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-			if ((count = XputFile(&xcache, fname, CHUNKSIZE, &addrs)) < 0) {
+			if ((count = XputFile(&xcache, fname, chunksize, &addrs)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
 			} else {
@@ -236,13 +236,14 @@ void *recvCmd(void *socketid)
 }
 
 
-//Just registering the service and openning the necessary sockets
+//Just registering the service and opening the necessary sockets
 int registerReceiver()
 {
 	int sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
+	say("Chunksize == %u\n\n", chunksize);
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
@@ -296,8 +297,30 @@ void *blockingListener(void *socketid)
 	return NULL;
 }
 
-int main()
+void help()
 {
+	printf("usage: xftd [chunksize]\n");
+	printf(" where chunksize >= 100 && chunksize <=5000000\n");
+	exit(1);
+}
+
+int main(int argc, char **argv)
+{
+	if (argc == 2) {
+		if ((chunksize = atoi(argv[1])) != 0) {
+			if (chunksize < 100) {
+				chunksize = 100;
+			} else if (chunksize > 5000000) {
+				chunksize = 5000000;
+			}
+		} else {
+			help();
+		}
+
+	} else if (argc != 1) {
+		help();
+	}
+
 	int sock = registerReceiver();
 
 	blockingListener((void *)&sock);
