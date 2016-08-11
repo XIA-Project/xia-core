@@ -392,6 +392,14 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
             cdns[cname].avg_throughput = (1-AVG_THROUGHPUT_ALPHA)*cdns[cname].avg_throughput
                                 + AVG_THROUGHPUT_ALPHA*curr_throughput;
 
+            // if requests for current CDN reached a threshold, retry others.
+            if(cdns[cname].num_reqs == CDN_TRY_OTHERS_NUM_REQ){
+                for(auto it = cdns.begin(); it != cdns.end(); it++){
+                    if(it->first != cname){
+                        it->second.num_reqs = 0;
+                    }
+                }
+            }
         }
 
         say("size of data: %d\n", len);

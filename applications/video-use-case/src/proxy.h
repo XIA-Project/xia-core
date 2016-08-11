@@ -29,6 +29,9 @@
 #define CONTENT_MANIFEST 0
 #define CONTENT_STREAM 1
 
+// every 15 request on the same CDN, try others.
+#define CDN_TRY_OTHERS_NUM_REQ 15
+
 // if the current throughput is 40% lower than the average for a CDN, then need 
 // to reselect a CDN
 #define CDN_RESELECT_THRESH 0.6
