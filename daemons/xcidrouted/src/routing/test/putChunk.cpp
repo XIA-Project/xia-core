@@ -30,9 +30,11 @@ int main(int argc, char *argv[]){
 		exit(-1);
 	}
 
-	Graph g(addrs);
-	printf("CID dag: %s\n", g.dag_string().c_str());
-
+	for(int i = 0; i < count; i++){
+		Graph g(&addrs[0]);
+		printf("CID dag: %s\n", g.dag_string().c_str());
+	}
+	
 	while(1){};
 	return 0;
 }
