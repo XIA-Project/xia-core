@@ -31,7 +31,7 @@ int main(int argc, char *argv[]){
 	}
 
 	for(int i = 0; i < count; i++){
-		Graph g(&addrs[0]);
+		Graph g(&addrs[i]);
 		printf("CID dag: %s\n", g.dag_string().c_str());
 	}
 	
