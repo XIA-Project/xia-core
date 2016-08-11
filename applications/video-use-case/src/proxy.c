@@ -239,14 +239,6 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
         return -1;
     }
 
-    std::cout << "proxy pick CDN: " << cname << ", host within CDN: " << dagUrls[0] << std::endl;
-
-    for(auto it = cdns.begin(); it != cdns.end(); it++){
-        std::cout << "CDN name: " << it->first << std::endl;
-        std::cout << "\tCDN num requests: " << it->second.num_reqs << std::endl;
-        std::cout << "\tCDN average throughput: " << it->second.avg_throughput << std::endl;
-    }
-
     int numChunks = dagUrls.size();
     sockaddr_x chunkAddresses[numChunks];
     process_urls_to_DAG(dagUrls, chunkAddresses);
@@ -259,6 +251,14 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
     if (forward_chunks_to_client(ctx, chunkAddresses, numChunks, true, cname.c_str(), ctx->remote_host) < 0){
         warn("unable to forward chunks to client\n");
         return -1;
+    }
+
+    std::cout << "proxy pick CDN: " << cname << ", host within CDN: " << dagUrls[0] << std::endl;
+
+    for(auto it = cdns.begin(); it != cdns.end(); it++){
+        std::cout << "CDN name: " << it->first << std::endl;
+        std::cout << "\tCDN num requests: " << it->second.num_reqs << std::endl;
+        std::cout << "\tCDN average throughput: " << it->second.avg_throughput << std::endl;
     }
 
     return 1;
@@ -393,10 +393,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
                                 + AVG_THROUGHPUT_ALPHA*curr_throughput;
 
             // if requests for current CDN reached a threshold, retry others.
-            if(cdns[cname].num_reqs == CDN_TRY_OTHERS_NUM_REQ){
+            if(cdns[cname].num_reqs % CDN_TRY_OTHERS_NUM_REQ == 0){
                 for(auto it = cdns.begin(); it != cdns.end(); it++){
                     if(it->first != cname){
                         it->second.num_reqs = 0;
+                        originCDNCache.erase(origin);
                     }
                 }
             }
