@@ -21,6 +21,7 @@ sys.path.append(conf.get_clickcontrol_path())
 from netjoin_policy import NetjoinPolicy
 from netjoin_receiver import NetjoinReceiver
 from netjoin_announcer import NetjoinAnnouncer
+from netjoin_l2_handler import NetjoinL2Handler
 from netjoin_authsession import NetjoinAuthsession
 
 # Setup logging for this application
