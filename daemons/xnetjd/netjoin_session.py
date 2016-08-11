@@ -13,6 +13,7 @@ from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
+from netjoin_dsrc_handler import NetjoinDSRCHandler
 from netjoin_ethernet_handler import NetjoinEthernetHandler
 from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
