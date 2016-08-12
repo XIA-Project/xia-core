@@ -464,10 +464,16 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::__store_policy(xcache_meta *meta)
 {
+	syslog(LOG_INFO, "store policy for CID: %s\n", meta->get_cid().c_str());
+
 	int status = policy->get(meta);
+	syslog(LOG_INFO, "policy get %d\n", status);
+
 	// get failed, meta new so store it
 	if(status == -1){
 		status = policy->store(meta);
+		syslog(LOG_INFO, "policy store %d\n", status);
+
 		// don't have enough capacity, return failure
 		if(status == -1){
 			return -1;
@@ -477,6 +483,8 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 		xcache_meta* evicted = policy->evict();
 		if(evicted){
 			evicted->lock();
+			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
+
 			// already have the lock to meta_map so it's ok to just delete here
 			unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
@@ -511,7 +519,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
-	meta->set_length(sizeof(data->c_str()));	// size of the data in bytes
+	meta->set_length(data->size());	// size of the data in bytes
+	syslog(LOG_INFO, "store data size: %lu\n", data->size());
 
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
