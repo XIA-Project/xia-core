@@ -20,6 +20,8 @@ static void usage(char *argv[])
 	printf("Usage: %s [OPTIONS]\n", argv[0]);
 	printf("  -h, --host=HOSTNAME       Specify the host on which"
 		   " this daemon should run.\n");
+	printf("  -c, --capacity=CAPACITY       Specify the capacity (in bytes) of the cache"
+		   " this daemon should run.\n");
 	printf("                            Default host = \"host0\"\n");
 	printf("  -V, --version             Displays xcache version.\n");
 	printf("  -l, --log-level=level     Syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
@@ -32,14 +34,14 @@ static void sethostname(struct xcache_conf *conf, char *hostname)
 	strcpy(conf->hostname, hostname);
 }
 
-static void initlogging(std::string  hostname, unsigned level, bool verbose)
+static void initlogging(std::string  hostname, long capacity, unsigned level, bool verbose)
 {
 	unsigned flags = LOG_CONS|LOG_NDELAY;
 
 	if (verbose) {
 		flags |= LOG_PERROR;
 	}
-	sprintf(ident, "xcache:%s", hostname.c_str());
+	sprintf(ident, "xcache:%s (capacity=%ld bytes)", hostname.c_str(), capacity);
 	openlog(ident, flags, LOG_LOCAL4);
 	setlogmask(LOG_UPTO(level));
 
@@ -62,6 +64,7 @@ int main(int argc, char *argv[])
 
 	struct option options[] = {
 		{"host", required_argument, 0, 0},
+		{"capacity", required_argument, 0, 0},
 		{"help", no_argument, 0, 0},
 		{"version", no_argument, 0, 0},
 		{"level", required_argument, 0, 0},
@@ -73,7 +76,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "Vvl:h:t:", options, &option_index);
+		c = getopt_long(argc, argv, "Vvl:h:t:c:", options, &option_index);
 		if(c == -1)
 			break;
 
@@ -82,6 +85,8 @@ int main(int argc, char *argv[])
 			/* long option passed */
 			if (!strcmp(options[option_index].name, "host")) {
 				sethostname(&xcache_conf, optarg);
+			} else if (!strcmp(options[option_index].name, "capacity")) {
+				xcache_conf.capacity = strtol(optarg, NULL, 10);
 			} else if (!strcmp(options[option_index].name, "help")) {
 				usage(argv);
 				return 0;
@@ -117,13 +122,16 @@ int main(int argc, char *argv[])
 		case 't':
 			xcache_conf.threads = strtol(optarg, NULL, 0);
 			break;
+		case 'c':
+			xcache_conf.capacity = strtol(optarg, NULL, 10);
+			break;
 		default:
 			usage(argv);
 			return 1;
 		}
 	}
 
-	initlogging(xcache_conf.hostname, level, verbose);
+	initlogging(xcache_conf.hostname, xcache_conf.capacity, level, verbose);
 
 	ctrl.set_conf(&xcache_conf);
 	ctrl.run();
