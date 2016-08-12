@@ -7,18 +7,15 @@ XCACHE=$(BINDIR)/xcache
 
 SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 	XIARouter.cc csclient.cc
-OBJS=xcache_cache_click.proto $(SOURCES:.cc=.o)
+OBJS=$(SOURCES:.cc=.o)
 
 LDFLAGS+=$(LIBS) -lprotobuf -lcrypto
 CFLAGS+=-I$(APIDIR)/xcache -I ../common -I../../click/include
 
 all:$(XCACHE)
 
-$(XCACHE): xcache_cache_click.pb.cc $(SOURCES)
+$(XCACHE): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
-
-xcache_cache_click.pb.cc: xcache_cache_click.proto
-	protoc --cpp_out=. xcache_cache_click.proto
 
 clean:
 	@-rm *.pb.*
