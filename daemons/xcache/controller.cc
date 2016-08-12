@@ -1057,9 +1057,10 @@ xcache_meta *xcache_controller::acquire_meta(std::string cid)
 
 void xcache_controller::release_meta(xcache_meta *meta)
 {
-	unlock_meta_map();
-	if(meta)
+	if(meta){
 		meta->unlock();
+	}
+	unlock_meta_map();
 }
 
 inline int xcache_controller::lock_meta_map(void)
