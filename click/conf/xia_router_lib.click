@@ -473,8 +473,6 @@ elementclass XIAEndHost {
 	xlc2 :: XIALineCard($mac2, 2, 0, 0);
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
 
-	cf :: CacheFilter;
-
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
