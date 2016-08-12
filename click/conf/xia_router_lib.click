@@ -18,12 +18,16 @@ elementclass CacheFilter {
 	// Filter packets coming in from the network and if they contain
 	//  CID data, tee the data off to the Xcache daemon as well as
 	// forwarding it on.
-	// CUrrently the filter is only installed in the Router elements, but
-	// can be used in hosts if necessary
+	// The filter is not currently used on hosts but can be added if needed.
+	//
+	// the following command on the routers click control port can be
+	//  used to change state
+	//   write <hostname>/cf/cidFilter.enable true|false
 
 	XcacheSock::Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true, SNAPLEN 65536);
 	srcCidClassifier::XIAXIDTypeClassifier(src CID, -);
-	cidFilter::XIACidFilter();
+
+	cidFilter::XIACidFilter(true);	// if false, don't cache
 
 	input -> srcCidClassifier;
 
@@ -358,8 +362,10 @@ elementclass XIARouter2Port {
 	xlc0 :: XIALineCard($mac0, 0, 0, 0);
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
 
+	cf :: CacheFilter;
+
 	input => xlc0, xlc1 => output;
-	xrc -> CacheFilter -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
+	xrc -> cf -> XIAPaintSwitch[0,1] => [1]xlc0[1], [1]xlc1[1]  -> [0]xrc;
 };
 
 // 4-port router node
@@ -384,8 +390,10 @@ elementclass XIARouter4Port {
 	xlc2 :: XIALineCard($mac2, 2, 0, 0);
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
 
+	cf :: CacheFilter;
+
 	input => xlc0, xlc1, xlc2, xlc3 => output;
-	xrc -> CacheFilter -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
+	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
 	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
 	XIAFromHost(9882) -> [1]xianetjoin[1] -> XIAToHost(9882);
@@ -439,8 +447,10 @@ elementclass XIADualRouter4Port {
 	dlc2 :: XIADualLineCard($mac2, 2, $ip2, $gw2, $ip_active2, 0, 0);
 	dlc3 :: XIADualLineCard($mac3, 3, $ip3, $gw3, $ip_active3, 0, 0);
 
+	cf :: CacheFilter;
+
     input => dlc0, dlc1, dlc2, dlc3 => output;
-	xrc -> CacheFilter -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
+	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
 };
 
 // endhost node with sockets
@@ -462,6 +472,8 @@ elementclass XIAEndHost {
 	xlc1 :: XIALineCard($mac1, 1, 0, 0);
 	xlc2 :: XIALineCard($mac2, 2, 0, 0);
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
+
+	cf :: CacheFilter;
 
 	input => xlc0, xlc1, xlc2, xlc3 => output;
 	xrc -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
