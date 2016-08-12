@@ -14,7 +14,12 @@
 #include <errno.h>
 #include "xcache.h"
 
+
+#define MB(__mb) (KB(__mb) * 1024)
+#define KB(__kb) ((__kb) * 1024)
+
 #define DEFAULT_THREADS 2
+#define DEFAULT_CAPACITY KB(62)  // default 62 Kilobytes capacity
 #define MAX_XID_SIZE 100
 
 struct xcache_conf {

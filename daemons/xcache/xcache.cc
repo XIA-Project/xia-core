@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
 	struct xcache_conf xcache_conf;
 
 	xcache_conf.threads = DEFAULT_THREADS;
+	xcache_conf.capacity = DEFAULT_CAPACITY;
 
 	strcpy(xcache_conf.hostname, "router0");
 
