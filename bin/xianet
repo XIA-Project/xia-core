@@ -324,7 +324,7 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --hostname $host &
-			./xcache -h $host $LOG_FLAGS &
+			./xcache -h $host -c 63488 $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")

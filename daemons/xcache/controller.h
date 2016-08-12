@@ -19,13 +19,13 @@
 #define KB(__kb) ((__kb) * 1024)
 
 #define DEFAULT_THREADS 2
-#define DEFAULT_CAPACITY KB(62)  // default 62 Kilobytes capacity
+#define DEFAULT_CAPACITY -1 // default unlimited capacity
 #define MAX_XID_SIZE 100
 
 struct xcache_conf {
 	char hostname[128];
 	int threads;
-	uint64_t capacity;
+	int64_t capacity;
 };
 
 struct xcache_req {
@@ -77,6 +77,7 @@ private:
 	xcache_store_manager store_manager;
 	xcache_cache cache;
 	LruPolicy* policy;
+	int64_t capacity;
 
 	XIARouter xr;
 	int context_id;

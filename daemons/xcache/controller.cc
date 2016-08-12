@@ -464,6 +464,11 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::__store_policy(xcache_meta *meta)
 {
+	// default capacity is unlimited
+	if(capacity == DEFAULT_CAPACITY){
+		return 0;
+	}
+
 	syslog(LOG_INFO, "store policy for CID: %s\n", meta->get_cid().c_str());
 
 	int status = policy->get(meta);
@@ -1079,6 +1084,8 @@ void xcache_controller::set_conf(struct xcache_conf *conf)
 	hostname = std::string(conf->hostname);
 
 	policy = new LruPolicy(conf->capacity);
+	capacity = conf->capacity;
+
 	n_threads = conf->threads;
 	threads = (pthread_t *)malloc(sizeof(pthread_t) * conf->threads);
 }
