@@ -53,12 +53,7 @@ enum {
  * Initializes XcacheHandle.
  */
 int XcacheHandleInit(XcacheHandle *h); //DONE
-// FIXME:guess we need to implement this...
-#ifdef notyet
 int XcacheHandleDestroy(XcacheHandle *h);
-#else
-#define XcacheHandleDestroy(...)
-#endif
 
 
 extern int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *info);  //DONE

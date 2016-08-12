@@ -156,6 +156,21 @@ void XbufFree(XcacheBuf *xbuf)
 	free(xbuf->buf);
 }
 
+int XcacheHandleDestroy(XcacheHandle *h)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_FREE_CONTEXT);
+	cmd.set_context_id(h->contextID);
+	send_command(h->xcacheSock, &cmd);
+
+	//close(h->xcacheSock);
+	//close(h->notifSock);
+
+	return 0;
+}
+
+
 int XcacheHandleInit(XcacheHandle *h)
 {
 	xcache_cmd cmd;

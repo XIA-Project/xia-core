@@ -231,6 +231,7 @@ void *recvCmd(void *socketid)
 	/* if (info) */
 	/* 	XfreeChunkInfo(info); */
 	/* XfreeCacheSlice(ctx); */
+	XcacheHandleDestroy(&xcache);
 	Xclose(sock);
 	pthread_exit(NULL);
 }

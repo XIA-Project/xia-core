@@ -404,7 +404,7 @@ int main(int argc, char **argv)
 //		enable this if you want to limit how many times this is done
 // 		i++;
 
-		if (strncmp(cmd, "get", 3) == 0){
+		if (strncasecmp(cmd, "get", 3) == 0){
 			params = sscanf(cmd,"get %s %s", fin, fout);
 
 			if(params !=2 ){
@@ -415,6 +415,11 @@ int main(int argc, char **argv)
 			}
 
 			getFile(sock, fin, fout);
+
+		} else if (strncasecmp(cmd, "quit", 4) == 0) {
+			XcacheHandleDestroy(&h);
+			Xclose(sock);
+			exit(0);
 		}
 	}
 	return 1;
