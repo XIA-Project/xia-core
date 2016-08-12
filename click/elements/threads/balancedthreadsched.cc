@@ -29,7 +29,7 @@
 #include <click/task.hh>
 #include <click/error.hh>
 
-#define DEBUG 0
+
 #define KEEP_GOOD_ASSIGNMENT 1
 
 
