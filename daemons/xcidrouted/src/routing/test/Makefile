@@ -8,7 +8,7 @@ DAEMONS_COMMON=$(DAEMONS_COMMON_PATH)/csclient.o $(DAEMONS_COMMON_PATH)/XIARoute
 
 CFLAGS+=-g -I$(DAEMONS_COMMON_INCLUDE)
 LDFLAGS+=$(LIBS) -lprotobuf -lpthread -lm
-TARGETS= daemons_common setCIDRoute putChunk requestChunk
+TARGETS= daemons_common removeAfterAdd
 
 all: $(TARGETS)
 
@@ -51,7 +51,12 @@ requestChunk.o: requestChunk.cpp
 requestChunk: requestChunk.o
 	$(CC) -o requestChunk requestChunk.o $(LDFLAGS) -std=c++11
 
+removeAfterAdd.o: removeAfterAdd.cpp
+	$(CC) $(CFLAGS) -c removeAfterAdd.cpp -std=c++11
+
+removeAfterAdd: removeAfterAdd.o
+	$(CC) -o removeAfterAdd removeAfterAdd.o $(LDFLAGS) -std=c++11
 
 clean:
-	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute putChunk requestChunk
+	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute putChunk requestChunk removeAfterAdd
 	rm -f *.o
