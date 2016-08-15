@@ -3,9 +3,6 @@
 
 #include <click/element.hh>
 #include <clicknet/xia.h>
-#if CLICK_USERLEVEL
-#include "../../userlevel/xcache.pb.h"
-#endif
 
 CLICK_DECLS
 
@@ -21,6 +18,8 @@ CLICK_DECLS
 
 class XIACidFilter : public Element {
 private:
+	bool enabled;
+
 public:
 	XIACidFilter();
 	~XIACidFilter();
@@ -31,6 +30,10 @@ public:
 	void push(int port, Packet *);
 	void handleXcachePacket(Packet *p);
 	void handleNetworkPacket(Packet *p);
+
+	void add_handlers();
+	static int toggle(const String &conf, Element *e, void *vparam, ErrorHandler *errh);
+	static String status(Element *e, void *thunk);
 };
 
 CLICK_ENDDECLS

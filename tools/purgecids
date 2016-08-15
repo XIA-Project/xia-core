@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# purge the CID routing table, and delete the associated data in the disk cache
+#
+
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XROUTE=$XIADIR/bin/xroute
+
+for cid in $($XROUTE | grep CID | grep -v default | cut -c11-51); do
+	$XROUTE -r $(hostname),CID,CID:$cid
+	sudo rm /tmp/content/$cid
+done

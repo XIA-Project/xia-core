@@ -18,7 +18,7 @@
 #include "dagaddr.h"
 #include "xcache_sock.h"
 #include "cid.h"
-#include <openssl/sha.h>
+//#include <openssl/sha.h>
 
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
@@ -44,27 +44,6 @@ static int send_response(int fd, const char *buf, size_t len)
 
 	ret = send(fd, buf, len, 0);
 	return ret;
-}
-
-static std::string hex_str(unsigned char *data, int len)
-{
-	char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-			 '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-	std::string s(len * 2, ' ');
-	for (int i = 0; i < len; ++i) {
-		s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
-		s[2 * i + 1] = hexmap[data[i] & 0x0F];
-	}
-	return s;
-}
-
-static std::string compute_cid(const char *data, size_t len)
-{
-	unsigned char digest[SHA_DIGEST_LENGTH];
-
-	SHA1((unsigned char *)data, len, digest);
-
-	return hex_str(digest, SHA_DIGEST_LENGTH);
 }
 
 static int xcache_create_lib_socket(void)
@@ -174,7 +153,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			syslog(LOG_WARNING, "Xrecv returned 0");
 			break;
 		}
-		syslog(LOG_INFO, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+		syslog(LOG_DEBUG, "recvd = %d, to_recv = %d\n", recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);
@@ -399,6 +378,11 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 		ret = alloc_context(resp, cmd);
 		break;
 
+	case xcache_cmd::XCACHE_FREE_CONTEXT:
+		syslog(LOG_INFO, "Freeing context_id %u\n", cmd->context_id());
+		ret = free_context(cmd);
+		break;
+
 	case xcache_cmd::XCACHE_FLAG_DATASOCKET:
 		c = lookup_context(cmd->context_id());
 
@@ -445,10 +429,25 @@ struct xcache_context *xcache_controller::lookup_context(int context_id)
 	}
 }
 
+int xcache_controller::free_context(xcache_cmd *cmd)
+{
+	unsigned id = cmd->context_id();
+	xcache_context *c = context_map[id];
+
+	close(c->notifSock);
+	close(c->xcacheSock);
+
+	context_map.erase(id);
+	free(c);
+	return RET_NORESP;
+}
+
 int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	struct xcache_context *c = (struct xcache_context *)malloc(sizeof(struct xcache_context));
 	IGNORE_PARAM(cmd);
+
+	// FIXME: race condition!
 	++context_id;
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -651,7 +650,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	remaining = sizeof(header);
 	offset = 0;
 
-	syslog(LOG_INFO, "Header Send Start\n");
+	syslog(LOG_DEBUG, "Header Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
@@ -662,19 +661,19 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
-		syslog(LOG_INFO, "Header Send Remaining %lu\n", remaining);
+		syslog(LOG_DEBUG, "Header Send Remaining %lu\n", remaining);
 
 	}
 
 	remaining = resp.data().length();
 	offset = 0;
 
-	syslog(LOG_INFO, "Content Send Start\n");
+	syslog(LOG_DEBUG, "Content Send Start\n");
 
 	while (remaining > 0) {
 		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
-		syslog(LOG_INFO, "Sent = %d\n", sent);
+		syslog(LOG_DEBUG, "Sent = %d\n", sent);
 		if (sent < 0) {
 			syslog(LOG_ALERT, "Receiver Closed the connection: %s", strerror(errno));
 			assert(0);
@@ -682,9 +681,9 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
-		syslog(LOG_INFO, "Content Send Remaining %lu\n", remaining);
+		syslog(LOG_DEBUG, "Content Send Remaining %lu\n", remaining);
 	}
-	syslog(LOG_INFO, "Send Done\n");
+	syslog(LOG_DEBUG, "Send Done\n");
 
 }
 
@@ -970,6 +969,7 @@ repeat:
 		xcache_cmd resp, cmd;
 		int ret;
 		uint32_t msg_length, remaining;
+		bool parse_success = false;
 
 		ret = recv(*iter, &msg_length, sizeof(msg_length), 0);
 		if(ret <= 0)
@@ -977,26 +977,25 @@ repeat:
 
 		remaining = ntohl(msg_length);
 
+		if (remaining == 0)
+			goto next;
+
 		while(remaining > 0) {
 			ret = recv(*iter, buf, MIN(sizeof(buf), remaining), 0);
 			syslog(LOG_DEBUG, "Recv returned %d, remaining = %d\n", ret, remaining);
 			if(ret <= 0)
-				break;
+				goto disconnected;
 
 			buffer.append(buf, ret);
 			remaining -= ret;
 		}
 
-		if(msg_length == 0 && ret <= 0) {
-			goto disconnected;
-		} else {
-			bool parse_success = cmd.ParseFromString(buffer);
+		parse_success = cmd.ParseFromString(buffer);
 
-			syslog(LOG_INFO, "Controller received %lu bytes\n", buffer.length());
-			if(!parse_success) {
-				syslog(LOG_ERR, "Protobuf could not parse\n");
-				goto next;
-			}
+		syslog(LOG_INFO, "Controller received %lu bytes\n", buffer.length());
+		if(!parse_success) {
+			syslog(LOG_ERR, "Protobuf could not parse\n");
+			goto next;
 		}
 
 		/*
@@ -1038,6 +1037,7 @@ next:
 		continue;
 
 disconnected:
+		// FIXME: this should clean up the context somehow
 		syslog(LOG_INFO, "Client %d disconnected.\n", *iter);
 		close(*iter);
 removefd:

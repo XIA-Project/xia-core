@@ -156,6 +156,21 @@ void XbufFree(XcacheBuf *xbuf)
 	free(xbuf->buf);
 }
 
+int XcacheHandleDestroy(XcacheHandle *h)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_FREE_CONTEXT);
+	cmd.set_context_id(h->contextID);
+	send_command(h->xcacheSock, &cmd);
+
+	//close(h->xcacheSock);
+	//close(h->notifSock);
+
+	return 0;
+}
+
+
 int XcacheHandleInit(XcacheHandle *h)
 {
 	xcache_cmd cmd;
@@ -223,7 +238,7 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 		}
 	}
 
-	fprintf(stderr, "%s: Got a response from server\n", __func__);
+	//fprintf(stderr, "%s: Got a response from server\n", __func__);
 	memcpy(addr, cmd.dag().c_str(), cmd.dag().length());
 
 	//Graph g(addr);

@@ -15,13 +15,14 @@ message xcache_cmd {
 		XCACHE_GET_STATUS = 12;
 		XCACHE_READ = 13;
 		XCACHE_SENDCHUNK = 14;
+		XCACHE_FREE_CONTEXT = 15;
 	};
 
 	enum status_type {
 		XCACHE_OK = 1;
 		XCACHE_ERR_EXISTS = 2;
 	};
-  
+
 	required req_type cmd = 1;
 
 	optional int32 context_id = 2;

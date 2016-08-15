@@ -80,7 +80,7 @@ private:
 	int64_t capacity;
 
 	XIARouter xr;
-	int context_id;
+	unsigned context_id;
 
 public:
 	/**
@@ -169,6 +169,9 @@ public:
 	 * Allocate a new context.
 	 */
 	int alloc_context(xcache_cmd *resp, xcache_cmd *cmd);
+
+	// free the context
+	int free_context(xcache_cmd *cmd);
 
 	/**
 	 * Remove content.
