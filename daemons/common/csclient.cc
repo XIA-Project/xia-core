@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <syslog.h>
 #include <stdio.h>
 #include <ctype.h>
 
@@ -250,6 +251,7 @@ ControlSocketClient::read(string el, string handler, char *buf, int &bufsz)
 ControlSocketClient::err_t
 ControlSocketClient::write(string el, string handler, const char *buf, int bufsz)
 {
+  syslog(LOG_DEBUG, "at the beginning of cs write\n");
   check_init();
 
   if (el.size() > 0)
@@ -258,17 +260,23 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
   snprintf(cbuf, sizeof(cbuf), "%d", bufsz);
   string cmd = "WRITEDATA " + handler + " " + cbuf + "\n";
 
+  syslog(LOG_DEBUG, "before write to click with command %s\n", cmd.c_str());
+
   int res = ::write(_fd, cmd.c_str(), cmd.size());
   if (res < 0)
     return sys_err;
   if ((size_t) res != cmd.size())
     return sys_err;
 
+  syslog(LOG_DEBUG, "after write to click before write with actual buf: %s\n", buf);
+
   res = ::write(_fd, buf, bufsz);
   if (res < 0)
     return sys_err;
   if (res != bufsz)
     return sys_err;
+
+  syslog(LOG_DEBUG, "after write to click with buf before readline from click\n");
 
   string cmd_resp;
   string line;
@@ -282,6 +290,8 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
   }
   while (line[3] == '-');
 
+  syslog(LOG_DEBUG, "before getting the response code\n");
+
   int code = get_resp_code(line);
   if (code != CODE_OK && code != CODE_OK_WARN)
     {
@@ -289,6 +299,7 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
     return handle_err_code(code);
     }
 
+  syslog(LOG_DEBUG, "finished all\n");
   return no_err;
 }
 

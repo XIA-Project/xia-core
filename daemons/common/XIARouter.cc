@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <syslog.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <sstream>
@@ -185,8 +186,11 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 	else
 		entry = mutableXID + "," + itoa(port) + "," + next + "," + itoa(flags);
 
-	if ((_cserr = _cs.write(table, cmd, entry)) != 0)
+
+	syslog(LOG_DEBUG, "before cs write in XIARouter\n");
+	if ((_cserr = _cs.write(table, cmd, entry)) != 0){
 		return XR_CLICK_ERROR;
+	}
 	
 	return XR_OK;
 }
