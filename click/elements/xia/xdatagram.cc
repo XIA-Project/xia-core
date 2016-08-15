@@ -77,18 +77,19 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	if (recv_buffer_count > 0 && p) {
 		// get different sized packages depending on socket type
 		// datagram only wants payload
-		// raw wants transport header too
-		// packet wants it all
+		// raw wants all headers
 		XIAHeader xiah(p->xia_header());
-		DatagramHeader dhdr(p);
 		int data_size;
 		String payload;
 
 		switch (sock_type) {
 			case SOCK_DGRAM:
+			{
+				DatagramHeader dhdr(p);
 				data_size = xiah.plen() - dhdr.hlen();
 				payload = String((const char*)dhdr.payload(), data_size);
 				break;
+			}
 
 			case SOCK_RAW:
 			{
@@ -100,9 +101,9 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 				break;
 
 			default:
-			// this should not be possible
-			data_size = 0;
-			break;
+				// this should not be possible
+				data_size = 0;
+				break;
 		}
 
 		// this part is the same for everyone

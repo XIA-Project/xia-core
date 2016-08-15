@@ -205,13 +205,6 @@ public:
 
 	char *random_xid(const char *type, char *buf);
 
-	uint32_t calc_recv_window(sock *sk);
-	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
-	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
-	void check_for_and_handle_pending_recv(sock *sk);
-	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
-	uint32_t next_missing_seqnum(sock *sk);
-
 	bool usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag);
 
 	void ProcessAPIPacket(WritablePacket *p_in);

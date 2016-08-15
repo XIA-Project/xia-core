@@ -279,11 +279,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			p_in->kill();
 			break;
 
-//		case CACHE_PORT:	//Packet from cache
-//			ProcessCachePacket(p_in);
-//			p_in->kill();
-//			break;
-
 		case XHCP_PORT:		//Packet with DHCP information
 			ProcessXhcpPacket(p_in);
 			p_in->kill();
@@ -715,157 +710,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 	}
 	return;
 
-}
-
-
-
-/*************************************************************
-** BUFFER MANAGEMENT
-*************************************************************/
-/**
-* @brief Calculates a connection's loacal receive window.
-*
-* recv_window = recv_buffer_size - (next_seqnum - base)
-*
-* @param sk
-*
-* @return The receive window.
-*/
-uint32_t XTRANSPORT::calc_recv_window(sock *sk)
-{
-	return sk->recv_buffer_size - (sk->next_recv_seqnum - sk->recv_base);
-}
-
-/**
-* @brief Checks whether or not a received packet can be buffered.
-*
-* Checks if we have room to buffer the received packet; that is, is the packet's
-* sequence number within our recieve window? (Or, in the case of a DGRAM socket,
-* simply checks if there is an unused slot at the end of the recv buffer.)
-*
-* @param p
-* @param sk
-*
-* @return true if packet can be buffered, false otherwise
-*/
-bool XTRANSPORT::should_buffer_received_packet(WritablePacket * /*p*/, sock *sk)
-{
-	if (sk->sock_type == SOCK_RAW) {
-		if (sk->recv_buffer_count < sk->recv_buffer_size) {
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
-* @brief Adds a packet to the connection's receive buffer.
-*
-* Stores the supplied packet pointer, p, in a slot depending on sock type:
-*
-*   STREAM: index = seqnum % bufsize.
-*   DGRAM:  index = (end + 1) % bufsize
-*
-* @param p
-* @param sk
-*/
-void XTRANSPORT::add_packet_to_recv_buf(WritablePacket *p, sock *sk)
-{
-	int index = -1;
-
-	if (sk->sock_type == SOCK_RAW) {
-		index = (sk->dgram_buffer_end + 1) % sk->recv_buffer_size;
-		sk->dgram_buffer_end = index;
-		sk->recv_buffer_count++;
-	}
-
-	WritablePacket *p_cpy = p->clone()->uniqueify();
-	sk->recv_buffer[index] = p_cpy;
-}
-
-/**
-* @brief check to see if the app is waiting for this data; if so, return it now
-*
-* @param sk
-*/
-void XTRANSPORT::check_for_and_handle_pending_recv(sock *sk)
-{
-	if (sk->recv_pending) {
-		int bytes_returned = read_from_recv_buf(sk->pending_recv_msg, sk);
-		ReturnResult(sk->port, sk->pending_recv_msg, bytes_returned);
-
-		sk->recv_pending = false;
-		delete sk->pending_recv_msg;
-		sk->pending_recv_msg = NULL;
-	}
-}
-
-
-/**
-* @brief Read received data from buffer.
-*
-* We'll use this same xia_socket_msg as the response to the API:
-* 1) We fill in the data (from *only one* packet for DGRAM)
-* 2) We fill in how many bytes we're returning
-* 3) We fill in the sender's DAG (DGRAM only)
-* 4) We clear out any buffered packets whose data we return to the app
-*
-* @param xia_socket_msg The Xrecv or Xrecvfrom message from the API
-* @param sk The sock struct for this connection
-*
-* @return  The number of bytes read from the buffer.
-*/
-int XTRANSPORT::read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk)
-{
-	if (sk->sock_type == SOCK_RAW) {
-		xia::X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
-
-		bool peek = x_recvfrom_msg->flags() & MSG_PEEK;
-
-		// Get just the next packet in the recv buffer (we don't return data from more
-		// than one packet in case the packets came from different senders). If no
-		// packet is available, we indicate to the app that we returned 0 bytes.
-		WritablePacket *p = sk->recv_buffer[sk->dgram_buffer_start];
-
-		if (sk->recv_buffer_count > 0 && p) {
-			// get different sized packages depending on socket type
-			// datagram only wants payload
-			// raw wants transport header too
-			// packet wants it all
-			XIAHeader xiah(p->xia_header());
-			int data_size;
-			String payload;
-			String header((const char*)xiah.hdr(), xiah.hdr_size());
-			String data((const char*)xiah.payload(), xiah.plen());
-			payload = header + data;
-			data_size = payload.length();
-			String src_path = xiah.src_path().unparse();
-			uint16_t iface = SRC_PORT_ANNO(p);
-
-			x_recvfrom_msg->set_interface_id(iface);
-			x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
-			x_recvfrom_msg->set_sender_dag(src_path.c_str());
-			x_recvfrom_msg->set_bytes_returned(data_size);
-
-			if (!peek) {
-				// NOTE: bytes beyond what the app asked for will be discarded,
-				// they are not saved for the next recv like streaming socket data
-
-				p->kill();
-				sk->recv_buffer[sk->dgram_buffer_start] = NULL;
-				sk->recv_buffer_count--;
-				sk->dgram_buffer_start = (sk->dgram_buffer_start + 1) % sk->recv_buffer_size;
-			}
-
-			return data_size;
-
-		} else {
-			x_recvfrom_msg->set_bytes_returned(0);
-			return 0;
-		}
-	}
-
-	return -1;
 }
 
 
@@ -1386,39 +1230,14 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 
 void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 {
-	XIAHeader xiah(p_in->xia_header());
-
-	String src_path = xiah.src_path().unparse();
-	String header((const char*)xiah.hdr(), xiah.hdr_size());
-	String payload((const char*)xiah.payload(), xiah.plen());
-	String str = header + payload;
-
-	xia::XSocketMsg xsm;
-	xsm.set_type(xia::XRECV);
-
-	xsm.set_id(10);
-	xia::X_Recvfrom_Msg *x_recvfrom_msg = xsm.mutable_x_recvfrom();
-	x_recvfrom_msg->set_sender_dag(src_path.c_str());
-	x_recvfrom_msg->set_payload(str.c_str(), str.length());
-
-	std::string p_buf;
-	xsm.SerializeToString(&p_buf);
-
 	list<uint32_t>::iterator i;
 
 	for (i = xcmp_listeners.begin(); i != xcmp_listeners.end(); i++) {
 		uint32_t id = *i;
-
 		sock *sk = idToSock.get(id);
 
-		if (sk && sk->sock_type == SOCK_RAW && should_buffer_received_packet(p_in, sk)) {
-			add_packet_to_recv_buf(p_in, sk);
-
-			if (sk->polling) {
-				// tell API we are readable
-				ProcessPollEvent(id, POLLIN);
-			}
-			check_for_and_handle_pending_recv(sk);
+		if (sk && sk->sock_type == SOCK_RAW) {
+			dynamic_cast<XDatagram *>(sk)->push(p_in);
 		}
 	}
 }
@@ -1626,10 +1445,6 @@ void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
 }
 #endif
 
-// FIXME: this logic needs to move so we can get rid of the redundant
-// check_for_and_handle_pending_recv, should_buffer_received_packet, and
-// add_packet_to_recv_buf in this file
-// RAW socket should be able to go through the xdatagram class
 int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
@@ -1652,16 +1467,12 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 		ERROR("sk == NULL\n");
 		return 0;
 	}
-	unsigned short _dport = sk->port;
 
 	// it's not a raw packet, so tell ProcessNetworkPacket to handle it
 	if (sk->sock_type != SOCK_RAW) {
 		return 0;
 	}
 
-	if (!should_buffer_received_packet(p_in, sk)) {
-		return 1;
-	}
 	INFO("socket %d STATE:%s\n", sk->port, StateStr(sk->state));
 
 	String src_path_str = src_path.unparse();
@@ -1671,12 +1482,9 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	INFO("dst|%s|", dst_path_str.c_str());
 	INFO("len=%d", p_in->length());
 
-	add_packet_to_recv_buf(p_in, sk);
-	if (sk->polling) {
-		// tell API we are readable
-		ProcessPollEvent(_dport, POLLIN);
-	}
-	check_for_and_handle_pending_recv(sk);
+	// RAW sockets are treated the same as datagram sockets
+	dynamic_cast<XDatagram *>(sk)->push(p_in);
+
 	return 1;
 }
 
