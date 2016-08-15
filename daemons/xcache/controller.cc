@@ -490,7 +490,7 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 			evicted->lock();
 			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
 			// already have the lock to meta_map so it's ok to just delete here
-			unregister_meta(evicted);
+			//unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
 			evicted->unlock();
 		}
@@ -735,7 +735,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	int rv;
 	std::string empty_str("");
 	std::string temp_cid("CID:");
-
+f
 	temp_cid += meta->get_cid();
 	
 	syslog(LOG_DEBUG, "[thread %p] Setting Route for %s.\n",  (void *)pthread_self(), temp_cid.c_str());
