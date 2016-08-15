@@ -17,8 +17,7 @@
 
 /*
 ** TODO:
-** - is the notification thread doing anything?
-** - set verbose flag from cmdline
+** - add non-blocking option for better test coverage
 ** - add ability to put as well as get files
 ** - add scp-like cmdline ability
 */
@@ -36,9 +35,53 @@
 #define MAX_CHUNKSIZE (10 * 1024 * 1024)	// set upper limit since we don't know how big chunks will be
 
 // global configuration options
-int verbose = 1;
+int verbose = 0;
+char name[256];
 
 XcacheHandle h;
+
+/*
+** display cmd line options and exit
+*/
+void help(const char *name)
+{
+	printf("\n%s (%s)\n", TITLE, VERSION);
+	printf("usage: %s [-v] [-n name]\n", name);
+	printf("where:\n");
+	printf(" -v : verbose mode\n");
+	printf(" -n : remote service name (default = %s)\n", NAME);
+	printf("\n");
+	exit(0);
+}
+
+/*
+** configure the app
+*/
+void getConfig(int argc, char** argv)
+{
+	int c;
+
+	strcpy(name, NAME);
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "hn:v")) != -1) {
+		switch (c) {
+			case 'v':
+				verbose = 1;
+				break;
+			case 'n':
+				strcpy(name, optarg);
+				break;
+			case '?':
+			case 'h':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+		}
+	}
+}
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -84,7 +127,7 @@ void die(int ecode, const char *fmt, ...)
 int sendCmd(int sock, const char *cmd)
 {
 	int n;
- 	warn("Sending Command: %s \n", cmd);
+	say("Sending Command: %s \n", cmd);
 	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to communicate\n");
@@ -118,7 +161,6 @@ int retrieveChunk(FILE *fd, char *url)
 	char *saveptr, *token;
 	char *buf = (char*)malloc(MAX_CHUNKSIZE);
 
-	say("Received url = %s\n", url);
 	token = strtok_r(url, " ", &saveptr);
 	while (token) {
 		int ret;
@@ -163,7 +205,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	}
 
 	int count = atoi(&reply[4]);
-	printf("Count = %d\n", count);
+	say("Chunk Count = %d\n", count);
 
 	FILE *f = fopen(fout, "w");
 
@@ -177,7 +219,6 @@ int getFile(int sock, const char *fin, const char *fout)
 			return -1;
 		}
 		offset++;
-		say("reply = %s\n", &reply[4]);
 		if (retrieveChunk(f, &reply[4]) < 0) {
 			warn("error retreiving: %s\n", &reply[4]);
 			status= -1;
@@ -236,36 +277,26 @@ int initializeClient(const char *name)
 }
 
 void usage(){
-	warn("usage: get <source file> <dest name>\n       quit\n");
+	warn("usage: get <source file> <dest name>\n       quit\n\n");
 }
 
 int main(int argc, char **argv)
 {
-	const char *name;
 	int sock = -1;
 	char fin[512], fout[512];
 	char cmd[512], reply[512];
 	int params = -1;
 
-	say ("\n%s (%s): started\n", TITLE, VERSION);
+	getConfig(argc, argv);
 
-	if ( argc == 1) {
-		say ("No service name passed, using default: %s\n", NAME);
-		sock = initializeClient(NAME);
-		usage();
+	say("\n%s (%s)\n", TITLE, VERSION);
+	say("connecting to %s\n\n", name);
 
-	} else if (argc == 2) {
-		name = argv[1];
-		say ("Connecting to: %s\n", name);
-		sock = initializeClient(name);
-		usage();
-
-	} else {
-		die(-1, "xftp [service name]");
-	}
+	sock = initializeClient(NAME);
+	usage();
 
 	while (true) {
-		say(">>");
+		printf(">>");
 		cmd[0] = fin[0] = fout[0] = 0;
 		params = -1;
 
@@ -274,6 +305,7 @@ int main(int argc, char **argv)
 		}
 
 		if (strncasecmp(cmd, "get", 3) == 0){
+			cmd[strlen(cmd) - 1] = 0;
 			params = sscanf(cmd,"get %s %s", fin, fout);
 
 			if (params != 2) {
