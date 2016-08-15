@@ -490,7 +490,7 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 			evicted->lock();
 			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
 			// already have the lock to meta_map so it's ok to just delete here
-			//unregister_meta(evicted);
+			unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
 			evicted->unlock();
 		}
@@ -541,9 +541,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	syslog(LOG_DEBUG, "[thread %p] after store policy\n", (void *)pthread_self());
 
 	meta_map[meta->get_cid()] = meta;
-
-	register_meta(meta);
 	store_manager.store(meta, data);
+	register_meta(meta);
 
 	syslog(LOG_DEBUG, "[thread %p] after saving meta and data\n", (void *)pthread_self());
 
