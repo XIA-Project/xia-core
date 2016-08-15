@@ -55,7 +55,7 @@ removeAfterAdd.o: removeAfterAdd.cpp
 	$(CC) $(CFLAGS) -c removeAfterAdd.cpp -std=c++11
 
 removeAfterAdd: removeAfterAdd.o
-	$(CC) -o removeAfterAdd removeAfterAdd.o $(LDFLAGS) -std=c++11
+	$(CC) -o removeAfterAdd removeAfterAdd.o csclient.o XIARouter.o $(LDFLAGS) -std=c++11
 
 clean:
 	rm -f testCIDSetRoute testAlarmHandler configureLocalCIDs setCIDRoute putChunk requestChunk removeAfterAdd
