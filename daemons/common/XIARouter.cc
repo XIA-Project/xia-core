@@ -148,7 +148,7 @@ std::string XIARouter::itoa(signed i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cconst std::string &xid, int port, const std::string &next, unsigned long flags)
+int XIARouter::updateRoute(string const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
 	string xidtype;
 	string mutableXID(xid);
