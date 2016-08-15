@@ -489,7 +489,6 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 		if(evicted){
 			evicted->lock();
 			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
-
 			// already have the lock to meta_map so it's ok to just delete here
 			unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
@@ -728,9 +727,12 @@ int xcache_controller::register_meta(xcache_meta *meta)
 
 	temp_cid += meta->get_cid();
 
-	syslog(LOG_DEBUG, "Setting Route for %s.\n", temp_cid.c_str());
+	pthread_id_np_t tid;
+	tid = pthread_getthreadid_np();
+	
+	syslog(LOG_DEBUG, "[thread %d] Setting Route for %s.\n", tid, temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	syslog(LOG_DEBUG, "status code %d error message %s\n", rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", tid, rv, xr.cserror());
 
 	return rv;
 }
@@ -743,9 +745,9 @@ int xcache_controller::unregister_meta(xcache_meta *meta)
 
 	temp_cid += meta->get_cid();
 
-	syslog(LOG_DEBUG, "Removing Route for %s.\n", temp_cid.c_str());
+	syslog(LOG_DEBUG, "[thread %d] Removing Route for %s.\n", tid, temp_cid.c_str());
 	rv = xr.delRoute(temp_cid);
-	syslog(LOG_DEBUG, "status code %d error message %s\n", rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", tid, rv, xr.cserror());
 
 	return rv;
 }
