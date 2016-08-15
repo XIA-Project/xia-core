@@ -18,8 +18,8 @@ NAME=`basename $0`
 
 # xianet startup flags
 # host flags may need to change if flack changes which interfaces it allocates
-H_FLAGS="-t -feth0"
-R_FLAGS="-r -feth0"
+H_FLAGS="-v -l 7 -t -feth0"
+R_FLAGS="-v -l 7 -r -feth0"
 R_NS_FLAGS="-n $R_FLAGS"
 
 # NOTE: xiahosts must contain the name sof the nodes on the XIA network.
