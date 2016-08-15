@@ -735,7 +735,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	int rv;
 	std::string empty_str("");
 	std::string temp_cid("CID:");
-f
+
 	temp_cid += meta->get_cid();
 	
 	syslog(LOG_DEBUG, "[thread %p] Setting Route for %s.\n",  (void *)pthread_self(), temp_cid.c_str());
