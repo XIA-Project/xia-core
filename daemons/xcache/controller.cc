@@ -726,13 +726,10 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	std::string temp_cid("CID:");
 
 	temp_cid += meta->get_cid();
-
-	pthread_id_np_t tid;
-	tid = pthread_getthreadid_np();
 	
-	syslog(LOG_DEBUG, "[thread %d] Setting Route for %s.\n", tid, temp_cid.c_str());
+	syslog(LOG_DEBUG, "[thread %p] Setting Route for %s.\n",  (void *)pthread_self(), temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", tid, rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %p] status code %d error message %s\n", (void *)pthread_self(), rv, xr.cserror());
 
 	return rv;
 }
@@ -745,9 +742,9 @@ int xcache_controller::unregister_meta(xcache_meta *meta)
 
 	temp_cid += meta->get_cid();
 
-	syslog(LOG_DEBUG, "[thread %d] Removing Route for %s.\n", tid, temp_cid.c_str());
+	syslog(LOG_DEBUG, "[thread %p] Removing Route for %s.\n", (void *)pthread_self(), temp_cid.c_str());
 	rv = xr.delRoute(temp_cid);
-	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", tid, rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %p] status code %d error message %s\n", (void *)pthread_self(), rv, xr.cserror());
 
 	return rv;
 }
