@@ -15,7 +15,6 @@
 #include <clicknet/udp.h>
 #include <clicknet/tcp.h>
 #include <click/string.hh>
-#include <click/xiatransportheader.hh>
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
@@ -212,9 +211,6 @@ public:
 	void check_for_and_handle_pending_recv(sock *sk);
 	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
 	uint32_t next_missing_seqnum(sock *sk);
-	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
-	void resize_send_buffer(sock *sk, uint32_t new_size);
-	void resize_recv_buffer(sock *sk, uint32_t new_size);
 
 	bool usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag);
 

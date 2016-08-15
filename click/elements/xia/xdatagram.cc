@@ -6,12 +6,9 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-
-//#include <click/xiacontentheader.hh>
 #include "xdatagram.hh"
 #include "xtransport.hh"
 #include "xlog.hh"
-#include <click/xiatransportheader.hh>
 
 
 CLICK_DECLS
@@ -83,14 +80,14 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 		// raw wants transport header too
 		// packet wants it all
 		XIAHeader xiah(p->xia_header());
-		TransportHeader thdr(p);
+		DatagramHeader dhdr(p);
 		int data_size;
 		String payload;
 
 		switch (sock_type) {
 			case SOCK_DGRAM:
-				data_size = xiah.plen() - thdr.hlen();
-				payload = String((const char*)thdr.payload(), data_size);
+				data_size = xiah.plen() - dhdr.hlen();
+				payload = String((const char*)dhdr.payload(), data_size);
 				break;
 
 			case SOCK_RAW:

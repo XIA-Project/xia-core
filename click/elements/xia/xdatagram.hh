@@ -14,7 +14,7 @@
 #include <clicknet/udp.h>
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
-#include <click/xiatransportheader.hh>
+#include "xiadatagramheader.hh"
 #include "xtransport.hh"
 
 #if CLICK_USERLEVEL
