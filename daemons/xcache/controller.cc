@@ -510,8 +510,12 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 int xcache_controller::__store(struct xcache_context * /*context */,
 			       xcache_meta *meta, const std::string *data)
 {
+	syslog(LOG_DEBUG, "[thread %p] Inside __store for CID %s\n", (void *)pthread_self(), meta->get_cid().c_str());
+	
 	lock_meta_map();
 	meta->lock();
+
+	syslog(LOG_DEBUG, "[thread %p] after locking meta map and meta\n", (void *)pthread_self());
 
 	if (verify_content(meta, data) == false) {
 		/*
@@ -523,8 +527,10 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
+	syslog(LOG_DEBUG, "[thread %p] after verifying the content\n", (void *)pthread_self());
+
 	meta->set_length(data->size());	// size of the data in bytes
-	syslog(LOG_INFO, "store data size: %lu\n", data->size());
+	syslog(LOG_DEBUG, "[thread %p] after set data length; store data size: %lu\n", (void *)pthread_self(), data->size());
 
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
@@ -532,15 +538,20 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		unlock_meta_map();
 		return RET_FAILED;
 	}
+	syslog(LOG_DEBUG, "[thread %p] after store policy\n", (void *)pthread_self());
 
 	meta_map[meta->get_cid()] = meta;
 
 	register_meta(meta);
 	store_manager.store(meta, data);
 
+	syslog(LOG_DEBUG, "[thread %p] after saving meta and data\n", (void *)pthread_self());
+
 	meta->set_AVAILABLE();
 	meta->unlock();
 	unlock_meta_map();
+
+	syslog(LOG_DEBUG, "[thread %p] after unlock and cleanup\n", (void *)pthread_self());
 
 	return RET_SENDRESP;
 }
