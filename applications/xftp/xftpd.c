@@ -255,7 +255,7 @@ int registerReceiver()
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	if (XregisterName(NAME, dag) < 0 )
+	if (XregisterName(name, dag) < 0 )
 		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
