@@ -1,6 +1,6 @@
 /* ts=4 */
 /*
-** Copyright 2011 Carnegie Mellon University
+** Copyright 2011/2016 Carnegie Mellon University
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,34 +15,30 @@
 ** limitations under the License.
 */
 
+/*
+** TODO:
+** - add ability to change service name on cmdline
+** - chroot to some reasonable base directory
+** - add ability to handle put as well as get
+** - set verbose flag from cmdline
+** - return url for multiple dags instead of 1 at a time?
+*/
+
 #include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <pthread.h>
 #include "xcache.h"
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include "dagaddr.h"
-#include <assert.h>
-
 #include "Xkeys.h"
 
-#define VERSION "v1.0"
+#define VERSION "v2.0"
 #define TITLE "XIA Basic FTP Server"
+#define NAME "basicftp.xia"
+#define BUFSIZE 1000
 
-#define MAX_XID_SIZE 100
-// #define DAG  "RE %s %s %s"
-#define NAME "www_s.basicftp.aaa.xia"
-
-#undef XIA_MAXBUF
-#define XIA_MAXBUF 500
-
-#define MB(__mb) (KB(__mb) * 1024)
-#define KB(__kb) ((__kb) * 1024)
-#define NUM_CHUNKS	10
-#define REREQUEST 3
+#define MB(__mb) (__mb * 1024 * 1024)
+#define MAXCHUNKSIZE MB(5)
 
 int verbose = 1;
 unsigned chunksize = MB(1);
@@ -88,32 +84,17 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-int sendCmd(int sock, const char *cmd)
-{
-	int n;
-	warn("Sending Command: %s \n", cmd);
-
-	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to communicate\n");
-	}
-
-	return n;
-}
-
 void *recvCmd(void *socketid)
 {
-	int i, n, count = 0;
+	int n, count = 0;
 	sockaddr_x *addrs = NULL;
-	char command[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
+	char command[BUFSIZE];
+	char reply[BUFSIZE];
 	int sock = *((int*)socketid);
 	char *fname;
-//  char **params;
 	XcacheHandle xcache;
 
 	XcacheHandleInit(&xcache);
-	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
 
 	while (1) {
 		say("waiting for command\n");
@@ -129,14 +110,9 @@ void *recvCmd(void *socketid)
  			break;
 		}
 
-		//Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
 			fname = &command[4];
 			say("client requested file %s\n", fname);
-
-			count = 0;
-
-			say("chunking file %s\n", fname);
 
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
 			if ((count = XputFile(&xcache, fname, chunksize, &addrs)) < 0) {
@@ -147,90 +123,48 @@ void *recvCmd(void *socketid)
 			}
 			say("%s\n", reply);
 
-
-			//Just tells the receiver how many chunks it should expect.
+			// tell the receiver how many chunks it should expect
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
-			//Sending the blocks cids
-		}
-		else if (strncmp(command, "block", 5) == 0) {
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
-			} else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
-					char url[256];
+		} else if (strncmp(command, "block", 5) == 0) {
+			char *chk = &command[6];
+			int i = atoi(chk);
+			char url[256];
 
-					dag_to_url(url, 256, &addrs[i]);
-					if (strlen(reply) + strlen(url) >= XIA_MAXBUF) {
-						printf("reply 0 %s\n", reply);
-						if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-							warn("unable to send reply to client\n");
-							break;
-						}
-						reply[0] = 0;
-					} else {
-						strcat(reply, " ");
-						strcat(reply, url);
-					}
+			strcpy(reply, "OK:");
+
+			dag_to_url(url, 256, &addrs[i]);
+			if (strlen(reply) + strlen(url) >= BUFSIZE) {
+				// this shouldn't happen
+				strcpy(reply, "FAIL:buffer too small.");
+				say("reply: %s\n", reply);
+				if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+					warn("unable to send reply to client\n");
+					break;
 				}
-			}
-			printf("reply 1 %s\n", reply);
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
+				continue;
 
-		} else if(strncmp(command, "meta", 4) == 0) {
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
 			} else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
-					char url[256];
-
-					dag_to_url(url, 256, &addrs[i]);
-					strcat(reply, " ");
-					strcat(reply, url);
-				}
+				strcat(reply, " ");
+				strcat(reply, url);
 			}
-			printf("%s\n", reply);
+			say("reply:%s\n", reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
-		}
-		else if (strncmp(command, "done", 4) == 0) {
+
+		} else if (strncmp(command, "done", 4) == 0) {
 			say("done sending file: removing the chunks from the cache\n");
-			/* for (i = 0; i < count; i++) */
-			/*   XremoveChunk(ctx, info[i].cid); */
-			/* XfreeChunkInfo(info); */
-			free(addrs);
+			if (addrs) {
+				free(addrs);
+			}
 			count = 0;
 		}
 	}
 
-	/* if (info) */
-	/* 	XfreeChunkInfo(info); */
-	/* XfreeCacheSlice(ctx); */
 	XcacheHandleDestroy(&xcache);
 	Xclose(sock);
 	pthread_exit(NULL);
@@ -260,7 +194,6 @@ int registerReceiver()
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	//FIXME NAME is hard coded
 	if (XregisterName(NAME, dag) < 0 )
 		die(-1, "error registering name: %s\n", NAME);
 
@@ -301,7 +234,7 @@ void *blockingListener(void *socketid)
 void help()
 {
 	printf("usage: xftd [chunksize]\n");
-	printf(" where chunksize >= 100 && chunksize <=5000000\n");
+	printf(" where chunksize >= 100 && chunksize <= %d\n", MAXCHUNKSIZE);
 	exit(1);
 }
 
@@ -311,8 +244,8 @@ int main(int argc, char **argv)
 		if ((chunksize = atoi(argv[1])) != 0) {
 			if (chunksize < 100) {
 				chunksize = 100;
-			} else if (chunksize > 5000000) {
-				chunksize = 5000000;
+			} else if (chunksize > MAXCHUNKSIZE) {
+				chunksize = MAXCHUNKSIZE;
 			}
 		} else {
 			help();

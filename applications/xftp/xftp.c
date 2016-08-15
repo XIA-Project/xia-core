@@ -1,6 +1,6 @@
 /* ts=4 */
 /*
-** Copyright 2011 Carnegie Mellon University
+** Copyright 2011/2016 Carnegie Mellon University
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,44 +15,30 @@
 ** limitations under the License.
 */
 
+/*
+** TODO:
+** - is the notification thread doing anything?
+** - set verbose flag from cmdline
+** - add ability to put as well as get files
+** - add scp-like cmdline ability
+*/
+
 #include <stdio.h>
 #include <stdarg.h>
-#include <time.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <pthread.h>
 #include "Xsocket.h"
 #include "xcache.h"
-#include "dagaddr.hpp"
 #include "dagaddr.h"
-#include <assert.h>
 
-#undef XIA_MAXBUF
-#define XIA_MAXBUF 500
-
-#define MAX_XID_SIZE 100
-#define VERSION "v1.0"
+#define VERSION "v2.0"
 #define TITLE "XIA Basic FTP client"
-#define NAME "www_s.basicftp.aaa.xia"
-#define MAX_CHUNKSIZE 10000000
-#define REREQUEST 3
-
-#define NUM_CHUNKS	1
-#define NUM_PROMPTS	2
+#define NAME "basicftp.xia"
+#define MAX_CHUNKSIZE (10 * 1024 * 1024)	// set upper limit since we don't know how big chunks will be
 
 // global configuration options
 int verbose = 1;
-bool quick = false;
-
-char s_ad[MAX_XID_SIZE];
-char s_hid[MAX_XID_SIZE];
-
-char my_ad[MAX_XID_SIZE];
-char my_hid[MAX_XID_SIZE];
 
 XcacheHandle h;
-
-int getFile(int sock, char *p_ad, char* p_hid, const char *fin, const char *fout);
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -107,9 +93,9 @@ int sendCmd(int sock, const char *cmd)
 	return n;
 }
 
-int getChunkCount(int sock, char *reply, int sz)
+int getResponse(int sock, char *reply, int sz)
 {
-	int n=-1;
+	int n;
 
 	if ((n = Xrecv(sock, reply, sz, 0))  < 0) {
 		Xclose(sock);
@@ -127,72 +113,30 @@ int getChunkCount(int sock, char *reply, int sz)
 }
 
 
-
-int buildChunkDAGs(sockaddr_x addresses[], char *chunks, char *p_ad, char *p_hid)
-{
-	char *p = chunks;
-	char *next;
-	int n = 0;
-    Node n_src;
-    Node n_ad(Node::XID_TYPE_AD, strchr(p_ad, ':') + 1);
-    Node n_hid(Node::XID_TYPE_HID, strchr(p_hid, ':') + 1);
-
-
-
-	// build the list of chunks to retrieve
-	while ((next = strchr(p, ' '))) {
-		*next = 0;
-
-        Node n_cid(Node::XID_TYPE_CID, p);
-        Graph primaryIntent = n_src * n_cid;
-        Graph gFallback = n_src * n_ad * n_hid * n_cid;
-        Graph gAddr = primaryIntent + gFallback;
-
-        gAddr.fill_sockaddr(&addresses[n]);
-
-		n++;
-		p = next + 1;
-
-	}
-
-    Node n_cid(Node::XID_TYPE_CID, p);
-    Graph primaryIntent = n_src * n_cid;
-    Graph gFallback = n_src * n_ad * n_hid * n_cid;
-    Graph gAddr = primaryIntent + gFallback;
-
-    gAddr.fill_sockaddr(&addresses[n]);
-
-	printf("Chunk Address = %s\n", gAddr.dag_string().c_str());
-	n++;
-	return n;
-}
-
-int getListedChunks(FILE *fd, char *url)
+int retrieveChunk(FILE *fd, char *url)
 {
 	char *saveptr, *token;
 	char *buf = (char*)malloc(MAX_CHUNKSIZE);
 
-	printf("Received url = %s\n", url);
+	say("Received url = %s\n", url);
 	token = strtok_r(url, " ", &saveptr);
-	while(token) {
+	while (token) {
 		int ret;
 		sockaddr_x addr;
-		printf("Calling XgetChunk\n");
 
-		printf("Fetching URL %s\n", token);
+		say("Fetching URL %s\n", token);
 		url_to_dag(&addr, token, strlen(token));
 
-		Graph g(&addr);
-		printf("------------------------\n");
-		g.print_graph();
-		printf("------------------------\n");
+//		Graph g(&addr);
+//		printf("------------------------\n");
+//		g.print_graph();
+//		printf("------------------------\n");
 
-		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr,
-				       sizeof(addr))) < 0) {
+		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
 
-		printf("Got Chunk\n");
+		say("Got Chunk\n");
 		fwrite(buf, 1, ret, fd);
 		token = strtok_r(NULL, " ", &saveptr);
 	}
@@ -200,10 +144,6 @@ int getListedChunks(FILE *fd, char *url)
 	free(buf);
 	return 0;
 }
-
-
-//	This is used both to put files and to get files since in case of put I still have to request the file.
-//	Should be fixed with push implementation
 
 int getFile(int sock, const char *fin, const char *fout)
 {
@@ -217,7 +157,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	sendCmd(sock, cmd);
 
 	// get back number of chunks in the file
-	if (getChunkCount(sock, reply, sizeof(reply)) < 1){
+	if (getResponse(sock, reply, sizeof(reply)) < 1){
 		warn("could not get chunk count. Aborting. \n");
 		return -1;
 	}
@@ -229,22 +169,17 @@ int getFile(int sock, const char *fin, const char *fout)
 
 	offset = 0;
 	while (offset < count) {
-		int num = NUM_CHUNKS;
-		if (count - offset < num)
-			num = count - offset;
-
-		// tell the server we want a list of <num> cids starting at location <offset>
-		sprintf(cmd, "block %d:%d", offset, num);
+		sprintf(cmd, "block %d", offset);
 		sendCmd(sock, cmd);
 
-		if (getChunkCount(sock, reply, sizeof(reply)) < 1){
+		if (getResponse(sock, reply, sizeof(reply)) < 1) {
 			warn("could not get chunk count. Aborting. \n");
 			return -1;
 		}
-		offset += NUM_CHUNKS;
-		printf("reply4 = %s\n", &reply[4]);
-		if (getListedChunks(f, &reply[4]) < 0) {
-			printf(" = %s\n", &reply[4]);
+		offset++;
+		say("reply = %s\n", &reply[4]);
+		if (retrieveChunk(f, &reply[4]) < 0) {
+			warn("error retreiving: %s\n", &reply[4]);
 			status= -1;
 			break;
 		}
@@ -275,7 +210,6 @@ int initializeClient(const char *name)
 	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
-	char sdag[1024];
 
 	if (XcacheHandleInit(&h) < 0) {
 		printf("Xcache handle initialization failed.\n");
@@ -290,54 +224,23 @@ int initializeClient(const char *name)
 	if (XgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
 
-
-	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
 
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		die(-1, "Unable to bind to the dag: %s\n", dag);
+		die(-1, "Unable to connect to: %s\n%s\n", name, dag);
 	}
 
-	// save the AD and HID for later. This seems hacky
-	// we need to find a better way to deal with this
-	Graph g(&dag);
-	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-//   	say("sdag = %s\n",sdag);
-	char *ads = strstr(sdag,"AD:");
-	char *hids = strstr(sdag,"HID:");
-// 	i = sscanf(ads,"%s",s_ad );
-// 	i = sscanf(hids,"%s", s_hid);
-
-	if(sscanf(ads,"%s",s_ad ) < 1 || strncmp(s_ad,"AD:", 3) !=0){
-		die(-1, "Unable to extract AD.");
-	}
-
-	if(sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid,"HID:", 4) !=0 ){
-		die(-1, "Unable to extract AD.");
-	}
-
-	warn("Service AD: %s, Service HID: %s\n", s_ad, s_hid);
 	return sock;
 }
 
 void usage(){
-	say("usage: get|put <source file> <dest name>\n");
-}
-
-bool file_exists(const char * filename)
-{
-    if (FILE * file = fopen(filename, "r")){
-		fclose(file);
-		return true;
-	}
-    return false;
+	warn("usage: get <source file> <dest name>\n       quit\n");
 }
 
 int main(int argc, char **argv)
 {
-
 	const char *name;
 	int sock = -1;
 	char fin[512], fout[512];
@@ -346,68 +249,34 @@ int main(int argc, char **argv)
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
-	if( argc == 1){
-		say ("No service name passed, using default: %s\nYou can also pass --quick to execute a couple of default commands for quick testing. Requires s.txt to exist. \n", NAME);
+	if ( argc == 1) {
+		say ("No service name passed, using default: %s\n", NAME);
 		sock = initializeClient(NAME);
 		usage();
-	} else if (argc == 2){
-		if( strcmp(argv[1], "--quick") == 0){
-			quick = true;
-			name=NAME;
-		} else{
-			name = argv[1];
-			usage();
-		}
+
+	} else if (argc == 2) {
+		name = argv[1];
 		say ("Connecting to: %s\n", name);
 		sock = initializeClient(name);
+		usage();
 
-	} else if (argc == 3){
-		if( strcmp(argv[1], "--quick") == 0 ){
-			quick = true;
-			name = argv[2];
-			say ("Connecting to: %s\n", name);
-			sock = initializeClient(name);
-			usage();
-		} else{
-			die(-1, "xftp [--quick] [SID]");
-		}
-
-	} else{
-		die(-1, "xftp [--quick] [SID]");
+	} else {
+		die(-1, "xftp [service name]");
 	}
 
-	int i = 0;
-
-
-
-//		This is for quick testing with a couple of commands
-
-	while(i < NUM_PROMPTS){
+	while (true) {
 		say(">>");
-		cmd[0] = '\n';
-		fin[0] = '\n';
-		fout[0] = '\n';
+		cmd[0] = fin[0] = fout[0] = 0;
 		params = -1;
 
-		if(quick){
-			if( i==0 )
-				strcpy(cmd, "put s.txt r.txt");
-			else if( i==1 )
-				strcpy(cmd, "get r.txt sr.txt\n");
-			i++;
-		}else{
-			if (fgets(cmd, 511, stdin) == NULL) {
-				die(errno, "%s", strerror(errno));
-			}
+		if (fgets(cmd, sizeof(cmd) - 1, stdin) == NULL) {
+			die(errno, "%s", strerror(errno));
 		}
-
-//		enable this if you want to limit how many times this is done
-// 		i++;
 
 		if (strncasecmp(cmd, "get", 3) == 0){
 			params = sscanf(cmd,"get %s %s", fin, fout);
 
-			if(params !=2 ){
+			if (params != 2) {
 				sprintf(reply, "FAIL: invalid command (%s)\n", cmd);
 				warn(reply);
 				usage();
