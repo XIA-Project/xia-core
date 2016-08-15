@@ -17,15 +17,15 @@
 
 /*
 ** TODO:
-** - add ability to change service name on cmdline
-** - chroot to some reasonable base directory
+** - add ls cmd
 ** - add ability to handle put as well as get
-** - set verbose flag from cmdline
 ** - return url for multiple dags instead of 1 at a time?
 */
 
 #include <stdio.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <errno.h>
 #include "xcache.h"
 #include "Xsocket.h"
 #include "dagaddr.hpp"
@@ -40,8 +40,70 @@
 #define MB(__mb) (__mb * 1024 * 1024)
 #define MAXCHUNKSIZE MB(5)
 
-int verbose = 1;
+int verbose = 0;
+char name[256];
+char rootdir[256];
 unsigned chunksize = MB(1);
+XcacheHandle xcache;
+
+/*
+** display cmd line options and exit
+*/
+void help(const char *name)
+{
+	printf("\n%s (%s)\n", TITLE, VERSION);
+	printf("usage: %s [-v] [-n name] [-c chunk_size] [-r root_dir]\n", name);
+	printf("where:\n");
+	printf(" -v : verbose mode\n");
+	printf(" -n : specify service name (default = %s)\n", NAME);
+	printf(" -c : maximum chunk size (default = 1M)\n");
+	printf(" -r : specify the base directory we are running from\n");
+	printf("\n");
+	exit(0);
+}
+
+/*
+** configure the app
+*/
+void getConfig(int argc, char** argv)
+{
+	int c;
+
+	strcpy(name, NAME);
+	getcwd(rootdir, sizeof(rootdir));
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "c:hn:r:v")) != -1) {
+		switch (c) {
+			case 'c':
+				if ((chunksize = atoi(optarg)) != 0) {
+					if (chunksize < 100) {
+						chunksize = 100;
+					} else if (chunksize > MAXCHUNKSIZE) {
+						chunksize = MAXCHUNKSIZE;
+					}
+				}
+				break;
+
+			case 'v':
+				verbose = 1;
+				break;
+			case 'n':
+				strcpy(name, optarg);
+				break;
+			case 'r':
+				strcpy(rootdir, optarg);
+				break;
+			case '?':
+			case 'h':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+		}
+	}
+}
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -92,9 +154,7 @@ void *recvCmd(void *socketid)
 	char reply[BUFSIZE];
 	int sock = *((int*)socketid);
 	char *fname;
-	XcacheHandle xcache;
 
-	XcacheHandleInit(&xcache);
 
 	while (1) {
 		say("waiting for command\n");
@@ -157,7 +217,7 @@ void *recvCmd(void *socketid)
 			}
 
 		} else if (strncmp(command, "done", 4) == 0) {
-			say("done sending file: removing the chunks from the cache\n");
+			say("done sending file: %s\n", fname);
 			if (addrs) {
 				free(addrs);
 			}
@@ -165,7 +225,6 @@ void *recvCmd(void *socketid)
 		}
 	}
 
-	XcacheHandleDestroy(&xcache);
 	Xclose(sock);
 	pthread_exit(NULL);
 }
@@ -177,8 +236,10 @@ int registerReceiver()
 	int sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
-	say ("\n%s (%s): started\n", TITLE, VERSION);
-	say("Chunksize == %u\n\n", chunksize);
+	say ("\n%s (%s)\n", TITLE, VERSION);
+	say("Service Name: %s\n", name);
+	say("Root Directory: %s\n", rootdir);
+	say("Max Chunk Size: %u\n\n", chunksize);
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
@@ -231,33 +292,27 @@ void *blockingListener(void *socketid)
 	return NULL;
 }
 
-void help()
-{
-	printf("usage: xftd [chunksize]\n");
-	printf(" where chunksize >= 100 && chunksize <= %d\n", MAXCHUNKSIZE);
-	exit(1);
-}
-
 int main(int argc, char **argv)
 {
-	if (argc == 2) {
-		if ((chunksize = atoi(argv[1])) != 0) {
-			if (chunksize < 100) {
-				chunksize = 100;
-			} else if (chunksize > MAXCHUNKSIZE) {
-				chunksize = MAXCHUNKSIZE;
-			}
-		} else {
-			help();
-		}
-
-	} else if (argc != 1) {
-		help();
-	}
+	getConfig(argc, argv);
 
 	int sock = registerReceiver();
 
+	if (XcacheHandleInit(&xcache) < 0) {
+		die(-1, "Unable to initialze the cache subsystem\n");
+	}
+
+	// set the base directory. This affects all paths for the app,
+	// so do it after we've initialized everything otherwise the paths
+	// to /tmp and the keys directory will be incorrect
+	if (chroot(rootdir) < 0) {
+		die(-1, "\nUnable to chroot (sudo is required!): %s\n", strerror(errno));
+	}
+	chdir("/");
+
 	blockingListener((void *)&sock);
+	XcacheHandleDestroy(&xcache);
+
 
 	return 0;
 }
