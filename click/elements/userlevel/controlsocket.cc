@@ -826,6 +826,7 @@ ControlSocket::initialize_connection(int fd)
 void
 ControlSocket::selected(int fd, int)
 {
+    DBG("ControlSocket selected\n");
     if (fd == _socket_fd) {
 	union { struct sockaddr_in in; struct sockaddr_un un; } sa;
 #if HAVE_ACCEPT_SOCKLEN_T
@@ -861,7 +862,9 @@ ControlSocket::selected(int fd, int)
     // read commands from socket (but only a bit on each select)
     if (!conn->in_closed)
 	if (char *buf = conn->in_text.reserve(2048)) {
+      DBG("ControlSocket before read command read(fd) from socket\n");
 	    ssize_t r = read(conn->fd, buf, 2048);
+      DBG("ControlSocket after read command read(fd) from socket\n");
 	    if (r != 0 && r != -1)
 		conn->in_text.adjust_length(r);
 	    else if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR))
@@ -891,6 +894,7 @@ ControlSocket::selected(int fd, int)
 	    String line(in_text, line_end);
 	    conn->inpos = line_end - conn->in_text.begin();
 
+      DBG("ControlSocket before before parse command\n");
 	    // parse each individual command
 	    if (parse_command(*conn, line) > 0) {
 		// more data to come, so wait
