@@ -892,6 +892,7 @@ ControlSocket::selected(int fd, int)
 	    String line(in_text, line_end);
 	    conn->inpos = line_end - conn->in_text.begin();
 
+      DBG("ControlSocket selected before parse_command: %s\n", line.data());
 	    // parse each individual command
 	    if (parse_command(*conn, line) > 0) {
 		// more data to come, so wait
