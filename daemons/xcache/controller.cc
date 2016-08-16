@@ -508,12 +508,12 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 int xcache_controller::__store(struct xcache_context * /*context */,
 			       xcache_meta *meta, const std::string *data)
 {
-	syslog(LOG_DEBUG, "[thread %d] Inside __store for CID %s\n", pthread_self(), meta->get_cid().c_str());
+	syslog(LOG_DEBUG, "[thread %lu] Inside __store for CID %s\n", pthread_self(), meta->get_cid().c_str());
 	
 	lock_meta_map();
 	meta->lock();
 
-	syslog(LOG_DEBUG, "[thread %d] after locking meta map and meta\n", pthread_self());
+	syslog(LOG_DEBUG, "[thread %lu] after locking meta map and meta\n", pthread_self());
 
 	if (verify_content(meta, data) == false) {
 		/*
@@ -525,10 +525,10 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
-	syslog(LOG_DEBUG, "[thread %d] after verifying the content\n", pthread_self());
+	syslog(LOG_DEBUG, "[thread %lu] after verifying the content\n", pthread_self());
 
 	meta->set_length(data->size());	// size of the data in bytes
-	syslog(LOG_DEBUG, "[thread %d] after set data length; store data size: %lu\n", pthread_self(), data->size());
+	syslog(LOG_DEBUG, "[thread %lu] after set data length; store data size: %lu\n", pthread_self(), data->size());
 
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
@@ -536,19 +536,19 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		unlock_meta_map();
 		return RET_FAILED;
 	}
-	syslog(LOG_DEBUG, "[thread %d] after store policy\n", pthread_self());
+	syslog(LOG_DEBUG, "[thread %lu] after store policy\n", pthread_self());
 
 	meta_map[meta->get_cid()] = meta;
 	store_manager.store(meta, data);
 	register_meta(meta);
 
-	syslog(LOG_DEBUG, "[thread %d] after saving meta and data\n", pthread_self());
+	syslog(LOG_DEBUG, "[thread %lu] after saving meta and data\n", pthread_self());
 
 	meta->set_AVAILABLE();
 	meta->unlock();
 	unlock_meta_map();
 
-	syslog(LOG_DEBUG, "[thread %d] after unlock and cleanup\n", pthread_self());
+	syslog(LOG_DEBUG, "[thread %lu] after unlock and cleanup\n", pthread_self());
 
 	return RET_SENDRESP;
 }
@@ -735,9 +735,9 @@ int xcache_controller::register_meta(xcache_meta *meta)
 
 	temp_cid += meta->get_cid();
 
-	syslog(LOG_DEBUG, "[thread %d] Setting Route for %s.\n",  pthread_self(), temp_cid.c_str());
+	syslog(LOG_DEBUG, "[thread %lu] Setting Route for %s.\n",  pthread_self(), temp_cid.c_str());
 	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
 
 	return rv;
 }
@@ -749,9 +749,9 @@ int xcache_controller::unregister_meta(xcache_meta *meta) {
 
 	temp_cid += meta->get_cid();
 
-	syslog(LOG_DEBUG, "[thread %d] Removing Route for %s.\n", pthread_self(), temp_cid.c_str());
+	syslog(LOG_DEBUG, "[thread %lu] Removing Route for %s.\n", pthread_self(), temp_cid.c_str());
 	rv = xr.delRoute(temp_cid);
-	syslog(LOG_DEBUG, "[thread %d] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
+	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
 
 	return rv;
 }
