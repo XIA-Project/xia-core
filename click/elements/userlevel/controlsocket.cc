@@ -826,7 +826,6 @@ ControlSocket::initialize_connection(int fd)
 void
 ControlSocket::selected(int fd, int)
 {
-    DBG("ControlSocket selected\n");
     if (fd == _socket_fd) {
 	union { struct sockaddr_in in; struct sockaddr_un un; } sa;
 #if HAVE_ACCEPT_SOCKLEN_T
