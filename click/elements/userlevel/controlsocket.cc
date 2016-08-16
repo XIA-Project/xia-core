@@ -20,6 +20,7 @@
 
 #include <click/config.h>
 #include "controlsocket.hh"
+#include "elements/xia/xlog.hh"
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/timer.hh>
@@ -552,10 +553,14 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
     return conn.message(CSERR_DATA_TOO_BIG, "Data too large for write handler '" + handlername + "'");
 #endif
 
+  DBG("ControlSocket write_command after parsing the handler: %s with data %s\n", handlername.data(), data.data());
+
   ControlSocketErrorHandler errh;
 
   // call handler
   int result = h->call_write(data, e, &errh);
+
+  DBG("ControlSocket write_command after call write handler\n");
 
   // add a generic error message for certain handler codes
   int code = errh.error_code();
@@ -566,6 +571,8 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
       code = CSERR_OK_HANDLER_WARNING;
   }
 
+  DBG("ControlSocket write_command after getting the error code\n");
+
   String msg;
   if (code == CSERR_OK)
     msg = "Write handler '" + handlername + "' OK";
@@ -574,6 +581,8 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
   else if (code == CSERR_HANDLER_ERROR)
     msg = "Write handler '" + handlername + "' error";
   conn.transfer_messages(code, msg, &errh);
+
+  DBG("ControlSocket write_command after transferring the mesasges\n");
   return 0;
 }
 
@@ -882,9 +891,14 @@ ControlSocket::selected(int fd, int)
 		// more data to come, so wait
 		conn->inpos = oldpos;
 		blocked = true;
+
+      DBG("ControlSocket selected need blocking\n");
+
 	    } else
 		connection::contract(conn->in_text, conn->inpos);
 	} else
+      DBG("ControlSocket selected need blocking since write incomplete\n");
+
 	    // 12.Jul.2006, Cliff Frey: write incomplete, so we are blocked
 	    blocked = true;
     }
