@@ -467,9 +467,6 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 		return 0;
 	}
 
-	unregister_meta(meta);
-
-	/*
 	syslog(LOG_INFO, "store policy for CID: %s\n", meta->get_cid().c_str());
 
 	int status = policy->get(meta);
@@ -499,7 +496,6 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 			delete evicted;
 		}
 	}
-	 */
 	
 	return 0;
 }
@@ -757,7 +753,7 @@ int xcache_controller::unregister_meta(xcache_meta *meta) {
 	temp_cid += meta->get_cid();
 
 	syslog(LOG_DEBUG, "[thread %lu] Removing Route for %s.\n", pthread_self(), temp_cid.c_str());
-	rv = xr.delRoute("CID:7d3fd76c05e8b9f6540387e3acaec358d3acd39a");
+	rv = xr.delRoute(temp_cid);
 	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
 
 	return rv;
