@@ -483,8 +483,10 @@ SelectSet::run_selects_poll(RouterThread *thread)
 		// 31.Oct.2003 - Peter Swain: _pollfds may have grown or
 		// shrunk!
 		p = my_pollfds.begin() + pi;
-		if (p < my_pollfds.end() && fd != p->fd)
-		    p--;
+		if (p < my_pollfds.end() && fd != p->fd){
+            DBG("selectset pollfd grow or shrunk\n");
+            p--;
+        }
 	    }
 }
 
@@ -513,17 +515,11 @@ SelectSet::run_selects_select(RouterThread *thread)
 	wait_ptr = 0;
     thread->set_thread_state_for_blocking(delay_type);
 
-    DBG("selectset before another select\n");
-
     int n = select(n_select_fd, &read_mask, &write_mask, (fd_set*) 0, wait_ptr);
     int was_errno = errno;
 
-    DBG("selectset before another post_select\n");
-
     if (post_select(thread, true))
 	return;
-
-    DBG("selectset after another post_select\n");
 
     thread->set_thread_state(RouterThread::S_RUNSELECT);
     if (n < 0 && was_errno != EINTR)
