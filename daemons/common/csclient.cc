@@ -135,6 +135,7 @@ ControlSocketClient::readline(string &buf)
   buf.resize(0);
   do {
     int res = ::read(_fd, (void *) &c, 1);
+    syslog(LOG_DEBUG, "%c", c);
     if (res < 0)
       return sys_err;
     if (res != 1)
