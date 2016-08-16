@@ -538,6 +538,8 @@ ControlSocket::read_command(connection &conn, const String &handlername, String 
 int
 ControlSocket::write_command(connection &conn, const String &handlername, String data)
 {
+  DBG("ControlSocket write_command at the beginning the handler: %s with data %s\n", handlername.data(), data.data());
+  
   Element *e;
   const Handler* h = parse_handler(conn, handlername, &e);
   if (!h)
@@ -726,8 +728,11 @@ ControlSocket::parse_command(connection &conn, const String &line)
       if (!IntArg().parse(words[2], datalen) || datalen < 0)
 	  return conn.message(CSERR_SYNTAX, "Syntax error in '%s'", command.c_str());
       String data;
+      DBG("ControlSocket parse_command before reading the data from client\n");
       if ((r = conn.read(datalen, data)) != 0)
 	  return r;
+
+      DBG("ControlSocket parse_command after reading the data from client\n");
       if (command[0] == 'R')
 	  return read_command(conn, words[1], data);
       else
