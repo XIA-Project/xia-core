@@ -491,6 +491,9 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 			unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
 			evicted->unlock();
+
+			// can delete here since we have lock to meta map here 
+			delete evicted;
 		}
 	}
 
