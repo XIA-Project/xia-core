@@ -461,8 +461,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-int xcache_controller::__store_policy(xcache_meta *meta)
-{
+int xcache_controller::__store_policy(xcache_meta *meta){
 	// default capacity is unlimited
 	if(capacity == DEFAULT_CAPACITY){
 		return 0;
@@ -489,7 +488,7 @@ int xcache_controller::__store_policy(xcache_meta *meta)
 			evicted->lock();
 			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
 			// already have the lock to meta_map so it's ok to just delete here
-			//unregister_meta(evicted);
+			unregister_meta(evicted);
 			meta_map.erase(evicted->get_cid());
 			evicted->unlock();
 		}
@@ -743,8 +742,7 @@ int xcache_controller::register_meta(xcache_meta *meta)
 	return rv;
 }
 
-int xcache_controller::unregister_meta(xcache_meta *meta)
-{
+int xcache_controller::unregister_meta(xcache_meta *meta) {
 	int rv;
 	std::string empty_str("");
 	std::string temp_cid("CID:");
