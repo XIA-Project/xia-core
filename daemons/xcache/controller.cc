@@ -467,6 +467,9 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 		return 0;
 	}
 
+	unregister_meta(meta);
+
+	/*
 	syslog(LOG_INFO, "store policy for CID: %s\n", meta->get_cid().c_str());
 
 	int status = policy->get(meta);
@@ -496,7 +499,8 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 			delete evicted;
 		}
 	}
-
+	 */
+	
 	return 0;
 }
 
