@@ -14,9 +14,6 @@ from xia_address import *
 import random
 from c_xsocket import *
 
-set_conf("xsockconf.ini","hello_service.py")
-print_conf()
-
 #while(True):
 try:
     SID_HELLO = XmakeNewSID()

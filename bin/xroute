@@ -20,8 +20,9 @@ import sys
 import getopt
 import datetime
 import telnetlib
+import socket
 
-APP_VERSION="0.9"
+APP_VERSION="1.0"
 TITLE="XIA Route version %s"
 
 # default Click host and port (can be changed on cmd line)
@@ -49,7 +50,6 @@ class Options:
 		self._dumpFile = None
 		self._add = []
 		self._remove = []
-		self._devices = []
 		self._types = []
 
 	#
@@ -59,10 +59,10 @@ class Options:
 		try:
 			# FIXME: make the option names more meaningful
 			shortopt = "hpnvif:d:a:r:"
-			opts, args = getopt.getopt(sys.argv[1:], shortopt, 
+			opts, args = getopt.getopt(sys.argv[1:], shortopt,
 				["help", "print", "names", "verbose",
 				"host=", "port=", "file=", "dump=", "add=", "remove=",
-				"device=", "type="])
+				"type="])
 		except getopt.GetoptError, err:
 			# print	 help information and exit:
 			print str(err) # will print something like "option -a not recognized"
@@ -95,8 +95,6 @@ class Options:
 				self._host = a
 			elif o in ("--port"):
 				self._port = a
-			elif o in ("--device"):
-				self._devices.append(a)
 			elif o in ("--type"):
 				self._types.append(a)
 			else:
@@ -114,9 +112,6 @@ where:
 
   --port=<port>    : specify the click control port
 
-  --device=<device>: only output info for the specified device (router0)
-	                 can be specified multiple times on the command line
-
   --type=<xid>     : only output information for the specified XID type
                      can be specified multile times on the command line
 
@@ -132,11 +127,11 @@ where:
   -f <file>        : read add/delete commands from a config file
   --file=<file>      commands are in the form of:
                      add/update:
-                       cmd device,type,xid,port[,nexthop,flags]
-                       add router1,AD,AD0,1
-                       add router0,HID,-,0,HID1,0
+                       cmd type,xid,port[,nexthop,flags]
+                       add AD,AD0,1
+                       add HID,-,0,HID1,0
                      delete:
-                       del host1,CID,CID:0000000000000000000000000000000000000000
+                       del CID,CID:0000000000000000000000000000000000000000
 
   -d <file>        : dump a command file contining the current route tables
   --dump=<file>      the file format will be the same as the above command
@@ -158,7 +153,7 @@ where:
 		if self._printTables == True or self.__haveAction == False:
 			p = True
 		return p
-	
+
 	#
 	# getter methods
 	#
@@ -167,27 +162,24 @@ where:
 
 	def host(self):
 		return self._host
-	
+
 	def port(self):
 		return self._port
 
 	def commandFile(self):
 		return self._commandFile
-	
+
 	def dumpFile(self):
 		return self._dumpFile
 
 	def verbose(self):
 		return self._verbose
-	
+
 	def addCommands(self):
 		return self._add
-	
+
 	def removeCommands(self):
 		return self._remove
-	
-	def devices(self):
-		return self._devices
 
 	def types(self):
 		return self._types
@@ -200,9 +192,8 @@ where:
 #
 class RouterConfig:
 	"""router configuration"""
-	
+
 	def __init__(self, flat):
-		self._devices = []
 		self._xids = {}
 		self._xaliases = {}
 
@@ -210,12 +201,8 @@ class RouterConfig:
 		for entry in entries:
 			entry = entry.strip()
 
-			# FIXME: should this be case insensitive?
 			if entry.startswith("XIAXIDInfo"):
 				self.handleXIDs(entry)
-			elif entry.find("/xtransport ::") > 0:
-				# hacky way of finding the devices that are configured
-				self.addDevice(entry)
 			else:
 				# get other config stuff out of here at some point
 				None
@@ -231,30 +218,15 @@ class RouterConfig:
 			if entry.find(",") > 0:
 				entry = entry.rstrip(",")
 				(alias, xid) = entry.split()
-			
+
 				# create hash maps to go in both directions
 				xid = xid.lower()
 				self._xids[xid] = alias
 				self._xaliases[alias] = xid
-	#
-	# found a device entry, add it to our device list if we dont' have it already
-	#
-	def addDevice(self, text):
-		sep = text.find("/")
-		dev = text[:sep]
-		found = False
-		for d in self._devices:
-			if d == dev:
-				found = True
-		if found == False:
-			self._devices.append(dev)
 
 	#
 	# getter methods
 	#
-	def devices(self):
-		return self._devices
-
 	def XIDs(self):
 		return self._xids
 
@@ -276,13 +248,13 @@ class RouterConfig:
 
 #
 # The main body of the xroute app
-# 
+#
 class XrouteApp:
-	connected = False	
+	connected = False
 	csock = None
-	devices = []
+	device = socket.gethostname().split(".")[0]
 	types = []
-	
+
 	#
 	# the main logic of the xroute app
 	#
@@ -298,11 +270,6 @@ class XrouteApp:
 		self.connectToClick()
 		self.config = RouterConfig(self.readData("flatconfig"))
 
-		# if specified by the user, only get info for the specified devices (router0,...)
-		if (len(self.options.devices()) > 0):
-			self.devices = self.options.devices()
-		else:
-			self.devices = self.config.devices()
 
 		# if specified by the user, only get info for the specified XID types (AD, HID,...)
 		if (len(self.options.types())):
@@ -336,8 +303,7 @@ class XrouteApp:
 
 		# if needed, print the click route tables to stdout
 		if self.options.printTables():
-			for device in self.devices:
-				print(self.getRouteTable(device))
+			print(self.getRouteTable())
 
 		self.shutdown()
 
@@ -352,7 +318,7 @@ class XrouteApp:
 	#
 	# get the ciick statuscode and message
 	# some operations get 2 lines of status message with the code on each
-	# and the second line is more useful, so the caller can specify if we should 
+	# and the second line is more useful, so the caller can specify if we should
 	# die on error, or keep going and loop back for the 2nd line
 	#
 	def checkStatus(self, die):
@@ -487,9 +453,9 @@ class XrouteApp:
 	#
 	# print the specified route table to stdout
 	#
-	def printTable(self, device, table):
+	def printTable(self, table):
 		tfmt = "%s/xrc/n/proc/rt_%s.list"
-		data = self.readData(tfmt % (device, table))
+		data = self.readData(tfmt % (self.device, table))
 
 		text = ""
 		routes = data.split("\n")
@@ -499,7 +465,7 @@ class XrouteApp:
 			if len(parts) != 4:
 				if len(parts) > 1:
 					print "invalid route line: %d %s\n" % (len(parts), route)
-				continue	
+				continue
 			xid = parts[0]
 			port = parts[1]
 			nexthop = parts[2]
@@ -514,8 +480,8 @@ class XrouteApp:
 				if self.options.verbose() == False:
 					nexthop = self.config.getAlias(nexthop)
 
-				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid, 
-						port, self.portType(port), flags, nexthop) 
+				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid,
+						port, self.portType(port), flags, nexthop)
 
 
 #		print "text = %s" % (text)
@@ -525,16 +491,14 @@ class XrouteApp:
 	#
 	# format the route table header and loop through the requested XID tables
 	#
-	def getRouteTable(self, device):
-		text  = device
-		text += "\n"
-		text += "%-5s %-45s %-13s %-8s NEXT HOP\n" % ("TYPE", "XID", "PORT", "FLAGS")
+	def getRouteTable(self):
+		text  = "%-5s %-45s %-13s %-8s NEXT HOP\n" % ("TYPE", "XID", "PORT", "FLAGS")
 		text +=  "-" * 120
 		text += "\n"
 
 		# only print the XID types requested by the user
 		for table in self.types:
-			text += self.printTable(device, table)
+			text += self.printTable(table)
 		return text
 
 	#
@@ -544,16 +508,10 @@ class XrouteApp:
 	#
 	def deleteRoute(self, text):
 		try:
-			(device, table, xid) = text.split(",")
+			(table, xid) = text.split(",")
 		except:
 			self.errorExit("Invalid format for delete command")
 
-		found = False
-		for d in self.devices:
-			if d == device:
-				found = True
-		if found == False:
-			self.errorExit("device %s unknown" % (device));
 		if table not in (KNOWN_XIDS):
 			print "looking up non-standard XID: %s" % table
 		if (xid == None or xid == ""):
@@ -564,9 +522,9 @@ class XrouteApp:
 			# in case we were passed an alias, try to map to an xid
 			xid = self.config.getXID(xid)
 
-		cmd = "%s/xrc/n/proc/rt_%s.remove %s" % (device, table, xid)
+		cmd = "%s/xrc/n/proc/rt_%s.remove %s" % (self.device, table, xid)
 		self.writeData(cmd)
-		print "%s: deleted route for %s:%s" % (device, table, self.config.getAlias(xid))
+		print "deleted route for %s:%s" % (table, self.config.getAlias(xid))
 
 
 	#
@@ -576,30 +534,23 @@ class XrouteApp:
 	#
 	def addRoute(self, text):
 		parts = text.split(",")
-		if len(parts)  < 4 or len(parts) > 6:
+		if len(parts)  < 3 or len(parts) > 5:
 			self.errorExit("Invalid format for add route command")
 
-		device = parts[0]
-		table = parts[1]
-		xid = parts[2]
-		port = parts[3]
+		table = parts[0]
+		xid = parts[1]
+		port = parts[2]
 
-		if len(parts) >= 5:
-			nexthop = parts[4]
+		if len(parts) >= 4:
+			nexthop = parts[3]
 		else:
 			nexthop = ""
 
-		if len(parts) == 6:
-			flags = parts[5]
+		if len(parts) == 5:
+			flags = parts[4]
 		else:
 			flags = 0
-			
-		found = False
-		for d in self.devices:
-			if d == device:
-				found = True
-		if found == False:
-			self.errorExit("device %s unknown" % (device));
+
 		if table not in (KNOWN_XIDS):
 			print "attempting to add a route for a non-standard XID: %s" % table
 		if (xid == None or xid == ""):
@@ -609,22 +560,22 @@ class XrouteApp:
 		if (port == None or port == ""):
 			self.errorExit("port not specified")
 
-		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (device, table, xid, port, nexthop, flags)
+		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (self.device, table, xid, port, nexthop, flags)
 		print cmd
 
 		self.writeData(cmd)
-		print "%s: added route for %s:%s" % (device, table, self.config.getAlias(xid))
+		print "added route for %s:%s" % (table, self.config.getAlias(xid))
 
 
 	#
 	# read a command file and add / delete routes as specified
 	#
 	# format of the file is:
-	# <cmd> <device>,<xid type>,<xid>,[port]
-	#  add router0,AD,AD1,1
-	#  add router1,AD,AD:0123456789012345678901234567890123456789,1
-	#  add router1,HID,-,1
-	#  del router0,CID,CID0
+	# <cmd> <xid type>,<xid>,[port]
+	#  add AD,AD1,1
+	#  add AD,AD:0123456789012345678901234567890123456789,1
+	#  add HID,-,1
+	#  del CID,CID0
 	#
 	# blank lines or lines starting with # are ignored
 	#
@@ -661,14 +612,13 @@ class XrouteApp:
 	def dumpCommands(self):
 		tfmt = "%s/xrc/n/proc/rt_%s.list"
 		ts = datetime.datetime.now()
-		devices = self.config.devices()
 
 		try:
 			f = open(self.options.dumpFile(), "w")
 		except:
 			self.errorExit("Unable to open output file (%s)" % (self.options.dumpFile()))
 
-		f.write("\n# XIA router config generated from %s on %s\n" % 
+		f.write("\n# XIA router config generated from %s on %s\n" %
 				(os.uname()[1], ts.strftime("%Y-%m-%d %H:%M")))
 		f.write("#\n")
 		f.write("# Alias mappings from the xia click configuration\n")
@@ -676,18 +626,15 @@ class XrouteApp:
 		for alias, xid in sorted(self.config.aliases().iteritems()):
 			f.write("# %-10s -> %s\n" % (alias, xid))
 
-		for device in self.devices:
-			f.write("\n")
-			for table in self.types:
-				data = self.readData(tfmt % (device, table))
-				routes = data.split("\n")
-				for route in routes:
-					(xid, sep, port) = route.partition(";")
-					if sep != "" and port != "-1":
-						# FIXME: is using aliases here a good idea?
-						xid = self.config.getAlias(xid)
-						text = "add %s,%s,%s,%s\n" % (device, table, xid, port)
-						f.write(text)
+		for table in self.types:
+			data = self.readData(tfmt % (self.device, table))
+			routes = data.split("\n")
+			for route in routes:
+				if route:
+					# FIXME: is using aliases here a good idea?
+					xid = self.config.getAlias(xid)
+					text = "add %s,%s\n" % (table, route)
+					f.write(text)
 
 		f.close()
 

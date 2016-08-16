@@ -57,8 +57,6 @@ def update_stockfeed(stock):
 
 stock_name= ["ADA",  "BQB", "CKK", "GPR", "HER", "IAK", "KOY", "LUR", "XIA", "YRY" ]
 stock = map(lambda name: Stock(name), stock_name)
-set_conf("xsockconf.ini","stock_service.py")
-print_conf()
 
 try:
 	SID_STOCK = XmakeNewSID()

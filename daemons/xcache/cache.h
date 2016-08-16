@@ -15,8 +15,6 @@ class xcache_controller;
 struct cache_args {
 	xcache_cache *cache;
 	xcache_controller *ctrl;
-	int cache_in_port;
-	int cache_out_port;
 };
 
 struct cache_download {

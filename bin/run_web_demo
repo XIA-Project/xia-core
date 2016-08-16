@@ -15,14 +15,6 @@
 # limitations under the License.
 
 
-# FIXME:
-# the locaitons of the various service executables makes this script fragile
-# as they all currently have to run from the directory they are located in
-# in order to use the correct xsockconf.ini file. It would be good to 
-# a) relocate the services into a common directory instead of being scattered
-# throughout the source tree
-# b) not rely on the xsockconf.ini file if possible
-
 NAME=`basename $0`
 VERBOSE=0
 RUN_PROXY=1

@@ -401,9 +401,6 @@ def get_content_from_cid_list(dstAD, dst4ID, dstHID, cid_list):
     return content
 
 def xia_handler(host, path, http_header, browser_socket):
-    # Configure XSocket so we can talk to click
-	# FIXME: there is no need to reload this on every connection!
-    set_conf("xsockconf.ini", "xiaproxy.py")
 
     if http_header.find('GET /favicon.ico') != -1:
         return

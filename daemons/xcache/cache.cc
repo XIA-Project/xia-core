@@ -227,12 +227,12 @@ void *xcache_cache::run(void *arg)
 	(void)args;
 
 	if ((s = create_click_socket()) < 0) {
-		syslog(LOG_ALERT, "Failed to create a socket on %d\n", args->cache_out_port);
+		syslog(LOG_ALERT, "Failed to create a xcache:click socket\n");
 		pthread_exit(NULL);
 	}
 
 	do {
-		syslog(LOG_DEBUG, "Cache listening for data on port %d\n", args->cache_out_port);
+		syslog(LOG_DEBUG, "Cache listening for data from click\n");
 		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, (struct sockaddr *)&fromaddr, &len);
 		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));

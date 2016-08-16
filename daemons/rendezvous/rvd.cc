@@ -160,9 +160,6 @@ void config(int argc, char** argv)
 		exit(1);
 	}
 
-	// load the config setting for this hostname
-	set_conf("xsockconf.ini", hostname);
-
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen (APPNAME) + 4, 1);
 	sprintf(ident, "%s", APPNAME);

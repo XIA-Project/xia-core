@@ -148,8 +148,6 @@ def put_content_in_dir(dir):
 
 def main():
     global myAD, myHID, mySID, my4ID
-    # Set up connection with click via Xsocket API
-    set_conf("xsockconf.ini", "webserver.py")
         
     try:   
         # Create socket for listening for connections

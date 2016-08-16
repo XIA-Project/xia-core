@@ -814,8 +814,6 @@ void xcache_controller::run(void)
 
 	/* Arguments for the cache thread */
 	args.cache = &cache;
-	args.cache_in_port = getXcacheInPort();
-	args.cache_out_port = getXcacheOutPort();
 	args.ctrl = this;
 
 	/*

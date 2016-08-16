@@ -1,6 +1,6 @@
 import sys
 import os
-                                                                                                                                                                                                                    
+
 # find the path to xia-core
 XIADIR=os.getcwd()
 while os.path.split(XIADIR)[1] != 'xia-core':
@@ -8,12 +8,11 @@ while os.path.split(XIADIR)[1] != 'xia-core':
 sys.path.append(XIADIR + '/api/lib')
 
 from c_xsocket import *
-    
-# Set up connection with click via Xsocket API
-set_conf("xsockconf.ini", "malicious_router_publisher.py")
+
 sock = Xsocket(XSOCK_CHUNK)  # socket for reading local addr
+
 print XreadLocalHostAddr(sock)
-    
+
 # Allocate a local cache slice
 chunk_context = XallocCacheSlice(POLICY_DEFAULT, 0, 0)
 
