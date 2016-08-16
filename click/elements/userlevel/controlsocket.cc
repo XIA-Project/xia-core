@@ -423,8 +423,10 @@ ControlSocket::connection::flush_write(ControlSocket *cs, bool read_needs_proces
 	// don't select writes unless we have data to write (or read needs more
 	// processing)
 	if (out_text.length() || read_needs_processing)
+      DBG("ControlSocket: flush_write: add_select write since we have data to write/read need more processing");
 	    cs->add_select(fd, Element::SELECT_WRITE);
 	else
+      DBG("ControlSocket: flush_write: remove_select write, no more");
 	    cs->remove_select(fd, Element::SELECT_WRITE);
     }
 }
