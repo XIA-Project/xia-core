@@ -270,7 +270,7 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
     return sys_err;
 
   syslog(LOG_DEBUG, "after write to click before write with actual buf: %s\n", buf);
-  syslog(LOG_DEBUG, "buf size: %d, actual size: %d\n", bufsz, strlen(buf));
+  syslog(LOG_DEBUG, "buf size: %d, actual size: %lu\n", bufsz, strlen(buf));
 
   res = ::write(_fd, buf, bufsz);
   if (res < 0)
