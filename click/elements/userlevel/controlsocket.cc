@@ -913,10 +913,13 @@ ControlSocket::selected(int fd, int)
     // The 2nd argument causes write events to remain selected when commands
     // remain to be processed (whether or not CS has data to write).
     conn->flush_write(this, conn->in_text.length() && !blocked);
+    DBG("ControlSocket finished flush_write\n");
 
     // maybe close out
     if ((conn->in_closed && !conn->in_text.length() && !conn->out_text.length())
 	|| conn->out_closed) {
+          DBG("ControlSocket close and remove select\n");
+
 	remove_select(conn->fd, SELECT_READ | SELECT_WRITE);
 	close(conn->fd);
 	if (_verbose)
