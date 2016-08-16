@@ -753,7 +753,7 @@ int xcache_controller::unregister_meta(xcache_meta *meta) {
 	temp_cid += meta->get_cid();
 
 	syslog(LOG_DEBUG, "[thread %lu] Removing Route for %s.\n", pthread_self(), temp_cid.c_str());
-	rv = xr.delRoute(temp_cid);
+	rv = xr.delRoute("CID:7d3fd7bc05e8b9f6e49387e3acaec358d3acd39a");
 	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
 
 	return rv;
