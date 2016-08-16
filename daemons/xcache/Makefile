@@ -18,5 +18,4 @@ $(XCACHE): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 clean:
-	@-rm *.pb.*
 	@-rm $(XCACHE)

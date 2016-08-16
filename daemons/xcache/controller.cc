@@ -114,7 +114,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	Node expected_cid(g.get_final_intent());
 	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
 
-	meta->set_FETCHING();
+	meta->set_state(FETCHING);
 
 	remaining = sizeof(cid_header);
 	offset = 0;
@@ -218,7 +218,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
-	if(!meta->is_AVAILABLE()) {
+	if(!meta->state() == AVAILABLE) {
 		release_meta(meta);
 		return RET_FAILED;
 	}
@@ -504,7 +504,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	register_meta(meta);
 	store_manager.store(meta, data);
 
-	meta->set_AVAILABLE();
+	meta->set_state(AVAILABLE);
 	meta->unlock();
 	unlock_meta_map();
 

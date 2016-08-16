@@ -12,14 +12,16 @@
 
 class xcache_content_store;
 
+typedef enum {
+	AVAILABLE,
+	FETCHING,
+	OVERHEARING,
+	DENY_PENDING,
+} chunk_states;
+
 class xcache_meta {
 private:
-	enum chunk_states {
-		AVAILABLE,
-		FETCHING,
-		OVERHEARING,
-		DENY_PENDING,
-	} state;
+	chunk_states _state;
 
 	pthread_mutex_t meta_lock;
 	/**
@@ -54,6 +56,14 @@ public:
 
 	std::string dest_sid() {
 		return sid;
+	}
+
+	void set_state(chunk_states state) {
+		_state = state;
+	}
+
+	chunk_states state() {
+		return _state;
 	}
 
 	/**
@@ -115,22 +125,6 @@ public:
 //		std::cout << getpid() << " META UNLOCKED " << cid << "\n";
 		return rv;
 	}
-
-#define DEFINE_STATE_MACROS(__state)					\
-	bool is_##__state(void)  {					\
-		return (state == (__state));				\
-	}								\
-	bool set_##__state(void) {					\
-		std::cout << cid << " IS NOW " << #__state << "\n";	\
-		return (state = (__state));				\
-	}
-
-DEFINE_STATE_MACROS(AVAILABLE)
-DEFINE_STATE_MACROS(FETCHING)
-DEFINE_STATE_MACROS(OVERHEARING)
-DEFINE_STATE_MACROS(DENY_PENDING)
-
-#undef DEFINE_STATE_MACROS
 };
 
 #endif
