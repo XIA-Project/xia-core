@@ -451,11 +451,17 @@ SelectSet::run_selects_poll(RouterThread *thread)
 	timeout = -1;
     thread->set_thread_state_for_blocking(delay_type);
 
+    DBG("selectset before another poll\n");
+
     int n = poll(my_pollfds.begin(), my_pollfds.size(), timeout);
     int was_errno = errno;
 
+    DBG("selectset before another post_select\n");
+
     if (post_select(thread, true))
 	return;
+
+    DBG("selectset after another post_select\n");
 
     thread->set_thread_state(RouterThread::S_RUNSELECT);
     if (n < 0 && was_errno != EINTR)
