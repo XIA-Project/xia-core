@@ -53,7 +53,7 @@ void xcache_cache::unparse_xid(struct click_xia_xid_node *node, std::string &xid
 	char *h = hex;
 
 	while (id - node->xid.id < CLICK_XIA_XID_ID_LEN) {
-		sprintf(h, "%02x", *id);
+		sprintf(h, "%02x", (unsigned char)*id);
 		id++;
 		h += 2;
 	}
@@ -75,9 +75,6 @@ struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid,
 
 	total_nodes = xiah->dnode + xiah->snode;
 
-	tcp = (struct xtcp *)((char *)xiah + sizeof(struct click_xia) +
-		 (xiah->dnode + xiah->snode) * sizeof(struct click_xia_xid_node));
-
 	 // get the associated client SID and destination CID
 	for (unsigned i = 0; i < total_nodes; i++) {
 		unsigned type = htonl(xiah->node[i].xid.type);
@@ -88,6 +85,14 @@ struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid,
 			unparse_xid(&xiah->node[i], sid);
 		}
 	}
+
+	if (xiah->nxt != CLICK_XIA_NXT_XTCP) {
+		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
+		return NULL;
+	}
+
+	tcp = (struct xtcp *)((char *)xiah + sizeof(struct click_xia) +
+		 (xiah->dnode + xiah->snode) * sizeof(struct click_xia_xid_node));
 
 	// syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
 	// syslog(LOG_INFO, "XIA plen = %d\n", htons(xiah->plen));
@@ -102,8 +107,13 @@ struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid,
 
 xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid)
 {
+	// if it's not a syn-ack we don't know how much content has already gone by
+	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
+		syslog(LOG_INFO, "skipping %s: partial stream received", cid.c_str());
+		return NULL;
+	}
+
 	// FIXME: this should be wrapped in a mutex
-	std::map<std::string, struct cache_download *>::iterator iter;
 	struct cache_download *download;
 	xcache_meta *meta = new xcache_meta(cid);
 
@@ -158,15 +168,16 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 			return;
 
 		case FETCHING:
-			// FIXME: fetching is only set on client machines, but
-			// they aren't running the cache filter so this code will never
-			// be hit
+			// FIXME: this probably should not be a state, but rather a count of
+			// number of concurrent accessors of this chunk.
+			// fetching should never be an issue here, but only when deleting
+			// content to be sure it is safe to remove.
 			ctrl->release_meta(meta);
 			syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
 			return;
 
 		case DENY_PENDING:
-			// FIXME: nothing ever sets this state
+			// FIXME: should we delete this? nothing ever sets this state
 			ctrl->release_meta(meta);
 			syslog(LOG_INFO, "Already Denied Meta CID=%s", cid.c_str());
 			return;
@@ -186,6 +197,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		return;
 	}
 
+	// get the initial sequence number for this stream
 	uint32_t initial_seq = meta->seq();
 	ctrl->release_meta(meta);
 
@@ -214,11 +226,13 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	//syslog(LOG_INFO, "initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
 
 	// get the cid header if we don't already have it
+	// incrementally build the header if the packet size
+	//  is less than header size
 	if (offset < sizeof(struct cid_header)) {
-		if ((offset + payload_len) > sizeof(struct cid_header)) {
-			len = sizeof(struct cid_header);
+		if ((offset + payload_len) >= sizeof(struct cid_header)) {
+			len = sizeof(struct cid_header) - offset;
 		} else {
-			len = offset + payload_len;
+			len = payload_len;
 		}
 
 		memcpy((char *)&download->header + offset, payload, len);
@@ -227,7 +241,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		payload_len -= len;
 	}
 
-	// and there's data, append it to the download buffer
+	// there's data, append it to the download buffer
 	if (offset >= sizeof(struct cid_header)) {
 		if (download->data == NULL) {
 			download->data = (char *)calloc(ntohl(download->header.length), 1);
@@ -251,7 +265,8 @@ skip_data:
 			free(download->data);
 			free(download);
 		} else {
-			// can we ever get the fin, but be missing data?
+			// FIXME: leave this open in case more data is on the wire
+			// and let garbage collection handle it eventually? or nuke it now?
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
 		}
 	}

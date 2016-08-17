@@ -218,7 +218,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
-	if(!meta->state() == AVAILABLE) {
+	if(meta->state() != AVAILABLE) {
 		release_meta(meta);
 		return RET_FAILED;
 	}
@@ -232,9 +232,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	}
 
 	syslog(LOG_INFO, "Releasing meta\n");
-
 	release_meta(meta);
-
 	syslog(LOG_INFO, "Fetching content from local DONE\n");
 
 	return RET_OK;
@@ -479,25 +477,18 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 int xcache_controller::__store(struct xcache_context * /*context */,
 			       xcache_meta *meta, const std::string *data)
 {
-	lock_meta_map();
 	meta->lock();
 
 	if (verify_content(meta, data) == false) {
-		/*
-		 * Content Verification Failed
-		 */
+		// Content Verification Failed
 		syslog(LOG_ERR, "Content Verification Failed");
 		meta->unlock();
-		unlock_meta_map();
 		return RET_FAILED;
 	}
-
-	meta_map[meta->get_cid()] = meta;
 
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
 		meta->unlock();
-		unlock_meta_map();
 		return RET_FAILED;
 	}
 
@@ -505,8 +496,10 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	store_manager.store(meta, data);
 
 	meta->set_state(AVAILABLE);
+
+	_map.add_meta(meta);
+
 	meta->unlock();
-	unlock_meta_map();
 
 	return RET_SENDRESP;
 }
@@ -584,7 +577,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-
+// FIXME:this should set fetching state so we can't delete the data/route
+// out from under us
 void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 {
 	Graph g(mypath);
@@ -800,11 +794,25 @@ void *xcache_controller::worker_thread(void *arg)
 	return NULL;
 }
 
+// delete any chunks that are not complete but are too stale
+void *xcache_controller::garbage_collector(void *arg)
+{
+	xcache_controller *ctrl = (xcache_controller *)arg;
+
+	while(1) {
+		sleep(GC_INTERVAL);
+
+		meta_map *map = ctrl->get_meta_map();
+		map->walk();
+	}
+}
+
 void xcache_controller::run(void)
 {
 	fd_set fds, allfds;
 	int max, libsocket, rc, sendersocket;
 	struct cache_args args;
+	pthread_t gc_thread;
 
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
@@ -838,6 +846,9 @@ void xcache_controller::run(void)
 	for(int i = 0; i < n_threads; i++) {
 		pthread_create(&threads[i], NULL, worker_thread, (void *)this);
 	}
+
+	// start the garbage collector
+	pthread_create(&gc_thread, NULL, garbage_collector, (void *)this);
 
 	syslog(LOG_INFO, "Entering The Loop\n");
 
@@ -984,48 +995,6 @@ removefd:
 	}
 
 	goto repeat;
-}
-
-xcache_meta *xcache_controller::acquire_meta(std::string cid)
-{
-	lock_meta_map();
-
-	std::map<std::string, xcache_meta *>::iterator i = meta_map.find(cid);
-	if(i == meta_map.end()) {
-		/* We could not find the content locally */
-		unlock_meta_map();
-		return NULL;
-	}
-
-	xcache_meta *meta = i->second;
-	meta->lock();
-
-	return meta;
-
-}
-
-void xcache_controller::release_meta(xcache_meta *meta)
-{
-	unlock_meta_map();
-	if(meta)
-		meta->unlock();
-}
-
-inline int xcache_controller::lock_meta_map(void)
-{
-	return pthread_mutex_lock(&meta_map_lock);
-}
-
-inline int xcache_controller::unlock_meta_map(void)
-{
-	return pthread_mutex_unlock(&meta_map_lock);
-}
-
-void xcache_controller::add_meta(xcache_meta *meta)
-{
-	lock_meta_map();
-	meta_map[meta->get_cid()] = meta;
-	unlock_meta_map();
 }
 
 void xcache_controller::set_conf(struct xcache_conf *conf)
