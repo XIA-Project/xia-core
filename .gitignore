@@ -127,6 +127,7 @@ example/xcmpping
 example/xcmptraceroute
 example/xecho
 arada/waveserver/waveserver
+arada/waveserverip/waveserverip
 
 # output from scripts
 etc/click/host*.click
