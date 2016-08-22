@@ -50,6 +50,7 @@ daemons/xcidrouted/log
 !daemons/xcidrouted/bin/startrouted.sh
 daemons/xcidrouted/stats/
 arada/waveserver/waveserver
+arada/waveserverip/waveserverip
 
 # output from scripts
 etc/click/host*.click
