@@ -86,7 +86,7 @@ struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid,
 		}
 	}
 
-	if (xiah->nxt != CLICK_XIA_NXT_XTCP) {
+	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
 		return NULL;
 	}

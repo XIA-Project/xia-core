@@ -31,25 +31,6 @@ XIAHeader::src_path() const
     return p;
 }
 
-/* Returns layer 3 payload (this includes transport header) */
-const uint8_t*
-XIAHeader::payload() const
-{
-    uint8_t nxt = _hdr->nxt;
-    const uint8_t* p = next_header();
-    while (nxt < CLICK_XIA_NXT_NO)
-    {
-		const struct click_xia_ext * exthdr = reinterpret_cast<const struct click_xia_ext *>(p);
-		nxt = exthdr->nxt;
-		if (exthdr->hlen == 0) {
-			click_chatter("ERROR: xia header length = 0!\n");
-			break;
-		}
-		p += exthdr->hlen;
-    }
-    return p;
-}
-
 
 XIAHeaderEncap::XIAHeaderEncap()
 {
@@ -59,7 +40,7 @@ XIAHeaderEncap::XIAHeaderEncap()
     _hdr->ver = 1;
     _hdr->last = static_cast<int8_t>(-1);
     _hdr->hlim = static_cast<uint8_t>(250);
-    _hdr->nxt = CLICK_XIA_NXT_NO;
+    _hdr->nxt = CLICK_XIA_NXT_DATA;
     assert(hdr_size() == size);
 }
 
@@ -159,7 +140,7 @@ XIAHeaderEncap::encap(Packet* p_in, bool adjust_plen) const
     if (adjust_plen)
         reinterpret_cast<struct click_xia*>(p->data())->plen = htons(payload_len);
     p->set_xia_header(reinterpret_cast<struct click_xia*>(p->data()), header_len);
-    Timestamp now = Timestamp::now();   
+    Timestamp now = Timestamp::now();
     p->timestamp_anno() = now;
 
     return p;

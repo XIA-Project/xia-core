@@ -1002,7 +1002,7 @@ XStream::tcp_output()
 	WritablePacket *p = NULL;
 	WritablePacket *tcp_payload = NULL;
 
-	ti.th_nxt = CLICK_XIA_NXT_NO;
+	ti.th_nxt = CLICK_XIA_NXT_DATA;
 
 	for (int i=0; i < MAX_TCPOPTLEN; i++) {
 		opt[i] = 0;
@@ -1290,7 +1290,7 @@ send:
 	// sent to its tcp-speaking destination :-)
 	//Add XIA headers
 	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_XTCP);
+	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim);
 	xiah.set_dst_path(dst_path);
@@ -1351,7 +1351,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 		th.th_win = htons((u_short)win);
 	}
 
-	th.th_nxt = CLICK_XIA_NXT_NO;
+	th.th_nxt = CLICK_XIA_NXT_DATA;
 	th.th_seq =   htonl(seq+1);
 	th.th_ack =   htonl(ack);
 	th.th_flags = htons(flags);
@@ -1359,7 +1359,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_XTCP);
+	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim);
 	xiah.set_dst_path(dst_path);
@@ -1855,7 +1855,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					continue;
 				to->to_flags |= TOF_SACKPERM;
 				break;
-				case TCPOPT_SACK:
+			case TCPOPT_SACK:
 				if (optlen <= 2 || (optlen - 2) % TCPOLEN_SACK != 0)
 					continue;
 				if (flags & TO_SYN)

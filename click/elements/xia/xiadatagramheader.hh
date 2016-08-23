@@ -25,9 +25,9 @@ public:
 	// read from packet p->network_header() should point to XIA header
 	DatagramHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_DGRAM);
+		assert(xh.nxt() == CLICK_XIA_NXT_XDGRAM);
 
-		if (xh.nxt() == CLICK_XIA_NXT_DGRAM) {
+		if (xh.nxt() == CLICK_XIA_NXT_XDGRAM) {
 			_hdr = reinterpret_cast<const struct xdgram*>(xh.next_header());
 		} else {
 			_hdr = NULL;
@@ -49,7 +49,7 @@ class DatagramHeaderEncap
 public:
     DatagramHeaderEncap() {
 		_hdr = (struct xdgram*)calloc(1, sizeof(struct xdgram));
-		_hdr->th_nxt = CLICK_XIA_NXT_NO;
+		_hdr->th_nxt = CLICK_XIA_NXT_DATA;
 		_hdr->th_off = sizeof(struct xdgram) >> 2;
 	}
 

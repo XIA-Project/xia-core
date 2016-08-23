@@ -43,9 +43,9 @@ sock::sock(
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
 	if (type == SOCK_STREAM)
-		nxt_xport = CLICK_XIA_NXT_XTCP;
+		nxt_xport = CLICK_XIA_NXT_XSTREAM;
 	else
-		nxt_xport = CLICK_XIA_NXT_DGRAM;
+		nxt_xport = CLICK_XIA_NXT_XDGRAM;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -77,9 +77,9 @@ sock::sock(
 	sock_type = type;
 	hlim = HLIM_DEFAULT;
 	if (type == SOCK_STREAM)
-		nxt = CLICK_XIA_NXT_XTCP;
+		nxt = CLICK_XIA_NXT_XSTREAM;
 	else
-		nxt = CLICK_XIA_NXT_DGRAM;
+		nxt = CLICK_XIA_NXT_XDGRAM;
 	refcount = 1;
 	xcacheSock = false;
 	id = sockid;
@@ -100,7 +100,7 @@ sock::sock() {
 	timer_on = false;
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
-	nxt_xport = CLICK_XIA_NXT_NO;
+	nxt_xport = CLICK_XIA_NXT_DATA;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -746,11 +746,11 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			ProcessXcmpPacket(p_in);
 			return;
 
-		case CLICK_XIA_NXT_XTCP:
+		case CLICK_XIA_NXT_XSTREAM:
 			ProcessStreamPacket(p_in);
 			return;
 
-		case CLICK_XIA_NXT_DGRAM:
+		case CLICK_XIA_NXT_XDGRAM:
 			ProcessDatagramPacket(p_in);
 			return;
 
@@ -871,7 +871,10 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					 // FIXME: can we do this without having to convert to strings?
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
-					str_local_addr += _destination_xid.unparse().c_str();
+//					str_local_addr += _xcache_sid.unparse();
+//					str_local_addr += " ";
+					str_local_addr += _destination_xid.unparse();
+
 					sk->dst_path.parse_re(str_local_addr);
 				}
 
@@ -2159,7 +2162,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	//DBG("blocking = %d\n", sk->isBlocking);
 
 	sk->hlim = HLIM_DEFAULT;
-	sk->nxt_xport = CLICK_XIA_NXT_XTCP;
+	sk->nxt_xport = CLICK_XIA_NXT_XSTREAM;
 
 	if (!sk->pending_connection_buf.empty()) {
 		sock *new_sk = sk->pending_connection_buf.front();
@@ -3305,7 +3308,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		p = xiah.encap(just_payload_part, false);
 
 	} else {
-		xiah.set_nxt(CLICK_XIA_NXT_DGRAM);
+		xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
 		xiah.set_plen(pktPayloadSize);
 
 		//Add XIA Transport headers
