@@ -38,7 +38,7 @@
 #define BUFSIZE 1000
 
 #define MB(__mb) (__mb * 1024 * 1024)
-#define MAXCHUNKSIZE MB(5)
+#define MAXCHUNKSIZE MB(10)
 
 int verbose = 0;
 char name[256];
