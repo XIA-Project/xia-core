@@ -423,10 +423,8 @@ ControlSocket::connection::flush_write(ControlSocket *cs, bool read_needs_proces
 	// don't select writes unless we have data to write (or read needs more
 	// processing)
 	if (out_text.length() || read_needs_processing){
-    DBG("ControlSocket flush_write: add_select to the fd %d\n", fd);
     cs->add_select(fd, Element::SELECT_WRITE);
   } else{
-    DBG("ControlSocket flush_write: remove_select to the fd %d\n", fd);
     cs->remove_select(fd, Element::SELECT_WRITE);
   }
       
@@ -541,9 +539,7 @@ ControlSocket::read_command(connection &conn, const String &handlername, String 
 
 int
 ControlSocket::write_command(connection &conn, const String &handlername, String data)
-{
-  DBG("ControlSocket write_command at the beginning the handler: %s with data %s\n", handlername.data(), data.data());
-  
+{  
   Element *e;
   const Handler* h = parse_handler(conn, handlername, &e);
   if (!h)
@@ -559,14 +555,10 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
     return conn.message(CSERR_DATA_TOO_BIG, "Data too large for write handler '" + handlername + "'");
 #endif
 
-  DBG("ControlSocket write_command after parsing the handler: %s with data %s\n", handlername.data(), data.data());
-
   ControlSocketErrorHandler errh;
 
   // call handler
   int result = h->call_write(data, e, &errh);
-
-  DBG("ControlSocket write_command after call write handler\n");
 
   // add a generic error message for certain handler codes
   int code = errh.error_code();
@@ -577,8 +569,6 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
       code = CSERR_OK_HANDLER_WARNING;
   }
 
-  DBG("ControlSocket write_command after getting the error code\n");
-
   String msg;
   if (code == CSERR_OK)
     msg = "Write handler '" + handlername + "' OK";
@@ -588,7 +578,6 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
     msg = "Write handler '" + handlername + "' error";
   conn.transfer_messages(code, msg, &errh);
 
-  DBG("ControlSocket write_command after transferring the mesasges\n");
   return 0;
 }
 
@@ -732,11 +721,8 @@ ControlSocket::parse_command(connection &conn, const String &line)
       if (!IntArg().parse(words[2], datalen) || datalen < 0)
 	  return conn.message(CSERR_SYNTAX, "Syntax error in '%s'", command.c_str());
       String data;
-      DBG("ControlSocket parse_command before reading the data from client\n");
       if ((r = conn.read(datalen, data)) != 0)
 	  return r;
-
-        DBG("ControlSocket parse_command after reading the data from client\n");
       if (command[0] == 'R')
 	  return read_command(conn, words[1], data);
       else
@@ -830,7 +816,6 @@ ControlSocket::initialize_connection(int fd)
 void
 ControlSocket::selected(int fd, int)
 {
-    DBG("ControlSocket selected!\n");
     if (fd == _socket_fd) {
 	union { struct sockaddr_in in; struct sockaddr_un un; } sa;
 #if HAVE_ACCEPT_SOCKLEN_T
@@ -896,20 +881,14 @@ ControlSocket::selected(int fd, int)
 	    String line(in_text, line_end);
 	    conn->inpos = line_end - conn->in_text.begin();
 
-      DBG("ControlSocket selected before parse_command: %s\n", line.data());
 	    // parse each individual command
 	    if (parse_command(*conn, line) > 0) {
 		// more data to come, so wait
 		conn->inpos = oldpos;
 		blocked = true;
-
-      DBG("ControlSocket selected need blocking\n");
-
 	    } else
 		connection::contract(conn->in_text, conn->inpos);
 	} else
-      DBG("ControlSocket selected need blocking since write incomplete\n");
-
 	    // 12.Jul.2006, Cliff Frey: write incomplete, so we are blocked
 	    blocked = true;
     }
@@ -918,13 +897,10 @@ ControlSocket::selected(int fd, int)
     // The 2nd argument causes write events to remain selected when commands
     // remain to be processed (whether or not CS has data to write).
     conn->flush_write(this, conn->in_text.length() && !blocked);
-    DBG("ControlSocket finished flush_write\n");
 
     // maybe close out
     if ((conn->in_closed && !conn->in_text.length() && !conn->out_text.length())
 	|| conn->out_closed) {
-          DBG("ControlSocket close and remove select\n");
-
 	remove_select(conn->fd, SELECT_READ | SELECT_WRITE);
 	close(conn->fd);
 	if (_verbose)
