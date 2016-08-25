@@ -113,7 +113,7 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_ack = ntohl(tcph->th_ack);
 	ti.ti_off = tcph->th_off;
 	ti.ti_flags = ntohs(tcph->th_flags);
-	ti.ti_win = ntohs(tcph->th_win);
+	ti.ti_win = ntohl(tcph->th_win);
 	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 
 	//printf("\t\t\ttcpinput flag is %d\n", ti.ti_flags);
@@ -1243,7 +1243,7 @@ send:
 		win = (long) (tp->rcv_adv - tp->rcv_nxt);
 
 	// Set the tcp header window size we will advertisement
-	ti.th_win = htons((u_short) (win >> tp->rcv_scale)) ;
+	ti.th_win = htonl((u_short) (win >> tp->rcv_scale)) ;
 
 	tp->snd_up = tp->snd_una;
 
@@ -1345,10 +1345,10 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	if (! (flags & XTH_RST)) {
 		flags = XTH_ACK;
-		th.th_win = htons((u_short)(win >> tp->rcv_scale));
+		th.th_win = htonl((u_short)(win >> tp->rcv_scale));
 
 	} else {
-		th.th_win = htons((u_short)win);
+		th.th_win = htonl((u_short)win);
 	}
 
 	th.th_nxt = CLICK_XIA_NXT_DATA;
