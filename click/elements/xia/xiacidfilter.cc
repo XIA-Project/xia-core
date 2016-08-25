@@ -5,7 +5,6 @@
 #include <click/glue.hh>
 #include <click/packet_anno.hh>
 #include <iostream>
-#include <click/xiatransportheader.hh>
 #include "xlog.hh"
 
 CLICK_DECLS

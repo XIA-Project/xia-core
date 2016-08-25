@@ -533,6 +533,7 @@ clean_conf_and_keys()
 	rm -f $XIADIR/key/*
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
+	rm -f $XIADIR/etc/hosts.xia
 	rm -f $XIADIR/etc/xsockconf.ini
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
