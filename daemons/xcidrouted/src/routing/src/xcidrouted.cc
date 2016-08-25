@@ -710,7 +710,8 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	// sequence number but higher ttl need to be propagated further and 
 	// we could receive message with lower ttl first.
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end() &&
-		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
+		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000 &&
+		routeState.HID2Seq[msg.senderHID] - msg.seq < MAX_SEQ_DIFF){	
 		// we must have seen this sequence number before since all messages 
 		// are sent in order
 		if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
