@@ -98,7 +98,7 @@ char hnamebuf[MAXHOSTNAMELEN];
 int npackets;
 int preload = 0;		/* number of packets to "preload" */
 int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
-int ident;
+short ident;
 
 int nreceived = 0;		/* # of packets we got back */
 int timing = 0;
@@ -198,13 +198,13 @@ int main(int argc, char **argv)
 	if (argc == 4)
 		preload = atoi(av[3]);
 
-	ident = getpid() & 0xFFFF;
+	ident = htons(getpid() & 0xFFFF);
 
 	if((s = Xsocket(AF_XIA, SOCK_RAW, 0)) < 0) {
 	  perror("ping: socket");
 	  exit(5);
 	}
-	
+
 	int nxt = XPROTO_XCMP;
 	if (Xsetsockopt(s, XOPT_NEXT_PROTO, (const void*)&nxt, sizeof(nxt)) < 0) {
 	  printf("Xsetsockopt failed on XOPT_NEXT_PROTO\n");
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
             exit(-1);
         }
     }
-	
+
 	Graph g(&whereto);
 	printf("PING %s: %ld data bytes\n", g.dag_string().c_str(), (long int)datalen);
 
@@ -264,10 +264,10 @@ int main(int argc, char **argv)
 
 /*
  * 			C A T C H E R
- * 
+ *
  * This routine causes another PING to be transmitted, and then
  * schedules another SIGALRM for interval seconds from now.
- * 
+ *
  * Bug -
  * 	Our sense of time will slowly skew (ie, packets will not be launched
  * 	exactly at 1-second intervals).  This does not affect the quality
@@ -302,7 +302,7 @@ void catcher()
 
 /*
  * 			P I N G E R
- * 
+ *
  * Compose and transmit an ICMP ECHO REQUEST packet.  The IP packet
  * will be added on by the kernel.  The ID field is our UNIX process ID,
  * and the sequence number is an ascending integer.  The first 8 bytes
@@ -321,7 +321,7 @@ void pinger()
 	icp->icmp_type = ICMP_ECHO;
 	icp->icmp_code = 0;
 	icp->icmp_cksum = 0;
-	icp->icmp_seq = ntransmitted++;
+	icp->icmp_seq = htons(ntransmitted++);
 	icp->icmp_id = ident;		/* ID */
 
 	cc = datalen+8;			/* skips ICMP portion */
@@ -403,9 +403,9 @@ void pr_pack(u_char *buf, int cc, char *from)
 
 	gettimeofday( &tv, &tz );
 
-	
+
 	xp = (struct xip *) buf;
-	
+
    	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
 
 	/*
@@ -433,7 +433,7 @@ void pr_pack(u_char *buf, int cc, char *from)
 	}
 	cc -= hlen;
 	icp = (struct icmp *)(buf + hlen);
-	
+
 
 	if( (!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY )  {
 		printf("%d bytes from %s: icmp_type=%d (%s) icmp_code=%d\n",
@@ -464,8 +464,8 @@ void pr_pack(u_char *buf, int cc, char *from)
 		if(pingflags != FLOOD) {
 			printf("%d bytes from %s: icmp_seq=%d", cc,
 				   from,
-			  icp->icmp_seq );	/* DFM */
-			if (timing) 
+			  ntohs(icp->icmp_seq));	/* DFM */
+			if (timing)
 				printf(" time=%d ms\n", triptime );
 			else
 				putchar('\n');
@@ -516,14 +516,14 @@ u_short in_cksum(struct icmp *addr, int len)
 	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
 	sum += (sum >> 16);			/* add carry */
 	answer = ~sum;				/* truncate to 16 bits */
-	return (answer);
+	return htons(answer);
 }
 
 /*
  * 			T V S U B
- * 
+ *
  * Subtract 2 timeval structs:  out = out - in.
- * 
+ *
  * Out is assumed to be >= in.
  */
 void tvsub( struct timeval *out, struct timeval *in )
@@ -555,7 +555,7 @@ void finish()
 		if( nreceived > ntransmitted)
 			printf("-- somebody's printing up packets!");
 		else
-			printf("%d%% packet loss", 
+			printf("%d%% packet loss",
 			  (int) (((ntransmitted-nreceived)*100) /
 			  ntransmitted));
 	}

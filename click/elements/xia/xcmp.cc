@@ -27,8 +27,6 @@
 #include <click/packet_anno.hh>
 CLICK_DECLS
 
-#define DEBUG 1
-
 // no initialization needed
 XCMP::XCMP()
 {
@@ -41,7 +39,7 @@ XCMP::~XCMP()
 
 }
 
-// user must specify the XIAPath (ie. RE AD0 HID0) of the host 
+// user must specify the XIAPath (ie. RE AD0 HID0) of the host
 // that this element resides on
 int
 XCMP::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -121,7 +119,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
     size_t xlen = xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()+8;
 
     // make enough room for payload
-    if (type==0 && xlen< xs+hdr.plen()) 
+    if (type==0 && xlen< xs+hdr.plen())
         xlen = xs+hdr.plen();
 
     assert(xlen<1500);
@@ -132,7 +130,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
         // so the sender can figure out what ping our pong refers to)
         memcpy(msg, hdr.payload(), hdr.plen());
     }
- 
+
     // copy the correct route redirect address into the packet if needed
     if(lastaddr && nxthop) {
 	memcpy(&msg[xs], lastaddr, sizeof(struct click_xia_xid));
@@ -143,20 +141,20 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
     // strictly speaking, this first 8 bytes don't get us anything,
     // but for the sake of similarity to ICMP we include them.
     memcpy(&msg[xs+sizeof(struct click_xia_xid)*2], hdr.hdr(), hdr.hdr_size()); // copy XIP header
-    memcpy(&msg[xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()], 
+    memcpy(&msg[xs+sizeof(struct click_xia_xid)*2+hdr.hdr_size()],
 	       hdr.payload(), 8); // copy first 8 bytes of datagram
 
     struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(msg);
-    xcmph->type = type; 
+    xcmph->type = type;
     xcmph->code = code;
     xcmph->cksum = 0;
     // update the checksum
     uint16_t checksum = in_cksum((u_short *)msg, xlen);
     xcmph->cksum = checksum;
-		
+
     // create a packet to store the message in
     WritablePacket *p = Packet::make(256, msg, xlen, 0);
-		
+
     // encapsulate the packet within XCMP
     XIAHeaderEncap encap;
     encap.set_nxt(CLICK_XIA_NXT_XCMP);   // XCMP
@@ -166,7 +164,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid *last
     } else {
         encap.set_src_path(hdr.dst_path());
     }
-		
+
     // clear the paint
     SET_XIA_PAINT_ANNO(p, DESTINED_FOR_LOCALHOST);
 
@@ -196,15 +194,15 @@ XCMP::processBadForwarding(Packet *p_in) {
     XID lnode(lastnode.xid);
 
     if(DEBUG)
-        click_chatter("%s: %s sent me a packet that should route on its local network (Dst: %s)\n", 
-                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(), 
+        click_chatter("%s: %s sent me a packet that should route on its local network (Dst: %s)\n",
+                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(),
                       XID(lastnode.xid).unparse().c_str());
 
     // get the next hop information stored in the packet annotation
     XID nxt_hop = p_in->nexthop_neighbor_xid_anno();
 
     sendXCMPPacket(p_in, XCMP_REDIRECT, XCMP_REDIRECT_HOST, &lnode.xid(), &nxt_hop.xid(), &_src_path); // send a redirect
-	   
+
     if(DEBUG)
         click_chatter("%s: Redirect sent\n", _src_path.unparse().c_str());
 
@@ -224,13 +222,13 @@ XCMP::processUnreachable(Packet *p_in) {
 
     String broadcast_xid(BHID);  // broadcast HID
     XID bcast_xid;
-    bcast_xid.parse(broadcast_xid);    
+    bcast_xid.parse(broadcast_xid);
 
     XIAPath dst_path = hdr.dst_path();
     if (!dst_path.is_valid()) {
         click_chatter("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str() );
-	        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
-                      hdr.src_path().unparse().c_str(), 
+	        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(),
+                      hdr.src_path().unparse().c_str(),
                       hdr.dst_path().unparse().c_str());
         return;
     }
@@ -244,16 +242,17 @@ XCMP::processUnreachable(Packet *p_in) {
         return;
     }
 
-    if(DEBUG)
-        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(), 
-                      hdr.src_path().unparse().c_str(), 
+#ifdef DEBUG
+        click_chatter("%s: Dest (S: %s , D: %s) Unreachable\n", _src_path.unparse().c_str(),
+                      hdr.src_path().unparse().c_str(),
                       hdr.dst_path().unparse().c_str());
-
+#endif
     sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, NULL, NULL, &_src_path); // send an undeliverable message
 
-    if(DEBUG)
-        click_chatter("%s: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(), 
+#ifdef DEBUG
+        click_chatter("%s: Dest Unreachable sent to %s\n", _src_path.unparse().c_str(),
                       hdr.src_path().unparse().c_str());
+  #endif
 
     return;
 }
@@ -261,14 +260,14 @@ XCMP::processUnreachable(Packet *p_in) {
 // process a data packet that had expired
 void
 XCMP::processExpired(Packet *p_in) {
-    if(DEBUG)
+#ifdef DEBUG
         click_chatter("%s: HLIM Exceeded\n", _src_path.unparse().c_str());
-    
+#endif
     sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_REASSEMBLY , NULL, NULL, &_src_path); // send a TTL expire message
-  		
-    if(DEBUG)
+
+#ifdef DEBUG
         click_chatter("%s: TIME EXCEEDED sent\n", _src_path.unparse().c_str());
-		
+#endif
     return;
 }
 
@@ -276,17 +275,17 @@ XCMP::processExpired(Packet *p_in) {
 void
 XCMP::gotPing(const Packet *p_in) {
     const XIAHeader hdr(p_in);
-    if(DEBUG)
-        click_chatter("%s: PING received; client seq = %u\n", _src_path.unparse().c_str(), 
-                      *(uint16_t*)(hdr.payload() + 6));
-
+#ifdef DEBUG
+        click_chatter("%s: PING received; client seq = %u\n", _src_path.unparse().c_str(),
+                      ntohs(*(uint16_t*)(hdr.payload() + 6)));
+#endif
     sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL, NULL, NULL);
 
     /*
     // TODO: What is this?
     // set the dst ip anno for arp
     re = hdr.src_path().unparse();
-		
+
 
     for(i = 0; i < strlen(re.c_str()); i++)
     if(re.c_str()[i] == 'H') break;
@@ -305,34 +304,38 @@ XCMP::gotPing(const Packet *p_in) {
     //click_chatter("src = %s\n", hdr.src_path().unparse().c_str());
     */
 
-    if(DEBUG)
-        click_chatter("%s: PONG sent; client seq = %u\n", _src_path.unparse().c_str(), 
-                      *(uint16_t*)(p_in->data() + 6));
+#ifdef DEBUG
+        click_chatter("%s: PONG sent; client seq = %u\n", _src_path.unparse().c_str(),
+                      ntohs(*(uint16_t*)(p_in->data() + 6)));
+#endif
 }
 
 // got pong, send up
 void
 XCMP::gotPong(Packet *p_in) {
     XIAHeader hdr(p_in);
-    if(DEBUG)
-        click_chatter("%s: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), *(uint16_t*)(hdr.payload() + 6));
+#ifdef DEBUG
+        click_chatter("%s: PONG recieved; client seq = %u\n", _src_path.unparse().c_str(), ntohs(*(uint16_t*)(hdr.payload() + 6)));
+#endif
     sendUp(p_in);
 }
 
 // got expiry packet, send up
 void
 XCMP::gotExpired(Packet *p_in) {
-    if(DEBUG)
+#ifdef DEBUG
         click_chatter("%s: Received TIME EXCEEDED\n", _src_path.unparse().c_str());
+#endif
     sendUp(p_in);
 }
 
 // got unreachable packet, send up
 void
 XCMP::gotUnreachable(Packet *p_in) {
-    if(DEBUG)
+#ifdef DEBUG
         click_chatter("%s: Received UNREACHABLE\n", _src_path.unparse().c_str());
-    sendUp(p_in);		
+#endif
+    sendUp(p_in);
 }
 
 // got redirect packet, send up
@@ -342,7 +345,7 @@ void
 XCMP::gotRedirect(Packet *p_in) {
     if(DEBUG)
         click_chatter("%s: Received REDIRECT\n", _src_path.unparse().c_str());
-    
+
     XIAHeader hdr(p_in);
     const uint8_t *pay = hdr.payload();
     const size_t xs = sizeof(struct click_xia_xcmp);
@@ -354,13 +357,13 @@ XCMP::gotRedirect(Packet *p_in) {
     badhdr = new XIAHeader((const struct click_xia *)(&pay[xs+sizeof(struct click_xia_xid)*2]));
     if(DEBUG)
         click_chatter("%s: REDIRECT INFO: %s told me (%s) that in order to send to %s, I should first send to %s\n",
-                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(), 
+                      _src_path.unparse().c_str(), hdr.src_path().unparse().c_str(),
                       hdr.dst_path().unparse().c_str(), baddest.unparse().c_str(), newroute.unparse().c_str());
-		
+
     delete badhdr;
 
     // limit the max size for safety
-    const size_t msize = 1024; 
+    const size_t msize = 1024;
     char msg[msize];
 
     // truncate
@@ -372,7 +375,7 @@ XCMP::gotRedirect(Packet *p_in) {
     }
 
     memcpy(msg, hdr.payload(), cplen);
-				
+
     // create a packet to store the message in
     WritablePacket *p = Packet::make(256, msg, cplen, 0);
 
@@ -390,7 +393,7 @@ XCMP::gotRedirect(Packet *p_in) {
     // paint the packet so the upper level routing process
     // knows to update its table
     SET_XIA_PAINT_ANNO(p, 1);
-		
+
     // send the Route Update to Host
     output(1).push(encap.encap(p));
 
@@ -440,7 +443,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
     case XCMP_ECHO: // PING
         gotPing(p_in);
         break;
-	  
+
     case XCMP_ECHOREPLY: // PONG
         gotPong(p_in);
         break;
@@ -452,7 +455,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
     case XCMP_UNREACH: // XID unreachable
         gotUnreachable(p_in);
 		break;
-		
+
 	//NITIN disable XCMP REDIRECT messages
 	/*
     case XCMP_REDIRECT: // redirect
@@ -467,7 +470,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
     }
 }
 
-// run when reacting to a packet received. decides what to 
+// run when reacting to a packet received. decides what to
 // do based on the type of packet recieved
 void
 XCMP::push(int, Packet *p_in)
@@ -488,7 +491,7 @@ XCMP::push(int, Packet *p_in)
  *                      I N _ C K S U M
  *
  * Checksum routine for Internet Protocol family headers (C Version)
- * 
+ *
  */
 u_short XCMP::in_cksum(u_short *addr, int len) {
     register int nleft = len;
@@ -523,7 +526,7 @@ u_short XCMP::in_cksum(u_short *addr, int len) {
     sum = (sum >> 16) + (sum & 0xffff);     /* add hi 16 to low 16 */
     sum += (sum >> 16);                     /* add carry */
     answer = ~sum;                          /* truncate to 16 bits */
-    return (answer);
+    return htons(answer);
 }
 
 CLICK_ENDDECLS
