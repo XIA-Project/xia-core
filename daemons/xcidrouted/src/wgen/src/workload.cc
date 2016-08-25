@@ -186,7 +186,7 @@ void ClientWorkload::generateVideoWorkload(const ConfigParser* parser){
 			double currRand = (double)rand()/(double)RAND_MAX;
 			if(currRand > currFrequency){
 				break;
-			} 
+			}
 
 			double nextTime = -1*log(currRand)/parser->rateRequests;	// this is in seconds
 			RequestProperty currRequestProperty = {currVideoId, k, parser->chunkSize, nextTime*1000};
