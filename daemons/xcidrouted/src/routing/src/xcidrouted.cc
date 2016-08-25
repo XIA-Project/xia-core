@@ -707,9 +707,10 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	}
 
 	// need to check both the sequence number and ttl since message with lower
-	// sequence number but higher ttl need to be propagated further
+	// sequence number but higher ttl need to be propagated further and 
+	// we could receive message with lower ttl first.
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end() &&
-		msg.seq < routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
+		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
 		// we must have seen this sequence number before since all messages 
 		// are sent in order
 		if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
@@ -727,13 +728,21 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	set<string> advertiseDeletion;
 	// remove the entries that need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
-		if(routeState.CIDRoutes.find(*it) != routeState.CIDRoutes.end()){
-			CIDRouteEntry currEntry = routeState.CIDRoutes[*it];
+		string currDelCID = *it;
+		bool hasDelCandidate = false;
+
+		// if CID route entries has this CID
+		if(routeState.CIDRoutes.find(currDelCID) != routeState.CIDRoutes.end()){
+			CIDRouteEntry currEntry = routeState.CIDRoutes[currDelCID];
 
 			// remove an entry only if it is from the same host
 			if(currEntry.dest == msg.senderHID){
-				routeState.CIDRoutes.erase(*it);
-				xr.delRouteCIDRouting(*it);
+				routeState.CIDRoutes.erase(currDelCID);
+				xr.delRouteCIDRouting(currDelCID);
+			
+				if(currEntry.cost == msg.distance){
+					hasDelCandidate = true;
+				}
 			}
 		}
 
@@ -747,24 +756,28 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		// 		already AND broadcast is reliable and in-order AND it is shorter 
 		// 		than CID routes from other routers through this router. So routers 
 		// 		receiving the broadcast don't have routes in the deletion message.
-
-		if(routeState.localCIDs.find(*it) == routeState.localCIDs.end()){			
-			advertiseDeletion.insert(*it);
+		if(hasDelCandidate && routeState.localCIDs.find(currDelCID) == routeState.localCIDs.end()){
+			// FIXME: what if routers all have different TTL?
+			advertiseDeletion.insert(currDelCID);
 		}
 	}
 
-	// then check for each CID if it is the closest for current router
+	// then check for each CID if it is the closest for the current router
 	set<string> advertiseAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
 
 		// if the CID is not stored locally
-		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){			
-			advertiseAddition.insert(currNewCID);
+		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
 			// and the CID is not encountered before or it is encountered before 
 			// but the distance is longer then
 			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end() 
 				|| routeState.CIDRoutes[currNewCID].cost > msg.distance){
+
+				// FIXME: what if routers all have different TTL?
+				advertiseAddition.insert(currNewCID);
+
+				// set corresponding CID route entries
 				routeState.CIDRoutes[currNewCID].cost = msg.distance;
 				routeState.CIDRoutes[currNewCID].port = neighbor.port;
 				routeState.CIDRoutes[currNewCID].nextHop = neighbor.HID;
