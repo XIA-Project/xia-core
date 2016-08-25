@@ -740,7 +740,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 			if(currEntry.dest == msg.senderHID){
 				routeState.CIDRoutes.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
-			
+
 				if(currEntry.cost == msg.distance){
 					hasDelCandidate = true;
 				}
@@ -791,7 +791,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 
 	// update the message and broadcast to other neighbor
 	// 	iff there are something meaningful to broadcast.
-	if(msg.ttl - 1 > 0 && (advertiseAddition.size() > 0 || msg.delCIDs.size() > 0)){
+	if(msg.ttl - 1 > 0 && (advertiseAddition.size() > 0 || advertiseDeletion.size() > 0)){
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
