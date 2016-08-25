@@ -1136,7 +1136,7 @@ send:
 		if ((tp->t_flags & TF_NOOPT) == 0) {
 			u_short mss;
 			opt[0] = TCPOPT_MAXSEG;
-			opt[1] = 4;
+			opt[1] = TCPOLEN_MAXSEG >> 2; // pack len in multiples of 4 bytes
 			mss = htons((u_short)tcp_mss(0));
 			memcpy( &(opt[2]), &mss, sizeof(mss)) ;
 			optlen = 4;
@@ -1148,10 +1148,9 @@ send:
 				((flags & XTH_ACK) == 0 ||
 				 (tp->t_flags & TF_RCVD_SCALE))) {
 				*((u_long *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
-					TCPOPT_NOP << 24 |
-					TCPOPT_WSCALE << 16 |
-					TCPOLEN_WSCALE << 8 |
-					tp->request_r_scale);
+					TCPOPT_WSCALE << 24 |
+					(TCPOLEN_WSCALE >> 2) << 16 |
+					(u_short)tp->request_r_scale); // len is 4-byte multiple now
 				optlen += 4;
 			}
 		}
@@ -1167,10 +1166,10 @@ send:
 	(tp->t_flags & TF_RCVD_TSTMP))) {
 		//debug_output(VERB_DEBUG, "[%s] timestamp: SETTING TIMESTAMP", SPKRNAME);
 		u_long *lp = (u_long*) (opt + optlen);
-		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
+		*lp++ = htonl(TCPOPT_TSTAMP_HDR); // first 2 bytes of option are 0
 		*lp++ = htonl(get_transport()->tcp_now());
 		*lp = htonl(tp->ts_recent);
-		optlen += TCPOLEN_TSTAMP_APPA;
+		optlen += TCPOLEN_TIMESTAMP;
 	} else {
 		// Remove this clause after it's been debugged and timestamps are working properly
 		//debug_output(VERB_DEBUG, "[%s] timestamp: NOT setting timestamp", SPKRNAME);
@@ -1792,8 +1791,8 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				//printf("opt NOP\n");
 				break;
 			}
-			optlen = cp[1];
-			if (optlen < 1 || optlen > cnt ) {
+			optlen = cp[1] << 2; // length is multiple of 4 bytes on wire
+			if (optlen < 4 || optlen > cnt ) {
 				//printf("b3, optlen: [%x] cnt: [%x]", optlen, cnt);
 				break;
 			}
@@ -1831,9 +1830,10 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				if (optlen != TCPOLEN_TIMESTAMP)
 					continue;
 				*ts_present = 1;
-				bcopy((char *)cp + 2, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
+				// kind=*cp, len=*(cp+1)<<2, cp+2 and cp+3 are zeroed
+				bcopy((char *)cp + 4, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
 				*ts_val = ntohl(*ts_val);
-				bcopy((char *)cp + 6, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
+				bcopy((char *)cp + 8, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
 				*ts_ecr = ntohl(*ts_ecr);
 
 				//debug_output(VERB_DEBUG, "[%s] doopts: ts_val [%u] ts_ecr [%u]", SPKRNAME, *ts_val, *ts_ecr);
@@ -1856,12 +1856,12 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				to->to_flags |= TOF_SACKPERM;
 				break;
 				case TCPOPT_SACK:
-				if (optlen <= 2 || (optlen - 2) % TCPOLEN_SACK != 0)
+				if (optlen <= 4 || (optlen - 4) % TCPOLEN_SACK != 0)
 					continue;
 				if (flags & TO_SYN)
 					continue;
 				to->to_flags |= TOF_SACK;
-				to->to_nsacks = (optlen - 2) / TCPOLEN_SACK;
+				to->to_nsacks = (optlen - 4) / TCPOLEN_SACK;
 				to->to_sacks = cp + 2;
 				tcpstat.tcps_sack_rcv_blocks++;
 				break;
@@ -1874,7 +1874,8 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					continue;
 				tp->t_flags |=  TF_RCVD_SCALE;
 
-				tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
+				// kind=*cp, len=*(cp+1)<<2, cp[2] is zeroed, cp[3] is the scale
+				tp->requested_s_scale = min(cp[3], TCP_MAX_WINSHIFT);
 				//debug_output(VERB_DEBUG, "[%s] WSCALE set, flags [%x], req_s_sc [%x]\n", SPKRNAME,
 				break;
 			default:
