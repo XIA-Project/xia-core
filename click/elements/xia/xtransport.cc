@@ -69,7 +69,7 @@ sock::sock(
 	dgram_buffer_end = -1;
 	recv_buffer_count = 0;
 	pending_recv_msg = NULL;
-	migrateack_waiting = false;
+	migrating = false;
 	last_migrate_ts = 0;
 	num_migrate_tries = 0;
 	migrate_pkt = NULL;
@@ -124,7 +124,7 @@ sock::sock() {
 	dgram_buffer_end = -1;
 	recv_buffer_count = 0;
 	pending_recv_msg = NULL;
-	migrateack_waiting = false;
+	migrating = false;
 	last_migrate_ts = 0;
 	num_migrate_tries = 0;
 	migrate_pkt = NULL;
@@ -642,7 +642,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now)
 		DBG("Socket %d MIGRATE retransmit\n", _sport);
 
 		sk->timer_on = true;
-		sk->migrateack_waiting = true;
+		sk->migrating = true;
 		sk->expiry = now + Timestamp::make_msec(MIGRATEACK_DELAY);
 		sk->num_migrate_tries++;
 
@@ -653,7 +653,7 @@ bool XTRANSPORT::RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now)
 		WARN("Socket %d MIGRATE retransmit count exceeded\n", _sport);
 		// FIXME: send RST?
 		CancelRetransmit(sk);
-		sk->migrateack_waiting = false;
+		sk->migrating = false;
 		rc = true;
 	}
 #endif
@@ -1511,7 +1511,7 @@ void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
 	INFO("MIGRATEACK: updated sock state with newly acknowledged DAG");
 
 	// 6. The data retransmissions can now resume
-	sk->migrateack_waiting = false;
+	sk->migrating = false;
 	sk->num_migrate_tries = 0;
 
 	portToSock.set(_dport, sk);
@@ -3249,7 +3249,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		sk->last_migrate_ts = timestamp;
 
 		// Set timer
-		sk->migrateack_waiting = true;
+		sk->migrating = true;
 		ScheduleTimer(sk, MIGRATEACK_DELAY);
 
 		idToSock.set(_migrateid, sk);

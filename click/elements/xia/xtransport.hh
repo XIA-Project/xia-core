@@ -430,7 +430,7 @@ class sock : public Element {
 	/* =========================
 	 * tcp connection migration
 	 * ========================= */
-	bool migrateack_waiting;
+	bool migrating;
 	String last_migrate_ts;
 	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 	WritablePacket *migrate_pkt;
