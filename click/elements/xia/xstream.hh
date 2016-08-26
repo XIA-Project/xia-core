@@ -54,7 +54,7 @@ using namespace xia;
 
 #define NETWORK_PORT		2
 
-#define MAX_TCPOPTLEN		32
+#define MAX_TCPOPTLEN		900 // was 32, need 700 for migration, so raised
 
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
