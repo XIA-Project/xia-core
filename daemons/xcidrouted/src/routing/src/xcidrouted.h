@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -113,7 +114,7 @@ public:
 };
 
 typedef struct {
-	string dest;	 	// destination HID for the CID route enry
+	string dest;	 	// destination HID for the CID route entry
 	string nextHop; 	// nexthop HID
 	int32_t port;		// interface (outgoing port)	
 	uint32_t cost;
@@ -138,7 +139,7 @@ typedef struct {
 
  	map<string, uint32_t> HID2Seq;
  	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
- 	map<string, CIDRouteEntry> CIDRoutes;
+ 	map<string, map<string, CIDRouteEntry> > CIDRoutes;	// dest CID to sender HID to CID route entry
 
  	mutex mtx;           // mutex for critical section
 

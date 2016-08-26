@@ -710,11 +710,11 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	// sequence number but higher ttl need to be propagated further and 
 	// we could receive message with lower ttl first.
 	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end() &&
-		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000 &&
-		routeState.HID2Seq[msg.senderHID] - msg.seq < MAX_SEQ_DIFF){	
+		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
 		// we must have seen this sequence number before since all messages 
 		// are sent in order
-		if(routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
+		if(routeState.HID2Seq[msg.senderHID] - msg.seq >= MAX_SEQ_DIFF 
+			|| routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
 			return;
 		} else {
 			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
@@ -722,6 +722,11 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	} else {
 		routeState.HID2Seq[msg.senderHID] = msg.seq;
 		routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
+	}
+
+	// check that we are not the originator of this message
+	if(msg.senderHID == routeState.myHID){
+		return;
 	}
 
 	routeState.mtx.lock();
@@ -733,17 +738,31 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		bool hasDelCandidate = false;
 
 		// if CID route entries has this CID
-		if(routeState.CIDRoutes.find(currDelCID) != routeState.CIDRoutes.end()){
-			CIDRouteEntry currEntry = routeState.CIDRoutes[currDelCID];
+		if(routeState.CIDRoutes.find(currDelCID) != routeState.CIDRoutes.end() && 
+			routeState.CIDRoutes[currDelCID].find(msg.senderHID) != routeState.CIDRoutes[currDelCID].end()){
+			CIDRouteEntry currEntry = routeState.CIDRoutes[currDelCID][msg.senderHID];
 
-			// remove an entry only if it is from the same host
-			if(currEntry.dest == msg.senderHID){
-				routeState.CIDRoutes.erase(currDelCID);
+			routeState.CIDRoutes[currDelCID].erase(msg.senderHID);
+			if(routeState.CIDRoutes[currDelCID].size() == 0){
 				xr.delRouteCIDRouting(currDelCID);
+			} else {
+				uint32_t minCost = INT_MAX; 
+				string minCostCID;
+				CIDRouteEntry minCostEntry;
 
-				if(currEntry.cost == msg.distance){
-					hasDelCandidate = true;
+				for(auto jt = routeState.CIDRoutes[currDelCID].begin(); jt != routeState.CIDRoutes[currDelCID].end(); jt++){
+					if(jt->second.cost < minCost){
+						minCost = jt->second.cost;
+						minCostCID = jt->first;
+						minCostEntry = jt->second;
+					}
 				}
+
+				xr.setRouteCIDRouting(currDelCID, minCostEntry.port, minCostEntry.nextHop, 0xffff);
+			}
+
+			if(currEntry.cost == msg.distance){
+				hasDelCandidate = true;
 			}
 		}
 
@@ -772,18 +791,40 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
 			// and the CID is not encountered before or it is encountered before 
 			// but the distance is longer then
-			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end() 
-				|| routeState.CIDRoutes[currNewCID].cost > msg.distance){
+			bool shouldAdd = false;
+			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end()) {
+				shouldAdd = true;
+				// set corresponding CID route entries
+				routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
+				routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
+				routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
+				routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
+				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+			} else {
+				uint32_t minDist = INT_MAX;
+				string minSenderHID;
 
+				for(auto jt = routeState.CIDRoutes[currNewCID].begin(); jt != routeState.CIDRoutes[currNewCID].end(); jt++){
+					if(jt->second.cost < minDist){
+						minDist = jt->second.cost;
+						minSenderHID = jt->first;
+					}
+				}
+
+				if(minDist > msg.distance){
+					shouldAdd = true;
+					// set corresponding CID route entries
+					routeState.CIDRoutes[currNewCID][minSenderHID].cost = msg.distance;
+					routeState.CIDRoutes[currNewCID][minSenderHID].port = neighbor.port;
+					routeState.CIDRoutes[currNewCID][minSenderHID].nextHop = neighbor.HID;
+					routeState.CIDRoutes[currNewCID][minSenderHID].dest = msg.senderHID;
+					xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+				}
+			}
+
+			if(shouldAdd){
 				// FIXME: what if routers all have different TTL?
 				advertiseAddition.insert(currNewCID);
-
-				// set corresponding CID route entries
-				routeState.CIDRoutes[currNewCID].cost = msg.distance;
-				routeState.CIDRoutes[currNewCID].port = neighbor.port;
-				routeState.CIDRoutes[currNewCID].nextHop = neighbor.HID;
-				routeState.CIDRoutes[currNewCID].dest = msg.senderHID;
-				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 			}
 		}
 	}
