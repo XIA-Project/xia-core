@@ -836,7 +836,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
-		msg2Others.seq = msg.seq;
+		msg2Others.seq = msg.seq;a
 		msg2Others.ttl = msg.ttl - 1;
 		msg2Others.distance = msg.distance + 1;
 		msg2Others.newCIDs = advertiseAddition;
