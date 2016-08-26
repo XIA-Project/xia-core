@@ -87,6 +87,8 @@ struct mini_tcpip
 #define TCPOPT_SACK     5
 #define TCPOPT_TIMESTAMP    8
 #define TCPOLEN_TIMESTAMP   12 // was 10 but we put multiples of 4 bytes on wire
+#define TCPOPT_MIGRATE		50 // length calculated when option added
+#define TCPOPT_MIGRATEACK	51 // length calculated when option added
 
 // Timestamp header contains kind and size=12>>2 followed by 2 zeroed bytes
 // It will be followed by two 4-byte timestamps
