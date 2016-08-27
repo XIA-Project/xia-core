@@ -54,6 +54,9 @@
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XCIDROUTE "SID:1110000000000000000000000000000000001114"
 
+//#define LOG
+#define FILTER
+
 using namespace std;
 
 class Message{
@@ -136,13 +139,22 @@ typedef struct {
 
 	set<string> localCIDs;
  	map<string, NeighborInfo> neighbors;
-
+	
+	// highest sequence number seen from a router
  	map<string, uint32_t> HID2Seq;
+ 	// TLL associated with each sequence number sent by a router
+ 	// need this since advertisement with lower sequence number could
+ 	// have higher TTL than what is received before. 
  	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
+
+ 	// for filtering CID advertisement
+ #ifdef FILTER
+ 	map<string, CIDRouteEntry> CIDRoutesWithFilter;
+ #else
  	map<string, map<string, CIDRouteEntry> > CIDRoutes;	// dest CID to sender HID to CID route entry
+ #endif
 
  	mutex mtx;           // mutex for critical section
-
 } RouteState;
 
 void help(const char* name);
@@ -153,6 +165,7 @@ double nextWaitTimeInSecond(double ratePerSecond);
 int interfaceNumber(string xidType, string xid);
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result);
 
+void cleanCIDRoutes();
 void advertiseCIDs();
 void CIDAdvertiseTimer();
 
@@ -163,6 +176,12 @@ void printNeighborInfo();
 
 void processHelloMessage();
 void processNeighborJoin();
+
+bool checkSequenceAndTTL(const AdvertisementMessage & msg);
+void deleteCIDRoutes(const AdvertisementMessage & msg);
+void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
+set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
+set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg);
 void processNeighborMessage(const NeighborInfo &neighbor);
 
 #endif 

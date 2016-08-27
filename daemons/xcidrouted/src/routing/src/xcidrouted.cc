@@ -1,7 +1,5 @@
 #include "xcidrouted.h"
 
-//#define LOG
-
 using namespace std;
 
 static int ttl = -1;
@@ -463,6 +461,31 @@ void CIDAdvertiseTimer(){
     }).detach();
 }
 
+void cleanCIDRoutes(){
+	set<string> toRemove;
+#ifdef FILTER
+	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); it++){
+		if(routeState.localCIDs.find(it->first) != routeState.localCIDs.end()){
+			toRemove.insert(it->first);
+		}
+	}
+
+	for(auto it = toRemove.begin(); it != toRemove.end(); it++){
+		routeState.CIDRoutesWithFilter.erase(*it);
+	}
+#else
+	for(auto it = routeState.CIDRoutes.begin(); it != routeState.CIDRoutes.end(); it++){
+		if(routeState.localCIDs.find(it->first) != routeState.localCIDs.end()){
+			toRemove.insert(it->first);
+		}
+	}
+
+	for(auto it = toRemove.begin(); it != toRemove.end(); it++){
+		routeState.CIDRoutes.erase(*it);
+	}
+#endif
+}
+
 void advertiseCIDs(){
 	printf("advertising CIDs...\n");
 
@@ -503,6 +526,7 @@ void advertiseCIDs(){
 
 	routeState.mtx.lock();
 	routeState.localCIDs = currLocalCIDs;
+	cleanCIDRoutes();
 	routeState.mtx.unlock();
 
 #ifdef LOG
@@ -696,16 +720,7 @@ void processNeighborJoin(){
 	routeState.mtx.unlock();
 }
 
-void processNeighborMessage(const NeighborInfo &neighbor){
-	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
-	// deseralize the message
-	AdvertisementMessage msg;
-	int status = msg.recv(neighbor.recvSock);
-	if(status < 0){
-		printf("message receive failed\n");
-		return;
-	}
-
+bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 	// need to check both the sequence number and ttl since message with lower
 	// sequence number but higher ttl need to be propagated further and 
 	// we could receive message with lower ttl first.
@@ -715,7 +730,7 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		// are sent in order
 		if(routeState.HID2Seq[msg.senderHID] - msg.seq >= MAX_SEQ_DIFF 
 			|| routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
-			return;
+			return false;
 		} else {
 			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 		}
@@ -724,66 +739,46 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
 	}
 
-	// check that we are not the originator of this message
-	if(msg.senderHID == routeState.myHID){
-		return;
-	}
+	return true;
+}
 
-	routeState.mtx.lock();
+/**
+ * Tradeoff between filtering and not-filtering
+ * 	filtering: less traffic to propagate especially when redundancy between upstream and downstream router
+ * 		is high. But lose valuable information: router might want to keep information of multiple routes
+ * 	 	to reach CID
+ *
+ * 	not-filtering: more traffic; more information available at each router. During route eviction, router can 
+ * 		use these information to replace with another longer/equal cost route.
+ */
 
-	set<string> advertiseDeletion;
-	// remove the entries that need to be removed
+#ifdef FILTER
+
+// assuming each router has the same TTL
+set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
+	set<string> routeDeletion;
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		string currDelCID = *it;
-		bool hasDelCandidate = false;
 
-		// if CID route entries has this CID
-		if(routeState.CIDRoutes.find(currDelCID) != routeState.CIDRoutes.end() && 
-			routeState.CIDRoutes[currDelCID].find(msg.senderHID) != routeState.CIDRoutes[currDelCID].end()){
-			CIDRouteEntry currEntry = routeState.CIDRoutes[currDelCID][msg.senderHID];
+		if(routeState.CIDRoutesWithFilter.find(currDelCID) != routeState.CIDRoutesWithFilter.end()){
+			CIDRouteEntry currEntry = routeState.CIDRoutesWithFilter[currDelCID];
 
-			routeState.CIDRoutes[currDelCID].erase(msg.senderHID);
-			if(routeState.CIDRoutes[currDelCID].size() == 0){
+			// remove an entry only if it is from the same host and follows the same path
+			if(currEntry.dest == msg.senderHID && currEntry.cost == msg.distance){
+				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
-			} else {
-				uint32_t minCost = INT_MAX; 
-				string minCostCID;
-				CIDRouteEntry minCostEntry;
 
-				for(auto jt = routeState.CIDRoutes[currDelCID].begin(); jt != routeState.CIDRoutes[currDelCID].end(); jt++){
-					if(jt->second.cost < minCost){
-						minCost = jt->second.cost;
-						minCostCID = jt->first;
-						minCostEntry = jt->second;
-					}
-				}
-
-				xr.setRouteCIDRouting(currDelCID, minCostEntry.port, minCostEntry.nextHop, 0xffff);
-			}
-
-			if(currEntry.cost == msg.distance){
-				hasDelCandidate = true;
+				routeDeletion.insert(currDelCID);
 			}
 		}
 
-		// only send the delete message if current router don't have local CIDs.
-		// since
-		// 	a) local CIDs also exists during route addition of current broadcast message:
-		// 		if current router have the local CIDs, same brocast message does not
-		// 		even pass through during route addition.
-		// 	b) local CIDs don't exists during the route addition but added later on:
-		// 		if current router have the local CIDs, it must have been broadcasted 
-		// 		already AND broadcast is reliable and in-order AND it is shorter 
-		// 		than CID routes from other routers through this router. So routers 
-		// 		receiving the broadcast don't have routes in the deletion message.
-		if(hasDelCandidate && routeState.localCIDs.find(currDelCID) == routeState.localCIDs.end()){
-			// FIXME: what if routers all have different TTL?
-			advertiseDeletion.insert(currDelCID);
-		}
 	}
 
-	// then check for each CID if it is the closest for the current router
-	set<string> advertiseAddition;
+	return routeDeletion;
+}
+
+set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
+	set<string> routeAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
 
@@ -791,9 +786,71 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
 			// and the CID is not encountered before or it is encountered before 
 			// but the distance is longer then
-			bool shouldAdd = false;
+			if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
+				|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.distance){
+
+				routeAddition.insert(currNewCID);
+
+				// set corresponding CID route entries
+				routeState.CIDRoutesWithFilter[currNewCID].cost = msg.distance;
+				routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
+				routeState.CIDRoutesWithFilter[currNewCID].nextHop = neighbor.HID;
+				routeState.CIDRoutesWithFilter[currNewCID].dest = msg.senderHID;
+				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+			}
+		}
+	}
+	return routeAddition;
+}
+
+#else
+
+void deleteCIDRoutes(const AdvertisementMessage & msg){
+	// for each CID routes in the message that would need to be removed
+	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
+		string currDelCID = *it;
+
+		// if CID route entries has this CID from this message sender
+		if(routeState.CIDRoutes.find(currDelCID) != routeState.CIDRoutes.end() && 
+			routeState.CIDRoutes[currDelCID].find(msg.senderHID) != routeState.CIDRoutes[currDelCID].end()){
+			CIDRouteEntry currEntry = routeState.CIDRoutes[currDelCID][msg.senderHID];
+
+			// remove the accounting since this seneder just send a delete message
+			// for this CID
+			routeState.CIDRoutes[currDelCID].erase(msg.senderHID);
+
+			// if no more CID routes left for this CID from other sender, just remove the CID routes
+			if(routeState.CIDRoutes[currDelCID].size() == 0){
+				xr.delRouteCIDRouting(currDelCID);
+			} else {
+				// if there are CID routes left for this CID from other sender, just pick one with the minimum 
+				// distance and set it. We can do it since we haven't received eviction message from other sender
+				uint32_t minCost = INT_MAX;
+				CIDRouteEntry minCostEntry;
+
+				for(auto jt = routeState.CIDRoutes[currDelCID].begin(); jt != routeState.CIDRoutes[currDelCID].end(); jt++){
+					if(jt->second.cost < minCost){
+						minCost = jt->second.cost;
+						minCostEntry = jt->second;
+					}
+				}
+
+				xr.setRouteCIDRouting(currDelCID, minCostEntry.port, minCostEntry.nextHop, 0xffff);
+			}
+		}
+	}
+}
+
+void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
+	// then check for each CID if it is the closest for the current router
+	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
+		string currNewCID = *it;
+
+		// if the CID is not stored locally
+		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
+			// and the CID is not encountered before or it is encountered before 
+			// but the distance is longer then
 			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end()) {
-				shouldAdd = true;
 				// set corresponding CID route entries
 				routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
 				routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
@@ -802,45 +859,89 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 			} else {
 				uint32_t minDist = INT_MAX;
-				string minSenderHID;
-
 				for(auto jt = routeState.CIDRoutes[currNewCID].begin(); jt != routeState.CIDRoutes[currNewCID].end(); jt++){
 					if(jt->second.cost < minDist){
 						minDist = jt->second.cost;
-						minSenderHID = jt->first;
 					}
 				}
 
+				// only set the routes if current message is the shortest to reach the CID
 				if(minDist > msg.distance){
-					shouldAdd = true;
-					// set corresponding CID route entries
-					routeState.CIDRoutes[currNewCID][minSenderHID].cost = msg.distance;
-					routeState.CIDRoutes[currNewCID][minSenderHID].port = neighbor.port;
-					routeState.CIDRoutes[currNewCID][minSenderHID].nextHop = neighbor.HID;
-					routeState.CIDRoutes[currNewCID][minSenderHID].dest = msg.senderHID;
 					xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 				}
-			}
 
-			if(shouldAdd){
-				// FIXME: what if routers all have different TTL?
-				advertiseAddition.insert(currNewCID);
+				if(routeState.CIDRoutes[currNewCID].find(msg.senderHID) == routeState.CIDRoutes[currNewCID].end() 
+					|| routeState.CIDRoutes[currNewCID][msg.senderHID].cost > msg.distance){
+					routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
+					routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
+					routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
+					routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
+				}
 			}
 		}
 	}
+}
+
+#endif
+
+void processNeighborMessage(const NeighborInfo &neighbor){
+	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
+	// deseralize the message
+	AdvertisementMessage msg;
+	int status = msg.recv(neighbor.recvSock);
+	if(status < 0){
+		printf("message receive failed\n");
+		return;
+	}
+	
+	// check if 
+	// 	message is higher sequence number 
+	// 	OR lower sequence number but have higher TTL
+	if(!checkSequenceAndTTL(msg)){
+		return;
+	}	
+
+	// check that we are not the originator of this message
+	if(msg.senderHID == routeState.myHID){
+		return;
+	}
+
+	// our communication to XIA writes to single socket and is
+	// not thread safe.
+	routeState.mtx.lock();
+
+#ifdef FILTER
+	set<string> routeAddition = setCIDRoutesWithFilter(msg, neighbor);
+	set<string> routeDeletion = deleteCIDRoutesWithFilter(msg);
+#else
+	deleteCIDRoutes(msg);
+	setCIDRoutes(msg, neighbor);
+#endif
+	
 	routeState.mtx.unlock();
 
 	// update the message and broadcast to other neighbor
-	// 	iff there are something meaningful to broadcast.
-	if(msg.ttl - 1 > 0 && (advertiseAddition.size() > 0 || advertiseDeletion.size() > 0)){
+	// 	iff there are something meaningful to broadcast
+	// 	AND ttl is not going to be zero
+#ifdef FILTER
+	if(msg.ttl - 1 > 0 && (routeAddition.size() > 0 || routeDeletion.size() > 0)){
+#else
+	if(msg.ttl - 1 > 0 && (msg.newCIDs.size() > 0 || msg.delCIDs.size() > 0)){
+#endif
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
 		msg2Others.currSenderHID = routeState.myHID;
-		msg2Others.seq = msg.seq;a
+		msg2Others.seq = msg.seq;
 		msg2Others.ttl = msg.ttl - 1;
 		msg2Others.distance = msg.distance + 1;
-		msg2Others.newCIDs = advertiseAddition;
-		msg2Others.delCIDs = advertiseDeletion;
+
+#ifdef FILTER
+		msg2Others.newCIDs = routeAddition;
+		msg2Others.delCIDs = routeDeletion;
+#else
+		msg2Others.newCIDs = msg.newCIDs;
+		msg2Others.delCIDs = msg.delCIDs;
+#endif
 
 		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
