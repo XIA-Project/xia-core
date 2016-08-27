@@ -149,6 +149,8 @@ typedef struct {
 
  	// for filtering CID advertisement
  #ifdef FILTER
+ 	// filter by the shortest distance of any remaining TTL
+ 	map<uint32_t, uint32_t> TTL2Dist;
  	map<string, CIDRouteEntry> CIDRoutesWithFilter;
  #else
  	map<string, map<string, CIDRouteEntry> > CIDRoutes;	// dest CID to sender HID to CID route entry

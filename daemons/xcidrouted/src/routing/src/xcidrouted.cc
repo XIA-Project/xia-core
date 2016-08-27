@@ -754,7 +754,7 @@ bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 
 #ifdef FILTER
 
-// assuming each router has the same TTL
+// filter code assume TTLs are the same
 set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 	set<string> routeDeletion;
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
@@ -765,10 +765,10 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 
 			// remove an entry only if it is from the same host and follows the same path
 			if(currEntry.dest == msg.senderHID && currEntry.cost == msg.distance){
+				routeDeletion.insert(currDelCID);
+
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
-
-				routeDeletion.insert(currDelCID);
 			}
 		}
 
@@ -788,7 +788,6 @@ set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const Neigh
 			// but the distance is longer then
 			if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
 				|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.distance){
-
 				routeAddition.insert(currNewCID);
 
 				// set corresponding CID route entries
