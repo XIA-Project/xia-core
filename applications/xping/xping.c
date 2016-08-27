@@ -47,7 +47,7 @@
 #include "xip.h"
 
 #define	MAXWAIT		10	/* max time to wait for response, sec. */
-#define	MAXPACKET	4096	/* max packet size */
+#define	MAXPACKET	1024	/* max packet size */
 #define VERBOSE		1	/* verbose flag */
 #define QUIET		2	/* quiet flag */
 #define FLOOD		4	/* floodping flag */
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
 	else
 		datalen = 64-8;
 	if (datalen > MAXPACKET) {
-		fprintf(stderr, "ping: packet size too large\n");
+		fprintf(stderr, "ping: packet size too large: max allowed size = %d\n", MAXPACKET);
 		exit(1);
 	}
 	if (datalen >= sizeof(struct timeval))	/* can we time 'em? */
@@ -316,7 +316,7 @@ void pinger()
 	unsigned i;
 	int rc, cc;
 	register struct timeval *tp = (struct timeval *) &outpack[8];
-	register u_char *datap = &outpack[8+sizeof(struct timeval)];
+	register u_char *datap = &outpack[8+8];
 
 	icp->icmp_type = ICMP_ECHO;
 	icp->icmp_code = 0;
@@ -402,7 +402,6 @@ void pr_pack(u_char *buf, int cc, char *from)
 	int hlen, triptime = 0;
 
 	gettimeofday( &tv, &tz );
-
 
 	xp = (struct xip *) buf;
 
