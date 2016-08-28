@@ -11,7 +11,7 @@ TARGETS=cacheload cachepurge
 all: $(TARGETS)
 
 %: %.c
-	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -I$(APIDIR)/xcache $< -o $@ $(LDFLAGS)
 
 clean:
 	rm -f $(TARGETS)
