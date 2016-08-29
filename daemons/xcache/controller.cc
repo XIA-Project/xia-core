@@ -934,6 +934,8 @@ repeat:
 									&mypath_len, NULL, NULL)) < 0) {
 			syslog(LOG_ERR, "XacceptAs failed");
 		} else {
+			unsigned hop_count = XgetPrevAcceptHopCount();
+			syslog(LOG_INFO, "received a request with hop count: %u\n", hop_count);
 			xcache_req *req = new xcache_req();
 
 			syslog(LOG_INFO, "XacceptAs Succeeded\n");

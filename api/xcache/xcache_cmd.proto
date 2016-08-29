@@ -37,6 +37,7 @@ message xcache_cmd {
 	optional int32 readoffset = 11;
 	optional int32 readlen = 12;
 	optional bytes msg = 13;
+	optional int32 hopcount = 14;
 };
 
 message xcache_notif {

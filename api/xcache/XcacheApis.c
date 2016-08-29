@@ -420,6 +420,11 @@ inline int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 }
 
 /* Content Fetching APIs */
+static int hopCount = -1;
+int XgetPrevFetchHopCount(){
+	return hopCount;
+}
+
 int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x *addr, socklen_t len)
 {
 	xcache_cmd cmd;

@@ -859,9 +859,11 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
-				/*
+				uint8_t hop_count = -1;
 				// we have received a syn for CID,
 				if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+					hop_count = HLIM_DEFAULT - xiah.hlim();
+
 				 	// but there is no DESTINED_FOR_LOCAL_HOST route for the destination CID, 
 				 	// which means the CID is evicted, flatten the destination DAG.
 				 	// 
@@ -881,7 +883,6 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 					sk->dst_path.parse_re(str_local_addr);
 				}
-				 */
 
 				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);
@@ -892,6 +893,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
 				new_sk->set_key(xid_pair);
+				new_sk->set_hop_count(hop_count);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
 				new_sk->push(p_in);
 			}
@@ -2251,7 +2253,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		// tell APP our id for future communications
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
 		x_accept_msg->set_new_id(new_sk->get_id());
-
+		x_accept_msg->set_hop_count(new_sk->get_hop_count());
 		// Get remote DAG to return to app
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 

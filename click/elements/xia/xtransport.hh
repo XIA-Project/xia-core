@@ -328,6 +328,8 @@ class sock : public Element {
     void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
+    uint8_t get_hop_count() {return hop_count;}
+    void set_hop_count(uint8_t n) {hop_count = n;}
     bool is_full_src_dag() {return full_src_dag;}
     void set_full_src_dag(bool f) {full_src_dag = f;}
     String get_sdag() {return sdag;}
@@ -370,6 +372,7 @@ class sock : public Element {
 	XIAPath src_path;			// peer DAG
 	XIAPath dst_path;			// our DAG
 	uint8_t hlim;				// hlim/ttl
+	uint8_t hop_count;
 
 	bool full_src_dag;			// bind to full dag or just to SID
 
