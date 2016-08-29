@@ -181,7 +181,7 @@ XCMP::processUnreachable(Packet *p_in)
 
 	if (!dst_path.is_valid()) {
 		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str());
-		INFO("Sending Unreachable from %s\n	to %s\n	for %s\n",
+		INFO("Sending Unreachable from %s\n   to %s\n   for %s\n",
 			 _src_path.unparse().c_str(),
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 		return;
@@ -200,7 +200,7 @@ XCMP::processUnreachable(Packet *p_in)
 
 	// send an undeliverable message
 	sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, &_src_path);
-	INFO("Sending Unreachable from %s\n	to %s\n	for %s\n",
+	INFO("Sent Unreachable from %s\n   to %s\n   for %s\n",
 		_src_path.unparse().c_str(),
 		hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 }
@@ -210,10 +210,10 @@ void
 XCMP::processExpired(Packet *p_in) {
 	XIAHeader hdr(p_in);
 
-	INFO("Sending HLIM Exceeded from %s\n	for %s\n	=> %s\n",
+	sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_TRANSIT, &_src_path);
+	INFO("Sent HLIM Exceeded from %s\n   for %s\n   => %s\n",
 		_src_path.unparse().c_str(),
 		hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
-	sendXCMPPacket(p_in, XCMP_TIMXCEED, XCMP_TIMXCEED_TRANSIT, &_src_path);
 	return;
 }
 
@@ -253,9 +253,8 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
 		// src = us, dest = original sender
-		// header was rewritten, so src and dest changed after calling sendXCMPPacket
 		INFO("PONG #%u sent: %s\n	=> %s\n", sn,
-			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
+			hdr.dst_path().unparse().c_str(), hdr.src_path().unparse().c_str());
 
 	} else if (xcmph->type == XCMP_ECHOREPLY) {
 		// PONG
@@ -342,9 +341,9 @@ u_short XCMP::in_cksum(u_short *addr, int len) {
 	/*
 	 * add back carry outs from top 16 bits to low 16 bits
 	 */
-	sum = (sum >> 16) + (sum & 0xffff);	 /* add hi 16 to low 16 */
-	sum += (sum >> 16);					 /* add carry */
-	answer = ~sum;						  /* truncate to 16 bits */
+	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
+	sum += (sum >> 16);					/* add carry */
+	answer = ~sum;						/* truncate to 16 bits */
 	return htons(answer);
 }
 
