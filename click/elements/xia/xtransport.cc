@@ -70,9 +70,9 @@ sock::sock(
 	recv_buffer_count = 0;
 	pending_recv_msg = NULL;
 	migrating = false;
+	migrateacking = false;
 	last_migrate_ts = 0;
 	num_migrate_tries = 0;
-	migrate_pkt = NULL;
 	recv_pending = false;
 	port = apiport;
 	transport = trans;
@@ -125,9 +125,9 @@ sock::sock() {
 	recv_buffer_count = 0;
 	pending_recv_msg = NULL;
 	migrating = false;
+	migrateacking = false;
 	last_migrate_ts = 0;
 	num_migrate_tries = 0;
-	migrate_pkt = NULL;
 	recv_pending = false;
 	refcount = 1;
 	xcacheSock = false;
@@ -3144,11 +3144,11 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
             continue;
         }
 
-        XIASecurityBuffer migrate_msg(512);
-        if (! build_migrate_message(migrate_msg, sk->src_path, sk->dst_path)) {
-            INFO("Failed to build migrate message");
-            continue;
-        }
+		sk->migrating = true;
+		XStream *st = dynamic_cast<XStream *>(sk);
+
+		st->usrmigrate();
+
 #if 0
 		// Send MIGRATE message to each corresponding endpoint
 		// src_DAG, dst_DAG, timestamp - Signed by private key

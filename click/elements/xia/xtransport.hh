@@ -431,7 +431,8 @@ class sock : public Element {
 	 * tcp connection migration
 	 * ========================= */
 	bool migrating;
-	String last_migrate_ts;
+	bool migrateacking;
+	String last_migrate_ts;			// timestamp of last migrate/migrateack seen
 	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 	WritablePacket *migrate_pkt;
 

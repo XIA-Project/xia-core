@@ -187,6 +187,7 @@ public:
 	void 	tcp_input(WritablePacket *p);
 	void 	tcp_output();
 	int		usrsend(WritablePacket *p);
+	void	usrmigrate();
 	void	usrclosed() ;
 	void 	usropen();
 	void	tcp_timers(int timer);

@@ -12,7 +12,7 @@ bool _pack_String(XIASecurityBuffer &buf, String data)
 }
 
 bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
-        XIAPath &src_path, XIAPath &dst_path)
+        XIAPath &src_path, XIAPath &dst_path, String &migrate_ts)
 {
 
     if(!_pack_String(migrate_payload, src_path.unparse())) {
@@ -30,6 +30,7 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
         click_chatter("Failed packing timestamp into migrate message");
         return false;
     }
+	migrate_ts = now.unparse();
 
     return true;
 }
@@ -78,12 +79,13 @@ bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
 }
 
 bool build_migrate_message(XIASecurityBuffer &migrate_msg,
-        XIAPath &src_path, XIAPath &dst_path)
+        XIAPath &src_path, XIAPath &dst_path, String &migrate_ts)
 {
     XIASecurityBuffer migrate_payload(512);
 
     // Build the migrate payload
-    if(!_build_migrate_payload(migrate_payload, src_path, dst_path)) {
+    if(!_build_migrate_payload(migrate_payload, src_path, dst_path,
+				migrate_ts)) {
         click_chatter("Failed building migrate message payload");
         return false;
     }
@@ -167,7 +169,8 @@ bool _unpack_and_verify(XIASecurityBuffer &buf, XID xid,
 
 bool _verify_migrate(XIASecurityBuffer &migrate_payload,
         XIAPath their_addr, XIAPath our_addr,
-        XIAPath &their_new_addr)
+        XIAPath &their_new_addr,
+		String &migrate_ts)
 {
     // The payload contains [their_new_dag, our_dag, timestamp]
     uint16_t our_dag_len = XIA_MAX_DAG_STR_SIZE;
@@ -217,12 +220,13 @@ bool _verify_migrate(XIASecurityBuffer &migrate_payload,
     }
 
     their_new_addr = their_dag;
+	migrate_ts = timestamp;
     return true;
 }
 
 bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
         XIAPath their_addr, XIAPath our_addr,
-        XIAPath &accepted_addr)
+        XIAPath &accepted_addr, String &migrate_ts)
 {
     XIAPath their_new_addr;
 
@@ -239,7 +243,7 @@ bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
 
     // Unpack and verify
     if (! _verify_migrate(migrate_payload, their_addr, our_addr,
-                their_new_addr)) {
+                their_new_addr, migrate_ts)) {
         click_chatter("Failed to unpack or verify migrate message");
         return false;
     }
