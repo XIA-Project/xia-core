@@ -46,148 +46,202 @@ int xcache_cache::create_click_socket()
 	return s;
 }
 
-void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
+void xcache_cache::unparse_xid(struct click_xia_xid_node *node, std::string &xid)
 {
-	int total_nodes, i;
+	char hex[41];
+	unsigned char *id = node->xid.id;
+	char *h = hex;
+
+	while (id - node->xid.id < CLICK_XIA_XID_ID_LEN) {
+		sprintf(h, "%02x", (unsigned char)*id);
+		id++;
+		h += 2;
+	}
+
+	hex[CLICK_XIA_XID_ID_LEN * 2] = 0;
+	xid = std::string(hex);
+}
+
+struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid)
+{
 	struct click_xia *xiah = (struct click_xia *)pkt;
 	struct xtcp *tcp;
-	std::string cid = "";
-	std::string sid = "";
-	int payload_len;
-	xcache_meta *meta;
-	struct cache_download *download;
-	std::map<std::string, struct cache_download *>::iterator iter;
-	size_t offset;
+	unsigned total_nodes;
 
-	//syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
-	//syslog(LOG_DEBUG, "XIA version = %d\n", xiah->ver);
-	//syslog(LOG_DEBUG, "XIA plen = %d\n", htons(xiah->plen));
-	//syslog(LOG_DEBUG, "XIA nxt = %d\n", xiah->nxt);
+	if ((len < sizeof(struct click_xia)) || (htons(xiah->plen) > len) ) {
+		// packet is too small, this had better not happen!
+		return NULL;
+	}
 
 	total_nodes = xiah->dnode + xiah->snode;
 
-	// FIXME: replace magic numbers below
-	for (i = 0; i < total_nodes; i++) {
-		uint8_t id[20];
-		char hex_string[41];
-
+	 // get the associated client SID and destination CID
+	for (unsigned i = 0; i < total_nodes; i++) {
 		unsigned type = htonl(xiah->node[i].xid.type);
 
-		if (type == CLICK_XIA_XID_TYPE_CID || type == CLICK_XIA_XID_TYPE_SID) {
-			hex_string[40] = 0;
-			memcpy(id, xiah->node[i].xid.id, 20);
-			for(int j = 0; j < 20; j++) {
-				sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
-			}
-			if (type == CLICK_XIA_XID_TYPE_CID) {
-				cid = std::string(hex_string);
-			} else {
-				sid = std::string(hex_string);
-			}
+		if (type == CLICK_XIA_XID_TYPE_CID) {
+			unparse_xid(&xiah->node[i], cid);
+		} else if (type == CLICK_XIA_XID_TYPE_SID) {
+			unparse_xid(&xiah->node[i], sid);
 		}
 	}
 
-	tcp = (struct xtcp *)
-		((char *)xiah + sizeof(struct click_xia) +
-		 (total_nodes) * sizeof(struct click_xia_xid_node));
+	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
+		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
+		return NULL;
+	}
 
-	//syslog(LOG_DEBUG, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
-	//syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
-	//syslog(LOG_DEBUG, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
-	//syslog(LOG_DEBUG, "tcp->th_off = %d\n", tcp->th_off);
+	tcp = (struct xtcp *)((char *)xiah + sizeof(struct click_xia) +
+		 (xiah->dnode + xiah->snode) * sizeof(struct click_xia_xid_node));
 
-	char *payload = (char *)tcp + tcp->th_off * 4;
-	payload_len = (unsigned long)pkt + len - (unsigned long)payload;
+	// syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
+	// syslog(LOG_INFO, "XIA plen = %d\n", htons(xiah->plen));
+	// syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
+	// syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
+	// syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
+	// syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
+	// syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
 
-	syslog(LOG_DEBUG, "%s Payload length = %d\n", cid.c_str(), payload_len);
+	return tcp;
+}
 
-	meta = ctrl->acquire_meta(cid);
+xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid)
+{
+	// if it's not a syn-ack we don't know how much content has already gone by
+	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
+		syslog(LOG_INFO, "skipping %s: partial stream received", cid.c_str());
+		return NULL;
+	}
 
-	if (!meta) {
-		// FIXME: race condition if 2 streams enter at the same time
-		//   move meta cretion into acquire_meta
+	// FIXME: this should be wrapped in a mutex
+	struct cache_download *download;
+	xcache_meta *meta = new xcache_meta(cid);
+
+	meta->set_state(OVERHEARING);
+	meta->set_seq(ntohl(tcp->th_seq));
+	meta->set_dest_sid(sid);
+
+	download = (struct cache_download *)calloc(sizeof(struct cache_download), 1);
+	ongoing_downloads[cid] = download;
+
+	return meta;
+}
+
+void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
+{
+	struct xtcp *tcp;
+	std::string cid = "";
+	std::string sid = "";
+	size_t payload_len;
+	size_t offset;
+	xcache_meta *meta;
+	struct cache_download *download;
+	std::map<std::string, struct cache_download *>::iterator iter;
+
+	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
+
+	if ((tcp = validate_pkt(pkt, len, cid, sid)) == NULL) {
+		// the packet is not large enough, this better not happen
+		// as this code has no recovery.
+		syslog(LOG_ERR, "packet is not large enough, discarding");
+		return;
+	}
+
+	char *payload = (char *)tcp + (tcp->th_off << 2);
+	payload_len = len + (size_t)(pkt - payload);
+	syslog(LOG_DEBUG, "%s Payload length = %lu\n", cid.c_str(), payload_len);
+
+	if (!(meta = ctrl->acquire_meta(cid))) {
 		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
-		meta = new xcache_meta(cid);
-		meta->set_OVERHEARING();
-		meta->set_seq(ntohl(tcp->th_seq));
-		meta->set_dest_sid(sid);
-		ctrl->add_meta(meta);
-		ctrl->acquire_meta(cid);
-
-	} else if (meta->is_DENY_PENDING()) {
-		ctrl->release_meta(meta);
-		syslog(LOG_INFO, "Already Denied Meta CID=%s", cid.c_str());
+		ctrl->add_meta(start_new_meta(tcp, cid, sid));
 		return;
+	}
 
-	} else if (meta->is_AVAILABLE()) {
-		ctrl->release_meta(meta);
-		syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
-		return;
+	switch (meta->state()) {
+		case OVERHEARING:
+			// drop into the code below the switch
+			break;
 
-	} else if (meta->is_FETCHING()) {
-		ctrl->release_meta(meta);
-		syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
-		return;
+		case AVAILABLE:
+			ctrl->release_meta(meta);
+			syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
+			return;
 
-	} else if (meta->is_OVERHEARING()) {
-		if (meta->dest_sid() != sid) {
-			// Another stream is already getting this chunk.
-			//  so we can ignore this stream's data
-			//  otherwise we'll have memory overrun issues due to different sequence #s
-			syslog(LOG_INFO, "don't cross the streams!");
+		case FETCHING:
+			// FIXME: this probably should not be a state, but rather a count of
+			// number of concurrent accessors of this chunk.
+			// fetching should never be an issue here, but only when deleting
+			// content to be sure it is safe to remove.
+			ctrl->release_meta(meta);
+			syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
+			return;
+
+		case DENY_PENDING:
+			// FIXME: should we delete this? nothing ever sets this state
+			ctrl->release_meta(meta);
+			syslog(LOG_INFO, "Already Denied Meta CID=%s", cid.c_str());
+			return;
+
+		default:
+			syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
 			ctrl->release_meta(meta);
 			return;
-		}
+	}
 
-	} else {
-		syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
+	if (meta->dest_sid() != sid) {
+		// Another stream is already getting this chunk.
+		//  so we can ignore this stream's data
+		//  otherwise we'll have memory overrun issues due to different sequence #s
+		syslog(LOG_INFO, "don't cross the streams!");
 		ctrl->release_meta(meta);
 		return;
 	}
 
+	// get the initial sequence number for this stream
 	uint32_t initial_seq = meta->seq();
 	ctrl->release_meta(meta);
 
 	iter = ongoing_downloads.find(cid);
 	if (iter == ongoing_downloads.end()) {
-		// FIXME: this should happen above when we see a new SYN
-		//syslog(LOG_INFO, "New Download\n");
-		/* This is a new chunk */
-		download = (struct cache_download *)malloc(sizeof(struct cache_download));
-		memset(download, 0, sizeof(struct cache_download));
-		ongoing_downloads[cid] = download;
-	} else {
-		//syslog(LOG_INFO, "Download Found\n");
-		download = iter->second;
+		// Something bad happened!
+		// we should close this meta up
+		syslog(LOG_ERR, "Unable to find download buffer for %s", cid.c_str());
+		return;
+	}
+	//syslog(LOG_INFO, "Download Found\n");
+	download = iter->second;
+
+	// We got "payload" of length "payload_len"
+	// This is at offset ntohl(tcp->th_seq) in total chunk
+	// Adjusted sequence numbers from 1 to sizeof(struct cid_header)
+	//  constitute the CID header. Everything else is payload
+	if (payload_len == 0) {
+		// control packet
+		goto skip_data;
 	}
 
-	/*
-	 * We got "payload" of length "payload_len"
-	 * This is at offset ntohl(tcp->th_seq) in total chunk
-	 * Sequence numbers from 1 to sizeof(struct cid_header) constitute the
-	 * CID header. Everything else constitutes the payload
-	 */
-
-	if (payload_len == 0)
-		goto skip_data;
-
 	// FIXME: this doesn't deal with the case where the sequence number wraps.
-
 	// factor out the random start value of the seq #
 	offset = ntohl(tcp->th_seq) - initial_seq;
-
 	//syslog(LOG_INFO, "initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
 
+	// get the cid header if we don't already have it
+	// incrementally build the header if the packet size
+	//  is less than header size
 	if (offset < sizeof(struct cid_header)) {
-		len = (offset + payload_len) > sizeof(struct cid_header) ?
-			sizeof(struct cid_header) : offset + payload_len;
-		memcpy((char *)&download->header + offset, payload, len);
+		if ((offset + payload_len) >= sizeof(struct cid_header)) {
+			len = sizeof(struct cid_header) - offset;
+		} else {
+			len = payload_len;
+		}
 
+		memcpy((char *)&download->header + offset, payload, len);
 		payload += len;
 		offset += len;
 		payload_len -= len;
 	}
 
+	// there's data, append it to the download buffer
 	if (offset >= sizeof(struct cid_header)) {
 		if (download->data == NULL) {
 			download->data = (char *)calloc(ntohl(download->header.length), 1);
@@ -211,6 +265,8 @@ skip_data:
 			free(download->data);
 			free(download);
 		} else {
+			// FIXME: leave this open in case more data is on the wire
+			// and let garbage collection handle it eventually? or nuke it now?
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
 		}
 	}
@@ -221,19 +277,17 @@ void *xcache_cache::run(void *arg)
 	struct cache_args *args = (struct cache_args *)arg;
 	int s, ret;
 	char buffer[XIA_MAXBUF];
-	struct sockaddr_in fromaddr;
-	socklen_t len = sizeof(fromaddr);
 
 	(void)args;
 
 	if ((s = create_click_socket()) < 0) {
-		syslog(LOG_ALERT, "Failed to create a socket on %d\n", args->cache_out_port);
+		syslog(LOG_ALERT, "Failed to create a xcache:click socket\n");
 		pthread_exit(NULL);
 	}
 
 	do {
-		syslog(LOG_DEBUG, "Cache listening for data on port %d\n", args->cache_out_port);
-		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, (struct sockaddr *)&fromaddr, &len);
+		syslog(LOG_DEBUG, "Cache listening for data from click\n");
+		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, NULL, NULL);
 		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
 			pthread_exit(NULL);

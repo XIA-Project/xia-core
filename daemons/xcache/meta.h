@@ -8,23 +8,26 @@
 #include <stdint.h>
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
+#include <time.h>
 
 
 class xcache_content_store;
 
+typedef enum {
+	AVAILABLE,
+	FETCHING,
+	OVERHEARING,
+	DENY_PENDING,
+} chunk_states;
+
+#define TOO_OLD 240
+
 class xcache_meta {
 private:
-	enum chunk_states {
-		AVAILABLE,
-		FETCHING,
-		OVERHEARING,
-		DENY_PENDING,
-	} state;
+	chunk_states _state;
 
 	pthread_mutex_t meta_lock;
-	/**
-	 * Length of this content object.
-	 */
+	// Length of this content object.
 	uint64_t len;
 
 	// initial sequence number
@@ -33,104 +36,75 @@ private:
 	xcache_content_store *store;
 	std::string cid;
 	std::string sid;
+
+	time_t _accessed;
+	time_t _updated;
+
+	void init();
+
 public:
-	/**
-	 * A Constructor.
-	 */
 	xcache_meta();
-
-	void set_seq(uint32_t seq) {
-		// account for the tcp overhead in initial pkt
-		initial_seq = seq + 1;
-	}
-
-	uint32_t seq() {
-		return initial_seq;
-	}
-
-	void set_dest_sid(std::string _sid) {
-		sid = _sid;
-	}
-
-	std::string dest_sid() {
-		return sid;
-	}
-
-	/**
-	 * Another Constructor.
-	 */
 	xcache_meta(std::string);
 
-	/**
-	 * Set Content store for this meta.
-	 */
-	void set_store(xcache_content_store *s) {
-		store = s;
-	}
+	time_t last_accessed() { return _accessed; }
+	void access() { _accessed = time(NULL); }
 
-	void set_length(uint64_t length) {
-		this->len = length;
-	}
+	time_t updated() { return _updated; }
+	void update() { _updated = time(NULL); }
 
-	/**
-	 * Actually read the content.
-	 */
+	// account for the tcp overhead in initial pkt
+	void set_seq(uint32_t seq) { initial_seq = seq + 1; }
+	uint32_t seq() { return initial_seq; }
+
+	void set_dest_sid(std::string _sid) { sid = _sid; }
+	std::string dest_sid() { return sid; }
+
+	void set_state(chunk_states state) { _state = state;}
+	chunk_states state() { return _state; }
+
+	void set_store(xcache_content_store *s) { store = s; }
+
+	void set_length(uint64_t length) { this->len = length; }
+
+	// Actually read the content.
 	std::string get(void);
-
-	/**
-	 * Actually read the content.
-	 */
 	std::string get(off_t off, size_t len);
-
-	/**
-	 * Actually read the content.
-	 */
 	std::string safe_get(void);
 
-	/**
-	 * Print information about the meta.
-	 */
+	bool is_stale();
+
+	// Print information about the meta.
 	void status(void);
 
-	uint64_t get_length() {
-		return len;
-	}
+	uint64_t get_length() { return len; }
 
-	std::string get_cid() {
-		return cid;
-	}
+	std::string get_cid() { return cid; }
 
-	int lock(void) {
-		int rv;
-//		std::cout << getpid() << " META LOCK " << cid << "\n";
-		rv = pthread_mutex_lock(&meta_lock);
-//		std::cout << getpid() << " META LOCKED " << cid << "\n";
-		return rv;
-	}
+	int lock(void) { return pthread_mutex_lock(&meta_lock); }
+	int unlock(void) { return pthread_mutex_unlock(&meta_lock); }
+};
 
-	int unlock(void) {
-		int rv;
-//		std::cout << getpid() << " META UNLOCK " << cid << "\n";
-		rv = pthread_mutex_unlock(&meta_lock);
-//		std::cout << getpid() << " META UNLOCKED " << cid << "\n";
-		return rv;
-	}
 
-#define DEFINE_STATE_MACROS(__state)					\
-	bool is_##__state(void)  {					\
-		return (state == (__state));				\
-	}								\
-	bool set_##__state(void) {					\
-		std::cout << cid << " IS NOW " << #__state << "\n";	\
-		return (state = (__state));				\
-	}
+class meta_map {
+public:
+	meta_map();
+	~meta_map();
 
-DEFINE_STATE_MACROS(AVAILABLE)
-DEFINE_STATE_MACROS(FETCHING)
-DEFINE_STATE_MACROS(OVERHEARING)
-DEFINE_STATE_MACROS(DENY_PENDING)
+	int read_lock(void)  { return pthread_rwlock_wrlock(&rwlock); };
+	int write_lock(void) { return pthread_rwlock_rdlock(&rwlock); };
+	int unlock(void)     { return pthread_rwlock_unlock(&rwlock); };
 
-#undef DEFINE_STATE_MACROS
+	xcache_meta *acquire_meta(std::string cid);
+	void release_meta(xcache_meta *meta);
+	void add_meta(xcache_meta *meta);
+	void remove_meta(xcache_meta *meta);
+
+	//int walk(bool(*f)(xcache_meta *m));
+	int walk();
+
+private:
+	std::map<std::string, xcache_meta *> _map;
+	pthread_rwlock_t rwlock;
 };
 
 #endif

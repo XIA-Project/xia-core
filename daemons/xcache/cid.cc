@@ -19,6 +19,5 @@ std::string compute_cid(const char *data, size_t len)
 	unsigned char digest[SHA_DIGEST_LENGTH];
 
 	SHA1((unsigned char *)data, len, digest);
-
 	return hex_str(digest, SHA_DIGEST_LENGTH);
 }

@@ -24,8 +24,8 @@ DEFAULT_CACHE_IN_PORT=1501
 DEFAULT_CACHE_OUT_PORT=1502
 
 def help():
-	print '\nUsage: %s click_conf_file dest_sockconf dest_nodeconf' % sys.argv[0]
-	print 'creates xsockconf.ini and nodes.conf in the current directory based on the'
+	print '\nUsage: %s click_conf_file dest_nodeconf' % sys.argv[0]
+	print 'creates nodes.conf in the current directory based on the'
 	print 'specified click_conf_file\n'
 	sys.exit(-1)
 
@@ -38,19 +38,11 @@ def create_output_file(name):
 
 # start here
 
-# We take exactly 3 arguments
-if len(sys.argv) != 4:
+# We take exactly 2 arguments
+if len(sys.argv) != 3:
 	help()
 topology_conf_file = sys.argv[1]
-sockconf_ini_file  = sys.argv[2]
-nodes_conf_file	   = sys.argv[3]
-
-# Create the xsockconf.ini file
-sockconf = create_output_file(sockconf_ini_file)
-sockconf.write('# Generated from %s\n\n' % os.path.basename(topology_conf_file))
-sockconf.write('[default]\nclick_port=%s\n' % DEFAULT_PORT)
-sockconf.write('cache_in_port=%s\n' % DEFAULT_CACHE_IN_PORT)
-sockconf.write('cache_out_port=%s\n\n' % DEFAULT_CACHE_OUT_PORT)
+nodes_conf_file	   = sys.argv[2]
 
 # Create the nodes.conf file
 nodeconf = create_output_file(nodes_conf_file)
@@ -85,11 +77,6 @@ try:
 			elemtype  = match.group(2)
 			arguments = match.group(3).replace(' ','').split(',')
 
-			# Write a sockconf entry for this hostname
-			sockconf.write('[%s]\nclick_port=%s\n' % (hostname, arguments[0]))
-			sockconf.write('cache_in_port=%s\n' % arguments[2])
-			sockconf.write('cache_out_port=%s\n\n' % arguments[3])
-
 			# Create a nodes.conf entry for this hostname
 			nodeconf.write("%s\t%s\n" % (hostname, elemtype))
 except:
@@ -99,5 +86,4 @@ except:
 if nshost != None:
 	nodeconf.write("%s\t%s\n" % (nshost, 'nameserver'))
 
-sockconf.close
 nodeconf.close

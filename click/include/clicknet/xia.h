@@ -67,13 +67,10 @@ struct click_xia {
     click_xia_xid_node node[0];         /* XID node list */
 };
 
-#define CLICK_XIA_NXT_CID       12  /* CID-source specific key-value list */
-#define CLICK_XIA_NXT_XTCP      13
-#define CLICK_XIA_NXT_DGRAM     14
-#define CLICK_XIA_NXT_XCMP      61  /*  XCMP header */
-#define CLICK_XIA_NXT_HDR_MAX   (CLICK_XIA_NXT_NO-1)  /* maximum non-upper-layer nxt value */
-#define CLICK_XIA_NXT_NO        59                    /* no next header (as in IPv6) */
-#define CLICK_XIA_NXT_TRN       60  /* Transport header */
+#define CLICK_XIA_NXT_DATA		0
+#define CLICK_XIA_NXT_XCMP		0x01
+#define CLICK_XIA_NXT_XDGRAM	0x02
+#define CLICK_XIA_NXT_XSTREAM	0x03
 
 // XIA extension header
 #pragma pack(push)
