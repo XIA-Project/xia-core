@@ -61,6 +61,8 @@ extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, soc
 extern int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count); //DONE
 
+extern int XevictChunk(XcacheHandle *h, const char *cid);
+
 extern int XbufInit(XcacheBuf *xbuf);
 extern int XbufAdd(XcacheBuf *xbuf, void *data, size_t len);
 extern int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_x **info);

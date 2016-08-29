@@ -156,6 +156,8 @@ public:
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 
+	// evict a chunk locally
+	int evict(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Allocate a new context.
