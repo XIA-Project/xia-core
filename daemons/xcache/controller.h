@@ -190,6 +190,8 @@ public:
 	//inline int unlock_meta_map(void);
 
 	int register_meta(xcache_meta *);
+	int unregister_meta(xcache_meta *);
+
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);

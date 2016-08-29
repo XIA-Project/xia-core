@@ -485,7 +485,7 @@ int xcache_controller::__store_policy(xcache_meta *meta){
 		if(evicted){
 			evicted->lock();
 			syslog(LOG_INFO, "policy has evicted CID %s\n", evicted->get_cid().c_str());
-			unregister_meta(evicted);
+			// FIXME: do something with the evicted chunk
 			evicted->unlock();
 
 			// can delete here since we have lock to meta map here 

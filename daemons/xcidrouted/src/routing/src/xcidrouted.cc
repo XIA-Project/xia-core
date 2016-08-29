@@ -777,6 +777,7 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 	return routeDeletion;
 }
 
+// filter code assumes router TTLs are the same
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
 	set<string> routeAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
