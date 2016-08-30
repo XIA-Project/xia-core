@@ -7,6 +7,7 @@
 struct cid_header {
 	size_t offset;
 	size_t length;
+	unsigned hop_count;
 	size_t total_length;
 	char cid[CID_HASH_SIZE + 1];
 } __attribute__((packed));

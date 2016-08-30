@@ -31,6 +31,7 @@
 #include "Xsocket.h"
 #include "xcache.h"
 #include "dagaddr.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v2.0"
 #define TITLE "XIA Basic FTP client"
@@ -176,16 +177,18 @@ int retrieveChunk(FILE *fd, char *url)
 		say("Fetching URL %s\n", token);
 		url_to_dag(&addr, token, strlen(token));
 
-//		Graph g(&addr);
-//		printf("------------------------\n");
-//		g.print_graph();
-//		printf("------------------------\n");
-
         gettimeofday(&t1, NULL);
 		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
 		gettimeofday(&t2, NULL);
+
+		Graph g(&addr);
+		printf("------------------------\n");
+		g.print_graph();
+		say("fetch hop count is %d\n", XgetPrevFetchHopCount());
+		printf("------------------------\n");
+
 
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
         elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms

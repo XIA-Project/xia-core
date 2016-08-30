@@ -459,6 +459,7 @@ int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x
 		to_copy = MIN(cmd.data().length(), buflen);
 		memcpy(buf, cmd.data().c_str(), to_copy);
 		fprintf(stderr, "Fetch: Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
+		hopCount = cmd.hop_count();
 
 		return to_copy;
 	}

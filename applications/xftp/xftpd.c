@@ -70,7 +70,7 @@ void getConfig(int argc, char** argv)
 	int c;
 
 	strcpy(name, NAME);
-	getcwd(rootdir, sizeof(rootdir));
+	(void ) getcwd(rootdir, sizeof(rootdir));
 
 	opterr = 0;
 
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 	if (chroot(rootdir) < 0) {
 		die(-1, "\nUnable to chroot (sudo is required!): %s\n", strerror(errno));
 	}
-	chdir("/");
+	(void)chdir("/");
 
 	blockingListener((void *)&sock);
 	XcacheHandleDestroy(&xcache);

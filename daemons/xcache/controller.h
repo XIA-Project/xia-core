@@ -38,6 +38,7 @@ struct xcache_req {
 	int from_sock, to_sock;
 	void *data;
 	size_t datalen;
+	unsigned hop_count;
 };
 
 class xcache_controller {
@@ -100,7 +101,7 @@ public:
 	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
-	void send_content_remote(int sock, sockaddr_x *mypath);
+	void send_content_remote(xcache_req *req, sockaddr_x *mypath);
 
 	bool verify_content(xcache_meta *meta, const std::string *);
 
