@@ -29,7 +29,7 @@ public:
 
     inline const struct xtcp* header() const { return _hdr; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
-	inline uint8_t hlen() const           { return _hdr->th_off << 2; };
+	inline uint16_t hlen() const           { return _hdr->th_off << 2; };
 	inline uint32_t seq_num() const       { return ntohl(_hdr->th_seq); };
 	inline uint32_t ack_num() const       { return ntohl(_hdr->th_ack); };
 	inline uint32_t recv_window() const   { return ntohl(_hdr->th_win); };
