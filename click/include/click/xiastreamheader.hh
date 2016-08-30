@@ -80,7 +80,7 @@ public:
 
 	~StreamHeaderEncap() {
 		if (_hdr) {
-			delete _hdr;
+			free(_hdr);
 		}
 	}
 
