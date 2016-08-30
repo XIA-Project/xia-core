@@ -66,7 +66,7 @@ size_t datalen;		// How much data
 sockaddr_x whereto;
 sockaddr_x wherefrom;
 
-char usage[] = "Usage:  xping [-dfqrv] host [packetsize [count [preload]]]\n";
+char usage[] = "Usage:  xping [-fqrv] host [packetsize [count [preload]]]\n";
 
 char *hostname;
 int npackets;
