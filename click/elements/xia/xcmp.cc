@@ -28,6 +28,11 @@
 #include "xlog.hh"
 CLICK_DECLS
 
+#define MAX_PACKET		1500
+#define NUM_EMPTY_BYTES	4	// # of empty bytes in a ttl or unreachable header
+#define NUM_TIME_BYTES	8	// # of bytes to reserver for timing in ping/pong headers
+#define NUM_ORIG_BYTES	8	// # of bytes of original pkt to append to ttl/unreach packets
+#define SEQ_OFF			6	// offset of the sequence # in ping/pong pkts
 // user must specify the XIAPath (ie. RE AD0 HID0) of the host
 // that this element resides on
 int
@@ -102,7 +107,7 @@ void
 XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 	const XIAHeader hdr(p_in);
-	char msg[1500];
+	char msg[MAX_PACKET];
 	size_t xlen;
 
 	switch(type) {
@@ -118,17 +123,16 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 		case XCMP_UNREACH:
 		case XCMP_TIMXCEED:
 		default:
-			// size = xcmp header + 8 bytes + original XIP header
 			xlen = sizeof(struct click_xia_xcmp);
 
-			memset(msg + xlen, 0, 4);	// first 4 bytes after xcmp header are 0
-			xlen += 4;
+			memset(msg + xlen, 0, NUM_EMPTY_BYTES);	// first 4 bytes after xcmp header are 0
+			xlen += NUM_EMPTY_BYTES;
 			memcpy(msg + xlen, hdr.hdr(), hdr.hdr_size());
 			xlen += hdr.hdr_size();
 
 			// copy 1st 8 bytes of payload as is done in ICMP
-			memcpy(msg + xlen, hdr.payload(), 8);
-			xlen += 8;
+			memcpy(msg + xlen, hdr.payload(), NUM_ORIG_BYTES);
+			xlen += NUM_ORIG_BYTES;
 			break;
 	}
 
@@ -247,41 +251,40 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 
 	if (xcmph->type == XCMP_ECHO) {
 		// PING
-		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + 6));
+		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + SEQ_OFF));
 
 		// src = ping sender, dest = us
-		INFO("PING #%u received: %s\n	=> %s\n", sn,
+		INFO("PING #%u received: %s\n      => %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
-
 		// src = us, dest = original sender
-		INFO("PONG #%u sent: %s\n	=> %s\n", sn,
+		INFO("PONG #%u sent: %s\n      => %s\n", sn,
 			hdr.dst_path().unparse().c_str(), hdr.src_path().unparse().c_str());
 
 	} else if (xcmph->type == XCMP_ECHOREPLY) {
 		// PONG
-		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + 6));
-
+		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + SEQ_OFF));
 		// src  = them, dest = us
-		INFO("PONG #%d recieved: %s\n	=> %s\n", sn,
+		INFO("PONG #%d recieved: %s\n      => %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 		sendUp(p_in);
 
 	} else {
 		// get the header out of the data section of the packet
-		const struct click_xia* h = (const struct click_xia*)(hdr.payload() + sizeof(struct click_xia_xcmp) + 4);
+		const struct click_xia* h = (const struct click_xia*)(hdr.payload() +
+									sizeof(struct click_xia_xcmp) + NUM_EMPTY_BYTES);
 		XIAHeader hresp(h);
 
 		if (xcmph->type == XCMP_TIMXCEED) {
 			// Time EXCEEDED (ie. TTL expiration)
-			INFO("TTL Exceeded from %s\n	original packet was %s\n	=> %s\n",
+			INFO("TTL Exceeded from %s\n      in response to %s\n      => %s\n",
 				hdr.src_path().unparse().c_str(),
 				hresp.src_path().unparse().c_str(), hresp.dst_path().unparse().c_str());
 			sendUp(p_in);
 
 		} else if (xcmph->type == XCMP_UNREACH) {
 			// XID unreachable
-			INFO("Received Unreachable from %s\n	original packet was %s\n	=> %s\n",
+			INFO("Received Unreachable from %s\n      in response to %s\n      => %s\n",
 				hdr.src_path().unparse().c_str(),
 				hresp.src_path().unparse().c_str(), hresp.dst_path().unparse().c_str());
 			sendUp(p_in);
@@ -328,7 +331,7 @@ u_short XCMP::in_cksum(u_short *addr, int len) {
 	 *  back all the carry bits from the top 16 bits into the lower
 	 *  16 bits.
 	 */
-	while( nleft > 1 )  {
+	while( nleft > 1 ) {
 		sum += *w++;
 		nleft -= 2;
 	}
