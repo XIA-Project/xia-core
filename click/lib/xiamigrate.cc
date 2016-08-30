@@ -62,15 +62,15 @@ bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
     }
 
     // Fill in the migrate message
-    if(buf.pack((const char *) payload, payloadlen)) {
+    if(!buf.pack((const char *) payload, payloadlen)) {
         click_chatter("Failed packing migrate payload into migrate message");
         return false;
     }
-    if(buf.pack((const char *) signature, siglen)) {
+    if(!buf.pack((const char *) signature, siglen)) {
         click_chatter("Failed packing signature into migrate message");
         return false;
     }
-    if(buf.pack((const char *) pubkey, pubkeylen)) {
+    if(!buf.pack((const char *) pubkey, pubkeylen)) {
         click_chatter("Failed packing pubkey into migrate message");
         return false;
     }
