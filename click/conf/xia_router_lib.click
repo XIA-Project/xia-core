@@ -100,12 +100,12 @@ elementclass XIAPacketRoute {
 	consider_next_path => c, [2]output;
 
 	//NITIN disable XCMP REDIRECT messages
-	//NITIN x :: XCMP();
-	//NITIN x[1] -> Discard;
-	GPRP :: GenericPostRouteProc -> [0]output;
+	x :: XCMP();
+	x[1] -> Discard;
+	GPRP :: GenericPostRouteProc[0] -> [0]output;
 	//NITIN disable XCMP REDIRECT messages
-	//NITIN GPRP[1] -> x[0] -> consider_first_path;
-	GPRP[1] -> consider_first_path;
+	GPRP[1] -> x[0] -> consider_first_path;
+	//GPRP[1] -> consider_first_path;
 
 	// print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 	// TO ADD A NEW USER DEFINED XID (step 2)
