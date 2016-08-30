@@ -7,6 +7,7 @@
 #include <click/packet.hh>
 #include <click/vector.hh>
 #include <fcntl.h>
+#include <cstdint> // uint32_t
 
 #include "xstream.hh"
 #include "xtransport.hh"
@@ -83,7 +84,7 @@ void
 XStream::tcp_input(WritablePacket *p)
 {
 	unsigned 	tiwin, tiflags;
-	u_long		ts_val, ts_ecr;
+	uint32_t		ts_val, ts_ecr;
 	//int			len, tlen; /* seems to be unused */
 	unsigned	off, optlen;
 	const u_char *optp;
@@ -212,6 +213,10 @@ XStream::tcp_input(WritablePacket *p)
 					// We can now drop data we know was recieved by the other side
 					_q_usr_input.drop_until(acked);
 					tp->snd_una = ti.ti_ack;
+                    
+                    if (_staged) { // because drop_until frees up queue space
+                        unstage_data();
+                    }
 
 					/* If all outstanding data are acked, stop
 					 * retransmit timer, otherwise restart timer
@@ -775,6 +780,10 @@ XStream::tcp_input(WritablePacket *p)
 			tp->snd_wnd -= acked;
 			ourfinisacked = false;
 		}
+        if (_staged) { // because drop_until frees up queue space
+            unstage_data();
+        }
+
 		tp->snd_una = ti.ti_ack;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
@@ -1023,11 +1032,6 @@ XStream::tcp_output()
 	//								  {	  off	  }
 	// 		   			{  _q_usr_input.byte_length() }
 
-	// FIXME: WHERE SHOULD THIS LOGIC GO?????
-	if (_staged) {
-		unstage_data();
-	}
-
 again:
 	sendalot = 0;
 	/*71*/
@@ -1147,7 +1151,7 @@ send:
 			if ((tp->t_flags & TF_REQ_SCALE) &&
 				((flags & XTH_ACK) == 0 ||
 				 (tp->t_flags & TF_RCVD_SCALE))) {
-				*((u_long *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
+				*((uint32_t *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
 					TCPOPT_NOP << 24 |
 					TCPOPT_WSCALE << 16 |
 					TCPOLEN_WSCALE << 8 |
@@ -1166,7 +1170,7 @@ send:
 	((flags & (XTH_SYN | XTH_ACK)) == XTH_SYN ||
 	(tp->t_flags & TF_RCVD_TSTMP))) {
 		//debug_output(VERB_DEBUG, "[%s] timestamp: SETTING TIMESTAMP", SPKRNAME);
-		u_long *lp = (u_long*) (opt + optlen);
+		uint32_t *lp = (uint32_t*) (opt + optlen);
 		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
 		*lp++ = htonl(get_transport()->tcp_now());
 		*lp = htonl(tp->ts_recent);
@@ -1187,6 +1191,11 @@ send:
 	/*278*/
 	if (len) {
 		p = _q_usr_input.get(off);
+
+        if (_staged) { // because drop_until frees up queue space
+            unstage_data();
+        }
+
 		if (!p) {
 			//debug_output(VERB_ERRORS, "[%s] offset [%u] not in fifo!", SPKRNAME, off);
 			return;
@@ -1771,7 +1780,7 @@ XStream::set_state(const HandlerState new_state) {
 
 void
 XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
-	int * ts_present, u_long *ts_val, u_long *ts_ecr)
+	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr)
 {
 	uint16_t mss;
 	int opt, optlen;

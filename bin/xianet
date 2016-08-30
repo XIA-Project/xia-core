@@ -513,6 +513,8 @@ start_click()
 
 	$VALGRIND $CLICK -R $CONFPATH/$SCRIPT &
 
+    sleep 2
+
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
 
