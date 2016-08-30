@@ -7,13 +7,6 @@
 #include <click/xiaheader.hh>
 #include <clicknet/tcp.h>
 
-// FIXME: these need to be integrated into the new streaming transport somehow
-//    static StreamHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
-//                        { return new StreamHeaderEncap(StreamHeader::XSOCK_STREAM, StreamHeader::MIGRATE, seq_num, ack_num, length, recv_window); };
-//
-//    static StreamHeaderEncap* MakeMIGRATEACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
-//                        { return new StreamHeaderEncap(StreamHeader::XSOCK_STREAM, StreamHeader::MIGRATEACK, seq_num, ack_num, length, recv_window); };
-
 #include <clicknet/xtcp.h>
 
 class StreamHeader
