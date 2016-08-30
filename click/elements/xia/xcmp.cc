@@ -121,12 +121,12 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 			// size = xcmp header + 8 bytes + original XIP header
 			xlen = sizeof(struct click_xia_xcmp);
 
-			memset(msg + xlen, 0, 8);	// first 8 bytes after xcmp header are 0
-			xlen += 8;
+			memset(msg + xlen, 0, 4);	// first 4 bytes after xcmp header are 0
+			xlen += 4;
 			memcpy(msg + xlen, hdr.hdr(), hdr.hdr_size());
 			xlen += hdr.hdr_size();
 
-			// copy 1st8 bytes of payload as is done in ICMP
+			// copy 1st 8 bytes of payload as is done in ICMP
 			memcpy(msg + xlen, hdr.payload(), 8);
 			xlen += 8;
 			break;
@@ -248,10 +248,12 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 	if (xcmph->type == XCMP_ECHO) {
 		// PING
 		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + 6));
+
 		// src = ping sender, dest = us
 		INFO("PING #%u received: %s\n	=> %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
+
 		// src = us, dest = original sender
 		INFO("PONG #%u sent: %s\n	=> %s\n", sn,
 			hdr.dst_path().unparse().c_str(), hdr.src_path().unparse().c_str());
@@ -259,6 +261,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 	} else if (xcmph->type == XCMP_ECHOREPLY) {
 		// PONG
 		uint16_t sn = ntohs(*(uint16_t*)(hdr.payload() + 6));
+
 		// src  = them, dest = us
 		INFO("PONG #%d recieved: %s\n	=> %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
@@ -266,7 +269,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 
 	} else {
 		// get the header out of the data section of the packet
-		const struct click_xia* h = (const struct click_xia*)(hdr.payload() + sizeof(struct click_xia_xcmp) + 8);
+		const struct click_xia* h = (const struct click_xia*)(hdr.payload() + sizeof(struct click_xia_xcmp) + 4);
 		XIAHeader hresp(h);
 
 		if (xcmph->type == XCMP_TIMXCEED) {
