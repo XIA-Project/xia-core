@@ -38,8 +38,8 @@
  * down PR_SLOWHZ times a second.
  */
 #define PR_SLOWHZ       10 
-#define TCP_SLOW_TICK_MS 500
-#define TCP_FAST_TICK_MS 200
+#define TCP_SLOW_TICK_MS 100
+#define TCP_FAST_TICK_MS 100
 
 #define	TCPT_NTIMERS	5
 #define	TCPT_REXMT	0		/* retransmit */

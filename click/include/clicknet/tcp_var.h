@@ -33,6 +33,8 @@
  *	@(#)tcp_var.h	8.3 (Berkeley) 4/10/94
  */
 
+#include <cstdint> // uint32_t
+
 /*
  * Kernel variables for tcp.
  */
@@ -83,9 +85,9 @@ struct tcpcb {
 	tcp_seq	snd_wl1;		/* window update seg seq number */
 	tcp_seq	snd_wl2;		/* window update seg ack number */
 	tcp_seq	iss;			/* initial send sequence number */
-	u_long	snd_wnd;		/* send window */
+	uint32_t	snd_wnd;		/* send window */
 /* receive sequence variables */
-	u_long	rcv_wnd;		/* receive window */
+	uint32_t	rcv_wnd;		/* receive window */
 	tcp_seq	rcv_nxt;		/* receive next */
 	tcp_seq	rcv_up;			/* receive urgent pointer */
 	tcp_seq	irs;			/* initial receive sequence number */
@@ -99,8 +101,8 @@ struct tcpcb {
 					 * used to recognize retransmits
 					 */
 /* congestion control (for slow start, source quench, retransmit after loss) */
-	u_long	snd_cwnd;		/* congestion-controlled window */
-	u_long	snd_ssthresh;		/* snd_cwnd size threshhold for
+	uint32_t	snd_cwnd;		/* congestion-controlled window */
+	uint32_t	snd_ssthresh;		/* snd_cwnd size threshhold for
 					 * for slow start exponential to
 					 * linear switch
 					 */
@@ -114,7 +116,7 @@ struct tcpcb {
 	short	t_srtt;			/* smoothed round-trip time */
 	short	t_rttvar;		/* variance in round-trip time */
 	u_short	t_rttmin;		/* minimum rtt allowed */
-	u_long	max_sndwnd;		/* largest window peer has offered */
+	uint32_t	max_sndwnd;		/* largest window peer has offered */
 
 /* out-of-band data */
 	char	t_oobflags;		/* have some */
@@ -128,8 +130,8 @@ struct tcpcb {
 	u_char	rcv_scale;		/* window scaling for recv window */
 	u_char	request_r_scale;	/* pending window scaling */
 	u_char	requested_s_scale;
-	u_long	ts_recent;		/* timestamp echo data */
-	u_long	ts_recent_age;		/* when last updated */
+	uint32_t	ts_recent;		/* timestamp echo data */
+	uint32_t	ts_recent_age;		/* when last updated */
 	tcp_seq	last_ack_sent;
 
 /* TUBA stuff */
@@ -185,64 +187,64 @@ struct tcpcb {
  * but that's inconvenient at the moment.
  */
 struct	tcpstat {
-	u_long	tcps_connattempt;	/* connections initiated */
-	u_long	tcps_accepts;		/* connections accepted */
-	u_long	tcps_connects;		/* connections established */
-	u_long	tcps_drops;		/* connections dropped */
-	u_long	tcps_conndrops;		/* embryonic connections dropped */
-	u_long	tcps_closed;		/* conn. closed (includes drops) */
-	u_long	tcps_segstimed;		/* segs where we tried to get rtt */
-	u_long	tcps_rttupdated;	/* times we succeeded */
-	u_long	tcps_delack;		/* delayed acks sent */
-	u_long	tcps_timeoutdrop;	/* conn. dropped in rxmt timeout */
-	u_long	tcps_rexmttimeo;	/* retransmit timeouts */
-	u_long	tcps_persisttimeo;	/* persist timeouts */
-	u_long	tcps_keeptimeo;		/* keepalive timeouts */
-	u_long	tcps_keepprobe;		/* keepalive probes sent */
-	u_long	tcps_keepdrops;		/* connections dropped in keepalive */
+	uint32_t	tcps_connattempt;	/* connections initiated */
+	uint32_t	tcps_accepts;		/* connections accepted */
+	uint32_t	tcps_connects;		/* connections established */
+	uint32_t	tcps_drops;		/* connections dropped */
+	uint32_t	tcps_conndrops;		/* embryonic connections dropped */
+	uint32_t	tcps_closed;		/* conn. closed (includes drops) */
+	uint32_t	tcps_segstimed;		/* segs where we tried to get rtt */
+	uint32_t	tcps_rttupdated;	/* times we succeeded */
+	uint32_t	tcps_delack;		/* delayed acks sent */
+	uint32_t	tcps_timeoutdrop;	/* conn. dropped in rxmt timeout */
+	uint32_t	tcps_rexmttimeo;	/* retransmit timeouts */
+	uint32_t	tcps_persisttimeo;	/* persist timeouts */
+	uint32_t	tcps_keeptimeo;		/* keepalive timeouts */
+	uint32_t	tcps_keepprobe;		/* keepalive probes sent */
+	uint32_t	tcps_keepdrops;		/* connections dropped in keepalive */
 
-	u_long	tcps_sndtotal;		/* total packets sent */
-	u_long	tcps_sndpack;		/* data packets sent */
-	u_long	tcps_sndbyte;		/* data bytes sent */
-	u_long	tcps_sndrexmitpack;	/* data packets retransmitted */
-	u_long	tcps_sndrexmitbyte;	/* data bytes retransmitted */
-	u_long	tcps_sndacks;		/* ack-only packets sent */
-	u_long	tcps_sndprobe;		/* window probes sent */
-	u_long	tcps_sndurg;		/* packets sent with URG only */
-	u_long	tcps_sndwinup;		/* window update-only packets sent */
-	u_long	tcps_sndctrl;		/* control (SYN|FIN|RST) packets sent */
+	uint32_t	tcps_sndtotal;		/* total packets sent */
+	uint32_t	tcps_sndpack;		/* data packets sent */
+	uint32_t	tcps_sndbyte;		/* data bytes sent */
+	uint32_t	tcps_sndrexmitpack;	/* data packets retransmitted */
+	uint32_t	tcps_sndrexmitbyte;	/* data bytes retransmitted */
+	uint32_t	tcps_sndacks;		/* ack-only packets sent */
+	uint32_t	tcps_sndprobe;		/* window probes sent */
+	uint32_t	tcps_sndurg;		/* packets sent with URG only */
+	uint32_t	tcps_sndwinup;		/* window update-only packets sent */
+	uint32_t	tcps_sndctrl;		/* control (SYN|FIN|RST) packets sent */
 
-	u_long	tcps_rcvtotal;		/* total packets received */
-	u_long	tcps_rcvpack;		/* packets received in sequence */
-	u_long	tcps_rcvbyte;		/* bytes received in sequence */
-	u_long	tcps_rcvbadsum;		/* packets received with ccksum errs */
-	u_long	tcps_rcvbadoff;		/* packets received with bad offset */
-	u_long	tcps_rcvshort;		/* packets received too short */
-	u_long	tcps_rcvduppack;	/* duplicate-only packets received */
-	u_long	tcps_rcvdupbyte;	/* duplicate-only bytes received */
-	u_long	tcps_rcvpartduppack;	/* packets with some duplicate data */
-	u_long	tcps_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
-	u_long	tcps_rcvoopack;		/* out-of-order packets received */
-	u_long	tcps_rcvoobyte;		/* out-of-order bytes received */
-	u_long	tcps_rcvpackafterwin;	/* packets with data after window */
-	u_long	tcps_rcvbyteafterwin;	/* bytes rcvd after window */
-	u_long	tcps_rcvafterclose;	/* packets rcvd after "close" */
-	u_long	tcps_rcvwinprobe;	/* rcvd window probe packets */
-	u_long	tcps_rcvdupack;		/* rcvd duplicate acks */
-	u_long	tcps_rcvacktoomuch;	/* rcvd acks for unsent data */
-	u_long	tcps_rcvackpack;	/* rcvd ack packets */
-	u_long	tcps_rcvackbyte;	/* bytes acked by rcvd acks */
-	u_long	tcps_rcvwinupd;		/* rcvd window update packets */
-	u_long	tcps_pawsdrop;		/* segments dropped due to PAWS */
-	u_long	tcps_predack;		/* times hdr predict ok for acks */
-	u_long	tcps_preddat;		/* times hdr predict ok for data pkts */
-	u_long	tcps_pcbcachemiss;
+	uint32_t	tcps_rcvtotal;		/* total packets received */
+	uint32_t	tcps_rcvpack;		/* packets received in sequence */
+	uint32_t	tcps_rcvbyte;		/* bytes received in sequence */
+	uint32_t	tcps_rcvbadsum;		/* packets received with ccksum errs */
+	uint32_t	tcps_rcvbadoff;		/* packets received with bad offset */
+	uint32_t	tcps_rcvshort;		/* packets received too short */
+	uint32_t	tcps_rcvduppack;	/* duplicate-only packets received */
+	uint32_t	tcps_rcvdupbyte;	/* duplicate-only bytes received */
+	uint32_t	tcps_rcvpartduppack;	/* packets with some duplicate data */
+	uint32_t	tcps_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
+	uint32_t	tcps_rcvoopack;		/* out-of-order packets received */
+	uint32_t	tcps_rcvoobyte;		/* out-of-order bytes received */
+	uint32_t	tcps_rcvpackafterwin;	/* packets with data after window */
+	uint32_t	tcps_rcvbyteafterwin;	/* bytes rcvd after window */
+	uint32_t	tcps_rcvafterclose;	/* packets rcvd after "close" */
+	uint32_t	tcps_rcvwinprobe;	/* rcvd window probe packets */
+	uint32_t	tcps_rcvdupack;		/* rcvd duplicate acks */
+	uint32_t	tcps_rcvacktoomuch;	/* rcvd acks for unsent data */
+	uint32_t	tcps_rcvackpack;	/* rcvd ack packets */
+	uint32_t	tcps_rcvackbyte;	/* bytes acked by rcvd acks */
+	uint32_t	tcps_rcvwinupd;		/* rcvd window update packets */
+	uint32_t	tcps_pawsdrop;		/* segments dropped due to PAWS */
+	uint32_t	tcps_predack;		/* times hdr predict ok for acks */
+	uint32_t	tcps_preddat;		/* times hdr predict ok for data pkts */
+	uint32_t	tcps_pcbcachemiss;
 };
 
 #ifdef KERNEL
 struct	inpcb tcb;		/* head of queue of active tcpcb's */
 struct	tcpstat tcpstat;	/* tcp statistics */
-u_long	tcp_now;		/* for RFC 1323 timestamps */
+uint32_t	tcp_now;		/* for RFC 1323 timestamps */
 
 int	 tcp_attach __P((struct socket *));
 void	 tcp_canceltimers __P((struct tcpcb *));
@@ -255,7 +257,7 @@ struct tcpcb *
 struct tcpcb *
 	 tcp_drop __P((struct tcpcb *, int));
 void	 tcp_dooptions __P((struct tcpcb *,
-	    u_char *, int, struct tcpiphdr *, int *, u_long *, u_long *));
+	    u_char *, int, struct tcpiphdr *, int *, uint32_t *, uint32_t *));
 void	 tcp_drain __P((void));
 void	 tcp_fasttimo __P((void));
 void	 tcp_init __P((void));
@@ -270,7 +272,7 @@ void	 tcp_pulloutofband __P((struct socket *,
 void	 tcp_quench __P((struct inpcb *, int));
 int	 tcp_reass __P((struct tcpcb *, struct tcpiphdr *, struct mbuf *));
 void	 tcp_respond __P((struct tcpcb *,
-	    struct tcpiphdr *, struct mbuf *, u_long, u_long, int));
+	    struct tcpiphdr *, struct mbuf *, uint32_t, uint32_t, int));
 void	 tcp_setpersist __P((struct tcpcb *));
 void	 tcp_slowtimo __P((void));
 struct tcpiphdr *

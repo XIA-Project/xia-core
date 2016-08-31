@@ -18,6 +18,7 @@
 #include <click/xiastreamheader.hh>
 #include "xtransport.hh"
 #include <clicknet/tcp_fsm.h>
+#include <cstdint> // uint32_t
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -211,7 +212,7 @@ private:
 	void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
-	int * ts_present, u_long *ts_val, u_long *ts_ecr);
+	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
 	void		tcp_drop(int err);
