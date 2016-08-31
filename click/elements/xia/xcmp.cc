@@ -90,6 +90,22 @@ void XCMP::add_handlers()
 }
 
 
+const char *XCMP::unreachStr(int code)
+{
+	switch(code) {
+		case XCMP_UNREACH_NET:
+			return "NETWORK";
+		case XCMP_UNREACH_HOST:
+			return "HOST";
+			break;
+		case XCMP_UNREACH_INTENT:
+			return "INTENT";
+		default:
+			return "UNKNOWN";
+	}
+}
+
+
 // sends a packet up to the application layer
 void
 XCMP::sendUp(Packet *p_in) {
@@ -171,6 +187,7 @@ void
 XCMP::processUnreachable(Packet *p_in)
 {
 	XIAHeader hdr(p_in);
+	int code = XCMP_UNREACH_UNSPECIFIED;
 
 	// can't deliever an unreachable?
 	if (hdr.nxt() == CLICK_XIA_NXT_XCMP && ((unsigned char *)hdr.payload())[0] == XCMP_UNREACH) {
@@ -202,10 +219,54 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
+	// don't send undeliverables back to broadcast packets
+//	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
+//		return;
+//	}
+
+	// the xia_path code seems to discard the visited values, so we need to go
+	// into the dags directly
+	const struct click_xia *h = hdr.hdr();
+	unsigned dnodes = h->dnode;
+	int8_t last = h->last;
+	const struct click_xia_xid_node *n = &h->node[0];
+	int bad_node = -1;
+
+	if (last == -1) {
+		n += (dnodes - 1);
+	} else {
+		n += last;
+	}
+
+	for (int i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
+		if (!n->edge[i].visited) {
+			bad_node = n->edge[i].idx;
+			break;
+		}
+	}
+
+	if (bad_node >= 0) {
+		unsigned t = htonl(h->node[bad_node].xid.type);
+		printf("\n\nlast node = %d\n", bad_node);
+		printf("type = %04x\n\n", t);
+		switch (t) {
+			case CLICK_XIA_XID_TYPE_AD:
+				code = XCMP_UNREACH_NET;
+				break;
+			case CLICK_XIA_XID_TYPE_HID:
+				code = XCMP_UNREACH_HOST;
+				break;
+			default:
+				code = XCMP_UNREACH_INTENT;
+		}
+	} else {
+		code = XCMP_UNREACH_UNSPECIFIED;
+	}
+
 	// send an undeliverable message
-	sendXCMPPacket(p_in, XCMP_UNREACH, XCMP_UNREACH_HOST, &_src_path);
-	INFO("Sent Unreachable from %s\n   to %s\n   for %s\n",
-		_src_path.unparse().c_str(),
+	sendXCMPPacket(p_in, XCMP_UNREACH, code, &_src_path);
+	INFO("Sent %s Unreachable from %s\n   to %s\n   for %s\n",
+		unreachStr(code), _src_path.unparse().c_str(),
 		hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
 }
 
@@ -284,8 +345,9 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 
 		} else if (xcmph->type == XCMP_UNREACH) {
 			// XID unreachable
-			INFO("Received Unreachable from %s\n      in response to %s\n      => %s\n",
-				hdr.src_path().unparse().c_str(),
+
+			INFO("Received %s Unreachable from %s\n      in response to %s\n      => %s\n",
+				unreachStr(xcmph->code), hdr.src_path().unparse().c_str(),
 				hresp.src_path().unparse().c_str(), hresp.dst_path().unparse().c_str());
 			sendUp(p_in);
 

@@ -76,6 +76,7 @@ class XCMP : public Element { public:
 
     bool processPacket(Packet *p_in);
     void gotXCMPPacket(Packet *p_in);
+    const char *unreachStr(int code);
 
     // source XIAPath of the local host
     XIAPath _src_path;
