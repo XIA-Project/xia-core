@@ -40,8 +40,7 @@
 
 #include "wavedeviceremote.hh"
 
-#define WSMP_MTU 1024 // in theory up to 4096 bytes given 12 bit length field
-                      // but arada only supports up to 1400 bytes at the moment
+#define WSMP_MTU 99999999 // bytes, set to 1200 for the WSM waverserver version!
 
 CLICK_DECLS
 
