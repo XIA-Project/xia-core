@@ -40,7 +40,7 @@
 
 #include "wavedeviceremote.hh"
 
-#define WSMP_MTU 99999999 // bytes, set to 1200 for the WSM waverserver version!
+#define WAVE_MTU 99999999 // bytes, set to 1200 for the WSM waverserver version!
 
 CLICK_DECLS
 
@@ -384,9 +384,9 @@ bool WaveDeviceRemote::run_task(Task*){
     if (p) {
     
         // mind the MTU
-        if (p->length() > WSMP_MTU){
+        if (p->length() > WAVE_MTU){
             errh->error("%s, run_task(): packet larger than WSM MTU (%d vs %d \
-bytes), dropping", declaration().c_str(), p->length(), WSMP_MTU);
+bytes), dropping", declaration().c_str(), p->length(), WAVE_MTU);
             p->kill();
 
         } else{
