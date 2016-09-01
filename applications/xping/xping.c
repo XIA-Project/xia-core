@@ -307,8 +307,10 @@ void pinger()
 
 	if (timing) {
 		gettimeofday(&tp, &tz);
-		*(int *)&outpack[8]  = htonl(tp.tv_sec);
-		*(int *)&outpack[12] = htonl(tp.tv_usec);
+		void *p = &outpack[8];
+		*(unsigned *)p  = htonl(tp.tv_sec);
+		p = &outpack[12];
+		*(unsigned *)p = htonl(tp.tv_usec);
 	}
 
 	// skip 8 for time
