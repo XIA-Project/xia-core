@@ -11,7 +11,7 @@ using namespace std;
 
 static XcacheHandle xcache;
 static map<string, sockaddr_x> chunkIdToChunkDAG;
-static vector<RequestProperty> requests;
+static vector<RequestStats> requests;
 
 void parseChunkIdToCIDMap(string cidMapDir){
 	DIR *dir;
@@ -77,7 +77,7 @@ void fetchWorkload(ClientWorkloadParser* parser){
         elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 		
 		// chunk latency is in ms
-		RequestProperty prop = {currObjectId, currChunkId, currChunkSize, elapsedTime};
+		RequestStats prop = {currObjectId, currChunkId, currChunkSize, elapsedTime, XgetPrevFetchHopCount()};
 		requests.push_back(prop);
 	}
 }
@@ -95,8 +95,9 @@ void saveStats(int workloadId){
 		int chunkId = requests[i].chunkId;
 		int chunkSize = requests[i].chunkSize;
 		double chunkLatency = requests[i].delay;
+		int hopCount = requests[i].hopCount;
 
-		currFile << objectId << " " << chunkId << " " << chunkSize << " " << chunkLatency << endl;
+		currFile << objectId << " " << chunkId << " " << chunkSize << " " << chunkLatency << " " << hopCount << endl;
  	}
 
 	currFile.close();
