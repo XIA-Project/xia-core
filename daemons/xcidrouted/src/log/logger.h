@@ -13,6 +13,7 @@ public:
 	~Logger(); //Destructor
 
 	void log(const char* data);
+	void log(string data);
 	void end();
 
 private:

@@ -22,6 +22,10 @@ Logger::~Logger(){
 	printf("logger closed\n");
 };
 
+void Logger::log(string data){
+	log(data.c_str());
+}
+
 void Logger::log(const char* data){
 	time_t currTime = time(0);
 	double sinceThen = difftime(currTime, this->startTime);
