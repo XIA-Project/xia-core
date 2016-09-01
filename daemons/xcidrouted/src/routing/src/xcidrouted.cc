@@ -440,8 +440,7 @@ void CIDAdvertiseTimer(){
 	thread([](){
     	// sleep for INIT_WAIT_TIME_SEC seconds for hello message to propagate
 		this_thread::sleep_for(chrono::seconds(INIT_WAIT_TIME_SEC));
-        while (true)
-        {
+        while (true) {
             double nextTimeInSecond = nextWaitTimeInSecond(CID_ADVERT_UPDATE_RATE_PER_SEC);
             int nextTimeMilisecond = (int) ceil(nextTimeInSecond * 1000);
 
@@ -536,12 +535,10 @@ void advertiseCIDs(){
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
-
 		routeState.mtx.lock();
 
 #ifdef EVENT_LOG
-		logger->log("Broadcast TTL");
-		logger->log(to_string(ttl));
+		logger->log("Broadcast TTL: " + to_string(ttl));
 
 		logger->log("Broadcast newCIDs");
 		for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
@@ -560,6 +557,7 @@ void advertiseCIDs(){
 #endif
 			msg.send(it->second.sendSock);
 		}
+
 		routeState.mtx.unlock();
 
 		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
@@ -858,6 +856,7 @@ set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const Neigh
 
 #else
 
+// non-filtering code
 void deleteCIDRoutes(const AdvertisementMessage & msg){
 	// for each CID routes in the message that would need to be removed
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
