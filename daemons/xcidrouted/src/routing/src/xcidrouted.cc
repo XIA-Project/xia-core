@@ -100,7 +100,6 @@ string AdvertisementMessage::serialize() const{
 	string result;
 
 	result += this->senderHID + "^";
-	result += this->currSenderHID + "^";
 	result += to_string(this->seq) + "^";
 	result += to_string(this->ttl) + "^";
 	result += to_string(this->distance) + "^";
@@ -128,13 +127,6 @@ void AdvertisementMessage::deserialize(string data){
 	found = msg.find("^", start);
   	if (found != string::npos) {
   		this->senderHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
-
-	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		this->currSenderHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
 
@@ -200,7 +192,6 @@ void AdvertisementMessage::deserialize(string data){
 void AdvertisementMessage::print() const{
 	printf("AdvertisementMessage: \n");
 	printf("\tsenderHID: %s\n", this->senderHID.c_str());
-	printf("\tcurrSenderHID: %s\n", this->currSenderHID.c_str());
 	printf("\tseq: %d\n", this->seq);
 	printf("\tttl: %d\n", this->ttl);
 	printf("\tdistance: %d\n", this->distance);
@@ -273,14 +264,14 @@ int AdvertisementMessage::recv(int sock){
 	printf("receiving CID advertisement...\n");
 
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
-	if (n < 0) {
-		printf("Xrecv failed\n");
-		return n;
+	if (n <= 0) {
+		printf("received size have invalid size. return failed\n");
+		return -1;
 	}
 
 	if(remaining <= 0){
-		printf("received size have invalid size. Exit\n");
-		cleanup(0);
+		printf("received size have invalid size. return failed\n");
+		return -1;
 	}
 
 	remaining = ntohl(remaining);
@@ -304,8 +295,8 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	if(data.size() == 0 || data.size() != size){
-		printf("received data have invalid size. Exit\n");
-		cleanup(0);
+		printf("received size have invalid size. return failed\n");
+		return -1;
 	}
 
 	printf("received a raw advertisement message:\n");
@@ -376,7 +367,7 @@ void config(int argc, char** argv) {
 		hostname = strdup(DEFAULT_NAME);
 	}
 
-	if(ttl == -1){
+	if(ttl == -1 || ttl > MAX_TTL){
 		ttl = MAX_TTL;
 	}
 
@@ -491,7 +482,6 @@ void advertiseCIDs(){
 
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
-	msg.currSenderHID = routeState.myHID;
 	msg.seq = routeState.lsaSeq;
 	msg.ttl = ttl;
 	msg.distance = 0;
@@ -566,8 +556,7 @@ void advertiseCIDs(){
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 
 #ifdef EVENT_LOG
-			logger->log("Broadcast to neighbor:");
-			logger->log(it->second.HID);
+			logger->log("Broadcast to neighbor: " + it->second.HID);
 #endif
 			msg.send(it->second.sendSock);
 		}
@@ -703,7 +692,7 @@ void processHelloMessage(){
 		if(sock == -1){
 			return;
 		}
-			
+
 		routeState.mtx.lock();
 		int interface = interfaceNumber("HID", msg.HID);
 		routeState.neighbors[key].AD = msg.AD;
@@ -747,6 +736,18 @@ void processNeighborJoin(){
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
 	routeState.mtx.unlock();
+
+	// TODO: handle topology changes
+}
+
+void processNeighborLeave(const NeighborInfo &neighbor){
+	string key = neighbor.AD + neighbor.HID;
+	
+	routeState.mtx.lock();
+	routeState.neighbors.erase(key);
+	routeState.mtx.unlock();
+
+	// TODO: handle topology changes
 }
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg){
@@ -801,7 +802,7 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 
 #ifdef EVENT_LOG
 				logger->log("del route for CID: " + currDelCID);
-#endif		
+#endif
 
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
@@ -938,11 +939,12 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 
 void processNeighborMessage(const NeighborInfo &neighbor){
 	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
-	// deseralize the message
+
 	AdvertisementMessage msg;
 	int status = msg.recv(neighbor.recvSock);
 	if(status < 0){
-		printf("message receive failed\n");
+		printf("message receive failed, remove neighbor\n");
+		processNeighborLeave(neighbor);
 		return;
 	}
 	
@@ -1011,7 +1013,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 #endif
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
-		msg2Others.currSenderHID = routeState.myHID;
 		msg2Others.seq = msg.seq;
 		msg2Others.ttl = msg.ttl - 1;
 		msg2Others.distance = msg.distance + 1;
@@ -1112,7 +1113,7 @@ int main(int argc, char *argv[]) {
 				FD_SET(it->second.recvSock, &socks);
 			}
 		}
-		
+
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000;
 

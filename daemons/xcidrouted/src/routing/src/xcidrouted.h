@@ -94,8 +94,8 @@ public:
 	int send(int sock);
 	int recv(int sock);
 
+	// TODO: handle topology change
 	string senderHID;			// who is the original sender
-	string currSenderHID;		// who is the neighbor that forward the message
 	uint32_t seq; 				// LSA seq of from sender
 	uint32_t ttl;				// ttl to broadcast the advertisement
 	uint32_t distance; 			// # hops to the sender
@@ -177,6 +177,7 @@ void printNeighborInfo();
 
 void processHelloMessage();
 void processNeighborJoin();
+void processNeighborLeave(const NeighborInfo &neighbor);
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg);
 void deleteCIDRoutes(const AdvertisementMessage & msg);
