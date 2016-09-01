@@ -754,7 +754,6 @@ bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 
 #ifdef FILTER
 
-// filter code assume TTLs are the same
 set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 	set<string> routeDeletion;
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
@@ -777,7 +776,6 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 	return routeDeletion;
 }
 
-// filter code assumes router TTLs are the same
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
 	set<string> routeAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
