@@ -1,14 +1,13 @@
 #include <stdio.h>
+#include <syslog.h>
+#include <errno.h>
 #include <iostream>
 #include "controller.h"
 #include "clicknet/xia.h"
 #include <getopt.h>
-#include "logger.h"
 
-DEFINE_LOG_MACROS(XCACHE)
-
-
-static char version[] = "0.1";
+static char version[] = "1.0";
+static char ident[256]; // syslog identifcation string
 
 static void display_version(void)
 {
@@ -17,37 +16,15 @@ static void display_version(void)
 
 static void usage(char *argv[])
 {
-	int i;
-	char mask[][128] = {
-		"Controller",
-		"Cache",
-		"Slice",
-		"Meta",
-		"Stores",
-		"Policies",
-		"Xcache",
-	};
-
 	display_version();
 	printf("Usage: %s [OPTIONS]\n", argv[0]);
 	printf("  -h, --host=HOSTNAME       Specify the host on which"
 		   " this daemon should run.\n");
 	printf("                            Default host = \"host0\"\n");
-	printf("  -v, --version             Displays xcache version.\n");
-	printf("  -l, --log-level=level     Set xcache log level"
-		   "(From LOG_ERROR = %d to LOG_INFO = %d).\n",
-		   LOG_ERROR, LOG_INFO);
-	printf("  -m, --log-mask=<num>      Set xcache log Mask. "
-		   "Following are the mask values for various modules\n");
-	for(i = LOG_CTRL; i < LOG_END; i++) {
-		printf("                            Mask for module \"%s\": 0x%4.4x\n",
-			   mask[i], 0x1 << i);
-	}
-
-
-	printf("                            Default Mask = 0xFFFF "
-		   "(Enables all logs)\n");
-	printf("  --help                    Displays this help.\n");
+	printf("  -V, --version             Displays xcache version.\n");
+	printf("  -l, --log-level=level     Syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf("  -v, --verbose             Log to the console as well as syslog\n");
+	printf("  -h, --help                Displays this help.\n");
 }
 
 static void sethostname(struct xcache_conf *conf, char *hostname)
@@ -55,15 +32,30 @@ static void sethostname(struct xcache_conf *conf, char *hostname)
 	strcpy(conf->hostname, hostname);
 }
 
+static void initlogging(std::string  hostname, unsigned level, bool verbose)
+{
+	unsigned flags = LOG_CONS|LOG_NDELAY;
+
+	if (verbose) {
+		flags |= LOG_PERROR;
+	}
+	sprintf(ident, "xcache:%s", hostname.c_str());
+	openlog(ident, flags, LOG_LOCAL4);
+	setlogmask(LOG_UPTO(level));
+
+	syslog(LOG_NOTICE, "xcache started on %s", hostname.c_str());
+}
+
+
 int main(int argc, char *argv[])
 {
 	int c;
+	unsigned level = 3;
+	bool verbose = false;
+
 	xcache_controller ctrl;
 	struct xcache_conf xcache_conf;
-	struct logger_config logger_conf;
 
-	logger_conf.level = 0;
-	logger_conf.mask = LOG_ALL;
 	xcache_conf.threads = DEFAULT_THREADS;
 
 	strcpy(xcache_conf.hostname, "router0");
@@ -72,8 +64,8 @@ int main(int argc, char *argv[])
 		{"host", required_argument, 0, 0},
 		{"help", no_argument, 0, 0},
 		{"version", no_argument, 0, 0},
-		{"log_level", required_argument, 0, 0},
-		{"log_mask", required_argument, 0, 0},
+		{"level", required_argument, 0, 0},
+		{"verbose", required_argument, 0, 0},
 		{"threads", required_argument, 0, 0},
 		{0, 0, 0, 0},
 	};
@@ -81,7 +73,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		int option_index = 0;
 
-		c = getopt_long(argc, argv, "vl:m:h:t:", options, &option_index);
+		c = getopt_long(argc, argv, "Vvl:h:t:", options, &option_index);
 		if(c == -1)
 			break;
 
@@ -97,10 +89,10 @@ int main(int argc, char *argv[])
 				display_version();
 				return 0;
 			} else if (!strcmp(options[option_index].name, "log_level")) {
-				logger_conf.level = strtol(optarg, NULL, 10);
+				level = MIN(strtol(optarg, NULL, 10), LOG_DEBUG);
 				return 0;
-			} else if (!strcmp(options[option_index].name, "log_mask")) {
-				logger_conf.mask = strtol(optarg, NULL, 0);
+			} else if (!strcmp(options[option_index].name, "verbose")) {
+				verbose = true;
 				break;
 			} else if (!strcmp(options[option_index].name, "threads")) {
 				xcache_conf.threads = strtol(optarg, NULL, 0);
@@ -114,12 +106,12 @@ int main(int argc, char *argv[])
 			sethostname(&xcache_conf, optarg);
 			break;
 		case 'l':
-			logger_conf.level = strtol(optarg, NULL, 10);
-			break;
-		case 'm':
-			logger_conf.mask = strtol(optarg, NULL, 0);
+			level = MIN(strtol(optarg, NULL, 10), LOG_DEBUG);
 			break;
 		case 'v':
+			verbose = true;
+			break;
+		case 'V':
 			display_version();
 			return 0;
 		case 't':
@@ -131,26 +123,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	configure_logger(&logger_conf);
+	initlogging(xcache_conf.hostname, level, verbose);
+
 	ctrl.set_conf(&xcache_conf);
 	ctrl.run();
 	return 0;
-}
-
-bool operator<(const struct click_xia_xid& x, const struct click_xia_xid& y)
-{
-	if(x.type < y.type) {
-		return true;
-	} else if(x.type > y.type) {
-		return false;
-	}
-
-	for(int i = 0; i < CLICK_XIA_XID_ID_LEN; i++) {
-		if(x.id[i] < y.id[i])
-			return true;
-		else if(x.id[i] > y.id[i])
-			return false;
-	}
-
-	return false;
 }

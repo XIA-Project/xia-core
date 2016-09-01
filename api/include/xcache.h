@@ -53,17 +53,15 @@ enum {
  * Initializes XcacheHandle.
  */
 int XcacheHandleInit(XcacheHandle *h); //DONE
-#ifdef notyet
 int XcacheHandleDestroy(XcacheHandle *h);
-#else
-#define XcacheHandleDestroy(...)
-#endif
 
 
 extern int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *info);  //DONE
 extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count); //DONE
+
+extern int XevictChunk(XcacheHandle *h, const char *cid);
 
 extern int XbufInit(XcacheBuf *xbuf);
 extern int XbufAdd(XcacheBuf *xbuf, void *data, size_t len);

@@ -163,7 +163,8 @@ void *mainLoopThread(void * /*arg*/){
     }
 
 	char sndBuf[XIA_MAXBUF + 1];
-	int nsntBytes=0;
+    int nsntBytes=0;
+	unsigned long long nsntBytesTotal=0, nsntPacketsTotal=0;
 
 	randomString(sndBuf, pktSize); // set the snd buffer to a random string
 
@@ -173,9 +174,12 @@ void *mainLoopThread(void * /*arg*/){
             die(-4, "Send error %s on socket %d\n", strerror(errno), ssock);
         }
 
+        nsntBytesTotal += nsntBytes;
+        nsntPacketsTotal++;
+
         if (verbose){
-            printf("Xsock %4d sent %d of %d bytes\n", ssock, nsntBytes, \
-                pktSize);
+            printf("Sent %d of %db (total %llub, %llu packets)\n", \
+                nsntBytes, pktSize, nsntBytesTotal, nsntPacketsTotal);
         }
         usleep(sleepTime);
 	}

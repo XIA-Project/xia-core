@@ -4,7 +4,7 @@ include ../../xia.mk
 
 PROTOC=protoc
 CFLAGS+=-c -fpic
-LDFLAGS+=-lprotobuf
+LDFLAGS+=-lprotobuf $(XLIB)/libXsocket.so
 
 SOURCES=XcacheApis.c xcache_sock.c
 PROTO=xcache_cmd.proto

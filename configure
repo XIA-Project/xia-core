@@ -9,7 +9,7 @@ else
 	CFLAGS="-ggdb -DDEBUG"
 fi
 
-CFLAGS+=" -Wall -Wextra"
+CFLAGS+=" -Wall -Wextra -std=c++11"
 
 # compile for running inside a profiler
 [ ! -z $PROFILE ] && CFLAGS+=" -pg"

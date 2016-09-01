@@ -67,13 +67,10 @@ struct click_xia {
     click_xia_xid_node node[0];         /* XID node list */
 };
 
-#define CLICK_XIA_NXT_CID       12  /* CID-source specific key-value list */
-#define CLICK_XIA_NXT_XTCP      13
-#define CLICK_XIA_NXT_DGRAM     14
-#define CLICK_XIA_NXT_XCMP      61  /*  XCMP header */
-#define CLICK_XIA_NXT_HDR_MAX   (CLICK_XIA_NXT_NO-1)  /* maximum non-upper-layer nxt value */
-#define CLICK_XIA_NXT_NO        59                    /* no next header (as in IPv6) */
-#define CLICK_XIA_NXT_TRN       60  /* Transport header */
+#define CLICK_XIA_NXT_DATA		0
+#define CLICK_XIA_NXT_XCMP		0x01
+#define CLICK_XIA_NXT_XDGRAM	0x02
+#define CLICK_XIA_NXT_XSTREAM	0x03
 
 // XIA extension header
 #pragma pack(push)
@@ -110,7 +107,7 @@ struct click_xia_xcmp {
 #define	  XCMP_UNREACH_NET		0	/*   bad net		     */
 #define	  XCMP_UNREACH_HOST		1	/*   bad host		     */
 #define	  XCMP_UNREACH_PROTOCOL		2	/*   bad protocol	     */
-#define	  XCMP_UNREACH_PORT		3	/*   bad port		     */
+#define	  XCMP_UNREACH_INTENT		3	/*   bad port		     */
 #define	  XCMP_UNREACH_NEEDFRAG		4	/*   IP_DF caused drop	     */
 #define	  XCMP_UNREACH_SRCFAIL		5	/*   src route failed	     */
 #define	  XCMP_UNREACH_NET_UNKNOWN	6	/*   unknown net	     */
@@ -123,6 +120,7 @@ struct click_xia_xcmp {
 #define	  XCMP_UNREACH_FILTER_PROHIB	13	/*   admin prohib	     */
 #define	  XCMP_UNREACH_HOST_PRECEDENCE	14	/*   host prec violation     */
 #define	  XCMP_UNREACH_PRECEDENCE_CUTOFF 15	/*   prec cutoff	     */
+#define	  XCMP_UNREACH_UNSPECIFIED  16      /*    dag parsing error	     */
 #define	XCMP_REDIRECT		5		/* shorter route, codes:     */
 #define	  XCMP_REDIRECT_NET		0	/*   for network	     */
 #define	  XCMP_REDIRECT_HOST		1	/*   for host		     */

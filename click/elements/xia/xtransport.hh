@@ -15,7 +15,6 @@
 #include <clicknet/udp.h>
 #include <clicknet/tcp.h>
 #include <click/string.hh>
-#include <click/xiatransportheader.hh>
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
@@ -208,16 +207,6 @@ public:
 
 	char *random_xid(const char *type, char *buf);
 
-	uint32_t calc_recv_window(sock *sk);
-	bool should_buffer_received_packet(WritablePacket *p, sock *sk);
-	void add_packet_to_recv_buf(WritablePacket *p, sock *sk);
-	void check_for_and_handle_pending_recv(sock *sk);
-	int read_from_recv_buf(xia::XSocketMsg *xia_socket_msg, sock *sk);
-	uint32_t next_missing_seqnum(sock *sk);
-	void resize_buffer(WritablePacket* buf[], int max, int type, uint32_t old_size, uint32_t new_size, int *dgram_start, int *dgram_end);
-	void resize_send_buffer(sock *sk, uint32_t new_size);
-	void resize_recv_buffer(sock *sk, uint32_t new_size);
-
 	bool usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag);
 
 	void ProcessAPIPacket(WritablePacket *p_in);
@@ -300,8 +289,6 @@ public:
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 	int IfaceFromSIDPath(XIAPath sidPath);
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
-
-	XIAPath alterCIDDstPath(XIAPath dstPath);
 
 	// modify routing table
 	void addRoute(const XID &sid) {

@@ -18,9 +18,9 @@ public:
 	// read from packet p->network_header() should point to XIA header
 	StreamHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_XTCP);
+		assert(xh.nxt() == CLICK_XIA_NXT_XSTREAM);
 
-		if (xh.nxt() == CLICK_XIA_NXT_XTCP) {
+		if (xh.nxt() == CLICK_XIA_NXT_XSTREAM) {
 			_hdr = reinterpret_cast<const struct xtcp*>(xh.next_header());
 		} else {
 			_hdr = NULL;
@@ -47,7 +47,7 @@ class StreamHeaderEncap
 public:
     StreamHeaderEncap() {
 		_hdr = (struct xtcp*)calloc(1, sizeof(struct xtcp) + XTCP_OPTIONS_MAX);
-		_hdr->th_nxt = CLICK_XIA_NXT_NO;
+		_hdr->th_nxt = CLICK_XIA_NXT_DATA;
 	}
 
     static StreamHeaderEncap* MakeTCPHeader(xtcp *tcph) {

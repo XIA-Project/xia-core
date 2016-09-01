@@ -61,9 +61,6 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 
 	sent = 0;
 	do {
-		//int to_send;
-
-		//to_send = remaining < 512 ? remaining : 512;
 		ret = send(xcache_sock, cmd_on_wire.c_str() + sent, remaining, 0);
 		if (ret <= 0) {
 			break;
@@ -72,7 +69,7 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 		sent += ret;
 	} while(remaining > 0);
 
-	fprintf(stderr, "%s: Lib sent %d bytes\n", __func__, htonl(msg_length) + 4);
+	//fprintf(stderr, "%s: Lib sent %d bytes\n", __func__, htonl(msg_length) + 4);
 
 	if (ret < 0 || remaining > 0)
 		return -1;
@@ -116,7 +113,7 @@ static int get_response_blocking(int xcache_sock, xcache_cmd *cmd)
 	}
 
 	remaining = ntohl(msg_length);
-	fprintf(stderr, "Lib received msg of length %d\n", remaining);
+	//fprintf(stderr, "Lib received msg of length %d\n", remaining);
 	ret = read_bytes_to_buffer(xcache_sock, buffer, remaining);
 
 	if (ret == 0) {
@@ -155,6 +152,21 @@ void XbufFree(XcacheBuf *xbuf)
 	xbuf->length = 0;
 	free(xbuf->buf);
 }
+
+int XcacheHandleDestroy(XcacheHandle *h)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_FREE_CONTEXT);
+	cmd.set_context_id(h->contextID);
+	send_command(h->xcacheSock, &cmd);
+
+	close(h->xcacheSock);
+	close(h->notifSock);
+
+	return 0;
+}
+
 
 int XcacheHandleInit(XcacheHandle *h)
 {
@@ -195,6 +207,36 @@ int XcacheHandleInit(XcacheHandle *h)
 	return 0;
 }
 
+int XevictChunk(XcacheHandle *h, const char *cid)
+{
+	int rc = xcache_cmd::XCACHE_OK;
+	xcache_cmd cmd;
+
+	if (strncasecmp(cid, "cid:", 4) == 0)
+		cid += 4;
+	if (strlen(cid) != (XID_SIZE * 2)) {
+		return xcache_cmd::XCACHE_INVALID_CID;
+	}
+
+	cmd.set_cmd(xcache_cmd::XCACHE_EVICT);
+	cmd.set_context_id(h->contextID);
+	cmd.set_cid(cid);
+	printf("evict sending\n");
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
+		/* Error in Sending chunk */
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Did not get a valid response from xcache\n");
+		return -1;
+	}
+
+	return rc;
+}
+
 static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, int flags)
 {
 	xcache_cmd cmd;
@@ -223,7 +265,7 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 		}
 	}
 
-	fprintf(stderr, "%s: Got a response from server\n", __func__);
+	//fprintf(stderr, "%s: Got a response from server\n", __func__);
 	memcpy(addr, cmd.dag().c_str(), cmd.dag().length());
 
 	//Graph g(addr);

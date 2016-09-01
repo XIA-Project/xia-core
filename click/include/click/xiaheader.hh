@@ -33,7 +33,7 @@ class XIAHeader { public:
     XIAPath dst_path() const;               // destination path (expensive call)
     XIAPath src_path() const;               // source path (expensive call)
 
-    inline const uint8_t* next_header() const;  // next header 
+    inline const uint8_t* next_header() const;  // next header
 
     const uint8_t* payload() const;         // payload (expensive call; need to traverse extension headers)
 
@@ -180,6 +180,13 @@ inline const uint8_t*
 XIAHeader::next_header() const
 {
     return reinterpret_cast<const uint8_t*>(_hdr) + hdr_size();
+}
+
+/* Returns layer 3 payload (this includes transport header) */
+inline const uint8_t*
+XIAHeader::payload() const
+{
+    return next_header();
 }
 
 inline

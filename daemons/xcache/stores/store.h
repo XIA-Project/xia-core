@@ -72,6 +72,17 @@ public:
 	};
 
 	/**
+	 * Delete the content associated with meta from the content store.
+	 * @param  meta Key
+	 * @return      0 on success, -1 on error
+	 */
+	virtual int remove(xcache_meta *meta)
+	{
+		(void)meta;
+		return 0;
+	}
+
+	/**
 	 * Print the current status of the store.
 	 * Hints:
 	 * - Number of bytes allocated by the store

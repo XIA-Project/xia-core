@@ -16,9 +16,9 @@
 #include <click/string.hh>
 #include <elements/ipsec/sha1_impl.hh>
 #include <click/xiastreamheader.hh>
-#include <click/xiatransportheader.hh>
 #include "xtransport.hh"
 #include <clicknet/tcp_fsm.h>
+#include <cstdint> // uint32_t
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -65,7 +65,7 @@ using namespace xia;
  * Flags used when sending segments in tcp_output.  Basic flags (TH_RST,
  * TH_ACK,TH_SYN,TH_FIN) are totally determined by state, with the proviso
  * that TH_FIN is sent only if all data queued for output is included in the
- * segment. See definition of flags in xiatransportheader.hh
+ * segment. See definition of flags in xtcp.hh
  */
 //static const uint8_t  tcp_outflags[TCP_NSTATES] = {
 //	  TH_RST|TH_ACK,	  /* 0, CLOSED */
@@ -214,7 +214,7 @@ private:
 	void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
-	int * ts_present, u_long *ts_val, u_long *ts_ecr);
+	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr);
 	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
 	void		tcp_setpersist();
 	void		tcp_drop(int err);

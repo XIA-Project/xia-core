@@ -3,6 +3,12 @@
 # create a .png representaion of the click configuration
 #
 
+which dot > /dev/null
+if [ $? != 0 ]; then
+	echo Install the graphviz package and try this again!
+	exit
+fi
+
 if [ $# == 0 ]; then
 	echo "usage: clickgraph foo.click"
 	echo "creates foo.png in the current directory"
@@ -15,8 +21,9 @@ CLICKPATH="$(dirname "$(cd "$(dirname "$0")" && pwd)")/click"
 temp="/tmp/$(basename $1 .click).$$.tmp"
 conf=$(basename $1 .click)
 
-# make the elementmap file for use by click-flatten
-cd $CLICKPATH && make -s elementmap.xml && cd - > /dev/null
+# build the needed click tools and element map
+cd $CLICKPATH && make share/click/elementmap.xml && cp share/click/elementmap.xml . && cd -
+cd $CLICKPATH/tools && make && cd -
 
 # hack as click-flatten doesn't like paths in the require statement.
 # assumes the first 2 lines in the conf file are require lines that we can delete
@@ -25,4 +32,5 @@ echo "require (library xia_router_lib.click)" > $temp
 tail -n +3 $1 >> $temp
 
 $CLICKPATH/tools/click-flatten/click-flatten $temp | $CLICKPATH/tools/click-pretty/click-pretty --dot | dot -Tpng > $conf.png
+rm $temp
 

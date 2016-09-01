@@ -35,19 +35,19 @@ void listRoutes(std::string xidType)
 {
 	int rc;
 	vector<XIARouteEntry> routes;
-	syslog(LOG_INFO, "%s: route updates", xidType.c_str());
+	syslog(LOG_DEBUG, "%s: route updates", xidType.c_str());
 	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
 		vector<XIARouteEntry>::iterator ir;
 		for (ir = routes.begin(); ir < routes.end(); ir++) {
 			XIARouteEntry r = *ir;
-			syslog(LOG_INFO, "%s: %s | %d | %s | %ld", xidType.c_str(), r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
+			syslog(LOG_DEBUG, "%s: %s | %d | %s | %ld", xidType.c_str(), r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
 		}
 	} else if (rc == 0) {
-		syslog(LOG_INFO, "%s: No routes exist", xidType.c_str());
+		syslog(LOG_DEBUG, "%s: No routes exist", xidType.c_str());
 	} else {
 		syslog(LOG_WARNING, "%s: Error getting route list %d", xidType.c_str(), rc);
 	}
-	syslog(LOG_INFO, "%s: done listing route updates", xidType.c_str());
+	syslog(LOG_DEBUG, "%s: done listing route updates", xidType.c_str());
 }
 
 
@@ -393,7 +393,7 @@ int processLSA(const char* lsa_msg) {
 
 	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
 		// Calculate Shortest Path algorithm
-		syslog(LOG_INFO, "Calcuating shortest paths\n");
+		syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 		calcShortestPath();
 		route_state.calc_dijstra_ticks = 0;
 
@@ -503,10 +503,10 @@ void calcShortestPath() {
 
 void printRoutingTable() {
 
-	syslog(LOG_INFO, "AD Routing table at %s", route_state.myAD);
+	syslog(LOG_DEBUG, "AD Routing table at %s", route_state.myAD);
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
+		syslog(LOG_DEBUG, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 
   	}
 }
@@ -622,9 +622,6 @@ void config(int argc, char** argv)
 
 	if (!hostname)
 		hostname = strdup(DEFAULT_NAME);
-
-	// load the config setting for this hostname
-	set_conf("xsockconf.ini", hostname);
 
 	// note: ident must exist for the life of the app
 	ident = (char *)calloc(strlen(hostname) + strlen (APPNAME) + 4, 1);
@@ -752,7 +749,7 @@ int main(int argc, char *argv[])
 			{
 				if (now - iter->second >= EXPIRE_TIME){
 					xr.delRoute(iter->first);
-					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+					syslog(LOG_DEBUG, "purging host route for : %s", iter->first.c_str());
 					timeStamp.erase(iter++);
 				} else {
 					++iter;

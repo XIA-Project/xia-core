@@ -1,6 +1,6 @@
 /* ts=4 */
 /*
-** Copyright 2011 Carnegie Mellon University
+** Copyright 2011/2016 Carnegie Mellon University
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -15,37 +15,95 @@
 ** limitations under the License.
 */
 
+/*
+** TODO:
+** - add ls cmd
+** - add ability to handle put as well as get
+** - return url for multiple dags instead of 1 at a time?
+*/
+
 #include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <errno.h>
 #include "xcache.h"
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include "dagaddr.h"
-#include <assert.h>
-
 #include "Xkeys.h"
 
-#define VERSION "v1.0"
+#define VERSION "v2.0"
 #define TITLE "XIA Basic FTP Server"
+#define NAME "basicftp.xia"
+#define BUFSIZE 1000
 
-#define MAX_XID_SIZE 100
-// #define DAG  "RE %s %s %s"
-#define NAME "www_s.basicftp.aaa.xia"
+#define MB(__mb) (__mb * 1024 * 1024)
+#define MAXCHUNKSIZE MB(10)
 
-#undef XIA_MAXBUF
-#define XIA_MAXBUF 500
+int verbose = 0;
+char name[256];
+char rootdir[256];
+unsigned chunksize = MB(1);
+XcacheHandle xcache;
 
-#define MB(__mb) (KB(__mb) * 1024)
-#define KB(__kb) ((__kb) * 1024)
-#define CHUNKSIZE MB(1)
-#define NUM_CHUNKS	10
-#define REREQUEST 3
+/*
+** display cmd line options and exit
+*/
+void help(const char *name)
+{
+	printf("\n%s (%s)\n", TITLE, VERSION);
+	printf("usage: %s [-v] [-n name] [-c chunk_size] [-r root_dir]\n", name);
+	printf("where:\n");
+	printf(" -v : verbose mode\n");
+	printf(" -n : specify service name (default = %s)\n", NAME);
+	printf(" -c : maximum chunk size (default = 1M)\n");
+	printf(" -r : specify the base directory we are running from\n");
+	printf("\n");
+	exit(0);
+}
 
-int verbose = 1;
+/*
+** configure the app
+*/
+void getConfig(int argc, char** argv)
+{
+	int c;
+
+	strcpy(name, NAME);
+	getcwd(rootdir, sizeof(rootdir));
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "c:hn:r:v")) != -1) {
+		switch (c) {
+			case 'c':
+				if ((chunksize = atoi(optarg)) != 0) {
+					if (chunksize < 100) {
+						chunksize = 100;
+					} else if (chunksize > MAXCHUNKSIZE) {
+						chunksize = MAXCHUNKSIZE;
+					}
+				}
+				break;
+
+			case 'v':
+				verbose = 1;
+				break;
+			case 'n':
+				strcpy(name, optarg);
+				break;
+			case 'r':
+				strcpy(rootdir, optarg);
+				break;
+			case '?':
+			case 'h':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+		}
+	}
+}
 
 /*
 ** write the message to stdout unless in quiet mode
@@ -88,32 +146,15 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-int sendCmd(int sock, const char *cmd)
-{
-	int n;
-	warn("Sending Command: %s \n", cmd);
-
-	if ((n = Xsend(sock, cmd,  strlen(cmd), 0)) < 0) {
-		Xclose(sock);
-		die(-1, "Unable to communicate\n");
-	}
-
-	return n;
-}
-
 void *recvCmd(void *socketid)
 {
-	int i, n, count = 0;
+	int n, count = 0;
 	sockaddr_x *addrs = NULL;
-	char command[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
+	char command[BUFSIZE];
+	char reply[BUFSIZE];
 	int sock = *((int*)socketid);
 	char *fname;
-//  char **params;
-	XcacheHandle xcache;
 
-	XcacheHandleInit(&xcache);
-	//ChunkContext contains size, ttl, policy, and contextID which for now is PID
 
 	while (1) {
 		say("waiting for command\n");
@@ -129,17 +170,12 @@ void *recvCmd(void *socketid)
  			break;
 		}
 
-		//Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "get", 3) == 0) {
 			fname = &command[4];
 			say("client requested file %s\n", fname);
 
-			count = 0;
-
-			say("chunking file %s\n", fname);
-
 			//Chunking is done by the XputFile which itself uses XputChunk, and fills out the info
-			if ((count = XputFile(&xcache, fname, CHUNKSIZE, &addrs)) < 0) {
+			if ((count = XputFile(&xcache, fname, chunksize, &addrs)) < 0) {
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
 			} else {
@@ -147,102 +183,63 @@ void *recvCmd(void *socketid)
 			}
 			say("%s\n", reply);
 
-
-			//Just tells the receiver how many chunks it should expect.
+			// tell the receiver how many chunks it should expect
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
-			//Sending the blocks cids
-		}
-		else if (strncmp(command, "block", 5) == 0) {
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
-			} else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
-					char url[256];
+		} else if (strncmp(command, "block", 5) == 0) {
+			char *chk = &command[6];
+			int i = atoi(chk);
+			char url[256];
 
-					dag_to_url(url, 256, &addrs[i]);
-					if (strlen(reply) + strlen(url) >= XIA_MAXBUF) {
-						printf("reply 0 %s\n", reply);
-						if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-							warn("unable to send reply to client\n");
-							break;
-						}
-						reply[0] = 0;
-					} else {
-						strcat(reply, " ");
-						strcat(reply, url);
-					}
+			strcpy(reply, "OK:");
+
+			dag_to_url(url, 256, &addrs[i]);
+			if (strlen(reply) + strlen(url) >= BUFSIZE) {
+				// this shouldn't happen
+				strcpy(reply, "FAIL:buffer too small.");
+				say("reply: %s\n", reply);
+				if (Xsend(sock, reply, strlen(reply), 0) < 0) {
+					warn("unable to send reply to client\n");
+					break;
 				}
-			}
-			printf("reply 1 %s\n", reply);
-			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
+				continue;
 
-		} else if(strncmp(command, "meta", 4) == 0) {
-			char *start = &command[6];
-			char *end = strchr(start, ':');
-			if (!end) {
-				// we have an invalid command, return error to client
-				sprintf(reply, "FAIL: invalid block command");
 			} else {
-				*end = 0;
-				end++;
-				// FIXME: clean up naming, e is now a count
-				int s = atoi(start);
-				int e = s + atoi(end);
-				strcpy(reply, "OK:");
-				for(i = s; i < e && i < count; i++) {
-					char url[256];
-
-					dag_to_url(url, 256, &addrs[i]);
-					strcat(reply, " ");
-					strcat(reply, url);
-				}
+				strcat(reply, " ");
+				strcat(reply, url);
 			}
-			printf("%s\n", reply);
+			say("reply:%s\n", reply);
 			if (Xsend(sock, reply, strlen(reply), 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}
-		}
-		else if (strncmp(command, "done", 4) == 0) {
-			say("done sending file: removing the chunks from the cache\n");
-			/* for (i = 0; i < count; i++) */
-			/*   XremoveChunk(ctx, info[i].cid); */
-			/* XfreeChunkInfo(info); */
-			free(addrs);
+
+		} else if (strncmp(command, "done", 4) == 0) {
+			say("done sending file: %s\n", fname);
+			if (addrs) {
+				free(addrs);
+			}
 			count = 0;
 		}
 	}
 
-	/* if (info) */
-	/* 	XfreeChunkInfo(info); */
-	/* XfreeCacheSlice(ctx); */
 	Xclose(sock);
 	pthread_exit(NULL);
 }
 
 
-//Just registering the service and openning the necessary sockets
+//Just registering the service and opening the necessary sockets
 int registerReceiver()
 {
 	int sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
-	say ("\n%s (%s): started\n", TITLE, VERSION);
+	say ("\n%s (%s)\n", TITLE, VERSION);
+	say("Service Name: %s\n", name);
+	say("Root Directory: %s\n", rootdir);
+	say("Max Chunk Size: %u\n\n", chunksize);
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
@@ -258,8 +255,7 @@ int registerReceiver()
 		die(-1, "getaddrinfo failure!\n");
 
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
-	//FIXME NAME is hard coded
-	if (XregisterName(NAME, dag) < 0 )
+	if (XregisterName(name, dag) < 0 )
 		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
@@ -296,11 +292,27 @@ void *blockingListener(void *socketid)
 	return NULL;
 }
 
-int main()
+int main(int argc, char **argv)
 {
+	getConfig(argc, argv);
+
 	int sock = registerReceiver();
 
+	if (XcacheHandleInit(&xcache) < 0) {
+		die(-1, "Unable to initialze the cache subsystem\n");
+	}
+
+	// set the base directory. This affects all paths for the app,
+	// so do it after we've initialized everything otherwise the paths
+	// to /tmp and the keys directory will be incorrect
+	if (chroot(rootdir) < 0) {
+		die(-1, "\nUnable to chroot (sudo is required!): %s\n", strerror(errno));
+	}
+	chdir("/");
+
 	blockingListener((void *)&sock);
+	XcacheHandleDestroy(&xcache);
+
 
 	return 0;
 }

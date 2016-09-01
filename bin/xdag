@@ -15,37 +15,21 @@
 # limitations under the License.
 
 getxid() {
-	# global variable $device is used for which table to used 
 	# $1 contains the XID type to search for
-	XID=`$xdir/xroute -v --device=$device --type=$1 | grep self | tr -s " " "\t"  | cut -f2`
+	XID=`$xdir/xroute -v --type=$1 | grep self | tr -s " " "\t"  | cut -f2`
 }
 	
 xdir=`dirname $0`
 
 if [ "$1" = "-h" ]; then
-	echo "usage:xdag [device...]"
-	echo "  prints the DAG of the sepecified device(s)"
-	echo "  if no device specified, prints DAGs for all devices"
+	echo "usage:xdag"
+	echo "  prints the hostname/DAG suitable for including in etc/hosts.xia"
 	exit 1
 fi
 
-if [ $# -ne 0 ]; then
-	devices=$@
-else
-	# if nothing specifed, ask click for the list of all devices
-	devices=`$xdir/xdev`
-	rc=$?
-
-	# error, print the message returned from xdev
-	[ $rc -ne 0 ] &&  { echo $devices; exit 1; }
-fi
-
 # print DAG mappings suitable for inclusion in hosts.xia
-for device in $devices
-do
-	getxid "AD"
-	AD=$XID
-	getxid "HID"
-	HID=$XID
-	[ "$HID" != "" -a "$AD" != "" ] && echo "$device RE $AD $HID"
-done
+getxid "AD"
+AD=$XID
+getxid "HID"
+HID=$XID
+[ "$HID" != "" -a "$AD" != "" ] && echo "$(hostname -s) RE $AD $HID"

@@ -16,6 +16,7 @@
 
 #define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100
+#define GC_INTERVAL 10
 
 struct xcache_conf {
 	char hostname[128];
@@ -46,8 +47,7 @@ private:
 	/**
 	 * Map of metadata.
 	 */
-	std::map<std::string, xcache_meta *> meta_map;
-	pthread_mutex_t meta_map_lock;
+	meta_map _map;
 
 	/**
 	 * Map of contexts.
@@ -72,7 +72,7 @@ private:
 	xcache_cache cache;
 
 	XIARouter xr;
-	int context_id;
+	unsigned context_id;
 
 public:
 	/**
@@ -81,7 +81,6 @@ public:
 	 */
 	xcache_controller() {
 		hostname.assign("host0");
-		pthread_mutex_init(&meta_map_lock, NULL);
 		pthread_mutex_init(&request_queue_lock, NULL);
 		context_id = 0;
 		sem_init(&req_sem, 0, 0);
@@ -131,6 +130,7 @@ public:
 	void process_req(struct xcache_req *req);
 
 	static void *worker_thread(void *arg);
+	static void *garbage_collector(void *arg);
 
 
 	/**
@@ -156,11 +156,16 @@ public:
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 
+	// evict a chunk locally
+	int evict(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Allocate a new context.
 	 */
 	int alloc_context(xcache_cmd *resp, xcache_cmd *cmd);
+
+	// free the context
+	int free_context(xcache_cmd *cmd);
 
 	/**
 	 * Remove content.
@@ -168,13 +173,17 @@ public:
 	void remove(void);
 
 	/** Concurrency control **/
-	xcache_meta *acquire_meta(std::string cid);
-	void release_meta(xcache_meta *meta);
-	inline int lock_meta_map(void);
-	inline int unlock_meta_map(void);
+	xcache_meta *acquire_meta(std::string cid) { return _map.acquire_meta(cid); };
+	void release_meta(xcache_meta *meta) { _map.release_meta(meta); };
+	void add_meta(xcache_meta *meta) { _map.add_meta(meta); };
+	void remove_meta(xcache_meta *meta) { _map.remove_meta(meta); };
+
+	meta_map *get_meta_map() { return &_map; };
+
+	//inline int lock_meta_map(void);
+	//inline int unlock_meta_map(void);
 
 	int register_meta(xcache_meta *);
-	void add_meta(xcache_meta *meta);
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);

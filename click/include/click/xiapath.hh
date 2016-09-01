@@ -111,6 +111,10 @@ class XIAPath { public:
     // set the destination node
     void set_destination_node(handle_t node);
 
+	// if first edge of DAG points to intent, delete edge
+	// forcing us to take the fallback path
+	bool flatten();
+
     // increment the XID whose order is order
     void incr(size_t order);
 

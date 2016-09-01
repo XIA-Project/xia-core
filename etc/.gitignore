@@ -1,6 +1,6 @@
-xsockconf.ini
 nodes.conf
 address.conf
 resolv.conf
 sidmap.conf
+hosts.xia
 

@@ -142,7 +142,7 @@ XIAPath::parse_re(const String& s, const Element* context)
     reset();
 
     String str_copy = s;
-	click_chatter("XIAPath::parse_re: parsing: %s", s.c_str());
+	//click_chatter("XIAPath::parse_re: parsing: %s", s.c_str());
 
     click_xia_xid prev_xid;
     memset(&prev_xid, 0, sizeof(prev_xid));
@@ -789,6 +789,14 @@ void
 XIAPath::set_destination_node(handle_t node)
 {
     _dst = node;
+}
+
+bool
+XIAPath::flatten()
+{
+	// if the first edge of the source node points to the intent node,
+	// remove it so the first fallback becomes the primary path
+	return remove_edge(source_node(), destination_node());
 }
 
 int

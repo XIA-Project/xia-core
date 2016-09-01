@@ -72,8 +72,9 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
-	xid.o xidpair.o xiapath.o xiaheader.o xiaextheader.o xiatransportheader.o xiautil.o xia.pb.o \
-	xcache.pb.o xiasecurity.o xiamigrate.o\
+	xid.o xidpair.o xiapath.o xiaheader.o xiautil.o xia.pb.o \
+	xiasecurity.o \
+	xiamigrate.o \
 	xiaifacetable.o \
 	error-syslog.o \
 	$(EXTRA_DRIVER_OBJS)
@@ -136,9 +137,6 @@ endif
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
 
-xcache.pb.cc: xcache.proto
-	protoc --cpp_out=. xcache.proto
-
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
 
@@ -168,7 +166,6 @@ $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
 	@rm -f $(ELEMENTSCONF).d
 	echo '#include "xia.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
-	echo '#include "xcache.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
 
 DEPFILES := $(wildcard *.d)
 ifneq ($(DEPFILES),)
@@ -191,7 +188,7 @@ uninstall:
 
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
-	rm -f xia.pb.h xia.pb.cc xcache.pb.h xcache.pb.cc
+	rm -f xia.pb.h xia.pb.cc
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a

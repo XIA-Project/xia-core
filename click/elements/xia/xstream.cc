@@ -9,6 +9,7 @@
 #include <click/xiasecurity.hh>
 #include <click/xiamigrate.hh>
 #include <fcntl.h>
+#include <cstdint> // uint32_t
 
 #include "xstream.hh"
 #include "xtransport.hh"
@@ -85,7 +86,7 @@ void
 XStream::tcp_input(WritablePacket *p)
 {
 	unsigned 	tiwin, tiflags;
-	u_long		ts_val, ts_ecr;
+	uint32_t		ts_val, ts_ecr;
 	//int			len, tlen; /* seems to be unused */
 	unsigned	off, optlen;
 	const u_char *optp;
@@ -115,7 +116,7 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_ack = ntohl(tcph->th_ack);
 	ti.ti_off = tcph->th_off;
 	ti.ti_flags = ntohs(tcph->th_flags);
-	ti.ti_win = ntohs(tcph->th_win);
+	ti.ti_win = ntohl(tcph->th_win);
 	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 
 	//printf("\t\t\ttcpinput flag is %d\n", ti.ti_flags);
@@ -214,6 +215,10 @@ XStream::tcp_input(WritablePacket *p)
 					// We can now drop data we know was recieved by the other side
 					_q_usr_input.drop_until(acked);
 					tp->snd_una = ti.ti_ack;
+                    
+                    if (_staged) { // because drop_until frees up queue space
+                        unstage_data();
+                    }
 
 					/* If all outstanding data are acked, stop
 					 * retransmit timer, otherwise restart timer
@@ -777,6 +782,10 @@ XStream::tcp_input(WritablePacket *p)
 			tp->snd_wnd -= acked;
 			ourfinisacked = false;
 		}
+        if (_staged) { // because drop_until frees up queue space
+            unstage_data();
+        }
+
 		tp->snd_una = ti.ti_ack;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
@@ -1004,7 +1013,7 @@ XStream::tcp_output()
 	WritablePacket *p = NULL;
 	WritablePacket *tcp_payload = NULL;
 
-	ti.th_nxt = CLICK_XIA_NXT_NO;
+	ti.th_nxt = CLICK_XIA_NXT_DATA;
 
 	for (int i=0; i < MAX_TCPOPTLEN; i++) {
 		opt[i] = 0;
@@ -1024,11 +1033,6 @@ XStream::tcp_output()
 	//		   ----------------------------------------
 	//								  {	  off	  }
 	// 		   			{  _q_usr_input.byte_length() }
-
-	// FIXME: WHERE SHOULD THIS LOGIC GO?????
-	if (_staged) {
-		unstage_data();
-	}
 
 again:
 	sendalot = 0;
@@ -1161,7 +1165,7 @@ send:
 			if ((tp->t_flags & TF_REQ_SCALE) &&
 				((flags & XTH_ACK) == 0 ||
 				 (tp->t_flags & TF_RCVD_SCALE))) {
-				*((u_long *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
+				*((uint32_t *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
 					TCPOPT_WSCALE << 24 |
 					(TCPOLEN_WSCALE >> 2) << 16 |
 					(u_short)tp->request_r_scale); // len is 4-byte multiple now
@@ -1179,7 +1183,7 @@ send:
 	((flags & (XTH_SYN | XTH_ACK)) == XTH_SYN ||
 	(tp->t_flags & TF_RCVD_TSTMP))) {
 		//debug_output(VERB_DEBUG, "[%s] timestamp: SETTING TIMESTAMP", SPKRNAME);
-		u_long *lp = (u_long*) (opt + optlen);
+		uint32_t *lp = (uint32_t*) (opt + optlen);
 		*lp++ = htonl(TCPOPT_TSTAMP_HDR); // first 2 bytes of option are 0
 		*lp++ = htonl(get_transport()->tcp_now());
 		*lp = htonl(tp->ts_recent);
@@ -1270,6 +1274,11 @@ send:
 	/*278*/
 	if (len) {
 		p = _q_usr_input.get(off);
+
+        if (_staged) { // because drop_until frees up queue space
+            unstage_data();
+        }
+
 		if (!p) {
 			//debug_output(VERB_ERRORS, "[%s] offset [%u] not in fifo!", SPKRNAME, off);
 			return;
@@ -1326,7 +1335,7 @@ send:
 		win = (long) (tp->rcv_adv - tp->rcv_nxt);
 
 	// Set the tcp header window size we will advertisement
-	ti.th_win = htons((u_short) (win >> tp->rcv_scale)) ;
+	ti.th_win = htonl((u_short) (win >> tp->rcv_scale)) ;
 
 	tp->snd_up = tp->snd_una;
 
@@ -1373,7 +1382,7 @@ send:
 	// sent to its tcp-speaking destination :-)
 	//Add XIA headers
 	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_XTCP);
+	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim);
 	xiah.set_dst_path(dst_path);
@@ -1428,13 +1437,13 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	if (! (flags & XTH_RST)) {
 		flags = XTH_ACK;
-		th.th_win = htons((u_short)(win >> tp->rcv_scale));
+		th.th_win = htonl((u_short)(win >> tp->rcv_scale));
 
 	} else {
-		th.th_win = htons((u_short)win);
+		th.th_win = htonl((u_short)win);
 	}
 
-	th.th_nxt = CLICK_XIA_NXT_NO;
+	th.th_nxt = CLICK_XIA_NXT_DATA;
 	th.th_seq =   htonl(seq+1);
 	th.th_ack =   htonl(ack);
 	th.th_flags = htons(flags);
@@ -1442,7 +1451,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_XTCP);
+	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
 	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim);
 	xiah.set_dst_path(dst_path);
@@ -1861,7 +1870,7 @@ XStream::set_state(const HandlerState new_state) {
 
 void
 XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
-	int * ts_present, u_long *ts_val, u_long *ts_ecr)
+	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr)
 {
 	uint16_t mss;
 	int opt, optlen;

@@ -22,38 +22,14 @@
 
 //Click side: Control/data address/info
 #define DEFAULT_CLICKPORT "1500"
-#define DEFAULT_CACHE_IN_PORT "1501"
-#define DEFAULT_CACHE_OUT_PORT "1502"
 
 //set xia.click sorter to sort based on these ports.
 
 
 #define __PORT_LEN 6
 
-class  __InitXSocket {
-    public:
-		~__InitXSocket() {};
-		__InitXSocket();
-        static void read_conf(const char *inifile, const char *section_name);
-	    static void print_conf();
-	private:
-	static __InitXSocket _instance;
-};
 
-struct __XSocketConf {
-  static int initialized;
-  static char master_conf[BUF_SIZE];
-  char click_port[__PORT_LEN];
-  char cache_in_port[__PORT_LEN];
-  char cache_out_port[__PORT_LEN];
-};
-
-extern struct __XSocketConf _conf;
-extern struct __XSocketConf* get_conf(void);
-
-#define CLICKPORT  (get_conf()->click_port)
-#define CACHEINPORT  (get_conf()->cache_in_port)
-#define CACHEOUTPORT  (get_conf()->cache_out_port)
+#define CLICKPORT  DEFAULT_CLICKPORT
 
 extern "C" {
 typedef int (*socket_t)(int, int, int);

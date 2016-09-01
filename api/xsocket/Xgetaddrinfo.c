@@ -299,10 +299,10 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 
 	if (local || loopback) {
 		// New multi-homing implementation, return DAGs for all interfaces
-		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-		if (sock < 0) {
-			return EAI_SYSTEM;
-		}
+//		int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+//		if (sock < 0) {
+//			return EAI_SYSTEM;
+//		}
 		// Read DAGs for all system interfaces
 		struct ifaddrs *ifaddr, *ifa;
 		if(Xgetifaddrs(&ifaddr)) {

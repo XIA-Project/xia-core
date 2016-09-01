@@ -98,8 +98,7 @@ extern "C" {
 #define XOPT_ERROR_PEEK 0x07004
 
 // XIA protocol types
-#define XPROTO_XIA_TRANSPORT	0x0e
-#define XPROTO_XCMP		0x3d
+#define XPROTO_XCMP		0x01
 
 // error codes
 #define ECLICKCONTROL 9999	// error code for general click communication errors
@@ -135,9 +134,6 @@ extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds
 extern int Xfork(void);
 extern int Xnotify(void);
 
-extern void set_conf(const char *filename, const char *sectioname);
-extern void print_conf();
-
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
@@ -172,9 +168,6 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
-
-extern int getXcacheInPort(void);
-extern int getXcacheOutPort(void);
 
 #ifdef __cplusplus
 }

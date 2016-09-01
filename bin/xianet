@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 #
-# Copyright 2013 Carnegie Mellon University
+# Copyright 2013/2016 Carnegie Mellon University
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,10 +24,9 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 CLICKPATH=$XIADIR/click
 CONFPATH=$XIADIR/etc/click/
 CLICK=$CLICKPATH/userlevel/click
-SCRIPT=xia_local_topology.click
+SCRIPT=""
 
 NODECONF=$XIADIR/etc/nodes.conf
-XSOCKCONF=$XIADIR/etc/xsockconf.ini
 ADDRCONF=$XIADIR/etc/address.conf
 
 ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
@@ -44,7 +43,6 @@ RENDEZVOUS=0
 REMOTEDSRC=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
-HOSTSCRIPT=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
@@ -67,7 +65,7 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cvV4rtnZgH] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+usage: $NAME [-cvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
              [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
              [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
              [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
@@ -91,7 +89,6 @@ where:
   -I if generating a click script, use this interface (i.e., pick which interface a host uses)
   -N start the nameserver on the specified host
   -W connect via waveserver (ipaddr:port) on Arada box. MAC of DSRC Iface to use
-  -H if running with -t or -r and a config in the form of hostname.click exists, use it
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)
 
@@ -105,6 +102,15 @@ where:
 
 EOH
 	exit 0
+}
+
+get_last_config()
+{
+	for s in "$HOSTNAME.click" "router.click" "host.click" "dualstack_router.click" "dual_stack_host.click"; do
+		if [ -e etc/click/$s ]; then
+			SCRIPT=$s
+		fi
+	done
 }
 
 setup()
@@ -176,9 +182,6 @@ setup()
 				NAMESERVER=1
 				CONFFLAGS="$CONFFLAGS -n"
 				;;
-			H)
-				HOSTSCRIPT=1
-				;;
 			W)
 				REMOTEDSRC=1
 				CONFFLAGS="$CONFFLAGS -W $OPTARG"
@@ -207,7 +210,8 @@ setup()
 
 	case $MAKECONF in
 		"")
-			# local topology, just use the default script
+			# try to use the last valid configuration
+			get_last_config
 			;;
 		router)
 			SCRIPT=router.click
@@ -236,6 +240,9 @@ get_pid()
 {
 	if [ $# = 1 ]; then
 		local service=$1
+
+		# FIXME: use pgrep if we can safely
+		#
 		# avoid false positives when editing a file with click in the name
 		[ $service == "click" ] && service="userlevel/click"
 
@@ -324,7 +331,7 @@ router()
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --hostname $host &
-			./xcache -h $host -l3 -m 0xFF&
+			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
@@ -355,7 +362,7 @@ host()
 	case $action in
 		"start")
 			./xnetjd --client --hostname $host &
-			./xcache -h $host -l3 -m 0xFF&
+			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
@@ -470,6 +477,11 @@ start_click()
 	get_pid "click"
 	[ "$XPID" != "" ] && printf "Click is already running, aborting...\n" && exit 1
 
+	if [ -z $SCRIPT ]; then
+		printf "\nERROR: Unable to locate existing click script\n\n"
+		help
+	fi
+
 	# create a click conf file from a template if necessary
 	create_click_config
 	printf "\nXIA using script: $SCRIPT\n"
@@ -480,9 +492,9 @@ start_click()
 		exit 1
 	fi
 
-	# create xsockconf.ini and nodes.conf from the click config file
-	echo "Reading topology and generating $XSOCKCONF and $NODECONF"
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $XSOCKCONF $NODECONF
+	# create nodes.conf from the click config file
+	echo "Reading topology and generating $NODECONF"
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $NODECONF
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly
@@ -500,6 +512,8 @@ start_click()
 	[ "$VALGRIND" != "" ] && echo Logging valgrind output to $VGLOG
 
 	$VALGRIND $CLICK -R $CONFPATH/$SCRIPT &
+
+    sleep 2
 
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
@@ -526,16 +540,18 @@ clean_conf_and_keys()
 	fi
 	# Delete all keys and config files
 	# NOTE: This deletes all application keys also
-`	echo "Deleting config files"
-`	rm -f $XIADIR/etc/click/host*.click
+	echo "Deleting config files"
+	rm -f $XIADIR/etc/click/host*.click
 	rm -f $XIADIR/etc/click/router*.click
 	echo "Deleting key files"
 	rm -f $XIADIR/key/*
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
-	rm -f $XIADIR/etc/xsockconf.ini
+	rm -f $XIADIR/etc/hosts.xia
 	echo "Deleting temp files"
-	rm -f /tmp/xcache.*
+	sudo rm -f /tmp/xcache*
+	echo "Deleting content files"
+	sudo rm /tmp/content/*
 
 }
 
@@ -606,12 +622,7 @@ create_click_config()
 
 	CONFFLAGS="$CONFFLAGS -i $HOSTNAME"
 
-	if [ $HOSTSCRIPT == 1 -a -e $CONFPATH/$HOSTNAME.click ]; then
-		# if a conf file specific to this host exists use it
-		SCRIPT=$HOSTNAME.click
-		printf "Switched to script: $SCRIPT\n"
-
-	elif [ ! -f $CONFPATH/$SCRIPT ]; then
+	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		echo "Building configuration from template"
 		python $XIADIR/bin/xconfig.py $CONFFLAGS
 	else
@@ -640,7 +651,7 @@ case $1 in
 		[ $NO_CLICK != 1 ] && kill_service "click"
 		visualizer "stop"
 		check_all_services
-		rm /tmp/xcache.*
+		rm /tmp/xcache*
 		;;
 	restart|reload)
 		echo "Stopping XIA"
