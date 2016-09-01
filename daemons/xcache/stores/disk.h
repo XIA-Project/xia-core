@@ -129,6 +129,18 @@ public:
 		return data;
 	}
 
+	int remove(xcache_meta *meta)
+	{
+		int rc = -1;
+		if (meta) {
+			std::string path;
+
+			path = content_dir + meta->get_cid();
+			rc = unlink(path.c_str());
+		}
+		return rc;
+	}
+
 	void print(void)
 	{
 

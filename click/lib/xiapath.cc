@@ -142,7 +142,7 @@ XIAPath::parse_re(const String& s, const Element* context)
     reset();
 
     String str_copy = s;
-	click_chatter("XIAPath::parse_re: parsing: %s", s.c_str());
+	//click_chatter("XIAPath::parse_re: parsing: %s", s.c_str());
 
     click_xia_xid prev_xid;
     memset(&prev_xid, 0, sizeof(prev_xid));

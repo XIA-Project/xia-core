@@ -61,9 +61,6 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 
 	sent = 0;
 	do {
-		//int to_send;
-
-		//to_send = remaining < 512 ? remaining : 512;
 		ret = send(xcache_sock, cmd_on_wire.c_str() + sent, remaining, 0);
 		if (ret <= 0) {
 			break;
@@ -164,8 +161,8 @@ int XcacheHandleDestroy(XcacheHandle *h)
 	cmd.set_context_id(h->contextID);
 	send_command(h->xcacheSock, &cmd);
 
-	//close(h->xcacheSock);
-	//close(h->notifSock);
+	close(h->xcacheSock);
+	close(h->notifSock);
 
 	return 0;
 }
@@ -208,6 +205,36 @@ int XcacheHandleInit(XcacheHandle *h)
 	send_command(h->notifSock, &cmd);
 
 	return 0;
+}
+
+int XevictChunk(XcacheHandle *h, const char *cid)
+{
+	int rc = xcache_cmd::XCACHE_OK;
+	xcache_cmd cmd;
+
+	if (strncasecmp(cid, "cid:", 4) == 0)
+		cid += 4;
+	if (strlen(cid) != (XID_SIZE * 2)) {
+		return xcache_cmd::XCACHE_INVALID_CID;
+	}
+
+	cmd.set_cmd(xcache_cmd::XCACHE_EVICT);
+	cmd.set_context_id(h->contextID);
+	cmd.set_cid(cid);
+	printf("evict sending\n");
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
+		/* Error in Sending chunk */
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Did not get a valid response from xcache\n");
+		return -1;
+	}
+
+	return rc;
 }
 
 static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, int flags)

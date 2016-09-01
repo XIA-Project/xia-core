@@ -107,7 +107,7 @@ struct click_xia_xcmp {
 #define	  XCMP_UNREACH_NET		0	/*   bad net		     */
 #define	  XCMP_UNREACH_HOST		1	/*   bad host		     */
 #define	  XCMP_UNREACH_PROTOCOL		2	/*   bad protocol	     */
-#define	  XCMP_UNREACH_PORT		3	/*   bad port		     */
+#define	  XCMP_UNREACH_INTENT		3	/*   bad port		     */
 #define	  XCMP_UNREACH_NEEDFRAG		4	/*   IP_DF caused drop	     */
 #define	  XCMP_UNREACH_SRCFAIL		5	/*   src route failed	     */
 #define	  XCMP_UNREACH_NET_UNKNOWN	6	/*   unknown net	     */
@@ -120,6 +120,7 @@ struct click_xia_xcmp {
 #define	  XCMP_UNREACH_FILTER_PROHIB	13	/*   admin prohib	     */
 #define	  XCMP_UNREACH_HOST_PRECEDENCE	14	/*   host prec violation     */
 #define	  XCMP_UNREACH_PRECEDENCE_CUTOFF 15	/*   prec cutoff	     */
+#define	  XCMP_UNREACH_UNSPECIFIED  16      /*    dag parsing error	     */
 #define	XCMP_REDIRECT		5		/* shorter route, codes:     */
 #define	  XCMP_REDIRECT_NET		0	/*   for network	     */
 #define	  XCMP_REDIRECT_HOST		1	/*   for host		     */

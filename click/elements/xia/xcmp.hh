@@ -49,12 +49,12 @@ XCMP(RE AD0 HID0)
 
 class XCMP : public Element { public:
 
-    XCMP();
-    ~XCMP();
+    XCMP() {};
+    ~XCMP() {};
 
-    const char *class_name() const		{ return "XCMP"; }
-    const char *port_count() const		{ return "1/2"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const { return "XCMP"; }
+    const char *port_count() const { return "1/2"; }
+    const char *processing() const { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
     int initialize(ErrorHandler *);
@@ -66,22 +66,17 @@ class XCMP : public Element { public:
   private:
     // ICMP-style checksum
     u_short in_cksum(u_short *, int);
-    
+
     void sendUp(Packet *p_in);
-    void sendXCMPPacket(const Packet *p_in, int type, int code, click_xia_xid*, click_xia_xid*, XIAPath*);
+    void sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath*);
 
     void processBadForwarding(Packet *p_in);
     void processUnreachable(Packet *p_in);
     void processExpired(Packet *p_in);
 
-    void gotPing(const Packet *p_in);
-    void gotPong(Packet *p_in);
-    void gotExpired(Packet *p_in);
-    void gotUnreachable(Packet *p_in);
-    void gotRedirect(Packet *p_in);
-
     bool processPacket(Packet *p_in);
     void gotXCMPPacket(Packet *p_in);
+    const char *unreachStr(int code);
 
     // source XIAPath of the local host
     XIAPath _src_path;

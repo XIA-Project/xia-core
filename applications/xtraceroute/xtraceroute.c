@@ -1,5 +1,4 @@
 /*
- *
  *			X C M P T R A C E R O U T E . C
  *
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
@@ -11,34 +10,26 @@
  *	December, 1983
  * Modified at Uc Berkeley
  *
- * Changed argument to inet_ntoa() to be struct in_addr instead of u_long
- * DFM BRL 1992
- *
  * Status -
  *	Public Domain.  Distribution Unlimited.
  *
  * Bugs -
  *	More statistics could always be gathered.
- *	This program has to run SUID to ROOT to access the ICMP socket.
  */
-
 // modified from PING source code to act as a rudimentery traceroute for XIA
 
 #include <stdio.h>
 #include <errno.h>
 #include <sys/time.h>
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/file.h>
-
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netdb.h>
-
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -48,24 +39,11 @@
 
 #include "xip.h"
 
-#define	MAXWAIT		10	/* max time to wait for response, sec. */
-#define	MAXPACKET	4096	/* max packet size */
-#define VERBOSE		1	/* verbose flag */
-#define QUIET		2	/* quiet flag */
-#define FLOOD		4	/* floodping flag */
-#ifndef MAXHOSTNAMELEN
-#define MAXHOSTNAMELEN	64
-#endif
-
-#define HID0 "HID:0000000000000000000000000000000000000000"
-#define HID1 "HID:0000000000000000000000000000000000000001"
-#define AD0   "AD:1000000000000000000000000000000000000000"
-#define AD1   "AD:1000000000000000000000000000000000000001"
-#define RHID0 "HID:0000000000000000000000000000000000000002"
-#define RHID1 "HID:0000000000000000000000000000000000000003"
-#define CID0 "CID:2000000000000000000000000000000000000000"
-#define CID1 "CID:2000000000000000000000000000000000000001"
-#define SID0 "SID:0f00000000000000000000000000000000000055"
+#define	MAXWAIT		10		// max time to wait for response, sec.
+#define	MAXPACKET	4096	// max packet size
+#define VERBOSE		0x1		// verbose flag
+#define QUIET		0x2		// quiet flag
+#define FLOOD		0x4		// floodping flag
 
 typedef void (*sighandler_t)(int);
 
@@ -76,52 +54,40 @@ void pr_pack(u_char *buf, int cc, const char *from);
 void tvsub(struct timeval *out, struct timeval *in);
 int in_cksum(struct icmp *addr, int len);
 
-
 int ttl = 2;
-
-
 
 u_char	packet[MAXPACKET];
 int	i, pingflags, options;
-extern	int errno;
 
-int s;			/* Socket file descriptor */
-struct hostent *hp;	/* Pointer to host info */
-struct timezone tz;	/* leftover */
+int s;				// Socket file descriptor
+struct hostent *hp;	// Pointer to host info
+struct timezone tz;	// leftover
 
+size_t datalen;		// How much data
 sockaddr_x whereto;
 sockaddr_x wherefrom;
 socklen_t fromlen;
-size_t datalen;		/* How much data */
 
-char usage[] =
-"Usage: xtraceroute [-dfqrv] host [packetsize [count [preload]]]\n";
+char usage[] = "Usage: xtraceroute [-fqrv] host [packetsize [max hops]]\n";
 
 char *hostname;
-char hnamebuf[MAXHOSTNAMELEN];
+int npackets = 30;		// max number of hops allowed
+int preload = 0;		// number of packets to "preload"
+int ntransmitted = 0;	// sequence # for outbound packets = #sent
+unsigned short ident;
 
-int npackets = 30; /* max number of hops allowed */
-int preload = 0;		/* number of packets to "preload" */
-int ntransmitted = 0;		/* sequence # for outbound packets = #sent */
-int ident;
-
-int nreceived = 0;		/* # of packets we got back */
+int nreceived = 0;		// # of packets we got back
 int timing = 0;
 int tmin = 999999999;
 int tmax = 0;
-int tsum = 0;			/* sum of all times, for doing average */
+int tsum = 0;			// sum of all times, for doing average
 
 float nCatcher = 0;
-float catcher_timeout = 0; /* seconds */
+float catcher_timeout = 0; // seconds
 float interval = 0.5;
 int rc = 0;
 int srcSet = 0;
 
-char *inet_ntoa();
-
-/*
- * 			M A I N
- */
 int main(int argc, char **argv)
 {
     sockaddr_x from;
@@ -136,20 +102,11 @@ int main(int argc, char **argv)
             if (c != argc)
                 break;
             switch (*av[0]) {
-			case 'd':
-				options |= SO_DEBUG;
-				break;
-			case 'r':
-				options |= SO_DONTROUTE;
-				break;
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
 			case 'q':
 				pingflags |= QUIET;
-				break;
-			case 'f':
-				pingflags |= FLOOD;
 				break;
             case 't':
                 argc--, av++;
@@ -159,7 +116,7 @@ int main(int argc, char **argv)
                 argc--, av++;
                 fromlen = sizeof(wherefrom);
                 srcSet = 1;
-                if(XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
+                if (XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
                     printf("Error Resolving XID\n");
                     exit(-1);
                 }
@@ -168,7 +125,7 @@ int main(int argc, char **argv)
         }
 		argc--, av++;
 	}
-	if(argc < 1 || argc > 4)  {
+	if (argc < 1 || argc > 3)  {
 	  printf("%s",usage);
 		exit(1);
 	}
@@ -179,26 +136,26 @@ int main(int argc, char **argv)
 	  exit(-1);
 	}
 
-	if( argc >= 2 )
-		datalen = atoi( av[1] );
-	else
-		datalen = 64-8;
+	if (argc >= 2) {
+		datalen = atoi(av[1]);
+	} else {
+		datalen = 64 - 8;
+	}
 	if (datalen > MAXPACKET) {
-		fprintf(stderr, "ping: packet size too large\n");
+		fprintf(stderr, "traceroute: packet size too large\n");
 		exit(1);
 	}
-	if (datalen >= sizeof(struct timeval))	/* can we time 'em? */
+	if (datalen >= sizeof(struct timeval)) {
+		// can we time 'em?
 		timing = 1;
-
-	if (argc >= 3)
+	}
+	if (argc >= 3) {
 		npackets = atoi(av[2]);
+	}
 
-	if (argc == 4)
-		preload = atoi(av[3]);
+	ident = htons(getpid() & 0xFFFF);
 
-	ident = getpid() & 0xFFFF;
-
-	if((s = Xsocket(AF_XIA, SOCK_RAW, 0)) < 0) {
+	if ((s = Xsocket(AF_XIA, SOCK_RAW, 0)) < 0) {
 	  perror("ping: socket");
 	  exit(5);
 	}
@@ -218,46 +175,34 @@ int main(int argc, char **argv)
 
 	Graph g(&whereto);
 	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
-	printf("TRACEROUTE %s:\n", s_to);
+	printf("TRACEROUTE %s:\n\n", s_to);
 
-	setlinebuf( stdout );
+	setlinebuf(stdout);
 
-	signal( SIGINT, (sighandler_t)finish );
+	signal(SIGINT, (sighandler_t)finish);
 	signal(SIGALRM, (sighandler_t)catcher);
 
-	/* fire off them quickies */
-	for(i=0; i < preload; i++)
-		pinger();
-
-	if(!(pingflags & FLOOD))
-		catcher();	/* start things going */
+	catcher();	// start things going
 
 	for (;;) {
 		int len = sizeof (packet);
 		socklen_t fromlen = sizeof (from);
 		int cc;
-		struct timeval timeout;
-		int fdmask = 1 << s;
 
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 10000;
-
-		if(pingflags & FLOOD) {
-			pinger();
-			if( Xselect(32, (fd_set *)&fdmask, 0, 0, &timeout) == 0)
+		if ((cc=Xrecvfrom(s, packet, len, 0, (struct sockaddr *)&from, &fromlen)) < 0) {
+			if (errno == EINTR) {
 				continue;
-		}
-		if ( (cc=Xrecvfrom(s, packet, len, 0, (struct sockaddr *)&from, &fromlen)) < 0) {
-			if( errno == EINTR )
-				continue;
+			}
 			perror("ping: recvfrom");
 			continue;
 		}
 
 		Graph gf(&from);
 		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
-		pr_pack( packet, cc, s_from);
-		if(!strcmp(s_to,s_from)) finish();
+		pr_pack(packet, cc, s_from);
+		if (!strcmp(s_to,s_from)){
+			finish();
+		}
 
 		// FIXME: HACK!!!
 		// if the 2 dags are equivelent, but the above comparison fails because the nodes of the
@@ -268,21 +213,24 @@ int main(int argc, char **argv)
 		// node in the DAG.
 		char *f = strstr(s_from, "HID:");
 		char *t = strstr(s_to, "HID:");
-		if (!strcmp(f, t)) finish();
+		if (!strcmp(f, t)){
+			finish();
+		}
 		// END HACK
 
-		if (npackets && nreceived >= npackets)
+		if (npackets && nreceived >= npackets) {
 			finish();
+		}
 	}
-	/*NOTREACHED*/
+	// NOTREACHED
 }
 
 /*
  * 			C A T C H E R
- * 
+ *
  * This routine causes another PING to be transmitted, and then
  * schedules another SIGALRM for 1 second from now.
- * 
+ *
  * Bug -
  * 	Our sense of time will slowly skew (ie, packets will not be launched
  * 	exactly at 1-second intervals).  This does not affect the quality
@@ -299,7 +247,7 @@ void catcher()
         finish();
     }
 	if (npackets == 0 || ntransmitted < npackets) {
-        if(interval < 1) {
+        if (interval < 1) {
             ualarm((int)(interval*1000000),0);
         }
         else {
@@ -320,7 +268,7 @@ void catcher()
 
 /*
  * 			P I N G E R
- * 
+ *
  * Compose and transmit an ICMP ECHO REQUEST packet.  The IP packet
  * will be added on by the kernel.  The ID field is our UNIX process ID,
  * and the sequence number is an ascending integer.  The first 8 bytes
@@ -335,46 +283,47 @@ void pinger()
 	register struct icmp *icp = (struct icmp *) outpack;
 	unsigned i;
 	int rc, cc;
-	register struct timeval *tp = (struct timeval *) &outpack[8];
-	register u_char *datap = &outpack[8+sizeof(struct timeval)];
+	struct timeval tp;
+	register u_char *datap = &outpack[8 + 8];
 
 	icp->icmp_type = ICMP_ECHO;
 	icp->icmp_code = 0;
 	icp->icmp_cksum = 0;
-	icp->icmp_seq = ntransmitted++;
-	icp->icmp_id = ident;		/* ID */
+	icp->icmp_seq = htons(ntransmitted++);
+	icp->icmp_id = ident;	// ID
 
-	cc = datalen+8;			/* skips ICMP portion */
+	cc = datalen + 8;		// skips ICMP portion
 
-	if (timing)
-		gettimeofday( tp, &tz );
+	if (timing) {
+		gettimeofday(&tp, &tz);
+		*(int *)&outpack[8]  = htonl(tp.tv_sec);
+		*(int *)&outpack[12] = htonl(tp.tv_usec);
+	}
 
-	for( i=8; i<datalen; i++)	/* skip 8 for time */
+	// skip 8 for time
+	for(i = 8; i < datalen; i++) {
 		*datap++ = i;
+	}
 
-	/* Compute ICMP checksum here */
-	icp->icmp_cksum = in_cksum( icp, cc );
+	// Compute ICMP checksum here
+	icp->icmp_cksum = in_cksum(icp, cc);
 
-	
+
 	// Set the TTL on the packet so we can use this like traceroute
-	if(Xsetsockopt(s, XOPT_HLIM, (const void *)&ttl, sizeof(ttl)) < 0) {
+	if (Xsetsockopt(s, XOPT_HLIM, (const void *)&ttl, sizeof(ttl)) < 0) {
 	  printf("Xsetsockop failed on XOPT_HLIM\n");
 	  exit(-1);
 	}
 
 	ttl++;
 
-
 	rc = Xsendto(s, outpack, cc, 0, (struct sockaddr *)&whereto, sizeof(whereto));
 
-	if( rc < 0 || rc != cc )  {
-		if( rc<0 )  perror("sendto");
-		printf("ping: wrote %s %d chars, ret=%d\n",
-			hostname, cc, rc );
-		fflush(stdout);
-	}
-	if(pingflags == FLOOD) {
-		putchar('.');
+	if (rc < 0 || rc != cc)  {
+		if (rc < 0) {
+			perror("sendto");
+		}
+		printf("ping: wrote %s %d chars, ret=%d\n", hostname, cc, rc);
 		fflush(stdout);
 	}
 }
@@ -385,7 +334,7 @@ void pinger()
  * Convert an ICMP "type" field to a printable string.
  */
 const char *
-pr_type( register int t )
+pr_type(register int t)
 {
 	static const char *ttab[] = {
 		"Echo Reply",
@@ -407,8 +356,9 @@ pr_type( register int t )
 		"Info Reply"
 	};
 
-	if( t < 0 || t > 16 )
+	if (t < 0 || t > 16) {
 		return("OUT-OF-RANGE");
+	}
 
 	return(ttab[t]);
 }
@@ -428,59 +378,64 @@ void pr_pack(u_char *buf, int cc, const char *from)
 	register long *lp = (long *) packet;
 	register int i;
 	struct timeval tv;
-	struct timeval *tp;
+	struct timeval tp;
 	int hlen, triptime = 0;
 
-	gettimeofday( &tv, &tz );
+	gettimeofday(&tv, &tz);
 
 	xp = (struct xip *) buf;
-	
+
 	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
-	
+
 	if (cc < hlen + ICMP_MINLEN) {
-		if (pingflags & VERBOSE)
-			printf("packet too short (%d bytes) from %s\n", cc,
-				   from); /* DFM */
+		if (pingflags & VERBOSE) {
+			printf("packet too short (%d bytes) from %s\n", cc, from);
+		}
 		return;
 	}
 	cc -= hlen;
 	icp = (struct icmp *)(buf + hlen);
-	
-	if( (!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY )  {
-		printf("%s\n",
-		       from
-		       );
+
+	if ((!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY)  {
+		printf("%s\n", from );
         nreceived++;
 		if (pingflags & VERBOSE) {
-			for( i=0; i<12; i++)
-			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)),
-					   (unsigned int)*lp++);
+			for(i=0; i<12; i++) {
+			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)), (unsigned int)*lp++);
+			}
 		}
 		return;
 	}
-	if( icp->icmp_id != ident )
-		return;			/* 'Twas not our ECHO */
+	if (icp->icmp_id != ident)
+		return;			// 'Twas not our ECHO
 
 	if (timing) {
-		tp = (struct timeval *)&icp->icmp_data[0];
-		tvsub( &tv, tp );
-		triptime = tv.tv_sec*1000+(tv.tv_usec/1000);
+		int *t = (int *)&icp->icmp_data[0];
+
+		tp.tv_sec  = ntohl(*t);
+		t = (int *)&icp->icmp_data[4];
+		tp.tv_usec  = ntohl(*t);
+
+		tvsub(&tv, &tp);
+		triptime = tv.tv_sec * 1000 + (tv.tv_usec / 1000);
 		tsum += triptime;
-		if( triptime < tmin )
+		if (triptime < tmin) {
 			tmin = triptime;
-		if( triptime > tmax )
+		}
+		if (triptime > tmax) {
 			tmax = triptime;
+		}
 	}
 
-	if(!(pingflags & QUIET)) {
-		if(pingflags != FLOOD) {
-		  printf("%d bytes from %s: icmp_seq=%d", cc,
-		  	       from,
-		  	  icp->icmp_seq );	/* DFM */
-		  	if (timing) 
-				printf(" time=%d ms\n", triptime );
-			else
+	if (!(pingflags & QUIET)) {
+		if (pingflags != FLOOD) {
+		  printf("%d bytes from %s: icmp_seq=%d", cc, from, icp->icmp_seq);
+		  	if (timing) {
+				printf(" time=%d ms\n", triptime);
+
+			} else {
 				putchar('\n');
+			}
 		} else {
 			putchar('b');
 			fflush(stdout);
@@ -509,13 +464,13 @@ int in_cksum(struct icmp *addr, int len)
 	 *  back all the carry bits from the top 16 bits into the lower
 	 *  16 bits.
 				  */
-	while( nleft > 1 )  {
+	while (nleft > 1)  {
 		sum += *w++;
 		nleft -= 2;
 	}
 
-	/* mop up an odd byte, if necessary */
-	if( nleft == 1 ) {
+	// mop up an odd byte, if necessary
+	if (nleft == 1) {
 		u_short	u = 0;
 
 		*(u_char *)(&u) = *(u_char *)w ;
@@ -525,22 +480,22 @@ int in_cksum(struct icmp *addr, int len)
 	/*
 	 * add back carry outs from top 16 bits to low 16 bits
 	 */
-	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
-	sum += (sum >> 16);			/* add carry */
+	sum = (sum >> 16) + (sum & 0xffff);	// add hi 16 to low 16
+	sum += (sum >> 16);			// add carry
 	answer = ~sum;				/* truncate to 16 bits */
-	return (answer);
+	return htons(answer);
 }
 
 /*
  * 			T V S U B
- * 
+ *
  * Subtract 2 timeval structs:  out = out - in.
- * 
+ *
  * Out is assumed to be >= in.
  */
 void tvsub(struct timeval *out, struct timeval *in)
 {
-	if( (out->tv_usec -= in->tv_usec) < 0 )   {
+	if ((out->tv_usec -= in->tv_usec) < 0) {
 		out->tv_sec--;
 		out->tv_usec += 1000000;
 	}
@@ -556,7 +511,7 @@ void finish()
 {
     Xclose(s);
     int hops = rc ? -1 : nreceived;
-    printf("hops = %d\n", hops); 
+    printf("hops = %d\n", hops);
 	fflush(stdout);
 	exit(rc);
 }

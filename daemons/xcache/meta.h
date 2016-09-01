@@ -17,7 +17,7 @@ typedef enum {
 	AVAILABLE,
 	FETCHING,
 	OVERHEARING,
-	DENY_PENDING,
+	EVICTING
 } chunk_states;
 
 #define TOO_OLD 240
@@ -33,7 +33,7 @@ private:
 	// initial sequence number
 	uint32_t initial_seq;
 
-	xcache_content_store *store;
+	xcache_content_store *_store;
 	std::string cid;
 	std::string sid;
 
@@ -62,7 +62,8 @@ public:
 	void set_state(chunk_states state) { _state = state;}
 	chunk_states state() { return _state; }
 
-	void set_store(xcache_content_store *s) { store = s; }
+	void set_store(xcache_content_store *s) { _store = s; }
+	xcache_content_store *store() { return _store; };
 
 	void set_length(uint64_t length) { this->len = length; }
 

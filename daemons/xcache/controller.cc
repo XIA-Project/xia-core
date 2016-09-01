@@ -401,6 +401,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 		}
 		break;
 
+	case xcache_cmd::XCACHE_EVICT:
 	case xcache_cmd::XCACHE_STORE:
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 	case xcache_cmd::XCACHE_READ:
@@ -432,11 +433,14 @@ int xcache_controller::free_context(xcache_cmd *cmd)
 	unsigned id = cmd->context_id();
 	xcache_context *c = context_map[id];
 
-	close(c->notifSock);
-	close(c->xcacheSock);
+	if (c) {
+		close(c->notifSock);
+		close(c->xcacheSock);
 
-	context_map.erase(id);
-	free(c);
+		context_map.erase(id);
+		free(c);
+	}
+
 	return RET_NORESP;
 }
 
@@ -530,13 +534,71 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 	return rc;
 }
 
+
+
+
+
+int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	int rc;
+	std::string cid = cmd->cid();
+
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+
+	// cid was vaidated by in the API call
+	syslog(LOG_INFO, "evict called for cid:%s!\n", cmd->cid().c_str());
+	printf("evict called for cid:%s!\n", cmd->cid().c_str());
+
+	xcache_meta *meta = acquire_meta(cid.c_str());
+
+	if (meta) {
+		std::string c = "CID:" + cid;
+
+		switch (meta->state()) {
+
+
+			case AVAILABLE:
+				rc = xr.delRoute(c);
+				printf("del route returns %d\n", rc);
+				// let the garbage collector do the actual data removal
+				meta->set_state(EVICTING);
+
+			case EVICTING:
+				// we're in process of evicting...
+				resp->set_status(xcache_cmd::XCACHE_OK);
+				break;
+
+			case FETCHING:
+				rc = xr.delRoute(c);
+				// mark the chunk to be evicted once it's out of fetching state
+				resp->set_status(xcache_cmd::XCACHE_CID_MARKED_FOR_DELETE);
+				break;
+
+			case OVERHEARING:
+				resp->set_status(xcache_cmd::XCACHE_CID_IN_USE);
+				break;
+
+			default:
+				resp->set_status(xcache_cmd::XCACHE_CID_NOT_FOUND);
+				break;
+		}
+
+		release_meta(meta);
+
+	} else {
+		resp->set_status(xcache_cmd::XCACHE_CID_NOT_FOUND);
+	}
+
+	return RET_SENDRESP;
+}
+
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
 	std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
 
-	meta = acquire_meta(cid);
+	meta = acquire_meta(cid.c_str());
 
 	if (meta != NULL) {
 		/*
@@ -751,6 +813,17 @@ void xcache_controller::process_req(xcache_req *req)
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
 		send_content_remote(req->to_sock, (sockaddr_x *)req->data);
+		break;
+
+	case xcache_cmd::XCACHE_EVICT:
+		cmd = (xcache_cmd *)req->data;
+		ret = evict(&resp, cmd);
+		if(ret >= 0) {
+			printf("serializeing\n");
+			resp.SerializeToString(&buffer);
+			printf("serialized\n");
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
 		break;
 	}
 

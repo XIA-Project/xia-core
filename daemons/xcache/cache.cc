@@ -176,10 +176,9 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 			syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
 			return;
 
-		case DENY_PENDING:
-			// FIXME: should we delete this? nothing ever sets this state
+		case EVICTING:
 			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "Already Denied Meta CID=%s", cid.c_str());
+			syslog(LOG_INFO, "The CID is in process of being evicted: %s", cid.c_str());
 			return;
 
 		default:

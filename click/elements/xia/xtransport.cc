@@ -2732,6 +2732,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in RouteEngine
 		String route_engine_str = _hostname + "/xrc/n/x.dag";
 		HandlerCall::call_write(route_engine_str.c_str(), new_dag.unparse().c_str(), this);
+		// XCMP in PacketRoute
+		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
+		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
 		// All the XIAXIDRouteTable elements
 		std::string routetables[5] = {"rt_AD", "rt_HID", "rt_SID", "rt_CID", "rt_IP"};
 		for(int i=0; i<5; i++) {

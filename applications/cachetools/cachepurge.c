@@ -26,6 +26,8 @@
 #include "Xsocket.h"
 #include "xcache.h"
 #include "dagaddr.hpp"
+#include "xcache_cmd.pb.h"
+
 
 #define CACHEDIR "/tmp/content/"
 
@@ -61,15 +63,40 @@ void die(int ecode, const char *fmt, ...)
 	exit(ecode);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
+	int rc;
+	XcacheHandle xcache;
+	const char *cid = argv[1];
 
-		if (argc == 2 && strcmp(argv[1], "-q") == 0) {
-			verbose = 0;
-		} else if (argc != 1) {
-			help(argv[0]);
-		}
+	if (argc == 3 && strcmp(argv[1], "-q") == 0) {
+		verbose = 0;
+		cid = argv[2];
 
-		say("Sorry, I don't do anything yet\n", CACHEDIR);
+	} else if (argc != 2) {
+		help(argv[0]);
+	}
 
-		return 0;
+	XcacheHandleInit(&xcache);
+	rc = XevictChunk(&xcache, cid);
+	XcacheHandleDestroy(&xcache);
+
+	switch (rc) {
+		case xcache_cmd::XCACHE_OK:
+			say("%s removed from the cache & route table", cid);
+			break;
+		case xcache_cmd::XCACHE_INVALID_CID:
+			say("(%s) is not a valid cid", cid);
+			break;
+		case xcache_cmd::XCACHE_CID_NOT_FOUND:
+			say("%s not found in the cache", cid);
+			break;
+		case xcache_cmd::XCACHE_CID_IN_USE:
+			say("%s is busy, unable to delete", cid);
+			break;
+		default:
+			say("unknown error!\n");
+	}
+
+	return 0;
 }
