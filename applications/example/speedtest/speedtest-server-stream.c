@@ -114,6 +114,8 @@ void processClient(int sock){
     memset(buf, 0, sizeof(buf));
     unsigned long long ntotalBytes = 0;
     time_t startTime = time(NULL);
+    
+    unsigned long nmsgs = 0, totalNbytes = 0;
 
    	while (1) {
 
@@ -142,9 +144,11 @@ void processClient(int sock){
 			printf("%d client closed the connection\n", pid);
 			break;
 		}
-
+        nmsgs += 1;
+        totalNbytes += nrcvdBytes;
         if (verbose){
-            printf("Xsock %4d received %d bytes\n", sock, nrcvdBytes);
+            printf("Xsock %4d received %db (total %lu msgs, %lub)\n", sock, \
+                nrcvdBytes, nmsgs, totalNbytes);
         }
         
         ntotalBytes += nrcvdBytes;
@@ -152,8 +156,8 @@ void processClient(int sock){
 
     const time_t endTime = time(NULL);
     const time_t deltat = endTime-startTime;
-    const double throughput = ((double)ntotalBytes)/(deltat)/1e6;
-    printf("Test complete: %us @ %.2f MB/s\n", (unsigned int)deltat, \
+    const double throughput = ((double)ntotalBytes*8)/(deltat)/1e6;
+    printf("Test complete: %us @ %.3f Mbps\n", (unsigned int)deltat, \
         throughput);
 
 	Xclose(sock);

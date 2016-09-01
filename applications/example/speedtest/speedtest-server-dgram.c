@@ -135,8 +135,7 @@ int main(int argc, char *argv[]){
 	}
 
     time_t lastTime = time(NULL);
-    unsigned long long nrcvdBytes = 0;
-    unsigned long long nrcvdPackets = 0;
+    unsigned long long nrcvdBytesTotal=0, nrcvdPacketsTotal=0, nrcvdBytesSec=0;
 
 	while (1){
 
@@ -149,11 +148,12 @@ int main(int argc, char *argv[]){
             break;
         }
 
-        nrcvdBytes += n;
-        nrcvdPackets++;
+        nrcvdBytesTotal += n;
+        nrcvdBytesSec += n;
+        nrcvdPacketsTotal++;
 
         if (verbose){
-            printf("dgram received %d bytes\n", n);
+            printf("dgram received %db (total %llub, %llu packets)\n", n, nrcvdBytesTotal, nrcvdPacketsTotal);
         }
 
         const time_t newTime = time(NULL);
@@ -161,12 +161,13 @@ int main(int argc, char *argv[]){
         if (newTime != lastTime){
 
             const time_t deltat = newTime-lastTime;
-            const double throughput = ((double)nrcvdBytes)/(deltat)/1e6;
-            printf("%us @ %.2f MB/s, total packets=%llu\n", \
-                (unsigned int)deltat, throughput, nrcvdPackets);
+            const double throughput = ((double)nrcvdBytesSec*8)/(deltat)/1e6;
+            printf("%us @ %.4f Mbps, total packets=%llu (%llub)\n", \
+                (unsigned int)deltat, throughput, nrcvdPacketsTotal, \
+                nrcvdBytesTotal);
 
             lastTime = newTime;
-            nrcvdBytes = 0;
+            nrcvdBytesSec = 0;
         }
 	}
 
