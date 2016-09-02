@@ -136,6 +136,7 @@ void populate()
 	}
 
 	closedir(cd);
+	XcacheHandleDestroy(&xcache);
 }
 
 int main(int argc, char **argv) {

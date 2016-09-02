@@ -6,7 +6,7 @@
 
 void xcache_meta::init()
 {
-	store = NULL;
+	_store = NULL;
 	len = 0;
 	initial_seq = 0;
 	pthread_mutex_init(&meta_lock, NULL);
@@ -27,13 +27,13 @@ xcache_meta::xcache_meta(std::string cid)
 std::string xcache_meta::get(void)
 {
 	access();
-	return store->get(this);
+	return _store->get(this);
 }
 
 std::string xcache_meta::get(off_t off, size_t len)
 {
 	access();
-	return store->get_partial(this, off, len);
+	return _store->get_partial(this, off, len);
 }
 
 std::string xcache_meta::safe_get(void)
@@ -49,7 +49,7 @@ std::string xcache_meta::safe_get(void)
 
 void xcache_meta::status(void)
 {
-	syslog(LOG_INFO, "[%s] %s", cid.c_str(), store->get(this).c_str());
+	syslog(LOG_INFO, "[%s] %s", cid.c_str(), _store->get(this).c_str());
 }
 
 bool xcache_meta::is_stale()
@@ -136,8 +136,17 @@ int meta_map::walk(void)
 
 	for (i = _map.begin(); i != _map.end(); ) {
 		xcache_meta *m = i->second;
+
+		printf("%s\n", m->get_cid().c_str());
+
 		if (m->is_stale()) {
 			syslog(LOG_INFO, "removing stalled stream for %s", m->get_cid().c_str());
+			delete m;
+			_map.erase(i++);
+
+		} else if (m->state() == EVICTING) {
+			syslog(LOG_INFO, "evicting chunk %s", m->get_cid().c_str());
+			m->store()->remove(m);
 			delete m;
 			_map.erase(i++);
 		} else {

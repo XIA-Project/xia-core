@@ -1,6 +1,7 @@
 all:
 #	make -C xnetcat
 	make -C xftp
+	make -C cachetools
 	make -C chunk-demo
 	make -C xping
 	make -C xtraceroute
@@ -16,6 +17,7 @@ static: all
 clean:
 #	make -C xnetcat clean
 	make -C xftp clean
+	make -C cachetools clean
 	make -C chunk-demo clean
 	make -C xping clean
 	make -C xtraceroute clean
