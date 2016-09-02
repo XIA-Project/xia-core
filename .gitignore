@@ -42,7 +42,8 @@ applications/example/session
 daemons/session
 applications/example/videos/
 daemons/xroute/xrouted
-daemons/xcidrouted/bin/
+daemons/xcidrouted/bin/*
+!daemons/xcidrouted/bin/cleanup.sh
 arada/waveserver/waveserver
 
 # output from scripts
