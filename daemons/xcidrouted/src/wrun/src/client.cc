@@ -78,6 +78,9 @@ void fetchWorkload(ClientWorkloadParser* parser){
 		currAddr = chunkIdToChunkDAG[to_string(currObjectId) + "-" + to_string(currChunkId)];
 		bzero(currBuf, sizeof(currBuf));
 
+		Graph g(&currAddr);
+		printf("client fetching %s\n", g.dag_string().c_str());
+
 		// first sleep for a pre-defined delay in microseconds
 		usleep((useconds_t)currChunkDelay*1000);
 
