@@ -55,7 +55,7 @@
 #define SID_XCIDROUTE "SID:1110000000000000000000000000000000001114"
 
 //#define STATS_LOG
-//#define EVENT_LOG
+#define EVENT_LOG
 #define FILTER
 
 using namespace std;

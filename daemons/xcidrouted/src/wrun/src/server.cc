@@ -146,6 +146,9 @@ int main(int argc, char *argv[]) {
 	string SERVER_FILE_TEMPLATE(SERVER_WORKLOAD_FILE_TEMPLATE);
 	string worklaodFile = workloadDir + "/" + SERVER_FILE_TEMPLATE + to_string(workloadId) + ".dat";
 
+	// random seed
+	srand(time(NULL));
+
 	// register the receiver
 	registerServer();
 	// initialize the xcache
