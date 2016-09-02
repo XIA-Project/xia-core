@@ -8,6 +8,7 @@ struct cid_header {
 	size_t offset;
 	size_t length;
 	size_t total_length;
+	size_t ttl;
 	char cid[CID_HASH_SIZE + 1];
 } __attribute__((packed));
 

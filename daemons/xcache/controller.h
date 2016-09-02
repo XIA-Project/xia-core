@@ -8,6 +8,7 @@
 #include "slice.h"
 #include "meta.h"
 #include "store_manager.h"
+#include "policy_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
 #include "dagaddr.hpp"
@@ -29,6 +30,7 @@ struct xcache_req {
 #define XCFI_REMOVEFD 0x1
 
 	int flags;
+	time_t ttl;
 	int from_sock, to_sock;
 	void *data;
 	size_t datalen;
@@ -68,10 +70,10 @@ private:
 	 * Manages various content stores.
 	 * @See file store.h for details.
 	 */
+	xcache_policy_manager policy_manager;
 	xcache_store_manager store_manager;
 	xcache_cache cache;
 
-	XIARouter xr;
 	unsigned context_id;
 
 public:
@@ -92,7 +94,7 @@ public:
 	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
-	void send_content_remote(int sock, sockaddr_x *mypath);
+	void send_content_remote(int sock, sockaddr_x *mypath, time_t ttl);
 
 	bool verify_content(xcache_meta *meta, const std::string *);
 
@@ -152,7 +154,7 @@ public:
 	/**
 	 * Stores content locally.
 	 */
-	int store(xcache_cmd *, xcache_cmd *);
+	int store(xcache_cmd *, xcache_cmd *, time_t);
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 

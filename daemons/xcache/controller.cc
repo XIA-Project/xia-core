@@ -18,7 +18,6 @@
 #include "dagaddr.h"
 #include "xcache_sock.h"
 #include "cid.h"
-//#include <openssl/sha.h>
 
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
@@ -32,6 +31,7 @@ enum {
 	RET_REMOVEFD,
 	RET_ENQUEUE,
 };
+
 
 static int send_response(int fd, const char *buf, size_t len)
 {
@@ -465,9 +465,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::__store_policy(xcache_meta *meta)
 {
-	IGNORE_PARAM(meta);
-	//FIXME: Add code
-	return 0;
+	return policy_manager.cacheable(meta);
 }
 
 bool xcache_controller::verify_content(xcache_meta *meta, const std::string *data)
@@ -555,8 +553,6 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 		std::string c = "CID:" + cid;
 
 		switch (meta->state()) {
-
-
 			case AVAILABLE:
 				rc = xr.delRoute(c);
 				printf("del route returns %d\n", rc);
@@ -592,7 +588,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
+int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
@@ -611,6 +607,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 		 * New object - Allocate a meta
 		 */
 		meta = new xcache_meta(cid);
+		meta->set_ttl(ttl);
 
 		context = lookup_context(cmd->context_id());
 		if(!context) {
@@ -641,7 +638,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd)
 
 // FIXME:this should set fetching state so we can't delete the data/route
 // out from under us
-void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
+void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath, time_t ttl)
 {
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
@@ -660,6 +657,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	int sent;
 
 	header.length = htonl(resp.data().length());
+	header.ttl = htonl(ttl);
 	remaining = sizeof(header);
 	offset = 0;
 
@@ -788,7 +786,7 @@ void xcache_controller::process_req(xcache_req *req)
 
 	switch(req->type) {
 	case xcache_cmd::XCACHE_STORE:
-		ret = store(&resp, (xcache_cmd *)req->data);
+		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
@@ -812,7 +810,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
-		send_content_remote(req->to_sock, (sockaddr_x *)req->data);
+		send_content_remote(req->to_sock, (sockaddr_x *)req->data, req->ttl);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
@@ -1046,6 +1044,7 @@ repeat:
 			xcache_req *req = new xcache_req();
 
 			req->type = cmd.cmd();
+			req->ttl = cmd.ttl();
 			req->from_sock = *iter;
 			req->to_sock = *iter;
 			req->data = new xcache_cmd(cmd);

@@ -70,7 +70,7 @@ void getConfig(int argc, char** argv)
 	int c;
 
 	strcpy(name, NAME);
-	getcwd(rootdir, sizeof(rootdir));
+	(void*)getcwd(rootdir, sizeof(rootdir));
 
 	opterr = 0;
 
@@ -301,6 +301,8 @@ int main(int argc, char **argv)
 	if (XcacheHandleInit(&xcache) < 0) {
 		die(-1, "Unable to initialze the cache subsystem\n");
 	}
+
+	XcacheHandleSetTtl(&xcache, 30);
 
 	// set the base directory. This affects all paths for the app,
 	// so do it after we've initialized everything otherwise the paths

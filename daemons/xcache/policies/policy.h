@@ -31,5 +31,6 @@ public:
  * must be included here.
  */
 #include "fifo.h"
+#include "lru.h"
 
 #endif /* __POLICY_H__ */

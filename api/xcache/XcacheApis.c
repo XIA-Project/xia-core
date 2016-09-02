@@ -172,6 +172,11 @@ int XcacheHandleInit(XcacheHandle *h)
 {
 	xcache_cmd cmd;
 
+	if (!h) {
+		return -1;
+	}
+
+	h->ttl = 0;
 	h->xcacheSock = get_connected_socket();
 
 	if(h->xcacheSock < 0)
@@ -205,6 +210,17 @@ int XcacheHandleInit(XcacheHandle *h)
 	send_command(h->notifSock, &cmd);
 
 	return 0;
+}
+
+int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl)
+{
+	int rc = -1;
+
+	if (h) {
+		h->ttl = ttl;
+		rc = 0;
+	}
+	return rc;
 }
 
 int XevictChunk(XcacheHandle *h, const char *cid)
@@ -245,6 +261,7 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	cmd.set_context_id(h->contextID);
 	cmd.set_data(data, length);
 	cmd.set_flags(flags);
+	cmd.set_ttl(h->ttl);
 
 	if(send_command(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);

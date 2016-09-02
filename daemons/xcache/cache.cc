@@ -256,6 +256,9 @@ skip_data:
 		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
 
+			meta->set_ttl(ntohl(download->header.ttl));
+			meta->created(time(NULL));
+
 			ctrl->__store(NULL, meta, data);
 
 			/* Perform cleanup */
