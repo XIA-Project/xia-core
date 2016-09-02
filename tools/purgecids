@@ -6,8 +6,7 @@
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 XROUTE=$XIADIR/bin/xroute
 
-HOST=$(echo $(hostname) | cut -f1 -d".")
 for cid in $($XROUTE | grep CID | grep -v default | cut -c11-51); do
-	$XROUTE -r $HOST,CID,$cid
+	$XROUTE -r CID,CID:$cid
 	sudo rm /tmp/content/$cid
 done
