@@ -13,6 +13,16 @@ static RouteState routeState;
 static Logger* logger;
 #endif
 
+// should CID routing handle topology changes?
+// 
+// routing uses hard state advertisement to avoid advertisement
+// scalability issues. But the use of hard state also means that 
+// if in-network state fails, the routing would also fail to achieve
+// its purpose. More concretely, topology impact routing decisions and if 
+// topology changes, routing decision would be stale. So the best we can
+// do is when this happens, CID routing should start over (using soft
+// state).
+
 HelloMessage::HelloMessage(){};
 HelloMessage::~HelloMessage(){};
 
@@ -639,6 +649,16 @@ void initRouteState(){
 
    	Graph g = Node() * Node(BHID) * Node(SID_XCIDROUTE);
 	g.fill_sockaddr(&routeState.ddag);
+
+
+	// remove any previously set route and start fresh.
+	vector<XIARouteEntry> routeEntries;
+	getRouteEntries("CID", routeEntries);
+	for(unsigned i = 0; i < routeEntries.size(); i++){
+		if(routeEntries[i].port != (unsigned short)DESTINED_FOR_LOCALHOST){
+			xr.delRouteCIDRouting(routeEntries[i].xid);
+		}
+	}
 }
 
 int connectToNeighbor(string AD, string HID, string SID){

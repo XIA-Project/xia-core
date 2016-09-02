@@ -44,7 +44,7 @@
 #define MAX_SEQNUM 10000000
 #define MAX_TTL 2
 
-#define INIT_WAIT_TIME_SEC 15
+#define INIT_WAIT_TIME_SEC 60
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
 #define DEFAULT_NAME "router0"
