@@ -2,6 +2,7 @@
 #define __META_H__
 
 #include "clicknet/xia.h"
+#include <stdio.h>
 #include <iostream>
 #include <map>
 #include <iostream>
@@ -81,8 +82,14 @@ public:
 
 	std::string get_cid() { return cid; }
 
-	int lock(void) { return pthread_mutex_lock(&meta_lock); }
-	int unlock(void) { return pthread_mutex_unlock(&meta_lock); }
+	int lock(void) { 
+		printf("%p meta lock\n", this);
+		return pthread_mutex_lock(&meta_lock); 
+	}
+	int unlock(void) { 
+		printf("%p meta unlock\n", this);
+		return pthread_mutex_unlock(&meta_lock); 
+	}
 };
 
 
@@ -91,9 +98,18 @@ public:
 	meta_map();
 	~meta_map();
 
-	int read_lock(void)  { return pthread_rwlock_wrlock(&rwlock); };
-	int write_lock(void) { return pthread_rwlock_rdlock(&rwlock); };
-	int unlock(void)     { return pthread_rwlock_unlock(&rwlock); };
+	int read_lock(void)  { 
+		printf("%p read lock\n", this);
+		return pthread_rwlock_wrlock(&rwlock); 
+	};
+	int write_lock(void) { 
+		printf("%p write lock\n", this);
+		return pthread_rwlock_rdlock(&rwlock); 
+	};
+	int unlock(void) { 
+		printf("%p read/write unlock\n", this);
+		return pthread_rwlock_unlock(&rwlock); 
+	};
 
 	xcache_meta *acquire_meta(std::string cid);
 	void release_meta(xcache_meta *meta);
