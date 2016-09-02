@@ -264,14 +264,14 @@ int AdvertisementMessage::recv(int sock){
 	printf("receiving CID advertisement...\n");
 
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
-	if (n <= 0) {
-		printf("received size have invalid size. return failed\n");
-		return -1;
+	if (n < 0) {
+		printf("Xrecv failed\n");
+		cleanup(0);
 	}
 
 	if(remaining <= 0){
-		printf("received size have invalid size. return failed\n");
-		return -1;
+		printf("received size have invalid size. Exit\n");
+		cleanup(0);
 	}
 
 	remaining = ntohl(remaining);
@@ -295,8 +295,8 @@ int AdvertisementMessage::recv(int sock){
 	}
 
 	if(data.size() == 0 || data.size() != size){
-		printf("received size have invalid size. return failed\n");
-		return -1;
+		printf("received data have invalid size. Exit\n");
+		cleanup(0);
 	}
 
 	printf("received a raw advertisement message:\n");
@@ -943,7 +943,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	int status = msg.recv(neighbor.recvSock);
 	if(status < 0){
 		printf("message receive failed, remove neighbor\n");
-		processNeighborLeave(neighbor);
 		return;
 	}
 	
@@ -1121,7 +1120,6 @@ int main(int argc, char *argv[]) {
 			if (FD_ISSET(routeState.helloSock, &socks)) {
 				// if we received a hello packet from neighbor, check if it is a new neighbor
 				// and then establish connection state with them
-
 				processHelloMessage();
 			} else if (FD_ISSET(routeState.masterSock, &socks)) {
 				// if a new neighbor connects, add to the recv list
