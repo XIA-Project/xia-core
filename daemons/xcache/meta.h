@@ -59,7 +59,7 @@ public:
 	void update() { _updated = time(NULL); }
 
 	time_t created() { return _created; }
-	void created(time_t t) { _created = t; }
+	void set_created() { _created = _updated = _accessed = time(NULL); }
 
 	// account for the tcp overhead in initial pkt
 	void set_seq(uint32_t seq) { initial_seq = seq + 1; }

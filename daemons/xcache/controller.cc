@@ -608,6 +608,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		 */
 		meta = new xcache_meta(cid);
 		meta->set_ttl(ttl);
+		meta->set_created();
 
 		context = lookup_context(cmd->context_id());
 		if(!context) {

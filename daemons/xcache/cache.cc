@@ -257,7 +257,7 @@ skip_data:
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
 
 			meta->set_ttl(ntohl(download->header.ttl));
-			meta->created(time(NULL));
+			meta->set_created();
 
 			ctrl->__store(NULL, meta, data);
 

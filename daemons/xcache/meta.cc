@@ -156,11 +156,11 @@ int meta_map::walk(void)
 
 			} else {
 				syslog(LOG_INFO, "removing stalled cid:%s", c.c_str());
+				delete m;
+				_map.erase(i++);
 			}
-			delete m;
-			_map.erase(i++);
-
 		}
+
 		if (m->state() == EVICTING) {
 			syslog(LOG_INFO, "evicting chunk %s", c.c_str());
 			xr.delRoute(c);
