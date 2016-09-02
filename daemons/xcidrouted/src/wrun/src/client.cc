@@ -40,7 +40,7 @@ void parseChunkIdToCIDMap(string cidMapDir){
 					sockaddr_x chunkDAGSock;
 					url_to_dag(&chunkDAGSock, (char*)chunkDAG.c_str(), strlen(chunkDAG.c_str()));
 					
-					Graph g(chunkDAGSock);
+					Graph g(&chunkDAGSock);
 					Node finalIntent = g.get_final_intent();
 					string finalIntentStr = finalIntent.to_string();
 
