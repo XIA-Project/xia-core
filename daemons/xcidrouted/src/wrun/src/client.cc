@@ -12,6 +12,7 @@ using namespace std;
 static XcacheHandle xcache;
 static map<string, sockaddr_x> chunkIdToChunkDAG;
 static vector<RequestStats> requests;
+static set<string> cidsSoFar;
 
 void parseChunkIdToCIDMap(string cidMapDir){
 	DIR *dir;
@@ -37,6 +38,18 @@ void parseChunkIdToCIDMap(string cidMapDir){
 
 					sockaddr_x chunkDAGSock;
 					url_to_dag(&chunkDAGSock, (char*)chunkDAG.c_str(), strlen(chunkDAG.c_str()));
+					
+					Graph g(chunkDAGSock);
+					Node finalIntent = g.get_final_intent();
+					string finalIntentStr = finalIntent.to_string();
+
+					if(cidsSoFar.find(finalIntentStr) != cidsSoFar.end()){
+						printf("same CID as before, not allowed\n");
+						closedir(dir);
+						exit(0);
+					}
+					cidsSoFar.insert(finalIntentStr);
+
 					chunkIdToChunkDAG[objectId + "-" + chunkId] = chunkDAGSock;
 				}
             }
