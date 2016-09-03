@@ -286,6 +286,8 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
   }
   while (line[3] == '-');
 
+  syslog(LOG_INFO, "after readline and everything\n");
+
   int code = get_resp_code(line);
   if (code != CODE_OK && code != CODE_OK_WARN)
     {
