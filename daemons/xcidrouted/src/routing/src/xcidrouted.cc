@@ -811,7 +811,9 @@ bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 
 set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 #ifdef EVENT_LOG
-	logger->log("Inside deleteCIDRoutesWithFilter");	
+	if(msg.delCIDs.size() > 0){
+		logger->log("Inside deleteCIDRoutesWithFilter");	
+	}
 #endif
 
 	set<string> routeDeletion;
@@ -841,7 +843,9 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
 #ifdef EVENT_LOG
-	logger->log("Inside setCIDRoutesWithFilter");	
+	if(msg.newCIDs.size() > 0){
+		logger->log("Inside setCIDRoutesWithFilter");	
+	}
 #endif
 
 	set<string> routeAddition;
@@ -868,7 +872,6 @@ set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const Neigh
 					logger->log("old dest: " + entry.dest);
 				}
 #endif	
-
 				// set corresponding CID route entries
 				routeState.CIDRoutesWithFilter[currNewCID].cost = msg.distance;
 				routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;

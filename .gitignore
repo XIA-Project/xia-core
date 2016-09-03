@@ -43,6 +43,7 @@ daemons/session
 applications/example/videos/
 daemons/xroute/xrouted
 daemons/xcidrouted/bin/*
+daemons/xcidrouted/log
 !daemons/xcidrouted/bin/cleanup.sh
 !daemons/xcidrouted/bin/getmap.sh
 !daemons/xcidrouted/bin/getworkload.sh
