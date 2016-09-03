@@ -14,7 +14,7 @@ id2cid_ports=(id2cid_port1 id2cid_port2 id2cid_port3 id2cid_port4)
 
 touch tmp/id2cid_s1.dat
 
-for i in "${!foo[@]}"; do 
+for i in "${!id2cid_hosts[@]}"; do 
 	id2cid_host=${id2cid_hosts[$i]}
 	id2cid_port=${id2cid_ports[$i]}
 
