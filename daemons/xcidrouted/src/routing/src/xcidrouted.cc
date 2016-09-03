@@ -526,10 +526,12 @@ void advertiseCIDs(){
 	routeState.mtx.lock();
 
 #ifdef EVENT_LOG
-	logger->log("Inside advertise CID: ");
-	logger->log("Local CIDs: ");
-	for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
-		logger->log(*it);
+	if(currLocalCIDs.size() > 0){
+		logger->log("Inside advertise CID: ");
+		logger->log("Local CIDs: ");
+		for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
+			logger->log(*it);
+		}
 	}
 #endif	
 
@@ -550,13 +552,18 @@ void advertiseCIDs(){
 #ifdef EVENT_LOG
 		logger->log("Broadcast TTL: " + to_string(ttl));
 
-		logger->log("Broadcast newCIDs");
-		for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
-			logger->log(*it);
+		if(msg.newCIDs.size() > 0){
+			logger->log("Broadcast newCIDs");
+			for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
+				logger->log(*it);
+			}
 		}
-		logger->log("Broadcast delCIDs");
-		for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
-			logger->log(*it);
+		
+		if(msg.delCIDs.size() > 0){
+			logger->log("Broadcast delCIDs");
+			for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
+				logger->log(*it);
+			}
 		}
 #endif
 
