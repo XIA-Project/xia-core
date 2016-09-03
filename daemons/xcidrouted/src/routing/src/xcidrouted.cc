@@ -377,7 +377,7 @@ void config(int argc, char** argv) {
 		hostname = strdup(DEFAULT_NAME);
 	}
 
-	if(ttl == -1 || ttl > MAX_TTL){
+	if(ttl <= 0 || ttl > MAX_TTL){
 		ttl = MAX_TTL;
 	}
 
