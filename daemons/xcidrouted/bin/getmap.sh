@@ -20,5 +20,5 @@ for i in "${!id2cid_hosts[@]}"; do
 
 	scp -P $id2cid_port $id2cid_host:~/xia-core/daemons/xcidrouted/tmp/* tmp/temp
 	cat tmp/temp >> tmp/id2cid_s1.dat
-	rm -f tm/temp
+	rm -f tmp/temp
 done
