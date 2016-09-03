@@ -12,6 +12,7 @@ id2cid_port4=30267
 id2cid_hosts=($id2cid_host1 $id2cid_host2 $id2cid_host3 $id2cid_host4)
 id2cid_ports=($id2cid_port1 $id2cid_port2 $id2cid_port3 $id2cid_port4)
 
+rm -f tmp/id2cid_s1.dat
 touch tmp/id2cid_s1.dat
 
 for i in "${!id2cid_hosts[@]}"; do 
