@@ -9,8 +9,8 @@ id2cid_port3=30266
 id2cid_host4=zihaol1@pc2.instageni.northwestern.edu
 id2cid_port4=30267
 
-id2cid_hosts=(id2cid_host1 id2cid_host2 id2cid_host3 id2cid_host4)
-id2cid_ports=(id2cid_port1 id2cid_port2 id2cid_port3 id2cid_port4)
+id2cid_hosts=($id2cid_host1 $id2cid_host2 $id2cid_host3 $id2cid_host4)
+id2cid_ports=($id2cid_port1 $id2cid_port2 $id2cid_port3 $id2cid_port4)
 
 touch tmp/id2cid_s1.dat
 
