@@ -486,6 +486,32 @@ void cleanCIDRoutes(){
 #endif
 }
 
+#ifndef FILTER
+void setMinCostCIDRoutes(string cid){
+	if(routeState.CIDRoutes.find(cid) != routeState.CIDRoutes.end()){
+		uint32_t minCost = INT_MAX;
+		CIDRouteEntry minCostEntry;
+
+		for(auto it = routeState.CIDRoutes[cid].begin(); it != routeState.CIDRoutes[cid].end(); it++){
+			if(it->second.cost < minCost){
+				minCost = it->second.cost;
+				minCostEntry = it->second;
+			}
+		}
+		xr.setRouteCIDRouting(cid, minCostEntry.port, minCostEntry.nextHop, 0xffff);
+	}
+}
+
+void resetNonLocalCIDRoutes(const set<string> & delLocal){
+	for(auto it = delLocal.begin(); it != delLocal.end(); it++){
+		string currDelLocal = *it;
+		// if we have the cid routes for local CID routes that have just been removed
+		// set the shortest of them.
+		setMinCostCIDRoutes(currDelLocal);
+	}
+}
+#endif
+
 void advertiseCIDs(){
 	printf("advertising CIDs...\n");
 
@@ -524,19 +550,20 @@ void advertiseCIDs(){
 	}
 
 	routeState.mtx.lock();
-
 #ifdef EVENT_LOG
 	if(currLocalCIDs.size() > 0){
 		logger->log("Inside advertise CID: ");
-		logger->log("Local CIDs: ");
 		for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
-			logger->log(*it);
+			logger->log("Local CIDs: " + *it);
 		}
 	}
 #endif	
 
 	routeState.localCIDs = currLocalCIDs;
 	cleanCIDRoutes();
+#ifndef FILTER
+	resetNonLocalCIDRoutes(msg.delCIDs);
+#endif	
 	routeState.mtx.unlock();
 
 #ifdef STATS_LOG
@@ -901,23 +928,13 @@ void deleteCIDRoutes(const AdvertisementMessage & msg){
 			// for this CID
 			routeState.CIDRoutes[currDelCID].erase(msg.senderHID);
 
-			// if no more CID routes left for this CID from other sender, just remove the CID routes
 			if(routeState.CIDRoutes[currDelCID].size() == 0){
+				// if no more CID routes left for this CID from other sender, just remove the CID routes
 				xr.delRouteCIDRouting(currDelCID);
 			} else {
 				// if there are CID routes left for this CID from other sender, just pick one with the minimum 
 				// distance and set it. We can do it since we haven't received eviction message from other sender
-				uint32_t minCost = INT_MAX;
-				CIDRouteEntry minCostEntry;
-
-				for(auto jt = routeState.CIDRoutes[currDelCID].begin(); jt != routeState.CIDRoutes[currDelCID].end(); jt++){
-					if(jt->second.cost < minCost){
-						minCost = jt->second.cost;
-						minCostEntry = jt->second;
-					}
-				}
-
-				xr.setRouteCIDRouting(currDelCID, minCostEntry.port, minCostEntry.nextHop, 0xffff);
+				setMinCostCIDRoutes(currDelCID);
 			}
 		}
 	}

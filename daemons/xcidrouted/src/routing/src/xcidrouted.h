@@ -167,6 +167,10 @@ int interfaceNumber(string xidType, string xid);
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result);
 
 void cleanCIDRoutes();
+#ifndef FILTER
+void setMinCostCIDRoutes(string cid);
+void resetNonLocalCIDRoutes(const set<string> & delLocal);
+#endif
 void advertiseCIDs();
 void CIDAdvertiseTimer();
 
