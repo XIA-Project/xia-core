@@ -547,7 +547,7 @@ void advertiseCIDs(){
 			logger->log("Local CIDs: " + *it);
 		}
 	}
-#endif	
+#endif
 
 	routeState.localCIDs = currLocalCIDs;
 
@@ -953,7 +953,7 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 					minDist = jt->second.cost;
 				}
 			}
-			
+
 			// only set the routes if current message is the shortest to reach the CID
 			if(minDist > msg.distance){
 				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
