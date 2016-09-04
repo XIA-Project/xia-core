@@ -461,9 +461,11 @@ void CIDAdvertiseTimer(){
     }).detach();
 }
 
+#ifdef FILTER
+// only clean CID routes if we are doing filtering since we might want to keep some routes
+// in case our local cids are evicted
 void cleanCIDRoutes(){
 	set<string> toRemove;
-#ifdef FILTER
 	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); it++){
 		if(routeState.localCIDs.find(it->first) != routeState.localCIDs.end()){
 			toRemove.insert(it->first);
@@ -473,20 +475,8 @@ void cleanCIDRoutes(){
 	for(auto it = toRemove.begin(); it != toRemove.end(); it++){
 		routeState.CIDRoutesWithFilter.erase(*it);
 	}
-#else
-	for(auto it = routeState.CIDRoutes.begin(); it != routeState.CIDRoutes.end(); it++){
-		if(routeState.localCIDs.find(it->first) != routeState.localCIDs.end()){
-			toRemove.insert(it->first);
-		}
-	}
-
-	for(auto it = toRemove.begin(); it != toRemove.end(); it++){
-		routeState.CIDRoutes.erase(*it);
-	}
-#endif
 }
-
-#ifndef FILTER
+#else
 void setMinCostCIDRoutes(string cid){
 	if(routeState.CIDRoutes.find(cid) != routeState.CIDRoutes.end()){
 		uint32_t minCost = INT_MAX;
@@ -560,10 +550,13 @@ void advertiseCIDs(){
 #endif	
 
 	routeState.localCIDs = currLocalCIDs;
+
+#ifdef FILTER
 	cleanCIDRoutes();
-#ifndef FILTER
+#else
 	resetNonLocalCIDRoutes(msg.delCIDs);
-#endif	
+#endif
+
 	routeState.mtx.unlock();
 
 #ifdef STATS_LOG
@@ -944,38 +937,34 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 	// then check for each CID if it is the closest for the current router
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
+		// and the CID is not encountered before or it is encountered before 
+		// but the distance is longer then
+		if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end()) {
+			// set corresponding CID route entries
+			routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
+			routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
+			routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
+			routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
+			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+		} else {
+			uint32_t minDist = INT_MAX;
+			for(auto jt = routeState.CIDRoutes[currNewCID].begin(); jt != routeState.CIDRoutes[currNewCID].end(); jt++){
+				if(jt->second.cost < minDist){
+					minDist = jt->second.cost;
+				}
+			}
+			
+			// only set the routes if current message is the shortest to reach the CID
+			if(minDist > msg.distance){
+				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+			}
 
-		// if the CID is not stored locally
-		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
-			// and the CID is not encountered before or it is encountered before 
-			// but the distance is longer then
-			if(routeState.CIDRoutes.find(currNewCID) == routeState.CIDRoutes.end()) {
-				// set corresponding CID route entries
+			if(routeState.CIDRoutes[currNewCID].find(msg.senderHID) == routeState.CIDRoutes[currNewCID].end() 
+				|| routeState.CIDRoutes[currNewCID][msg.senderHID].cost > msg.distance){
 				routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
 				routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
 				routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
 				routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
-				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
-			} else {
-				uint32_t minDist = INT_MAX;
-				for(auto jt = routeState.CIDRoutes[currNewCID].begin(); jt != routeState.CIDRoutes[currNewCID].end(); jt++){
-					if(jt->second.cost < minDist){
-						minDist = jt->second.cost;
-					}
-				}
-
-				// only set the routes if current message is the shortest to reach the CID
-				if(minDist > msg.distance){
-					xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
-				}
-
-				if(routeState.CIDRoutes[currNewCID].find(msg.senderHID) == routeState.CIDRoutes[currNewCID].end() 
-					|| routeState.CIDRoutes[currNewCID][msg.senderHID].cost > msg.distance){
-					routeState.CIDRoutes[currNewCID][msg.senderHID].cost = msg.distance;
-					routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
-					routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
-					routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
-				}
 			}
 		}
 	}
