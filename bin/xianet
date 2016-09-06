@@ -651,7 +651,7 @@ case $1 in
 		[ $NO_CLICK != 1 ] && kill_service "click"
 		visualizer "stop"
 		check_all_services
-		rm /tmp/xcache*
+		rm -f /tmp/xcache*
 		;;
 	restart|reload)
 		echo "Stopping XIA"
