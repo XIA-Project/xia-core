@@ -9,7 +9,7 @@ static char* hostname = NULL;
 static XIARouter xr;
 static RouteState routeState;
 
-#if defined(LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG) || defined(EVENT_LOG)
 static Logger* logger;
 #endif
 
@@ -255,9 +255,8 @@ int AdvertisementMessage::send(int sock){
 	printf("sending CID advertisement:\n");
 	print();
 
-#ifdef STATS_LOG
-	string logStr = "send " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	logger->log(logStr.c_str());
+#ifdef STATS_LOG	
+	logger->log("send " + to_string(this->newCIDs.size() + this->delCIDs.size()) + " " + to_string(strlen(advertisement.c_str())));
 #endif
 
 	printf("sent CID advertisement\n");
@@ -321,8 +320,7 @@ int AdvertisementMessage::recv(int sock){
 
 #ifdef STATS_LOG
 	// log the number of advertised CIDs received.
-	string logStr = "recv " + to_string(this->newCIDs.size() + this->delCIDs.size());
-	logger->log(logStr.c_str());
+	logger->log("recv " + to_string(this->newCIDs.size() + this->delCIDs.size()) + " " + to_string(size));
 #endif
 
 	printf("received CID advertisement\n");
@@ -391,7 +389,7 @@ void config(int argc, char** argv) {
 }
 
 void cleanup(int) {
-#if defined(LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG) || defined(EVENT_LOG)
 	logger->end();
 	delete logger;
 #endif
@@ -524,7 +522,7 @@ void advertiseCIDs(){
 			currLocalCIDs.insert(routeEntries[i].xid);
 		}
 	}
-	
+
 	// then find the deleted local CIDs
 	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); it++){
 		if(currLocalCIDs.find(*it) == currLocalCIDs.end()){
@@ -561,8 +559,8 @@ void advertiseCIDs(){
 
 #ifdef STATS_LOG
 	//log the number of advertised CIDs received.
-	string logStr = "local " + to_string(currLocalCIDs.size());
-	logger->log(logStr.c_str());
+	//string logStr = "local " + to_string(currLocalCIDs.size());
+	//logger->log(logStr.c_str());
 #endif
 
 	// start advertise to each of my neighbors
@@ -781,18 +779,6 @@ void processNeighborJoin(){
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
 	routeState.mtx.unlock();
-
-	// TODO: handle topology changes
-}
-
-void processNeighborLeave(const NeighborInfo &neighbor){
-	string key = neighbor.AD + neighbor.HID;
-	
-	routeState.mtx.lock();
-	routeState.neighbors.erase(key);
-	routeState.mtx.unlock();
-
-	// TODO: handle topology changes
 }
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg){
@@ -808,7 +794,7 @@ bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 			return false;
 		} else {
 			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
-		}
+		} 
 	} else {
 		routeState.HID2Seq[msg.senderHID] = msg.seq;
 		routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
@@ -1012,11 +998,6 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	// 	OR lower sequence number but have higher TTL
 	if(!checkSequenceAndTTL(msg)){
 		return;
-	}	
-
-	// check that we are not the originator of this message
-	if(msg.senderHID == routeState.myHID){
-		return;
 	}
 
 	// our communication to XIA writes to single socket and is
@@ -1078,12 +1059,11 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 #endif
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-			if(it->second.HID != neighbor.HID){
+			if(it->second.HID != neighbor.HID && msg.senderHID != neighbor.HID){
 
 #ifdef EVENT_LOG
 				logger->log("relay to neighbor: " + it->second.HID);
 #endif
-
 				msg2Others.send(it->second.sendSock);
 			}
 		}
@@ -1110,7 +1090,7 @@ int main(int argc, char *argv[]) {
 	initRouteState();
    	registerReceiver();
 
-#if defined(LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG) || defined(EVENT_LOG)
    	logger = new Logger(hostname);
 #endif
 

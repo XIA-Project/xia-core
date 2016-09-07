@@ -54,9 +54,9 @@
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XCIDROUTE "SID:1110000000000000000000000000000000001114"
 
-//#define STATS_LOG
+#define STATS_LOG
 //#define EVENT_LOG
-//#define FILTER
+#define FILTER
 
 using namespace std;
 
@@ -183,7 +183,6 @@ void printNeighborInfo();
 
 void processHelloMessage();
 void processNeighborJoin();
-void processNeighborLeave(const NeighborInfo &neighbor);
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg);
 void deleteCIDRoutes(const AdvertisementMessage & msg);
