@@ -2,10 +2,14 @@
 #
 # simple script to attach gdb to a running click process
 #
+echo xdebug [process name]
 echo attach gdb to a running click process
-xiadir=$(pwd | sed 's/xia-core.*/xia-core/')
-xpid=$(ps -eo pid,comm | grep click | awk '{ print $1}')
+echo defaults to click
 
-[ "$xpid" == "" ] && echo "click process not found" && exit
+name=click
+[ "$1" != "" ] && name=$1
 
-sudo gdb $xiadir/click/userlevel/click $xpid
+xpid=$(pgrep $name)
+[ "$xpid" == "" ] && echo "$name process not found" && exit
+
+sudo gdb $name $xpid

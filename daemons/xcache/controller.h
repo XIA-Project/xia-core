@@ -17,7 +17,7 @@
 
 #define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100
-#define GC_INTERVAL 10
+#define GC_INTERVAL 5
 
 struct xcache_conf {
 	char hostname[128];
@@ -28,10 +28,12 @@ struct xcache_req {
 	int type;
 
 #define XCFI_REMOVEFD 0x1
+#define XCFI_CACHE     0x2
 
 	int flags;
 	time_t ttl;
 	int from_sock, to_sock;
+	char *cid;
 	void *data;
 	size_t datalen;
 };

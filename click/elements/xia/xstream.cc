@@ -6,6 +6,8 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
+#include <click/xiasecurity.hh>
+#include <click/xiamigrate.hh>
 #include <fcntl.h>
 #include <cstdint> // uint32_t
 
@@ -1126,6 +1128,18 @@ again:
 		tp->t_rxtshift = 0;
 		tcp_setpersist();
 	}
+
+	// XIA active session migration
+	// TODO: skip migration if not in established state
+	if (migrating) {
+		click_chatter("MIGRATING flag was set");
+		goto send;
+	}
+
+	if (migrateacking) {
+		click_chatter("MIGRATEACK needs to be sent");
+		goto send;
+	}
 	return;
 
 	/*222*/
@@ -1140,7 +1154,7 @@ send:
 		if ((tp->t_flags & TF_NOOPT) == 0) {
 			u_short mss;
 			opt[0] = TCPOPT_MAXSEG;
-			opt[1] = 4;
+			opt[1] = TCPOLEN_MAXSEG >> 2; // pack len in multiples of 4 bytes
 			mss = htons((u_short)tcp_mss(0));
 			memcpy( &(opt[2]), &mss, sizeof(mss)) ;
 			optlen = 4;
@@ -1152,10 +1166,9 @@ send:
 				((flags & XTH_ACK) == 0 ||
 				 (tp->t_flags & TF_RCVD_SCALE))) {
 				*((uint32_t *) (opt + optlen) ) = htonl( //FIXME 4-byte ALIGNMENT problem occurs here
-					TCPOPT_NOP << 24 |
-					TCPOPT_WSCALE << 16 |
-					TCPOLEN_WSCALE << 8 |
-					tp->request_r_scale);
+					TCPOPT_WSCALE << 24 |
+					(TCPOLEN_WSCALE >> 2) << 16 |
+					(u_short)tp->request_r_scale); // len is 4-byte multiple now
 				optlen += 4;
 			}
 		}
@@ -1171,16 +1184,86 @@ send:
 	(tp->t_flags & TF_RCVD_TSTMP))) {
 		//debug_output(VERB_DEBUG, "[%s] timestamp: SETTING TIMESTAMP", SPKRNAME);
 		uint32_t *lp = (uint32_t*) (opt + optlen);
-		*lp++ = htonl(TCPOPT_TSTAMP_HDR);
+		*lp++ = htonl(TCPOPT_TSTAMP_HDR); // first 2 bytes of option are 0
 		*lp++ = htonl(get_transport()->tcp_now());
 		*lp = htonl(tp->ts_recent);
-		optlen += TCPOLEN_TSTAMP_APPA;
+		optlen += TCPOLEN_TIMESTAMP;
 	} else {
 		// Remove this clause after it's been debugged and timestamps are working properly
 		//debug_output(VERB_DEBUG, "[%s] timestamp: NOT setting timestamp", SPKRNAME);
 	}
 		// printf("1076\n");
 
+	// Include the MIGRATE option if the migrating flag is set
+	// TODO: Ensure we are not exceeding max packet size with all options
+	if (migrating) {
+
+		int migratelen, padlen;
+
+		u_char *migrateoptptr = opt + optlen;
+
+		// Mark the option as a MIGRATE
+		*migrateoptptr = TCPOPT_MIGRATE;
+
+		// Build a migrate message
+		XIASecurityBuffer migrate_msg(900);
+		String migrate_ts;
+		if (build_migrate_message(migrate_msg, src_path, dst_path, migrate_ts)
+				== false) {
+			click_chatter("ERROR: Failed to build MIGRATE message");
+			migrating = false;
+			return;
+		}
+		last_migrate_ts = migrate_ts;
+
+		// option size is migrate length + two bytes for kind and option len
+		// plus, pad with zeroes at end to make a multiple of 4
+		padlen = 4 - ((migrate_msg.size() + 2) % 4);
+		migratelen = migrate_msg.size() + 2 + padlen;
+		assert(migratelen % 4 == 0);
+
+		// Ensure that XIASecurityBuffer won't blow up with extra bytes at end
+		// Didn't look like it would
+		// Put length >> 2 of option at *(migrateoptptr+1)
+		*(migrateoptptr + 1) = migratelen >> 2;
+
+		// Put migrate message at *(migrateoptptr+2)
+		memcpy(migrateoptptr+2, migrate_msg.get_buffer(), migrate_msg.size());
+
+		optlen += migratelen;
+	}
+
+	// Include the MIGRATEACK option if the migrateacking flag is set
+	if (migrateacking) {
+		int migrateacklen, padlen;
+
+		u_char *migrateackoptptr = opt + optlen;
+
+		// Mark the option as a MIGRATEACK
+		*migrateackoptptr = TCPOPT_MIGRATEACK;
+
+		// Build a migrateack message
+		XIASecurityBuffer migrate_ack(900);
+		if (build_migrateack_message(migrate_ack, src_path, dst_path,
+					last_migrate_ts) == false) {
+			click_chatter("ERROR: Failed to build MIGRATEACK message");
+			migrateacking = false;
+			return;
+		}
+
+		padlen = 4 - ((migrate_ack.size() + 2) %4);
+		migrateacklen = migrate_ack.size() + 2 + padlen;
+		assert (migrateacklen % 4 == 0);
+
+		*(migrateackoptptr + 1) = migrateacklen >> 2;
+
+		memcpy(migrateackoptptr+2, migrate_ack.get_buffer(),
+				migrate_ack.size());
+
+		// We don't retransmit MIGRATEACK messages, so set flag to false
+		migrateacking = false;
+		optlen += migrateacklen;
+	}
 	hdrlen += optlen;
 
 	if (len > tp->t_maxseg - optlen) {
@@ -1708,6 +1791,13 @@ XStream::usrsend(WritablePacket *p)
 	return retval;
 }
 
+/* requesting a stream session migration to new address */
+void
+XStream::usrmigrate()
+{
+	tcp_output();
+}
+
 /* user request 424*/
 void
 XStream::usrclosed()
@@ -1785,6 +1875,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 	uint16_t mss;
 	int opt, optlen;
 	optlen = 0;
+	XIAPath new_dst_path;
 
 	//printf("[%s] tcp_dooption cnt [%u]\n", "Xstream", cnt);
 	for (; cnt > 0; cnt -= optlen, cp += optlen) {
@@ -1801,8 +1892,8 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				//printf("opt NOP\n");
 				break;
 			}
-			optlen = cp[1];
-			if (optlen < 1 || optlen > cnt ) {
+			optlen = cp[1] << 2; // length is multiple of 4 bytes on wire
+			if (optlen < 4 || optlen > cnt ) {
 				//printf("b3, optlen: [%x] cnt: [%x]", optlen, cnt);
 				break;
 			}
@@ -1840,9 +1931,10 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				if (optlen != TCPOLEN_TIMESTAMP)
 					continue;
 				*ts_present = 1;
-				bcopy((char *)cp + 2, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
+				// kind=*cp, len=*(cp+1)<<2, cp+2 and cp+3 are zeroed
+				bcopy((char *)cp + 4, (char *)ts_val, sizeof(*ts_val)); //FIXME: Misaligned
 				*ts_val = ntohl(*ts_val);
-				bcopy((char *)cp + 6, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
+				bcopy((char *)cp + 8, (char *)ts_ecr, sizeof(*ts_ecr)); //FIXME: Misaligned
 				*ts_ecr = ntohl(*ts_ecr);
 
 				//debug_output(VERB_DEBUG, "[%s] doopts: ts_val [%u] ts_ecr [%u]", SPKRNAME, *ts_val, *ts_ecr);
@@ -1864,13 +1956,13 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					continue;
 				to->to_flags |= TOF_SACKPERM;
 				break;
-			case TCPOPT_SACK:
-				if (optlen <= 2 || (optlen - 2) % TCPOLEN_SACK != 0)
+				case TCPOPT_SACK:
+				if (optlen <= 4 || (optlen - 4) % TCPOLEN_SACK != 0)
 					continue;
 				if (flags & TO_SYN)
 					continue;
 				to->to_flags |= TOF_SACK;
-				to->to_nsacks = (optlen - 2) / TCPOLEN_SACK;
+				to->to_nsacks = (optlen - 4) / TCPOLEN_SACK;
 				to->to_sacks = cp + 2;
 				tcpstat.tcps_sack_rcv_blocks++;
 				break;
@@ -1883,9 +1975,42 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					continue;
 				tp->t_flags |=  TF_RCVD_SCALE;
 
-				tp->requested_s_scale = min(cp[2], TCP_MAX_WINSHIFT);
+				// kind=*cp, len=*(cp+1)<<2, cp[2] is zeroed, cp[3] is the scale
+				tp->requested_s_scale = min(cp[3], TCP_MAX_WINSHIFT);
 				//debug_output(VERB_DEBUG, "[%s] WSCALE set, flags [%x], req_s_sc [%x]\n", SPKRNAME,
 				break;
+			case TCPOPT_MIGRATE:
+				{
+					String migrate_ts;
+
+					click_chatter("Got migrate of len %d", optlen-2);
+					XIASecurityBuffer migrate((const char *)cp+2, optlen-2);
+					if (!valid_migrate_message(migrate, dst_path, src_path,
+								new_dst_path, migrate_ts)) {
+						click_chatter("ERROR: invalid migrate message");
+						continue;
+					}
+					// Peer migrated and sent a valid notification
+					last_migrate_ts = migrate_ts;
+					dst_path = new_dst_path;
+					migrateacking = true;
+					tcp_output();
+					break;
+				}
+			case TCPOPT_MIGRATEACK:
+				{
+					click_chatter("Got migrateack of len %d", optlen+2);
+					XIASecurityBuffer migrateack((const char *)cp+2, optlen-2);
+					if(!valid_migrateack_message(migrateack, dst_path,
+								src_path, last_migrate_ts)) {
+						click_chatter("ERROR: invalid migrateack message");
+						continue;
+					}
+
+					// Peer ack is valid, stop migrate retransmit
+					migrating = false;
+					break;
+				}
 			default:
 			continue;
 		}

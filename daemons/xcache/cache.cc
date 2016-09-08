@@ -251,7 +251,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
-		std::string *data = new std::string(download->data, ntohl(download->header.length));
+//		std::string *data = new std::string(download->data, ntohl(download->header.length));
 
 		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
@@ -259,12 +259,19 @@ skip_data:
 			meta->set_ttl(ntohl(download->header.ttl));
 			meta->set_created();
 
-			ctrl->__store(NULL, meta, data);
+			//ctrl->__store(NULL, meta, data);
+
+			xcache_req *req = new xcache_req();
+			req->type = xcache_cmd::XCACHE_CACHE;
+			req->cid = strdup(cid.c_str());
+			req->data = download->data;
+			req->datalen = ntohl(download->header.length);
+			ctrl->enqueue_request_safe(req);
 
 			/* Perform cleanup */
-			delete data;
+//			delete data;
 			ongoing_downloads.erase(iter);
-			free(download->data);
+			//free(download->data);
 			free(download);
 		} else {
 			// FIXME: leave this open in case more data is on the wire

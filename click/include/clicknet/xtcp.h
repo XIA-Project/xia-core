@@ -1,7 +1,8 @@
 #ifndef CLICKNET_XTCP_H
 #define CLICKNET_XTCP_H
 
-#define XTCP_OPTIONS_MAX	256	// maximum size of the options block
+// was 256, increased to 956 to allow large migrate/migrateack options
+#define XTCP_OPTIONS_MAX	956	// maximum size of the options block
 
 // IMPORTANT!!! If accessing the header fields directly make sure to use the appropriate htonx and ntohx functions!
 // the header fields should always be in network byte order

@@ -786,6 +786,18 @@ void xcache_controller::process_req(xcache_req *req)
 	ret = RET_NORESP;
 
 	switch(req->type) {
+	case xcache_cmd::XCACHE_CACHE:
+	{
+		xcache_meta *meta = acquire_meta(req->cid);
+		if (meta) {
+			std::string chunk((const char *)req->data, req->datalen);
+			release_meta(meta);
+			__store(NULL, meta, &chunk);
+			free(req->cid);
+		}
+		break;
+	}
+
 	case xcache_cmd::XCACHE_STORE:
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
@@ -827,7 +839,7 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 
 
-	if (req->type == xcache_cmd::XCACHE_SENDCHUNK) {
+	if (req->type == xcache_cmd::XCACHE_SENDCHUNK || req->type == xcache_cmd::XCACHE_CACHE) {
 		if (req->data) {
 			free(req->data);
 		}
