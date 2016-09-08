@@ -255,7 +255,7 @@ int AdvertisementMessage::send(int sock){
 	printf("sending CID advertisement:\n");
 	print();
 
-#ifdef STATS_LOG	
+#ifdef STATS_LOG
 	logger->log("send " + to_string(this->newCIDs.size() + this->delCIDs.size()) + " " + to_string(strlen(advertisement.c_str())));
 #endif
 
