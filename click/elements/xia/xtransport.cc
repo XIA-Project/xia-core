@@ -894,6 +894,10 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
+				int iface;
+				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
+					new_sk->outgoing_iface = iface;
+				}
 				new_sk->set_key(xid_pair);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
 				new_sk->push(p_in);

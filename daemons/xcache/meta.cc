@@ -137,8 +137,6 @@ int meta_map::walk(void)
 	for (i = _map.begin(); i != _map.end(); ) {
 		xcache_meta *m = i->second;
 
-		printf("%s\n", m->get_cid().c_str());
-
 		if (m->is_stale()) {
 			syslog(LOG_INFO, "removing stalled stream for %s", m->get_cid().c_str());
 			delete m;
