@@ -152,6 +152,8 @@ private:
 	uint32_t _next_id;
 
 	Packet* UDPIPPrep(Packet *, int);
+    bool migratable_sock(sock *, int);
+    bool update_src_path(sock *, XIAPath&);
 
 public:
 	/* TCP related fields */
@@ -418,8 +420,9 @@ class sock : public Element {
 	/* =========================
 	 * tcp connection migration
 	 * ========================= */
-	bool migrateack_waiting;
-	String last_migrate_ts;
+	bool migrating;
+	bool migrateacking;
+	String last_migrate_ts;			// timestamp of last migrate/migrateack seen
 	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
 	WritablePacket *migrate_pkt;
 

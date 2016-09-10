@@ -54,7 +54,8 @@ using namespace xia;
 
 #define NETWORK_PORT		2
 
-#define MAX_TCPOPTLEN		32
+// was 32, changed to match XTCP_OPTIONS_MAX from clicknet/xtcp.h
+#define MAX_TCPOPTLEN		XTCP_OPTIONS_MAX
 
 #define TCP_REXMTVAL(tp) \
 	(((tp)->t_srtt >> TCP_RTT_SHIFT) + (tp)->t_rttvar)
@@ -187,6 +188,7 @@ public:
 	void 	tcp_input(WritablePacket *p);
 	void 	tcp_output();
 	int		usrsend(WritablePacket *p);
+	void	usrmigrate();
 	void	usrclosed() ;
 	void 	usropen();
 	void	tcp_timers(int timer);

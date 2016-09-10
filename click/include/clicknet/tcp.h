@@ -81,28 +81,18 @@ struct mini_tcpip
 #define TCPOPT_MAXSEG       2
 #define TCPOLEN_MAXSEG      4
 #define TCPOPT_WSCALE       3
-#define TCPOLEN_WSCALE      3
+#define TCPOLEN_WSCALE      4 // was 3 but we put multiples of 4 bytes on wire
 #define TCPOPT_SACK_PERMITTED   4
-#define TCPOLEN_SACK_PERMITTED  2
+#define TCPOLEN_SACK_PERMITTED  4 // was 2 but we put multiples of 4 on wire
 #define TCPOPT_SACK     5
 #define TCPOPT_TIMESTAMP    8
-#define TCPOLEN_TIMESTAMP   10
+#define TCPOLEN_TIMESTAMP   12 // was 10 but we put multiples of 4 bytes on wire
+#define TCPOPT_MIGRATE		50 // length calculated when option added
+#define TCPOPT_MIGRATEACK	51 // length calculated when option added
 
-#define TCPOPT_EOL      0
-#define TCPOPT_NOP      1
-#define TCPOPT_MAXSEG       2
-#define    TCPOLEN_MAXSEG       4
-#define TCPOPT_WINDOW       3
-#define    TCPOLEN_WINDOW       3
-#define TCPOPT_SACK_PERMITTED   4       /* Experimental */
-#define    TCPOLEN_SACK_PERMITTED   2
-#define TCPOPT_SACK     5       /* Experimental */
-#define TCPOPT_TIMESTAMP    8
-#define    TCPOLEN_TIMESTAMP        10
-#define    TCPOLEN_TSTAMP_APPA      (TCPOLEN_TIMESTAMP+2) /* appendix A */
-
-#define TCPOPT_TSTAMP_HDR   \
-    (TCPOPT_NOP<<24|TCPOPT_NOP<<16|TCPOPT_TIMESTAMP<<8|TCPOLEN_TIMESTAMP)
+// Timestamp header contains kind and size=12>>2 followed by 2 zeroed bytes
+// It will be followed by two 4-byte timestamps
+#define TCPOPT_TSTAMP_HDR (TCPOPT_TIMESTAMP<<24|(TCPOLEN_TIMESTAMP>>2)<<16)
 
 /*
  * Default maximum segment size for TCP.

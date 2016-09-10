@@ -17,6 +17,7 @@ message xcache_cmd {
 		XCACHE_SENDCHUNK = 14;
 		XCACHE_FREE_CONTEXT = 15;
 		XCACHE_EVICT = 16;
+		XCACHE_CACHE = 17;
 	};
 
 	enum status_type {

@@ -7,13 +7,6 @@
 #include <click/xiaheader.hh>
 #include <clicknet/tcp.h>
 
-// FIXME: these need to be integrated into the new streaming transport somehow
-//    static StreamHeaderEncap* MakeMIGRATEHeader(uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
-//                        { return new StreamHeaderEncap(StreamHeader::XSOCK_STREAM, StreamHeader::MIGRATE, seq_num, ack_num, length, recv_window); };
-//
-//    static StreamHeaderEncap* MakeMIGRATEACKHeader( uint32_t seq_num, uint32_t ack_num, uint16_t length, uint32_t recv_window )
-//                        { return new StreamHeaderEncap(StreamHeader::XSOCK_STREAM, StreamHeader::MIGRATEACK, seq_num, ack_num, length, recv_window); };
-
 #include <clicknet/xtcp.h>
 
 class StreamHeader
@@ -36,7 +29,7 @@ public:
 
     inline const struct xtcp* header() const { return _hdr; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
-	inline uint8_t hlen() const           { return _hdr->th_off << 2; };
+	inline uint16_t hlen() const           { return _hdr->th_off << 2; };
 	inline uint32_t seq_num() const       { return ntohl(_hdr->th_seq); };
 	inline uint32_t ack_num() const       { return ntohl(_hdr->th_ack); };
 	inline uint32_t recv_window() const   { return ntohl(_hdr->th_win); };
@@ -80,7 +73,7 @@ public:
 
 	~StreamHeaderEncap() {
 		if (_hdr) {
-			delete _hdr;
+			free(_hdr);
 		}
 	}
 
