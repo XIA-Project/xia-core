@@ -19,6 +19,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include "Xsocket.h"
 #include "dagaddr.hpp"
 #include "xcidrouted_dv.hh"
@@ -51,7 +52,7 @@ void config(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "h:l:v")) != -1) {
+	while ((c = getopt(argc, argv, "h:l:v:")) != -1) {
 		switch (c) {
 			case 'h':
 				hostname = strdup(optarg);
@@ -81,25 +82,22 @@ void config(int argc, char** argv)
 	setlogmask(LOG_UPTO(level));
 }
 
-void listRoutes(std::string xidType)
-{
-	int rc;
-	vector<XIARouteEntry> routes;
-	syslog(LOG_INFO, "%s: route updates", xidType.c_str());
-	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
-		vector<XIARouteEntry>::iterator ir;
-		for (ir = routes.begin(); ir < routes.end(); ir++) {
-			XIARouteEntry r = *ir;
-			syslog(LOG_INFO, "%s: %s | %d | %s | %ld", xidType.c_str(), r.xid.c_str(), r.port, r.nextHop.c_str(), r.flags);
-		}
-	} else if (rc == 0) {
-		syslog(LOG_INFO, "%s: No routes exist", xidType.c_str());
-	} else {
-		syslog(LOG_WARNING, "%s: Error getting route list %d", xidType.c_str(), rc);
-	}
-	syslog(LOG_INFO, "%s: done listing route updates", xidType.c_str());
+void printRoutingTable(){
+	syslog(LOG_INFO, "CID Routing table at %s", route_state.myHID);
+  	map<std::string, RouteEntry>::iterator it1;
+  	for ( it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
+  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port));
+  	}
 }
 
+void printNeighborTable(){
+	syslog(LOG_NOTICE, "******************************* The neighbor table is: *******************************\n");
+	set<std::string>::iterator it;
+  	for (it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++ ) {
+  		std::string neighborHID = *it;
+  		syslog(LOG_NOTICE, "HID: %s", neighborHID.c_str());
+   	}
+}
 
 int interfaceNumber(std::string xidType, std::string xid)
 {
@@ -125,8 +123,7 @@ void getRouteEntries(std::string xidType, std::vector<XIARouteEntry> & result){
 	int rc;
 	vector<XIARouteEntry> routes;
 	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
-		vector<XIARouteEntry>::iterator ir;
-		for (ir = routes.begin(); ir < routes.end(); ir++) {
+		for (auto ir = routes.begin(); ir != routes.end(); ++ir) {
 			XIARouteEntry r = *ir;
 			if(strcmp(r.xid.c_str(), ROUTE_XID_DEFAULT) != 0){
 				result.push_back(r);
@@ -137,18 +134,29 @@ void getRouteEntries(std::string xidType, std::vector<XIARouteEntry> & result){
 	}
 }
 
-void printRoutingTable(){
-	syslog(LOG_INFO, "CID Routing table at %s", route_state.myHID);
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port));
-  	}
+double nextWaitTimeInSecond(double ratePerSecond){
+	double currRand = (double)rand()/(double)RAND_MAX;
+	double nextTime = -1*log(currRand)/ratePerSecond;	// next time in second
+	return nextTime;	
 }
 
 void initRouteState() {
+	route_state.send_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+   	if (route_state.send_sock < 0) {
+   		syslog(LOG_ALERT, "Unable to create a socket");
+   		exit(-1);
+   	}
+
+   	route_state.recv_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+   	if (route_state.recv_sock < 0) {
+   		syslog(LOG_ALERT, "Unable to create a socket");
+   		exit(-1);
+   	}
+
+
 	char cdag[MAX_DAG_SIZE];
 	// read the localhost AD and HID
-    if (XreadLocalHostAddr(route_state.sock, cdag, MAX_DAG_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ){
+    if (XreadLocalHostAddr(route_state.recv_sock, cdag, MAX_DAG_SIZE, route_state.my4ID, MAX_XID_SIZE) < 0 ){
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		exit(-1);
 	}
@@ -158,83 +166,187 @@ void initRouteState() {
     strcpy(route_state.myHID, g_localhost.intent_HID_str().c_str());
 
 	// make the src DAG (the one the routing process listens on)
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, SID_XROUTE, NULL, &ai) != 0) {
+	struct addrinfo *ai_recv;
+	if (Xgetaddrinfo(NULL, SID_XROUTE_RECV, NULL, &ai_recv) != 0) {
 		syslog(LOG_ALERT, "unable to create source DAG");
 		exit(-1);
 	}
-	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
+	memcpy(&route_state.sdag, ai_recv->ai_addr, sizeof(sockaddr_x));
+
+	struct addrinfo *ai_send;
+	if (Xgetaddrinfo(NULL, SID_XROUTE_SEND, NULL, &ai_send) != 0) {
+		syslog(LOG_ALERT, "unable to create source DAG");
+		exit(-1);
+	}
+	memcpy(&route_state.ddag, ai_send->ai_addr, sizeof(sockaddr_x));
+
 
 	// bind to the src DAG
-   	if (Xbind(route_state.sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
+   	if (Xbind(route_state.recv_sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
    		Graph g(&route_state.sdag);
    		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		Xclose(route_state.sock);
+		Xclose(route_state.recv_sock);
+   		exit(-1);
+   	}
+
+	// bind to the dest DAG
+   	if (Xbind(route_state.send_sock, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x)) < 0) {
+   		Graph g(&route_state.ddag);
+   		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		Xclose(route_state.send_sock);
    		exit(-1);
    	}
 }
 
-void populateNeighborState(std::vector<XIARouteEntry> & currHidRouteEntries){
-	// first update the existing neighbor entry
-	for (std::vector<XIARouteEntry>::iterator i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-		XIARouteEntry eachEntry = *i;
+void periodicJobs(){
+	thread([](){
+		vector<XIARouteEntry> currCidRouteEntries, currHidRouteEntries;
 
-		set<std::string>::iterator it;
-		it = route_state.neighbors.find(eachEntry.nextHop);
-		if(it == route_state.neighbors.end()) {
-			route_state.neighbors.insert(eachEntry.nextHop);
-		}
-	}
+        while (true) {
+            double nextTimeInSecond = nextWaitTimeInSecond(CID_ADVERT_UPDATE_RATE_PER_SEC);
+            int nextTimeMilisecond = (int) ceil(nextTimeInSecond * 1000);
 
-	// then remove those entries that have element in map, but not in the HID route table
-	vector<std::string> entriesToRemove;
-	set<std::string>::iterator it;
-  	for (it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++ ) {
-		bool found = false;
-		std::string checkXid = *it;
+            route_state.mtx.lock();
+            getRouteEntries("HID", currHidRouteEntries);
+			populateNeighborState(currHidRouteEntries);
 
-		for (std::vector<XIARouteEntry>::iterator i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-			if((*i).xid == checkXid){
-				found = true;
-			}
-		}
+			getRouteEntries("CID", currCidRouteEntries);
+			populateRouteState(currCidRouteEntries);
+			broadcastRIP();
+			route_state.mtx.unlock();
 
-		if(!found){
-			entriesToRemove.push_back(checkXid);
-		}
-  	}
-
-  	for (std::vector<std::string>::iterator i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
-  		route_state.neighbors.erase(*i);
-  	}
-}
-
-void printNeighborTable(){
-	syslog(LOG_NOTICE, "******************************* The neighbor table is: *******************************\n");
-	set<std::string>::iterator it;
-  	for (it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++ ) {
-  		std::string neighborHID = *it;
-  		syslog(LOG_NOTICE, "HID: %s", neighborHID.c_str());
-   	}
+            this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
+        }
+    }).detach();
 }
 
 void updateClickRoutingTable() {
 	int rc, port;
 	string destXID, nexthopXID;
 
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.CIDrouteTable.begin(); it1 != route_state.CIDrouteTable.end(); it1++ ) {
- 		destXID = it1->second.dest;
- 		nexthopXID = it1->second.nextHop;
-		port =  it1->second.port;
+  	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
+ 		destXID = it->first;
+ 		nexthopXID = it->second.nextHop;
+		port =  it->second.port;
 
-		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0){
+		if ((rc = xr.setRouteCIDRouting(destXID, port, nexthopXID, 0xffff)) != 0){
 			syslog(LOG_ERR, "error setting route %d", rc);
 		}
   	}
 }
 
-int processRIPUpdate(string rip_msg) {
+/* Message format (delimiter=^)
+	source-HID
+	num-source-cids
+	source-CID1
+	distance-cid1
+	source-CID2
+	distance-cid2
+	...
+*/
+string constructBroadcastRIP(vector<string> & cids, string neighborHID){
+	std::ostringstream sstream;
+	sstream << route_state.myHID << "^";
+	
+	int num_cids = 0;
+	for (auto i = cids.begin(); i != cids.end(); ++i) {
+		RouteEntry curr = route_state.CIDrouteTable[*i];
+		
+		// split horizon, don't advertise route learned from neighbor
+		// back to neighbor
+		if(curr.nextHop != neighborHID){
+			num_cids++;
+		}
+	}
+	sstream << num_cids << "^";
+
+	if(num_cids != 0){
+		for (auto i = cids.begin(); i != cids.end(); ++i) {
+			RouteEntry curr = route_state.CIDrouteTable[*i];
+			if(curr.nextHop != neighborHID){
+				sstream << (*i) << "^";
+				sstream << curr.cost << "^";
+			}
+		}	
+	}
+
+	return sstream.str();
+}
+
+
+int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int start, int end){
+	int rc1 = 0, rc2 = 0, msglen, buflen;
+	char buffer[XIA_MAXBUF];
+	bzero(buffer, XIA_MAXBUF);
+
+	vector<string> temp;
+	for(int i = start; i <= end; i++){
+		temp.push_back(cids[i]);
+	}
+
+	string rip = constructBroadcastRIP(temp, neighborHID);
+	msglen = rip.size();
+
+	if(msglen < XIA_MAXBUF){
+		strcpy (buffer, rip.c_str());
+		buflen = strlen(buffer);
+
+		sockaddr_x ddag;
+		Graph g = Node() * Node(neighborHID) * Node(SID_XROUTE_RECV);
+		g.fill_sockaddr(&ddag);
+
+		rc1 = Xsendto(route_state.send_sock, buffer, buflen, 0, (struct sockaddr*)&ddag, sizeof(sockaddr_x));
+		if(rc1 != buflen) {
+			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
+			return -1;
+		}
+	} else {
+		rc1 = broadcastRIPHelper(cids, neighborHID, start, (start + end)/2);
+		rc2 = broadcastRIPHelper(cids, neighborHID, (start + end)/2 + 1, end);
+
+		if(rc1 < 0 || rc2 < 0){
+			return -1;
+		}
+	}
+
+	return rc1 + rc2;
+}
+
+int broadcastRIP() {
+	vector<string> allCIDs;
+	for(auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
+		allCIDs.push_back(it->first);
+	}
+
+	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
+		string neighborHID = *it;
+
+		if(broadcastRIPHelper(allCIDs, neighborHID, 0, allCIDs.size() - 1) < 0){
+			syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
+		}
+	}
+
+	return 0;
+}
+
+void removeOutdatedRoutes(){
+	time_t now = time(NULL);
+	vector<string> cidsToRemove;
+
+  	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
+  		if(it->second.port != DESTINE_FOR_LOCALHOST && now - it->second.timer >= EXPIRE_TIME){
+  			xr.delRouteCIDRouting(it->first);
+  			syslog(LOG_INFO, "purging CID route for : %s", it->first.c_str());
+  			cidsToRemove.push_back(it->first);
+  		}
+  	}
+
+  	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
+  		route_state.CIDrouteTable.erase(*it);
+  	}
+}
+
+int processRIPUpdate(string neighborHID, string rip_msg) {
 	size_t found, start;
 	string msg, source_hid, cid_num_str, cid, cost;
 
@@ -247,7 +359,7 @@ int processRIPUpdate(string rip_msg) {
   		start = found+1;  // forward the search point
   	}
 
-  	int hid_interface = interfaceNumber("HID", source_hid);
+  	int hid_interface = interfaceNumber("HID", neighborHID);
 
   	found = msg.find("^", start);
   	if (found != string::npos) {
@@ -256,8 +368,8 @@ int processRIPUpdate(string rip_msg) {
   	}
 
   	int num_cids = atoi(cid_num_str.c_str());
-  	bool change = false;
 
+  	bool change = false;
   	for (int i = 0; i < num_cids; ++i) {
   		found = msg.find("^", start);
   		if (found != string::npos) {
@@ -272,27 +384,26 @@ int processRIPUpdate(string rip_msg) {
   		}
 
   		int curr_cost = atoi(cost.c_str());
-
-  		map<std::string, RouteEntry>::iterator it;
-  		it = route_state.CIDrouteTable.find(cid);
-
-  		if (it != route_state.CIDrouteTable.end()){
+  		if (route_state.CIDrouteTable.find(cid) != route_state.CIDrouteTable.end()){
   			if(route_state.CIDrouteTable[cid].cost > curr_cost + 1){
   				route_state.CIDrouteTable[cid].cost = curr_cost + 1;
   				route_state.CIDrouteTable[cid].port = hid_interface;
-  				route_state.CIDrouteTable[cid].dest = cid;
-  				route_state.CIDrouteTable[cid].nextHop = source_hid;
+  				route_state.CIDrouteTable[cid].dest = source_hid;
+  				route_state.CIDrouteTable[cid].nextHop = neighborHID;
+  				route_state.CIDrouteTable[cid].timer = time(NULL);
   				change = true;
   			}
   		} else {
-  			route_state.CIDrouteTable[cid].dest = cid;
-  			route_state.CIDrouteTable[cid].port = hid_interface;
-  			route_state.CIDrouteTable[cid].nextHop = source_hid;
   			route_state.CIDrouteTable[cid].cost = curr_cost + 1;
+  			route_state.CIDrouteTable[cid].dest = source_hid;
+  			route_state.CIDrouteTable[cid].port = hid_interface;
+  			route_state.CIDrouteTable[cid].nextHop = neighborHID;
+  			route_state.CIDrouteTable[cid].timer = time(NULL);
   			change = true;
   		}
   	}
 
+  	removeOutdatedRoutes();
   	if(change){
   		updateClickRoutingTable();
    	}
@@ -300,137 +411,63 @@ int processRIPUpdate(string rip_msg) {
 	return 1;
 }
 
-/* Message format (delimiter=^)
-	source-HID
-	num-source-cids
-	source-CID1
-	distance-cid1
-	source-CID2
-	distance-cid2
-	...
-*/
-string constructBroadcastRIP(vector<string> & cids){
-	std::ostringstream sstream;
-
-	sstream << route_state.myHID << "^";
-	sstream << cids.size() << "^";
-	for (std::vector<string>::iterator i = cids.begin(); i != cids.end(); ++i) {
-		RouteEntry curr = route_state.CIDrouteTable[*i];
-
-		sstream << (*i) << "^";
-		sstream << curr.cost << "^";
-	}
-
-	return sstream.str();
-}
-
-
-int sendBroadcastRIPHelper(string neighborHID, int start, int end){
-	int rc1 = 0, rc2 = 0, msglen, buflen;
-	char buffer[XIA_MAXBUF];
-	bzero(buffer, XIA_MAXBUF);
-
-	vector<string> temp;
-	for(int i = start; i <= end; i++){
-		temp.push_back(route_state.sourceCids[i]);
-	}
-
-	string rip = constructBroadcastRIP(temp);
-	msglen = rip.size();
-
-	if(msglen < XIA_MAXBUF){
-		strcpy (buffer, rip.c_str());
-		buflen = strlen(buffer);
-
-		sockaddr_x ddag;
-		Graph g = Node() * Node(neighborHID) * Node(SID_XROUTE);
-		g.fill_sockaddr(&ddag);
-
-		rc1 = Xsendto(route_state.sock, buffer, buflen, 0, (struct sockaddr*)&ddag, sizeof(sockaddr_x));
-		if(rc1 != buflen) {
-			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
-			return -1;
-		}
-	} else {
-		rc1 = sendBroadcastRIPHelper(neighborHID, start, (start + end)/2);
-		rc2 = sendBroadcastRIPHelper(neighborHID, (start + end)/2 + 1, end);
-		
-		if(rc1 < 0 || rc2 < 0){
-			return -1;
-		}
-	}
-
-	return rc1 + rc2;
-}
-
-int sendBroadcastRIP(string neighborHID){
-	int rc = -1;
-	if ((rc = sendBroadcastRIPHelper(neighborHID, 0, route_state.sourceCids.size() - 1)) < 0){
-		return -1;
-	}
-
-	return rc;
-}
-
-
-// send RIP
-void broadcastRIP() {
-	std::string neighborHID;
-	set<std::string>::iterator it;
-	
-	// send my routing table to my neighbor
-	for (it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
-		neighborHID = *it;
-
-		if(sendBroadcastRIP(neighborHID) < 0){
-			syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
-		}
-	}
-}
-
-void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
-	// clean up old stuff, only change the source cid route state for now
-	// assume that routes to others aren't touched
-	route_state.sourceCids.clear();
-
-	map<std::string, RouteEntry>::iterator it;
-	for (std::vector<XIARouteEntry>::iterator i = routeEntries.begin(); i != routeEntries.end(); ++i) {
+void populateNeighborState(vector<XIARouteEntry> & currHidRouteEntries){
+	for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
 		XIARouteEntry eachEntry = *i;
 
-		if(eachEntry.port == DESTINE_FOR_LOCALHOST){
-			route_state.sourceCids.push_back(eachEntry.xid);
+		if(!eachEntry.nextHop.empty()){
+			if(route_state.neighbors.find(eachEntry.nextHop) == route_state.neighbors.end()) {
+				route_state.neighbors.insert(eachEntry.nextHop);
+			}
 		}
 	}
 
-	vector<std::string> entriesToRemove;
-	for(it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
+	// then remove those entries that have element in map, but not in the HID route table
+	vector<string> entriesToRemove;
+  	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); ++it) {
 		bool found = false;
-		std::string checkXid = it->first;
+		string checkXid = *it;
 
-		for(auto i = route_state.sourceCids.begin(); i !=  route_state.sourceCids.end(); i++){
-			if(checkXid == *i){
+		for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
+			if((*i).nextHop == checkXid){
 				found = true;
 			}
 		}
 
-		if(found){
-			entriesToRemove.push_back(it->first);
+		if(!found){
+			entriesToRemove.push_back(checkXid);
+		}
+  	}
+
+  	for (auto i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
+  		route_state.neighbors.erase(*i);
+  	}
+}
+
+void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
+	route_state.sourceCids.clear();
+
+	for (auto i = routeEntries.begin(); i != routeEntries.end(); ++i) {
+		XIARouteEntry eachEntry = *i;
+
+		if(eachEntry.port == DESTINE_FOR_LOCALHOST){
+			route_state.sourceCids.push_back(eachEntry.xid);
+
+			route_state.CIDrouteTable[eachEntry.xid].dest = route_state.myHID;
+			route_state.CIDrouteTable[eachEntry.xid].nextHop = route_state.myHID;
+			route_state.CIDrouteTable[eachEntry.xid].port = DESTINE_FOR_LOCALHOST;
+			route_state.CIDrouteTable[eachEntry.xid].cost = 0;
 		}
 	}
-
-	for (std::vector<std::string>::iterator i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
-  		route_state.CIDrouteTable.erase(*i);
-  	}
 }
 
 int main(int argc, char *argv[]) {
 	int rc, selectRetVal, n, iteration = 0;
     socklen_t dlen;
     sockaddr_x theirDAG;
-    char recv_message[XIA_MAXBUF];
     fd_set socks;
     struct timeval timeoutval;
-    std::vector<XIARouteEntry> currHidRouteEntries, currCidRouteEntries;
+    char recv_message[XIA_MAXBUF];
 
     dlen = sizeof(sockaddr_x);
 
@@ -442,52 +479,37 @@ int main(int argc, char *argv[]) {
 		syslog(LOG_ALERT, "unable to connect to click (%d)", rc);
 		return -1;
 	}
-
 	xr.setRouter(hostname);
 
-   	// open socket for route process
-   	route_state.sock=Xsocket(AF_XIA, SOCK_DGRAM, 0);
-   	if (route_state.sock < 0) {
-   		syslog(LOG_ALERT, "Unable to create a socket");
-   		exit(-1);
-   	}
-
    	initRouteState();
+
+   	periodicJobs();
 
 	while (1) {
 		iteration++;
 		FD_ZERO(&socks);
-		FD_SET(route_state.sock, &socks);
+		FD_SET(route_state.recv_sock, &socks);
 
 		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = MAIN_LOOP_USEC * 2; // Main loop runs every 2000 usec
+		timeoutval.tv_usec = 2000; // Main loop runs every 2000 usec
 
-		// every 0.002 sec, check if any received packets
-		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
+		selectRetVal = Xselect(route_state.recv_sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			memset(recv_message, 0, sizeof(recv_message));
 			
-			n = Xrecvfrom(route_state.sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
+			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 				perror("Xrecvfrom have a problem");
 			}
 			
-			if(processRIPUpdate(recv_message) < 0){
+			Graph g(&theirDAG);
+			string neighborHID = g.intent_HID_str();
+
+			route_state.mtx.lock();
+			if(processRIPUpdate(neighborHID, recv_message) < 0){
 				syslog(LOG_WARNING, "problem with processing RIP update\n");
 			}
-		}
-
-		// check neighbor entry every second
-		if(iteration % CHECK_NEIGHBOR_ENTRY_ITERS == 0){
-			getRouteEntries("HID", currHidRouteEntries);
-			populateNeighborState(currHidRouteEntries);
-		}
-
-		// check broadcast RIP every 2 seconds
-		if(iteration % BROADCAST_RIP_ITERS == 0){
-			getRouteEntries("CID", currCidRouteEntries);
-			populateRouteState(currCidRouteEntries);
-			broadcastRIP();
+			route_state.mtx.unlock();
 		}
     }
 
