@@ -28,8 +28,8 @@ using namespace std;
 #define RIP_MAX_HOP_COUNT 16
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
-#define EXPIRE_TIME 10
-#define MAX_TTL 5
+#define EXPIRE_TIME 3
+#define MAX_TTL 16
 
 #define ROUTE_XID_DEFAULT "-"
 #define SID_XROUTE_SEND "SID:1110000000000000000000000000000000001119"
@@ -56,7 +56,6 @@ typedef struct RouteState {
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
 
-	vector<string> sourceCids; 			// cids from this router
 	set<string> neighbors; 				// map neighbor HID to neighbor entry
 	map<string, RouteEntry> CIDrouteTable; // map DestCID to route entry
 

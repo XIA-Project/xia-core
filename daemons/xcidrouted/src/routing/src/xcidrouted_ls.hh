@@ -33,9 +33,9 @@ using namespace std;
 #define MAX_XID_SIZE 100
 #define MAX_SEQNUM 10000000
 #define MAX_HOP_COUNT 50
-#define MAX_TTL 5
+#define MAX_TTL 16
 #define MAX_DAG_SIZE 512
-#define EXPIRE_TIME 10
+#define EXPIRE_TIME 3
 
 static unsigned short DESTINE_FOR_LOCALHOST = 65534;
 

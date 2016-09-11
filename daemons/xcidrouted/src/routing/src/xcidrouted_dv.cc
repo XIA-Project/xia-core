@@ -27,6 +27,7 @@
 #define DEFAULT_NAME "router0"
 #define APPNAME "xcidrouted_dv"
 
+int ttl = -1;
 char *hostname = NULL;
 char *ident = NULL;
 
@@ -40,6 +41,7 @@ void help(const char *name)
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
 	printf(" -v          : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=router0)\n");
+	printf(" -t TTL    	 : TTL for the CID advertisement, default is 1\n");
 	printf("\n");
 	exit(0);
 }
@@ -52,7 +54,7 @@ void config(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "h:l:v:")) != -1) {
+	while ((c = getopt(argc, argv, "h:l:v:t:")) != -1) {
 		switch (c) {
 			case 'h':
 				hostname = strdup(optarg);
@@ -62,6 +64,9 @@ void config(int argc, char** argv)
 				break;
 			case 'v':
 				verbose = LOG_PERROR;
+				break;
+			case 't':
+				ttl = atoi(optarg);
 				break;
 			case '?':
 			default:
@@ -73,6 +78,10 @@ void config(int argc, char** argv)
 
 	if (!hostname){
 		hostname = strdup(DEFAULT_NAME);
+	}
+
+	if(ttl <= 0 || ttl > MAX_TTL){
+		ttl = MAX_TTL;
 	}
 
 	// note: ident must exist for the life of the app
@@ -254,7 +263,7 @@ string constructBroadcastRIP(vector<string> & cids, string neighborHID){
 		
 		// split horizon, don't advertise route learned from neighbor
 		// back to neighbor
-		if(curr.nextHop != neighborHID){
+		if(curr.cost < ttl && curr.nextHop != neighborHID){
 			num_cids++;
 		}
 	}
@@ -263,7 +272,7 @@ string constructBroadcastRIP(vector<string> & cids, string neighborHID){
 	if(num_cids != 0){
 		for (auto i = cids.begin(); i != cids.end(); ++i) {
 			RouteEntry curr = route_state.CIDrouteTable[*i];
-			if(curr.nextHop != neighborHID){
+			if(curr.cost < ttl && curr.nextHop != neighborHID){
 				sstream << (*i) << "^";
 				sstream << curr.cost << "^";
 			}
@@ -445,14 +454,10 @@ void populateNeighborState(vector<XIARouteEntry> & currHidRouteEntries){
 }
 
 void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
-	route_state.sourceCids.clear();
-
 	for (auto i = routeEntries.begin(); i != routeEntries.end(); ++i) {
 		XIARouteEntry eachEntry = *i;
 
 		if(eachEntry.port == DESTINE_FOR_LOCALHOST){
-			route_state.sourceCids.push_back(eachEntry.xid);
-
 			route_state.CIDrouteTable[eachEntry.xid].dest = route_state.myHID;
 			route_state.CIDrouteTable[eachEntry.xid].nextHop = route_state.myHID;
 			route_state.CIDrouteTable[eachEntry.xid].port = DESTINE_FOR_LOCALHOST;
