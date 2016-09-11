@@ -96,6 +96,7 @@ void getRouteEntries(std::string xidType, std::vector<XIARouteEntry> & result);
 int interfaceNumber(std::string xidType, std::string xid);
 double nextWaitTimeInSecond(double ratePerSecond);
 
+void cleanup(int);
 void printNetworkTable();
 void printNeighborTable();
 void printRoutingTable();

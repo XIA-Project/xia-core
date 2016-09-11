@@ -174,6 +174,13 @@ void printRoutingTable(){
   	}
 }
 
+void cleanup(int) {
+#if defined(STATS_LOG)
+	logger->end();
+	delete logger;
+#endif
+}
+
 size_t getTotalBytesForCIDRoutes(){
 	size_t result = 0;
 
@@ -777,7 +784,10 @@ int main(int argc, char *argv[]){
    	logger = new Logger(namePrefix + "_ls");
 #endif
 
+   	(void) signal(SIGINT, cleanup);
+
    	periodicJobs();
+
 
 	// main event loop
 	while(1){

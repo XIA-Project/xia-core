@@ -66,6 +66,7 @@ typedef struct RouteState {
 	mutex mtx;           // mutex for critical section
 } RouteState;
 
+void cleanup(int);
 void printRoutingTable();
 void printNeighborTable();
 

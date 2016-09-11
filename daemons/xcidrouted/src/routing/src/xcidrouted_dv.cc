@@ -95,6 +95,13 @@ void config(int argc, char** argv)
 	setlogmask(LOG_UPTO(level));
 }
 
+void cleanup(int) {
+#if defined(STATS_LOG)
+	logger->end();
+	delete logger;
+#endif
+}
+
 void printRoutingTable(){
 	syslog(LOG_INFO, "CID Routing table at %s", route_state.myHID);
   	for (auto it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
@@ -511,6 +518,7 @@ int main(int argc, char *argv[]) {
    	string namePrefix = hostname;
    	logger = new Logger(namePrefix + "_dv");
 #endif
+   	(void) signal(SIGINT, cleanup);
 
    	periodicJobs();
 
