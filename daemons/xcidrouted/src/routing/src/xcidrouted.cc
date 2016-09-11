@@ -292,7 +292,7 @@ int AdvertisementMessage::recv(int sock){
 		n = Xrecv(sock, buf, to_recv, 0);
 		if (n < 0) {
 			printf("Xrecv failed\n");
-			return -1;
+			cleanup(0);
 		} else if (n == 0) {
 			break;
 		}
@@ -303,7 +303,12 @@ int AdvertisementMessage::recv(int sock){
 		data += temp;
 	}
 
-	if(data.size() == 0 || data.size() != size){
+	// the other end has close the connection
+	if(data.size() == 0){
+		return -1;
+	}
+
+	if(data.size() != size){
 		printf("received data have invalid size. Exit\n");
 		cleanup(0);
 	}
@@ -773,10 +778,45 @@ void processHelloMessage(){
 		routeState.neighbors[key].port = interface;
 		routeState.neighbors[key].sendSock = sock;
 		routeState.mtx.unlock();
+
+		routeState.neighbors[key].timer = time(NULL);
+
+		// send to new neighbor everything we know so far about the CID routes
+		processNeighborJoin(routeState.neighbors[key]);
+	} else {
+		routeState.neighbors[key].timer = time(NULL);
 	}
 }
 
-void processNeighborJoin(){
+void checkExpiredNeighbors(){
+	time_t now = time(NULL);
+
+	vector<string> candidates;
+	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
+		// if this neighbor is expired
+		if(now - it->second.timer >= HELLO_EXPIRE){
+			candidates.push_back(it->first);
+		}
+	}
+
+	for(auto it = candidates.begin(); it != candidates.end(); ++it){
+		NeighborInfo currNeighbor = routeState.neighbors[*it];
+
+		routeState.mtx.lock();
+		if(routeState.neighbors[*it].sendSock != -1){
+			Xclose(routeState.neighbors[*it].sendSock);
+		}
+		if(routeState.neighbors[*it].recvSock != -1){
+			Xclose(routeState.neighbors[*it].recvSock);
+		}
+		routeState.neighbors.erase(*it);
+		routeState.mtx.unlock();
+
+		processNeighborLeave(currNeighbor);
+	}
+}
+
+void processNeighborConnect(){
 	int32_t acceptSock = -1;
 	string AD, HID;
 	sockaddr_x addr;
@@ -808,7 +848,18 @@ void processNeighborJoin(){
 	routeState.neighbors[key].AD = AD;
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
+	routeState.neighbors[key].timer = time(NULL);
 	routeState.mtx.unlock();
+}
+
+void processNeighborJoin(const NeighborInfo &neighbor){
+	//TODO:
+	
+}
+
+void processNeighborLeave(const NeighborInfo &neighbor){
+	//TODO:
+	
 }
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg){
@@ -1014,8 +1065,9 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	int status = msg.recv(neighbor.recvSock);
 	if(status < 0){
-		printf("message receive failed, remove neighbor\n");
-		return;
+		printf("neighbor has closed the connection\n");
+		processNeighborLeave(neighbor);
+		return;	
 	}
 	
 #ifdef EVENT_LOG
@@ -1187,9 +1239,11 @@ int main(int argc, char *argv[]) {
 				// if we received a hello packet from neighbor, check if it is a new neighbor
 				// and then establish connection state with them
 				processHelloMessage();
+				// handle any neighbor that has failed silently
+				checkExpiredNeighbors();
 			} else if (FD_ISSET(routeState.masterSock, &socks)) {
 				// if a new neighbor connects, add to the recv list
-				processNeighborJoin();
+				processNeighborConnect();
 			} else {
 				for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 					// if we recv a message from one of our established neighbor, procees the message

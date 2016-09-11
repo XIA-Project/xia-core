@@ -43,6 +43,7 @@
 #define HELLO_MAX_BUF_SIZE 4096
 #define MAX_SEQNUM 10000000
 #define MAX_TTL 5
+#define HELLO_EXPIRE 3
 
 #define INIT_WAIT_TIME_SEC 30
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
@@ -83,6 +84,23 @@ public:
 	string SID;
 };
 
+class RefreshMessage: Message{
+public:
+	RefreshMessage();
+	~RefreshMessage();
+
+	string serialize() const override;
+	void deserialize(string data) override;
+	void print() const override;
+
+	int send(int sock);
+	int recv(int sock);
+
+	string senderHID;
+	uint32_t seq;
+	map<string, uint32_t> CID2TTL;
+};
+
 class AdvertisementMessage: Message{
 public:
 	AdvertisementMessage();
@@ -94,7 +112,6 @@ public:
 	int send(int sock);
 	int recv(int sock);
 
-	// TODO: handle topology change
 	string senderHID;			// who is the original sender
 	uint32_t seq; 				// LSA seq of from sender
 	uint32_t ttl;				// ttl to broadcast the advertisement
@@ -112,6 +129,7 @@ public:
 	string AD;
 	string HID;
 	int port;
+	time_t timer;
 
 	int32_t sendSock = -1;
 	int32_t recvSock = -1;		
@@ -185,7 +203,10 @@ int connectToNeighbor(string AD, string HID, string SID);
 void printNeighborInfo();
 
 void processHelloMessage();
-void processNeighborJoin();
+void checkExpiredNeighbors();
+void processNeighborConnect();
+void processNeighborJoin(const NeighborInfo &neighbor);
+void processNeighborLeave(const NeighborInfo &neighbor);
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg);
 void deleteCIDRoutes(const AdvertisementMessage & msg);
