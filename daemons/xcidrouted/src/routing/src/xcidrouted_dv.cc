@@ -27,12 +27,16 @@
 #define DEFAULT_NAME "router0"
 #define APPNAME "xcidrouted_dv"
 
-int ttl = -1;
-char *hostname = NULL;
-char *ident = NULL;
+static int ttl = -1;
+static char *hostname = NULL;
+static char *ident = NULL;
 
-XIARouter xr;
-RouteState route_state;
+static XIARouter xr;
+static RouteState route_state;
+
+#if defined(STATS_LOG)
+static Logger* logger;
+#endif
 
 void help(const char *name)
 {
@@ -93,9 +97,8 @@ void config(int argc, char** argv)
 
 void printRoutingTable(){
 	syslog(LOG_INFO, "CID Routing table at %s", route_state.myHID);
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port));
+  	for (auto it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
+  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d", (it1->first).c_str(), (it1->second.nextHop).c_str(), (it1->second.port));
   	}
 }
 
@@ -106,6 +109,52 @@ void printNeighborTable(){
   		std::string neighborHID = *it;
   		syslog(LOG_NOTICE, "HID: %s", neighborHID.c_str());
    	}
+}
+
+void populateNeighborState(vector<XIARouteEntry> & currHidRouteEntries){
+	for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
+		XIARouteEntry eachEntry = *i;
+
+		if(!eachEntry.nextHop.empty()){
+			if(route_state.neighbors.find(eachEntry.nextHop) == route_state.neighbors.end()) {
+				route_state.neighbors.insert(eachEntry.nextHop);
+			}
+		}
+	}
+
+	// then remove those entries that have element in map, but not in the HID route table
+	vector<string> entriesToRemove;
+  	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); ++it) {
+		bool found = false;
+		string checkXid = *it;
+
+		for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
+			if((*i).nextHop == checkXid){
+				found = true;
+			}
+		}
+
+		if(!found){
+			entriesToRemove.push_back(checkXid);
+		}
+  	}
+
+  	for (auto i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
+  		route_state.neighbors.erase(*i);
+  	}
+}
+
+void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
+	for (auto i = routeEntries.begin(); i != routeEntries.end(); ++i) {
+		XIARouteEntry eachEntry = *i;
+
+		if(eachEntry.port == DESTINE_FOR_LOCALHOST){
+			route_state.CIDrouteTable[eachEntry.xid].nextHop = route_state.myHID;
+			route_state.CIDrouteTable[eachEntry.xid].port = DESTINE_FOR_LOCALHOST;
+			route_state.CIDrouteTable[eachEntry.xid].cost = 0;
+			route_state.CIDrouteTable[eachEntry.xid].timer = time(NULL);
+		}
+	}
 }
 
 int interfaceNumber(std::string xidType, std::string xid)
@@ -147,6 +196,18 @@ double nextWaitTimeInSecond(double ratePerSecond){
 	double currRand = (double)rand()/(double)RAND_MAX;
 	double nextTime = -1*log(currRand)/ratePerSecond;	// next time in second
 	return nextTime;	
+}
+
+size_t getTotalBytesForCIDRoutes(){
+	size_t result = 0;
+
+	for(auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
+		result += it->first.size();
+		result += it->second.nextHop.size();
+		result += sizeof(it->second.port) + sizeof(it->second.cost) + sizeof(it->second.timer);
+	}
+
+	return result;
 }
 
 void initRouteState() {
@@ -222,6 +283,11 @@ void periodicJobs(){
 			getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
 			broadcastRIP();
+
+#ifdef STATS_LOG
+			size_t totalSize = getTotalBytesForCIDRoutes();
+			logger->log("size " + to_string(totalSize));
+#endif
 			route_state.mtx.unlock();
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
@@ -230,22 +296,16 @@ void periodicJobs(){
 }
 
 void updateClickRoutingTable() {
-	int rc, port;
-	string destXID, nexthopXID;
+	int rc;
 
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
- 		destXID = it->first;
- 		nexthopXID = it->second.nextHop;
-		port =  it->second.port;
-
-		if ((rc = xr.setRouteCIDRouting(destXID, port, nexthopXID, 0xffff)) != 0){
+		if ((rc = xr.setRouteCIDRouting(it->first, it->second.port, it->second.nextHop, 0xffff)) != 0){
 			syslog(LOG_ERR, "error setting route %d", rc);
 		}
   	}
 }
 
 /* Message format (delimiter=^)
-	source-HID
 	num-source-cids
 	source-CID1
 	distance-cid1
@@ -255,7 +315,6 @@ void updateClickRoutingTable() {
 */
 string constructBroadcastRIP(vector<string> & cids, string neighborHID){
 	std::ostringstream sstream;
-	sstream << route_state.myHID << "^";
 	
 	int num_cids = 0;
 	for (auto i = cids.begin(); i != cids.end(); ++i) {
@@ -309,6 +368,11 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
 			return -1;
 		}
+
+#ifdef STATS_LOG
+		logger->log("send " + to_string(buflen));
+#endif
+
 	} else {
 		rc1 = broadcastRIPHelper(cids, neighborHID, start, (start + end)/2);
 		rc2 = broadcastRIPHelper(cids, neighborHID, (start + end)/2 + 1, end);
@@ -343,7 +407,7 @@ void removeOutdatedRoutes(){
 	vector<string> cidsToRemove;
 
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
-  		if(it->second.port != DESTINE_FOR_LOCALHOST && now - it->second.timer >= EXPIRE_TIME){
+  		if(now - it->second.timer >= EXPIRE_TIME){
   			xr.delRouteCIDRouting(it->first);
   			syslog(LOG_INFO, "purging CID route for : %s", it->first.c_str());
   			cidsToRemove.push_back(it->first);
@@ -353,20 +417,20 @@ void removeOutdatedRoutes(){
   	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
   		route_state.CIDrouteTable.erase(*it);
   	}
+
+#ifdef STATS_LOG
+  	if(cidsToRemove.size() != 0){
+		logger->log("route deletion");
+  	}
+#endif
 }
 
 int processRIPUpdate(string neighborHID, string rip_msg) {
 	size_t found, start;
-	string msg, source_hid, cid_num_str, cid, cost;
+	string msg, cid_num_str, cid, cost;
 
 	start = 0;
 	msg = rip_msg;
-
-	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		source_hid = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
 
   	int hid_interface = interfaceNumber("HID", neighborHID);
 
@@ -397,14 +461,12 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   			if(route_state.CIDrouteTable[cid].cost > curr_cost + 1){
   				route_state.CIDrouteTable[cid].cost = curr_cost + 1;
   				route_state.CIDrouteTable[cid].port = hid_interface;
-  				route_state.CIDrouteTable[cid].dest = source_hid;
   				route_state.CIDrouteTable[cid].nextHop = neighborHID;
   				route_state.CIDrouteTable[cid].timer = time(NULL);
   				change = true;
   			}
   		} else {
   			route_state.CIDrouteTable[cid].cost = curr_cost + 1;
-  			route_state.CIDrouteTable[cid].dest = source_hid;
   			route_state.CIDrouteTable[cid].port = hid_interface;
   			route_state.CIDrouteTable[cid].nextHop = neighborHID;
   			route_state.CIDrouteTable[cid].timer = time(NULL);
@@ -414,56 +476,13 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
 
   	removeOutdatedRoutes();
   	if(change){
+#ifdef STATS_LOG
+		logger->log("route addition");
+#endif
   		updateClickRoutingTable();
    	}
 
 	return 1;
-}
-
-void populateNeighborState(vector<XIARouteEntry> & currHidRouteEntries){
-	for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-		XIARouteEntry eachEntry = *i;
-
-		if(!eachEntry.nextHop.empty()){
-			if(route_state.neighbors.find(eachEntry.nextHop) == route_state.neighbors.end()) {
-				route_state.neighbors.insert(eachEntry.nextHop);
-			}
-		}
-	}
-
-	// then remove those entries that have element in map, but not in the HID route table
-	vector<string> entriesToRemove;
-  	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); ++it) {
-		bool found = false;
-		string checkXid = *it;
-
-		for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-			if((*i).nextHop == checkXid){
-				found = true;
-			}
-		}
-
-		if(!found){
-			entriesToRemove.push_back(checkXid);
-		}
-  	}
-
-  	for (auto i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
-  		route_state.neighbors.erase(*i);
-  	}
-}
-
-void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
-	for (auto i = routeEntries.begin(); i != routeEntries.end(); ++i) {
-		XIARouteEntry eachEntry = *i;
-
-		if(eachEntry.port == DESTINE_FOR_LOCALHOST){
-			route_state.CIDrouteTable[eachEntry.xid].dest = route_state.myHID;
-			route_state.CIDrouteTable[eachEntry.xid].nextHop = route_state.myHID;
-			route_state.CIDrouteTable[eachEntry.xid].port = DESTINE_FOR_LOCALHOST;
-			route_state.CIDrouteTable[eachEntry.xid].cost = 0;
-		}
-	}
 }
 
 int main(int argc, char *argv[]) {
@@ -488,6 +507,11 @@ int main(int argc, char *argv[]) {
 
    	initRouteState();
 
+#if defined(STATS_LOG)
+   	string namePrefix = hostname;
+   	logger = new Logger(namePrefix + "_dv");
+#endif
+
    	periodicJobs();
 
 	while (1) {
@@ -511,6 +535,9 @@ int main(int argc, char *argv[]) {
 			string neighborHID = g.intent_HID_str();
 
 			route_state.mtx.lock();
+#ifdef STATS_LOG
+			logger->log("recv " + to_string(n));
+#endif		
 			if(processRIPUpdate(neighborHID, recv_message) < 0){
 				syslog(LOG_WARNING, "problem with processing RIP update\n");
 			}

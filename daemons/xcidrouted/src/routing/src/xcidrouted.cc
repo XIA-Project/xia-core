@@ -256,7 +256,7 @@ int AdvertisementMessage::send(int sock){
 	print();
 
 #ifdef STATS_LOG
-	logger->log("send " + to_string(this->newCIDs.size() + this->delCIDs.size()) + " " + to_string(strlen(advertisement.c_str())));
+	logger->log("send " + to_string(advertisement.size()));
 #endif
 
 	printf("sent CID advertisement\n");
@@ -319,8 +319,7 @@ int AdvertisementMessage::recv(int sock){
 	print();
 
 #ifdef STATS_LOG
-	// log the number of advertised CIDs received.
-	logger->log("recv " + to_string(this->newCIDs.size() + this->delCIDs.size()) + " " + to_string(size));
+	logger->log("recv " + to_string(data.size()));
 #endif
 
 	printf("received CID advertisement\n");
@@ -444,6 +443,36 @@ void getRouteEntries(string xidType, vector<XIARouteEntry> & result){
 	}
 }
 
+size_t getTotalBytesForCIDRoutes(){
+	size_t result = 0;
+
+	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); ++it){
+		result += it->size();
+	}
+
+#ifdef FILTER
+	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); ++it){
+		result += it->first.size();
+		result += it->second.nextHop.size();
+		result += it->second.dest.size();
+		result += sizeof(it->second.port) + sizeof(it->second.cost);
+	}
+#else
+	for(auto it = routeState.CIDRoutes.begin(); it != routeState.CIDRoutes.end(); ++it){
+		result += it->first.size();
+		for(auto ij = it->second.begin(); ij != it->second.end(); ++ij){
+			result += ij->first.size();
+			
+			result += ij->second.nextHop.size();
+			result += ij->second.dest.size();
+			result += sizeof(it->second.port) + sizeof(it->second.cost);
+		}
+	}
+#endif
+
+	return result;
+}
+
 void CIDAdvertiseTimer(){
 	thread([](){
     	// sleep for INIT_WAIT_TIME_SEC seconds for hello message to propagate
@@ -453,6 +482,13 @@ void CIDAdvertiseTimer(){
             int nextTimeMilisecond = (int) ceil(nextTimeInSecond * 1000);
 
             advertiseCIDs();
+
+#ifdef STATS_LOG
+            routeState.mtx.lock();
+			size_t totalSize = getTotalBytesForCIDRoutes();
+			logger->log("size " + to_string(totalSize));
+			routeState.mtx.unlock();
+#endif
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
         }
@@ -556,12 +592,6 @@ void advertiseCIDs(){
 #endif
 
 	routeState.mtx.unlock();
-
-#ifdef STATS_LOG
-	//log the number of advertised CIDs received.
-	//string logStr = "local " + to_string(currLocalCIDs.size());
-	//logger->log(logStr.c_str());
-#endif
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
@@ -837,6 +867,10 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 				logger->log("del route for CID: " + currDelCID);
 #endif
 
+#ifdef STATS_LOG
+				logger->log("route deletion");
+#endif
+
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
 			}
@@ -878,6 +912,11 @@ set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const Neigh
 					logger->log("old dest: " + entry.dest);
 				}
 #endif	
+
+#ifdef STATS_LOG
+				logger->log("route addition");
+#endif
+
 				// set corresponding CID route entries
 				routeState.CIDRoutesWithFilter[currNewCID].cost = msg.distance;
 				routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
@@ -908,6 +947,9 @@ void deleteCIDRoutes(const AdvertisementMessage & msg){
 			routeState.CIDRoutes[currDelCID].erase(msg.senderHID);
 
 			if(routeState.CIDRoutes[currDelCID].size() == 0){
+#ifdef STATS_LOG
+				logger->log("route deletion");
+#endif
 				// if no more CID routes left for this CID from other sender, just remove the CID routes
 				xr.delRouteCIDRouting(currDelCID);
 			} else {
@@ -931,6 +973,11 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 			routeState.CIDRoutes[currNewCID][msg.senderHID].port = neighbor.port;
 			routeState.CIDRoutes[currNewCID][msg.senderHID].nextHop = neighbor.HID;
 			routeState.CIDRoutes[currNewCID][msg.senderHID].dest = msg.senderHID;
+			
+#ifdef STATS_LOG
+			logger->log("route addition");
+#endif
+
 			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 		} else {
 			uint32_t minDist = INT_MAX;
@@ -942,6 +989,9 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 
 			// only set the routes if current message is the shortest to reach the CID
 			if(minDist > msg.distance){
+#ifdef STATS_LOG
+				logger->log("route addition");
+#endif
 				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 			}
 

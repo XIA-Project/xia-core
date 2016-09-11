@@ -22,45 +22,46 @@
 #include "Xsocket.h"
 #include "../common/XIARouter.hh"
 
+#include "../../log/logger.h"
+
 using namespace std;
 
+#define ROUTE_XID_DEFAULT "-"
 #define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #define SID_XROUTE_SEND "SID:1110000000000000000000000000000000001119"
 #define SID_XROUTE_RECV "SID:1110000000000000000000000000000000001120"
 
-#define ROUTE_XID_DEFAULT "-"
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 #define MAX_XID_SIZE 100
 #define MAX_SEQNUM 10000000
 #define MAX_HOP_COUNT 50
 #define MAX_TTL 16
 #define MAX_DAG_SIZE 512
-#define EXPIRE_TIME 3
+#define EXPIRE_TIME 5
+
+#define STATS_LOG
 
 static unsigned short DESTINE_FOR_LOCALHOST = 65534;
 
 typedef struct {
 	int32_t cost; 			// link cost
 	int32_t port;			// interface (outgoing port)
-	string HID;				// neighbor HID
 } NeighborEntry;
 
 typedef struct {
 	string dest;			// destination CID
 	string nextHop;			// nexthop HID
 	int32_t port;			// interface (outgoing port)
-	uint32_t flags;			// flag
-	time_t timer;
+	int32_t cost;
 } RouteEntry;
 
 typedef struct {
 	uint32_t seq; 					// LSA seq of dest (for filtering purpose)	
-	uint32_t num_neighbors;			// number of neighbors of dest HID
-
 	set<int> cid_nums;
 
-	vector<string> dest_cids;		// cids from the destination
-	vector<string> neighbor_hids;	// neighbor hids
+	uint32_t num_neighbors;			// number of neighbors of dest HID
+	map<string, time_t> dest_cids;		// cids from the destination
+	vector<string> neighbor_hids;		// neighbor hids
 	
 	bool checked;	// used for calculating the shortest path
 	int32_t cost;	// cost from myAD to destAD
@@ -80,11 +81,13 @@ typedef struct RouteState {
 
 	uint32_t lsa_seq;			// LSA sequence number of this router
 
-	std::vector<string> sourceCids; 		// cids from this router
 	map<std::string, NeighborEntry> neighborTable; // map neighbor HID to neighbor entry
-	map<std::string, NodeStateEntry> networkTable; // map DestHID to NodeState entry
 
-	map<std::string, RouteEntry> CIDrouteTable; // map DestCID to route entry
+/* Key data structure for maintaining CID route  */
+	vector<string> sourceCids; 				// cids from this router
+	map<string, NodeStateEntry> networkTable;  // map DestHID to NodeState entry
+	map<string, RouteEntry> CIDrouteTable; 	// map DestCID to route entry
+/* Key data structure for maintaining CID route  */
 
 	mutex mtx;           // mutex for critical section
 } RouteState;
@@ -96,13 +99,13 @@ double nextWaitTimeInSecond(double ratePerSecond);
 void printNetworkTable();
 void printNeighborTable();
 void printRoutingTable();
+size_t getTotalBytesForCIDRoutes();
 
-void fillMeToMyNetworkTable();
 void removeAbnormalNetworkTable();
 void periodicJobs();
 void calcShortestPath();
-void removeOutdatedRoutes();
-void updateClickRoutingTable();
+void removeOutdatedRoutes(const map<string, RouteEntry> & prevRoutes);
+void updateClickRoutingTable(const map<string, RouteEntry> & prevRoutes);
 
 // send LSA
 /* Message format (delimiter=^)

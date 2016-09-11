@@ -10,6 +10,7 @@ using namespace std;
 class Logger{
 public:
 	Logger(const char* hostname);
+	Logger(const string name);
 	~Logger(); //Destructor
 
 	void log(const char* data);

@@ -1,5 +1,9 @@
 #include "logger.h"
 
+Logger::Logger(const string name){
+	Logger(name.c_str());
+}
+
 Logger::Logger(const char* hostname){
 	this->startTime = time(0);
 

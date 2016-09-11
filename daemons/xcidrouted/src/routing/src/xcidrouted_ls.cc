@@ -26,12 +26,16 @@
 #define DEFAULT_NAME "router0"
 #define APPNAME "xcidrouted"
 
-char *hostname = NULL;
-char *ident = NULL;
+static char *hostname = NULL;
+static char *ident = NULL;
 
-int ttl = -1;
-XIARouter xr;
-RouteState route_state;
+static int ttl = -1;
+static XIARouter xr;
+static RouteState route_state;
+
+#if defined(STATS_LOG)
+static Logger* logger;
+#endif
 
 void getRouteEntries(std::string xidType, std::vector<XIARouteEntry> & result){
 	if(result.size() != 0){
@@ -133,12 +137,11 @@ void printNeighborTable(){
 	syslog(LOG_NOTICE, "******************************* The neighbor table is: *******************************\n");
 	map<std::string, NeighborEntry>::iterator it;
   	for (it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); it++ ) {
-  		std::string neighborHID = it->first;
+  		string neighborHID = it->first;
   		NeighborEntry entry = it->second;
   		syslog(LOG_NOTICE, "HID: %s", neighborHID.c_str());
   		syslog(LOG_NOTICE, "entry cost: %d", entry.cost);
   		syslog(LOG_NOTICE, "entry port: %d", entry.port);
-  		syslog(LOG_NOTICE, "entry HID: %s", entry.HID.c_str());
    	}
 }
 
@@ -167,56 +170,103 @@ void printRoutingTable(){
 	syslog(LOG_INFO, "CID Routing table at %s", route_state.myHID);
   	map<std::string, RouteEntry>::iterator it1;
   	for ( it1=route_state.CIDrouteTable.begin() ; it1 != route_state.CIDrouteTable.end(); it1++ ) {
-  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags));
+  		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port));
   	}
 }
 
-void fillMeToMyNetworkTable(){
-	// fill my neighbors into my entry in the networkTable
-  	NodeStateEntry entry;
-	entry.seq = route_state.lsa_seq;
-	entry.num_neighbors = route_state.neighborTable.size();
-	entry.dest_cids = route_state.sourceCids;
+size_t getTotalBytesForCIDRoutes(){
+	size_t result = 0;
 
-  	for (auto it = route_state.neighborTable.begin() ; it != route_state.neighborTable.end(); it++ ) {
- 		entry.neighbor_hids.push_back(it->second.HID);
-  	}
+	// get the space needed for storing the source CIDs
+	for(auto it = route_state.sourceCids.begin(); it != route_state.sourceCids.end(); ++it){
+		result += it->size();
+	}
 
-  	route_state.networkTable[route_state.myHID] = entry;
+	// get the space needed for storing the network table
+	for(auto it = route_state.networkTable.begin(); it != route_state.networkTable.end(); ++it){
+		result += it->first.size();
+		result += sizeof(it->second.seq);
+		result += sizeof(int) * it->second.cid_nums.size();
+		result += sizeof(it->second.num_neighbors);
+
+		for(auto ij = it->second.dest_cids.begin(); ij != it->second.dest_cids.end(); ++ij){
+			result += ij->first.size();
+			result += sizeof(ij->second);
+		}
+		
+		for(auto ij = it->second.neighbor_hids.begin(); ij != it->second.neighbor_hids.end(); ++ij){
+			result += ij->size();
+		}
+
+		result += sizeof(it->second.checked) + sizeof(it->second.cost) + it->second.prevNode.size();	
+	}
+
+	// get the space needed for storing the CID route table
+	for(auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
+		result += it->first.size();
+		result += it->second.dest.size() + it->second.nextHop.size();
+		result += sizeof(it->second.port) + sizeof(it->second.cost);
+	}
+
+	return result;
 }
 
 void removeAbnormalNetworkTable(){
-	vector<std::string> entryToRemove;
- 	map<std::string, NodeStateEntry>::iterator it1;
+	vector<string> entryToRemove;
  	// remove entries in our table that is invalid:
  	// 1. zero neighbors. 2. empty dest HID.
-  	for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); it1++ ) {
- 		if(it1->second.num_neighbors == 0 || (it1->first).empty()) {
- 			entryToRemove.push_back(it1->first);
+  	for (auto i = route_state.networkTable.begin(); i != route_state.networkTable.end(); ++i) {
+ 		if((i->first).empty() || (i->second.num_neighbors == 0)) {
+ 			entryToRemove.push_back(i->first);
  		} 
   	}
-  	for (std::vector<std::string>::iterator i = entryToRemove.begin(); i != entryToRemove.end(); ++i) {
+  	for (auto i = entryToRemove.begin(); i != entryToRemove.end(); ++i) {
   		route_state.networkTable.erase(*i);
   	}
 
+	time_t now = time(NULL);
+	vector<string> toRemove;
   	// remove invalid neighbors in the network table.
   	// invalid neighbors are defined as the neighor HID must be in one of the dest HID of network table 
-	for (it1 = route_state.networkTable.begin(); it1 != route_state.networkTable.end(); it1++ ) {
-		vector<string> neighbors = it1->second.neighbor_hids;
-		vector<string> toRemove;
+	for (auto i = route_state.networkTable.begin(); i != route_state.networkTable.end(); ++i) {
+		toRemove.clear();
+		// remove the neighbor for current destination that's not in network table.
+		for (auto j = i->second.neighbor_hids.begin(); j != i->second.neighbor_hids.end(); ++j) {
+			if (route_state.networkTable.find(*j) == route_state.networkTable.end()){
+				toRemove.push_back(*j);
+			}
+		}
+		for (auto j = toRemove.begin(); j != toRemove.end(); ++j) {
+			i->second.neighbor_hids.erase(
+				std::remove(i->second.neighbor_hids.begin(), i->second.neighbor_hids.end(), *j), i->second.neighbor_hids.end());
+			i->second.num_neighbors--;
+		}
 
-		for (unsigned i = 0; i < neighbors.size(); i++) {
-			if (route_state.networkTable.find(neighbors[i]) == route_state.networkTable.end()){
-				toRemove.push_back(neighbors[i]);
+		toRemove.clear();
+		// remove the dest cids that's in the local routes
+		for(auto j = i->second.dest_cids.begin(); j != i->second.dest_cids.end(); ++j){
+			auto findInLocal = std::find(route_state.sourceCids.begin(), route_state.sourceCids.end(), j->first);
+
+			if(findInLocal != route_state.sourceCids.end()){
+				toRemove.push_back(j->first);
+			}
+		}
+		for(auto j = toRemove.begin(); j != toRemove.end(); ++j){
+			i->second.dest_cids.erase(*j);
+		}
+
+		toRemove.clear();
+		// remove the expired dest cids in our local topology map
+		for(auto j = i->second.dest_cids.begin(); j != i->second.dest_cids.end(); ++j){
+			if(now - j->second >= EXPIRE_TIME){
+				toRemove.push_back(j->first);
 			}
 		}
 
-		for (vector<std::string>::iterator i = toRemove.begin(); i != toRemove.end(); ++i) {
-			it1->second.neighbor_hids.erase(
-				std::remove(it1->second.neighbor_hids.begin(), it1->second.neighbor_hids.end(), *i), it1->second.neighbor_hids.end());
-			it1->second.num_neighbors--;
+		for(auto j = toRemove.begin(); j != toRemove.end(); ++j){
+			i->second.dest_cids.erase(*j);
 		}
-  	}
+  	} 	
 }
 
 void periodicJobs(){
@@ -230,16 +280,20 @@ void periodicJobs(){
             route_state.mtx.lock();
             getRouteEntries("HID", currHidRouteEntries);
 			populateNeighborState(currHidRouteEntries);
-			fillMeToMyNetworkTable();
 
             getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
-			fillMeToMyNetworkTable();
 			
 			if(sendLSA()) {
 				syslog(LOG_ALERT, "ERROR: Failed sending LSA");
 				exit(-1);
 			}
+
+#ifdef STATS_LOG
+			size_t totalSize = getTotalBytesForCIDRoutes();
+			logger->log("size " + to_string(totalSize));
+#endif
+
 			route_state.mtx.unlock();
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
@@ -248,95 +302,84 @@ void periodicJobs(){
 }
 
 void calcShortestPath() {
-	// clean up the network table (remove abnormal entries etc)
-	removeAbnormalNetworkTable();
-
- 	map<std::string, NodeStateEntry> table = route_state.networkTable;
+ 	map<string, NodeStateEntry> table = route_state.networkTable;
   	for (auto it = route_state.networkTable.begin(); it != route_state.networkTable.end(); ++it) {
  		// initialize the checking variable
  		it->second.checked = false;
  		it->second.cost = 10000000;
   	}
 
-	// compute shortest path
-	// initialization
-	string myHID = route_state.myHID;
-	route_state.networkTable[myHID].checked = true;
-	route_state.networkTable[myHID].cost = 0;
-	table.erase(myHID);
-
-	for (auto it = route_state.networkTable[myHID].neighbor_hids.begin(); it != route_state.networkTable[myHID].neighbor_hids.end(); ++it) {
-		string tempHID = it->c_str();
+	for (auto it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); ++it) {
+		string neighbor = it->first;
 		
-		if(route_state.networkTable.find(tempHID) != route_state.networkTable.end()){
-			route_state.networkTable[tempHID].cost = 1;
-			route_state.networkTable[tempHID].prevNode = myHID;
+		if(route_state.networkTable.find(neighbor) != route_state.networkTable.end()){
+			route_state.networkTable[neighbor].cost = 1;
+			route_state.networkTable[neighbor].prevNode = route_state.myHID;
 		}
 	}
-
+	
 	while (!table.empty()) {
+		string selectedHID = "";
 		int minCost = 10000000;
-		string selectedHID;
+	
 		for (auto it = table.begin(); it != table.end(); ++it) {
-			string tmpHID = it->first;
-			if (route_state.networkTable[tmpHID].cost < minCost) {
-				minCost = route_state.networkTable[tmpHID].cost;
-				selectedHID = tmpHID;
+			if (route_state.networkTable[it->first].cost < minCost) {
+				minCost = route_state.networkTable[it->first].cost;
+				selectedHID = it->first;
 			}
   		}
 
-  		// not possible
-		if(selectedHID.empty()) {
-			return;
-		}
+  		if(selectedHID.empty()){
+  			return;
+  		}
 
   		table.erase(selectedHID);
   		route_state.networkTable[selectedHID].checked = true;
 
  		for (auto it = route_state.networkTable[selectedHID].neighbor_hids.begin() ; it != route_state.networkTable[selectedHID].neighbor_hids.end(); ++it) {
-			string tempHID = it->c_str();
-			if (route_state.networkTable.find(tempHID) != route_state.networkTable.end() 
-						&& route_state.networkTable[tempHID].checked != true) {
-				if (route_state.networkTable[tempHID].cost > route_state.networkTable[selectedHID].cost + 1) {
-					route_state.networkTable[tempHID].cost = route_state.networkTable[selectedHID].cost + 1;
-					route_state.networkTable[tempHID].prevNode = selectedHID;
+			string selectedHIDNeighbor = *it;
+
+			if (route_state.networkTable[selectedHIDNeighbor].checked == false) {
+				if (route_state.networkTable[selectedHIDNeighbor].cost > route_state.networkTable[selectedHID].cost + 1) {
+					route_state.networkTable[selectedHIDNeighbor].cost = route_state.networkTable[selectedHID].cost + 1;
+					route_state.networkTable[selectedHIDNeighbor].prevNode = selectedHID;
 				}
 			}
 		}
 	}
 
+	// clear the current CID route table
+	route_state.CIDrouteTable.clear();
 	// set up the nexthop for each appropriate CID
-  	for (auto it =route_state.networkTable.begin(); it != route_state.networkTable.end(); ++it) {
+  	for (auto it = route_state.networkTable.begin(); it != route_state.networkTable.end(); ++it) {
   		// for this destination
   		string currDest = it->first;
-  		// if it's not destined for myself
-  		if (myHID != currDest) {
-  			string currNode = currDest;
-  			int hop_count = 0;
-  			while (route_state.networkTable[currNode].prevNode != myHID && hop_count < MAX_HOP_COUNT) {
-  				currNode = route_state.networkTable[currNode].prevNode;
-  				hop_count++;
-  			}
+  		string currNode = currDest;
+  		
+  		int hop_count = 0;
+  		while (route_state.networkTable[currNode].prevNode != route_state.myHID && hop_count < MAX_HOP_COUNT) {
+  			currNode = route_state.networkTable[currNode].prevNode;
+  			hop_count++;
+  		}
 
-  			if(hop_count < MAX_HOP_COUNT) {
-  				vector<std::string> cidsForCurrDest = route_state.networkTable[currDest].dest_cids;
-  				// for all the cids of the destination...
-  				for (auto i = cidsForCurrDest.begin(); i != cidsForCurrDest.end(); ++i) {
-  					bool found = false;
-  					string destCID = *i;
+  		if(hop_count < MAX_HOP_COUNT) {
+  			// for all the cids of the destination...
+  			for (auto i = route_state.networkTable[currDest].dest_cids.begin(); i != route_state.networkTable[currDest].dest_cids.end(); ++i) {
+  				string destCID = i->first;
 
-  					for (auto j = route_state.sourceCids.begin(); j != route_state.sourceCids.end(); ++j) {
-  						string myCID = *j;
-  						if(destCID == myCID){
-  							found = true;
-  						}
-  					}
-
-  					if(!found){
-  						route_state.CIDrouteTable[destCID].dest = destCID;
-  						route_state.CIDrouteTable[destCID].nextHop = route_state.neighborTable[currNode].HID;
+  				// if we haven't seen this CID routes before, set the routes
+  				if(route_state.CIDrouteTable.find(destCID) == route_state.CIDrouteTable.end()){
+  					route_state.CIDrouteTable[destCID].dest = currDest;
+  					route_state.CIDrouteTable[destCID].nextHop = currNode;
+  					route_state.CIDrouteTable[destCID].port = route_state.neighborTable[currNode].port;
+  					route_state.CIDrouteTable[destCID].cost = hop_count + 1;
+  				} else {
+  					// if we have seen the CID routes before and cost is larger then, reset the routes
+  					if(route_state.CIDrouteTable[destCID].cost > hop_count + 1){
+  						route_state.CIDrouteTable[destCID].dest = currDest;
+  						route_state.CIDrouteTable[destCID].nextHop = currNode;
   						route_state.CIDrouteTable[destCID].port = route_state.neighborTable[currNode].port;
-  						route_state.CIDrouteTable[destCID].timer = time(NULL);
+  						route_state.CIDrouteTable[destCID].cost = hop_count + 1;
   					}
   				}
   			}
@@ -344,34 +387,30 @@ void calcShortestPath() {
   	}
 }
 
-void removeOutdatedRoutes() {
-	time_t now = time(NULL);
-	vector<string> cidsToRemove;
-
-  	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
-  		if(now - it->second.timer >= EXPIRE_TIME){
+void removeOutdatedRoutes(const map<string, RouteEntry> & prevRoutes) {
+  	for (auto it = prevRoutes.begin(); it != prevRoutes.end(); ++it) {
+  		if(route_state.CIDrouteTable.find(it->first) == route_state.CIDrouteTable.end()){
+#ifdef STATS_LOG
+			logger->log("route deletion");
+#endif
   			xr.delRouteCIDRouting(it->first);
   			syslog(LOG_INFO, "purging CID route for : %s", it->first.c_str());
-  			cidsToRemove.push_back(it->first);
   		}
-  	}
-
-  	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
-  		route_state.CIDrouteTable.erase(*it);
   	}
 }
 
-void updateClickRoutingTable() {
-	int rc, port;
-	string destXID, nexthopXID;
-
+void updateClickRoutingTable(const map<string, RouteEntry> & prevRoutes) {
+  	int rc;
   	for (auto it =route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
- 		destXID = it->second.dest;
- 		nexthopXID = it->second.nextHop;
-		port =  it->second.port;
 
-		if ((rc = xr.setRouteCIDRouting(destXID, port, nexthopXID, 0xffff)) != 0){
-			syslog(LOG_ERR, "error setting route %d", rc);
+		if(prevRoutes.find(it->first) == prevRoutes.end()){
+
+#ifdef STATS_LOG
+			logger->log("route addition");
+#endif
+			if ((rc = xr.setRouteCIDRouting(it->first, it->second.port, it->second.nextHop, 0xffff)) != 0){
+				syslog(LOG_ERR, "error setting route %d", rc);
+			}
 		}
   	}
 }
@@ -436,6 +475,10 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
 			return -1;
 		}
+
+#ifdef STATS_LOG
+		logger->log("send " + to_string(buflen));
+#endif
 
 		seq++;
 	} else {
@@ -510,31 +553,20 @@ int processLSA(string lsa_msg) {
   	}
 
   	// filter out the already seen LSA
-	set<int> prevCIDNums;
-	map<string, NodeStateEntry>::iterator it = route_state.networkTable.find(destHID);
-	if(it != route_state.networkTable.end()) {
-		set<int>::iterator it2 = it->second.cid_nums.find(cid_msg_num);
-
+	if(route_state.networkTable.find(destHID) != route_state.networkTable.end()) {
 		// filter already seen LSA
-  	  	if ((lsa_seq_num < it->second.seq && it->second.seq - lsa_seq_num < 1000000) || 
-  	  						(lsa_seq_num == it->second.seq && it2 != it->second.cid_nums.end())) {
-  			return 1;
+  	  	if ((lsa_seq_num < route_state.networkTable[destHID].seq && route_state.networkTable[destHID].seq - lsa_seq_num < 1000000) || 
+  	  		(lsa_seq_num == route_state.networkTable[destHID].seq && route_state.networkTable[destHID].cid_nums.find(cid_msg_num) != route_state.networkTable[destHID].cid_nums.end())) {
+  			return 0;
   		}
 
-  		// save the state from the previous round
-  		// provided they are in the same round
-  		if(lsa_seq_num == it->second.seq){
-  			prevCIDNums = it->second.cid_nums;
+  		if(lsa_seq_num > route_state.networkTable[destHID].seq){
+			route_state.networkTable[destHID].cid_nums.clear();
   		}
-
-  		route_state.networkTable.erase(it);
   	}
 
-  	// create new node state entry
-  	NodeStateEntry entry;
-	entry.seq = lsa_seq_num;
-	entry.cid_nums = prevCIDNums;
-	entry.cid_nums.insert(cid_msg_num);
+	route_state.networkTable[destHID].seq = lsa_seq_num;
+	route_state.networkTable[destHID].cid_nums.insert(cid_msg_num);
 
   	// read num_dest_cids
 	found=msg.find("^", start);
@@ -549,7 +581,7 @@ int processLSA(string lsa_msg) {
 		found=msg.find("^", start);
   		if (found!=string::npos) {
   			dest_cid = msg.substr(start, found-start);
-  			entry.dest_cids.push_back(dest_cid);
+			route_state.networkTable[destHID].dest_cids[dest_cid] = time(NULL);
   			start = found+1;  // forward the search point
   		}
   	}
@@ -562,7 +594,8 @@ int processLSA(string lsa_msg) {
   	}
 
   	int neighbors_num = atoi(num_neighbors.c_str());
-  	entry.num_neighbors = neighbors_num;
+  	route_state.networkTable[destHID].num_neighbors = neighbors_num;
+  	route_state.networkTable[destHID].neighbor_hids.clear();
 
   	// read in neighbor hids
   	for (int i = 0; i < neighbors_num; ++i) {
@@ -571,14 +604,16 @@ int processLSA(string lsa_msg) {
   			neighbor_hid = msg.substr(start, found-start);
   			start = found+1;  // forward the search point
 
-  			entry.neighbor_hids.push_back(neighbor_hid);
+  			route_state.networkTable[destHID].neighbor_hids.push_back(neighbor_hid);
   		}
   	}
-  	route_state.networkTable[destHID] = entry;
 
+  	/* Core routing logic */
+  	map<string, RouteEntry> CIDrouteTableOld = route_state.CIDrouteTable;
+	removeAbnormalNetworkTable();
   	calcShortestPath();
-  	removeOutdatedRoutes();
-  	updateClickRoutingTable();
+  	removeOutdatedRoutes(CIDrouteTableOld);
+  	updateClickRoutingTable(CIDrouteTableOld);
 
   	if(ttl - 1 > 0){
   		char buffer[XIA_MAXBUF];
@@ -590,7 +625,14 @@ int processLSA(string lsa_msg) {
 
   		// rebroadcast
   		strcpy(buffer, newMsg.c_str());
-		Xsendto(route_state.send_sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+		if(Xsendto(route_state.send_sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x)) < 0){
+			syslog(LOG_DEBUG, "problem with Xsendto");
+			return -1;
+		}
+  		
+#ifdef STATS_LOG
+		logger->log("send " + to_string(newMsg.size()));
+#endif
   	}
 
 	return 1;
@@ -669,22 +711,18 @@ void populateRouteState(std::vector<XIARouteEntry> & routeEntries){
 
 void populateNeighborState(std::vector<XIARouteEntry> & currHidRouteEntries){
 	// first update the existing neighbor entry
-	for (std::vector<XIARouteEntry>::iterator i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
+	for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
 		XIARouteEntry eachEntry = *i;
 
 		if(!eachEntry.nextHop.empty()){
-			map<string, NeighborEntry>::iterator it = route_state.neighborTable.find(eachEntry.nextHop);
-			if(it == route_state.neighborTable.end()) {
+			if(route_state.neighborTable.find(eachEntry.nextHop) == route_state.neighborTable.end()) {
 				NeighborEntry newNeighborEntry;
 				newNeighborEntry.cost = 1;
 				newNeighborEntry.port = eachEntry.port;
-				newNeighborEntry.HID = eachEntry.nextHop;
-
 				route_state.neighborTable[eachEntry.nextHop] = newNeighborEntry;
 			} else {
 				route_state.neighborTable[eachEntry.nextHop].cost = 1;
 				route_state.neighborTable[eachEntry.nextHop].port = eachEntry.port;
-				route_state.neighborTable[eachEntry.nextHop].HID = eachEntry.nextHop;
 			}
 		}
 	}
@@ -696,7 +734,7 @@ void populateNeighborState(std::vector<XIARouteEntry> & currHidRouteEntries){
 		bool found = false;
 
 		for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-			if((*i).nextHop == neighborHID){
+			if(i->nextHop == neighborHID){
 				found = true;
 			}
 		}
@@ -706,7 +744,7 @@ void populateNeighborState(std::vector<XIARouteEntry> & currHidRouteEntries){
 		}
   	}
 
-  	for (std::vector<std::string>::iterator i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
+  	for (auto i = entriesToRemove.begin(); i != entriesToRemove.end(); ++i) {
   		route_state.neighborTable.erase(*i);
   	}
 }
@@ -734,6 +772,11 @@ int main(int argc, char *argv[]){
 
    	initRouteState();
 
+#if defined(STATS_LOG)
+   	string namePrefix = hostname;
+   	logger = new Logger(namePrefix + "_ls");
+#endif
+
    	periodicJobs();
 
 	// main event loop
@@ -755,7 +798,13 @@ int main(int argc, char *argv[]){
 			}
 
 			route_state.mtx.lock();
+
+#ifdef STATS_LOG
+			logger->log("recv " + to_string(n));
+#endif
+
 			processLSA(recv_message);
+
 			route_state.mtx.unlock();
 		}
 	}	

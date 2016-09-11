@@ -138,7 +138,6 @@ typedef struct {
 	char my4ID[MAX_XID_SIZE]; // not used
 	char mySID[MAX_XID_SIZE];
 
-	set<string> localCIDs;
  	map<string, NeighborInfo> neighbors;
 	
 	// highest sequence number seen from a router
@@ -148,12 +147,15 @@ typedef struct {
  	// have higher TTL than what is received before. 
  	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
 
- 	// for filtering CID advertisement
+ 	/* key data structure for maintaining CID routes */
+	set<string> localCIDs;
+
  #ifdef FILTER
  	map<string, CIDRouteEntry> CIDRoutesWithFilter;
  #else
  	map<string, map<string, CIDRouteEntry> > CIDRoutes;	// dest CID to sender HID to CID route entry
  #endif
+ 	/* key data structure for maintaining CID routes */
 
  	mutex mtx;           // mutex for critical section
 } RouteState;
@@ -165,6 +167,7 @@ void cleanup(int);
 double nextWaitTimeInSecond(double ratePerSecond);
 int interfaceNumber(string xidType, string xid);
 void getRouteEntries(string xidType, vector<XIARouteEntry> & result);
+size_t getTotalBytesForCIDRoutes();
 
 #ifdef FILTER
 void cleanCIDRoutes();
