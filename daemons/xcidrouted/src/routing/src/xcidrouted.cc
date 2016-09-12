@@ -746,10 +746,11 @@ void initRouteState(){
 
    	srand(time(NULL));
    	routeState.lsaSeq = 0;
+   	routeState.joinSeq = 0;
+   	routeState.leaveSeq = 0;
 
    	Graph g = Node() * Node(BHID) * Node(SID_XCIDROUTE);
 	g.fill_sockaddr(&routeState.ddag);
-
 
 	// remove any previously set route and start fresh.
 	vector<XIARouteEntry> routeEntries;
@@ -817,19 +818,17 @@ void processHelloMessage(){
 		routeState.neighbors[key].HID = msg.HID;
 		routeState.neighbors[key].port = interface;
 		routeState.neighbors[key].sendSock = sock;
-		routeState.mtx.unlock();
-
 		routeState.neighbors[key].timer = time(NULL);
 
 		// send to new neighbor everything we know so far about the CID routes
 		sendNeighborJoin(routeState.neighbors[key]);
+		routeState.mtx.unlock();
 	} else {
 		routeState.neighbors[key].timer = time(NULL);
 	}
 }
 
 void removeExpiredNeighbor(string neighborHID){
-	routeState.mtx.lock();
 	if(routeState.neighbors[neighborHID].sendSock != -1){
 		Xclose(routeState.neighbors[neighborHID].sendSock);
 	}
@@ -837,6 +836,15 @@ void removeExpiredNeighbor(string neighborHID){
 		Xclose(routeState.neighbors[neighborHID].recvSock);
 	}
 	routeState.neighbors.erase(neighborHID);
+}
+
+void removeExpiredNeighbors(const vector<string>& neighbors){
+	routeState.mtx.lock();
+	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
+		NeighborInfo currNeighbor = routeState.neighbors[*it];
+		removeExpiredNeighbor(*it);
+		sendNeighborLeave(currNeighbor);
+	}
 	routeState.mtx.unlock();
 }
 
@@ -851,12 +859,7 @@ void checkExpiredNeighbors(){
 		}
 	}
 
-	for(auto it = candidates.begin(); it != candidates.end(); ++it){
-		NeighborInfo currNeighbor = routeState.neighbors[*it];
-
-		removeExpiredNeighbor(*it);
-		sendNeighborLeave(currNeighbor);
-	}
+	removeExpiredNeighbors(candidates);
 }
 
 void processNeighborConnect(){
@@ -896,14 +899,25 @@ void processNeighborConnect(){
 
 }
 
+// function already protected by locks
 void sendNeighborJoin(const NeighborInfo &neighbor){
-	//TODO: this neighbor is leaving the topology
+#ifdef FILTER
 
+
+#else
+	//TODO: non-filter version of this
+#endif
 }
 
+// function already protected by locks
 void sendNeighborLeave(const NeighborInfo &neighbor){
-	//TODO: this neighbor is leaving the topology
-	
+#ifdef FILTER
+
+
+
+#else
+	//TODO: non-filter version of this
+#endif
 }
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg){
@@ -1120,8 +1134,6 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 #endif
 
 		routeState.mtx.lock();
-
-
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.HID != neighbor.HID && msg.senderHID != neighbor.HID){
 				msg2Others.send(it->second.sendSock);
@@ -1277,6 +1289,8 @@ int processNeighborMessage(const NeighborInfo &neighbor){
 		printf("handle message failed\n");
 		return -2;
 	}
+
+	return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -1363,14 +1377,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 				}
-
-				// if any neighbor close connection while recving, do cleaning
-				for(auto it = candidates.begin(); it != candidates.end(); ++it){
-					NeighborInfo currNeighbor = routeState.neighbors[*it];
-
-					removeExpiredNeighbor(*it);
-					sendNeighborLeave(currNeighbor);
-				}
+				removeExpiredNeighbors(candidates);
 			}
 		}
 	}

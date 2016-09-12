@@ -175,7 +175,9 @@ typedef struct {
 	int32_t helloSock; 		// socket for routing process
 	int32_t masterSock;	// socket for receiving advertisment
 
-	int32_t lsaSeq;	// LSA sequence number of this router
+	uint32_t lsaSeq;	// LSA sequence number of this router
+	uint32_t joinSeq;
+	uint32_t leaveSeq;
 
 	sockaddr_x sdag;
 	sockaddr_x ddag;
@@ -202,7 +204,6 @@ typedef struct {
 
  	/* key data structure for maintaining CID routes */
 	set<string> localCIDs;
-
  #ifdef FILTER
  	map<string, CIDRouteEntry> CIDRoutesWithFilter;
  #else
@@ -239,6 +240,7 @@ void printNeighborInfo();
 
 void processHelloMessage();
 void removeExpiredNeighbor(string neighborHID);
+void removeExpiredNeighbors(const vector<string>& neighbors);
 void checkExpiredNeighbors();
 void processNeighborConnect();
 void sendNeighborJoin(const NeighborInfo &neighbor);
