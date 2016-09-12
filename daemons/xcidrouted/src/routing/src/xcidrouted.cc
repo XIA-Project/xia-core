@@ -9,7 +9,7 @@ static char* hostname = NULL;
 static XIARouter xr;
 static RouteState routeState;
 
-#if defined(STATS_LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG)
 static Logger* logger;
 #endif
 
@@ -109,6 +109,7 @@ AdvertisementMessage::~AdvertisementMessage(){};
 string AdvertisementMessage::serialize() const{
 	string result;
 
+	result += to_string(CIDMessage::Advertise) + "^";
 	result += this->senderHID + "^";
 	result += to_string(this->seq) + "^";
 	result += to_string(this->ttl) + "^";
@@ -218,118 +219,189 @@ void AdvertisementMessage::print() const{
 }
 
 int AdvertisementMessage::send(int sock){
-	if(sock < 0){
-		printf("CID advertisement send failed: sock < 0\n");
-		return -1;
-	}
-
-	printf("sending CID advertisement...\n");
-
-	string advertisement = serialize();
-	int sent = -1;
-	size_t remaining = strlen(advertisement.c_str()), offset = 0;
-	char start[remaining];
-	size_t length = htonl(remaining);
-	strcpy(start, advertisement.c_str());
-
-	// first send the size of the message
-	sent = Xsend(sock, (char*)&length, sizeof(size_t), 0);
-	if(sent < 0){
-		printf("Xsend send size failed\n");
-		return -1;
-	}
-
-	// then send the actual message
-	while(remaining > 0){
-		sent = Xsend(sock, start + offset, remaining, 0);
-		if (sent < 0) {
-			printf("Xsend failed\n");
-			return -1;
-		}
-
-		remaining -= sent;
-		offset += sent;
-	}
-
-	printf("sending raw CID advertisement: %s\n", start);
-	printf("sending CID advertisement:\n");
-	print();
-
-#ifdef STATS_LOG
-	logger->log("send " + to_string(advertisement.size()));
-#endif
-
-	printf("sent CID advertisement\n");
-
-	return 1;
+	return sendMessageToSock(sock, serialize());
 }
 
-int AdvertisementMessage::recv(int sock){
-	int n, to_recv;
-	size_t remaining, size;
-	char buf[IO_BUF_SIZE];
-	string data;
+NodeJoinMessage::NodeJoinMessage(){};
+NodeJoinMessage::~NodeJoinMessage(){};
 
-	printf("receiving CID advertisement...\n");
+string NodeJoinMessage::serialize() const{
+	string result;
 
-	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
-	if (n < 0) {
-		printf("Xrecv failed\n");
-		cleanup(0);
+	result += to_string(CIDMessage::Join) + "^";
+	result += this->senderHID + "^";
+	result += to_string(this->seq) + "^";
+
+	result += to_string(this->CID2Info.size()) + "^";
+	for(auto it = this->CID2Info.begin(); it != this->CID2Info.end(); ++it){
+		result += it->first + "^";
+		result += to_string(it->second.ttl) + "^";
+		result += it->second.destHID + "^";
 	}
 
-	if(remaining <= 0){
-		printf("received size have invalid size. Exit\n");
-		cleanup(0);
+	return result;
+}
+
+void NodeJoinMessage::deserialize(string data) {
+	size_t found, start;
+	string msg, seq_str, num_info_str, cid_str, ttl_str, dest_str;
+
+	start = 0;
+	msg = data;
+
+	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		this->senderHID = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		seq_str = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+  	this->seq = atoi(seq_str.c_str());
+
+  	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		num_info_str = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+  	int num_info = atoi(num_info_str.c_str());
+
+  	for(int i = 0; i < num_info; i++){
+  		found = msg.find("^", start);
+  		if (found != string::npos) {
+  			cid_str = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+  		found = msg.find("^", start);
+  		if (found != string::npos) {
+  			ttl_str = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+  		int ttl = atoi(ttl_str.c_str());
+
+  		found = msg.find("^", start);
+  		if (found != string::npos) {
+  			dest_str = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+  		this->CID2Info[cid_str].ttl = ttl;
+  		this->CID2Info[cid_str].destHID = dest_str;
+  	}
+}
+
+void NodeJoinMessage::print() const {
+	printf("NodeJoinMessage: \n");
+	printf("\tsenderHID: %u\n", this->senderHID);
+	printf("\tseq: %u\n", this->seq);
+
+	printf("\tCID2Info:\n");
+	for(auto it = this->CID2Info.begin(); it != this->CID2Info.end(); ++it){
+		printf("\t\tCID: %s\n", it->first.c_str());
+		printf("\t\tttl: %u\n", it->second.ttl);
+		printf("\t\tdestHID: %s\n", it->second.destHID.c_str());
+	}
+}
+
+int NodeJoinMessage::send(int sock){
+	return sendMessageToSock(sock, serialize());
+}
+
+NodeLeaveMessage::NodeLeaveMessage(){};
+NodeLeaveMessage::~NodeLeaveMessage(){};
+
+string NodeLeaveMessage::serialize() const{
+	string result;
+
+	result += to_string(CIDMessage::Leave) + "^";
+	result += this->senderHID + "^";
+	result += to_string(this->seq) + "^";
+	result += this->prevHID + "^";
+
+	result += to_string(this->CID2TTL.size()) + "^";
+	for(auto it = this->CID2TTL.begin(); it != this->CID2TTL.end(); ++it){
+		result += it->first + "^";
+		result += to_string(it->second) + "^";
 	}
 
-	remaining = ntohl(remaining);
-	size = remaining;
+	return result;
+}
 
-	while (remaining > 0) {
-		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
+void NodeLeaveMessage::deserialize(string data) {
+	size_t found, start;
+	string msg, seq_str, num_info_str, cid_str, ttl_str;
 
-		n = Xrecv(sock, buf, to_recv, 0);
-		if (n < 0) {
-			printf("Xrecv failed\n");
-			cleanup(0);
-		} else if (n == 0) {
-			break;
-		}
+	start = 0;
+	msg = data;
 
-		remaining -= n;
-		string temp(buf, n);
+	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		this->senderHID = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
 
-		data += temp;
+	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		seq_str = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+  	this->seq = atoi(seq_str.c_str());
+
+  	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		this->prevHID = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+  	found = msg.find("^", start);
+  	if (found != string::npos) {
+  		num_info_str = msg.substr(start, found-start);
+  		start = found+1;  // forward the search point
+  	}
+
+  	int num_info = atoi(num_info_str.c_str());
+  	for(int i = 0; i < num_info; i++){
+  		found = msg.find("^", start);
+  		if (found != string::npos) {
+  			cid_str = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+  		found = msg.find("^", start);
+  		if (found != string::npos) {
+  			ttl_str = msg.substr(start, found-start);
+  			start = found+1;  // forward the search point
+  		}
+
+  		int ttl = atoi(ttl_str.c_str());
+
+  		this->CID2TTL[cid_str] = ttl;
+  	}
+}
+
+void NodeLeaveMessage::print() const {
+	printf("NodeLeaveMessage: \n");
+	printf("\tsenderHID: %s\n", this->senderHID.c_str());
+	printf("\tseq: %u\n", this->seq);
+	printf("\tprevHID: %s\n", this->prevHID.c_str());
+
+	printf("\tCID2TTL:\n");
+	for(auto it = this->CID2TTL.begin(); it != this->CID2TTL.end(); ++it){
+		printf("\t\tCID: %s\n", it->first.c_str());
+		printf("\t\tttl: %u\n", it->second);
 	}
+}
 
-	// the other end has close the connection
-	if(data.size() == 0){
-		return -1;
-	}
-
-	if(data.size() != size){
-		printf("received data have invalid size. Exit\n");
-		cleanup(0);
-	}
-
-	printf("received a raw advertisement message:\n");
-	printf("remaining size: %lu, actual received size: %lu\n", size, data.size());
-	for(int i = 0; i < (int)data.size(); i++){
-		printf("%c", data[i]);
-	}
-	printf("\n");
-	
-	deserialize(data);
-	print();
-
-#ifdef STATS_LOG
-	logger->log("recv " + to_string(data.size()));
-#endif
-
-	printf("received CID advertisement\n");
-
-	return 1;
+int NodeLeaveMessage::send(int sock){
+	return sendMessageToSock(sock, serialize());
 }
 
 NeighborInfo::NeighborInfo(){};
@@ -393,7 +465,7 @@ void config(int argc, char** argv) {
 }
 
 void cleanup(int) {
-#if defined(STATS_LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG)
 	logger->end();
 	delete logger;
 #endif
@@ -579,15 +651,6 @@ void advertiseCIDs(){
 	}
 
 	routeState.mtx.lock();
-#ifdef EVENT_LOG
-	if(currLocalCIDs.size() > 0){
-		logger->log("Inside advertise CID: ");
-		for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
-			logger->log("Local CIDs: " + *it);
-		}
-	}
-#endif
-
 	routeState.localCIDs = currLocalCIDs;
 
 #ifdef FILTER
@@ -595,36 +658,13 @@ void advertiseCIDs(){
 #else
 	resetNonLocalCIDRoutes(msg.delCIDs);
 #endif
-
 	routeState.mtx.unlock();
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
 		routeState.mtx.lock();
 
-#ifdef EVENT_LOG
-		logger->log("Broadcast TTL: " + to_string(ttl));
-
-		if(msg.newCIDs.size() > 0){
-			logger->log("Broadcast newCIDs");
-			for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
-				logger->log(*it);
-			}
-		}
-		
-		if(msg.delCIDs.size() > 0){
-			logger->log("Broadcast delCIDs");
-			for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
-				logger->log(*it);
-			}
-		}
-#endif
-
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-
-#ifdef EVENT_LOG
-			logger->log("Broadcast to neighbor: " + it->second.HID);
-#endif
 			msg.send(it->second.sendSock);
 		}
 
@@ -782,10 +822,22 @@ void processHelloMessage(){
 		routeState.neighbors[key].timer = time(NULL);
 
 		// send to new neighbor everything we know so far about the CID routes
-		processNeighborJoin(routeState.neighbors[key]);
+		sendNeighborJoin(routeState.neighbors[key]);
 	} else {
 		routeState.neighbors[key].timer = time(NULL);
 	}
+}
+
+void removeExpiredNeighbor(string neighborHID){
+	routeState.mtx.lock();
+	if(routeState.neighbors[neighborHID].sendSock != -1){
+		Xclose(routeState.neighbors[neighborHID].sendSock);
+	}
+	if(routeState.neighbors[neighborHID].recvSock != -1){
+		Xclose(routeState.neighbors[neighborHID].recvSock);
+	}
+	routeState.neighbors.erase(neighborHID);
+	routeState.mtx.unlock();
 }
 
 void checkExpiredNeighbors(){
@@ -802,17 +854,8 @@ void checkExpiredNeighbors(){
 	for(auto it = candidates.begin(); it != candidates.end(); ++it){
 		NeighborInfo currNeighbor = routeState.neighbors[*it];
 
-		routeState.mtx.lock();
-		if(routeState.neighbors[*it].sendSock != -1){
-			Xclose(routeState.neighbors[*it].sendSock);
-		}
-		if(routeState.neighbors[*it].recvSock != -1){
-			Xclose(routeState.neighbors[*it].recvSock);
-		}
-		routeState.neighbors.erase(*it);
-		routeState.mtx.unlock();
-
-		processNeighborLeave(currNeighbor);
+		removeExpiredNeighbor(*it);
+		sendNeighborLeave(currNeighbor);
 	}
 }
 
@@ -848,17 +891,18 @@ void processNeighborConnect(){
 	routeState.neighbors[key].AD = AD;
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
-	routeState.neighbors[key].timer = time(NULL);
 	routeState.mtx.unlock();
+	routeState.neighbors[key].timer = time(NULL);
+
 }
 
-void processNeighborJoin(const NeighborInfo &neighbor){
-	//TODO:
-	
+void sendNeighborJoin(const NeighborInfo &neighbor){
+	//TODO: this neighbor is leaving the topology
+
 }
 
-void processNeighborLeave(const NeighborInfo &neighbor){
-	//TODO:
+void sendNeighborLeave(const NeighborInfo &neighbor){
+	//TODO: this neighbor is leaving the topology
 	
 }
 
@@ -897,12 +941,6 @@ bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 #ifdef FILTER
 
 set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
-#ifdef EVENT_LOG
-	if(msg.delCIDs.size() > 0){
-		logger->log("Inside deleteCIDRoutesWithFilter");	
-	}
-#endif
-
 	set<string> routeDeletion;
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		string currDelCID = *it;
@@ -913,15 +951,9 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 			// remove an entry only if it is from the same host and follows the same path
 			if(currEntry.dest == msg.senderHID && currEntry.cost == msg.distance){
 				routeDeletion.insert(currDelCID);
-
-#ifdef EVENT_LOG
-				logger->log("del route for CID: " + currDelCID);
-#endif
-
 #ifdef STATS_LOG
 				logger->log("route deletion");
 #endif
-
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
 			}
@@ -933,12 +965,6 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 }
 
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
-#ifdef EVENT_LOG
-	if(msg.newCIDs.size() > 0){
-		logger->log("Inside setCIDRoutesWithFilter");	
-	}
-#endif
-
 	set<string> routeAddition;
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
@@ -950,19 +976,6 @@ set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const Neigh
 			if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
 				|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.distance){
 				routeAddition.insert(currNewCID);
-
-#ifdef EVENT_LOG
-				logger->log("set route for CID: " + currNewCID);
-				logger->log("set route with new cost: " + to_string(msg.distance) + " new port: " + to_string(neighbor.port) + " nextHop: " + neighbor.HID + 
-							" dest: " + msg.senderHID);	
-				if(routeState.CIDRoutesWithFilter.find(currNewCID) != routeState.CIDRoutesWithFilter.end()){
-					CIDRouteEntry entry = routeState.CIDRoutesWithFilter[currNewCID];
-					logger->log("old cost: " + to_string(entry.cost));
-					logger->log("old port: " + to_string(entry.port));
-					logger->log("old nextHop: " + entry.nextHop);
-					logger->log("old dest: " + entry.dest);
-				}
-#endif	
 
 #ifdef STATS_LOG
 				logger->log("route addition");
@@ -1059,56 +1072,20 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 
 #endif
 
-void processNeighborMessage(const NeighborInfo &neighbor){
-	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
-
+int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
-	int status = msg.recv(neighbor.recvSock);
-	if(status < 0){
-		printf("neighbor has closed the connection\n");
-		processNeighborLeave(neighbor);
-		return;	
-	}
-	
-#ifdef EVENT_LOG
-	routeState.mtx.lock();
-
-	string logStr = "Received advertisement from neighbor: " + neighbor.HID;
-	logger->log(logStr.c_str());
-
-	logStr = "seq: " + to_string(msg.seq) + " ttl: " + to_string(msg.ttl) + " distance: " + to_string(msg.distance);
-	logger->log(logStr.c_str());
-
-	logStr = "original sender: " + msg.senderHID;
-	logger->log(logStr.c_str());
-
-	logger->log("new cids:");
-	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
-		logger->log((*it).c_str());
-	}
-
-	logger->log("del cids:");
-	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
-		logger->log((*it).c_str());
-	}
-
-	routeState.mtx.unlock();
-#endif
+	msg.deserialize(data);
 
 	// check if 
 	// 	message is higher sequence number 
 	// 	OR lower sequence number but have higher TTL
 	if(!checkSequenceAndTTL(msg)){
-		return;
+		return 0;
 	}
 
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
-
-#ifdef EVENT_LOG
-	logger->log("passed sequence number check and self loop check");
-#endif 	
 
 #ifdef FILTER
 	set<string> routeAddition = setCIDRoutesWithFilter(msg, neighbor);
@@ -1144,32 +1121,161 @@ void processNeighborMessage(const NeighborInfo &neighbor){
 
 		routeState.mtx.lock();
 
-#ifdef EVENT_LOG
-		logger->log("Relaying message to neighbor");
-		string logStr = "seq: " + to_string(msg2Others.seq) + " ttl: " + to_string(msg2Others.ttl) + " distance: " + to_string(msg2Others.distance);
-		logger->log(logStr);
-
-		logger->log("new cids:");
-		for(auto it = msg2Others.newCIDs.begin(); it != msg2Others.newCIDs.end(); it++){
-			logger->log(*it);
-		}
-
-		logger->log("del cids:");
-		for(auto it = msg2Others.delCIDs.begin(); it != msg2Others.delCIDs.end(); it++){
-			logger->log(*it);
-		}
-#endif
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.HID != neighbor.HID && msg.senderHID != neighbor.HID){
-
-#ifdef EVENT_LOG
-				logger->log("relay to neighbor: " + it->second.HID);
-#endif
 				msg2Others.send(it->second.sendSock);
 			}
 		}
 		routeState.mtx.unlock();
+	}
+
+	return 0;
+}
+
+int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
+	NodeJoinMessage msg;
+	msg.deserialize(data);
+
+	return 0;
+}
+
+int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
+	NodeLeaveMessage msg;
+	msg.deserialize(data);
+
+	return 0;
+}
+
+int handleNeighborMessage(string data, const NeighborInfo &neighbor){
+	size_t found = data.find("^", 0);
+  	string typeStr;
+
+  	if (found != string::npos) {
+  		typeStr = data.substr(0, found);
+  	} else {
+  		return -1;
+  	}
+
+  	int type = atoi(typeStr.c_str());
+  	string actualData = data.substr(found+1);
+
+  	switch(type){
+  		case CIDMessage::Advertise:
+  			return handleAdvertisementMessage(actualData, neighbor);
+  		case CIDMessage::Join:
+  			return handleNodeJoinMessage(actualData, neighbor);
+  		case CIDMessage::Leave:
+  			return handleNodeLeaveMessage(actualData, neighbor);
+  		default:
+  			printf("Unknown message type\n");
+  			return -1;
+  	}
+}
+
+int recvMessageFromSock(int sock, string &data){
+	int n, to_recv;
+	size_t remaining, size;
+	char buf[IO_BUF_SIZE];
+
+	printf("receiving CID advertisement...\n");
+
+	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
+	if (n < 0) {
+		printf("Xrecv failed\n");
+		cleanup(0);
+	}
+
+	if(remaining > XIA_MAXBUF){
+		printf("received size have invalid size. Exit\n");
+		cleanup(0);
+	} else if(remaining == 0) {
+		return -1;
+	}
+
+	remaining = ntohl(remaining);
+	size = remaining;
+
+	while (remaining > 0) {
+		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
+
+		n = Xrecv(sock, buf, to_recv, 0);
+		if (n < 0) {
+			printf("Xrecv failed\n");
+			cleanup(0);
+		} else if (n == 0) {
+			// the other end has closed the connection for some reason
+			return -1;
+		}
+
+		remaining -= n;
+		string temp(buf, n);
+
+		data += temp;
+	}
+
+	if(data.size() != size){
+		printf("received data have invalid size. Exit\n");
+		cleanup(0);
+	}
+	
+#ifdef STATS_LOG
+	logger->log("recv " + to_string(data.size()));
+#endif
+
+	return 1;
+}
+
+int sendMessageToSock(int sock, string advertisement){
+	if(sock < 0){
+		printf("CID advertisement send failed: sock < 0\n");
+		return -1;
+	}
+
+	int sent = -1;
+	size_t remaining = strlen(advertisement.c_str()), offset = 0;
+	char start[remaining];
+	size_t length = htonl(remaining);
+	strcpy(start, advertisement.c_str());
+
+	// first send the size of the message
+	sent = Xsend(sock, (char*)&length, sizeof(size_t), 0);
+	if(sent < 0){
+		printf("Xsend send size failed\n");
+		return -1;
+	}
+
+	// then send the actual message
+	while(remaining > 0){
+		sent = Xsend(sock, start + offset, remaining, 0);
+		if (sent < 0) {
+			printf("Xsend failed\n");
+			return -1;
+		}
+
+		remaining -= sent;
+		offset += sent;
+	}
+
+#ifdef STATS_LOG
+	logger->log("send " + to_string(advertisement.size()));
+#endif
+
+	return 0;
+}
+
+int processNeighborMessage(const NeighborInfo &neighbor){
+	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
+	string data;
+	int status = recvMessageFromSock(neighbor.recvSock, data);
+	if(status < 0){
+		printf("neighbor has closed the connection\n");
+		return -1;	
+	}
+
+	if(handleNeighborMessage(data, neighbor) < 0){
+		printf("handle message failed\n");
+		return -2;
 	}
 }
 
@@ -1192,7 +1298,7 @@ int main(int argc, char *argv[]) {
 	initRouteState();
    	registerReceiver();
 
-#if defined(STATS_LOG) || defined(EVENT_LOG)
+#if defined(STATS_LOG)
    	logger = new Logger(hostname);
 #endif
 
@@ -1245,11 +1351,25 @@ int main(int argc, char *argv[]) {
 				// if a new neighbor connects, add to the recv list
 				processNeighborConnect();
 			} else {
+				int status;
+				vector<string> candidates;
+
 				for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 					// if we recv a message from one of our established neighbor, procees the message
 					if(it->second.recvSock != -1 && FD_ISSET(it->second.recvSock, &socks)){
-						processNeighborMessage(it->second);
+						status = processNeighborMessage(it->second);
+						if(status == -1){
+							candidates.push_back(it->first);
+						}
 					}
+				}
+
+				// if any neighbor close connection while recving, do cleaning
+				for(auto it = candidates.begin(); it != candidates.end(); ++it){
+					NeighborInfo currNeighbor = routeState.neighbors[*it];
+
+					removeExpiredNeighbor(*it);
+					sendNeighborLeave(currNeighbor);
 				}
 			}
 		}

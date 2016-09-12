@@ -56,7 +56,6 @@
 #define SID_XCIDROUTE "SID:1110000000000000000000000000000000001114"
 
 #define STATS_LOG
-//#define EVENT_LOG
 #define FILTER
 
 using namespace std;
@@ -84,33 +83,25 @@ public:
 	string SID;
 };
 
-class RefreshMessage: Message{
+class CIDMessage: Message{
 public:
-	RefreshMessage();
-	~RefreshMessage();
+	virtual int send(int sock) = 0;	
 
-	string serialize() const override;
-	void deserialize(string data) override;
-	void print() const override;
-
-	int send(int sock);
-	int recv(int sock);
-
-	string senderHID;
-	uint32_t seq;
-	map<string, uint32_t> CID2TTL;
+	enum MsgType {
+        Join, Leave, Advertise
+    };
 };
 
-class AdvertisementMessage: Message{
+class AdvertisementMessage: CIDMessage{
 public:
 	AdvertisementMessage();
 	~AdvertisementMessage();
-
+	
 	string serialize() const override;
 	void deserialize(string data) override;
 	void print() const override;
-	int send(int sock);
-	int recv(int sock);
+
+	int send(int sock) override;
 
 	string senderHID;			// who is the original sender
 	uint32_t seq; 				// LSA seq of from sender
@@ -119,6 +110,44 @@ public:
 
 	set<string> newCIDs; 	// new CIDs in the advertisement
 	set<string> delCIDs; 	// CIDs that need deletion
+};
+
+class NodeJoinMessage: CIDMessage{
+public:
+	NodeJoinMessage();
+	~NodeJoinMessage();
+
+	typedef struct {
+		uint32_t ttl;
+		string destHID;
+	} CIDInfo;
+
+	string serialize() const override;
+	void deserialize(string data) override;
+	void print() const override;
+
+	int send(int sock) override;
+
+	string senderHID;
+	uint32_t seq;					
+	map<string, CIDInfo> CID2Info;
+};
+
+class NodeLeaveMessage: CIDMessage{
+public:
+	NodeLeaveMessage();
+	~NodeLeaveMessage();
+
+	string serialize() const override;
+	void deserialize(string data) override;
+	void print() const override;
+
+	int send(int sock) override;
+
+	string senderHID;
+	uint32_t seq;
+	string prevHID;					// who send this message previously
+	map<string, uint32_t> CID2TTL;
 };
 
 class NeighborInfo{
@@ -157,13 +186,19 @@ typedef struct {
 	char mySID[MAX_XID_SIZE];
 
  	map<string, NeighborInfo> neighbors;
-	
+
 	// highest sequence number seen from a router
  	map<string, uint32_t> HID2Seq;
  	// TLL associated with each sequence number sent by a router
  	// need this since advertisement with lower sequence number could
  	// have higher TTL than what is received before. 
  	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
+ 	
+	// similar to HID2Seq but for node join message
+ 	map<string, uint32_t> joinHID2Seq;
+
+	// similar to HID2Seq but for node join message
+ 	map<string, uint32_t> leaveHID2Seq;
 
  	/* key data structure for maintaining CID routes */
 	set<string> localCIDs;
@@ -203,16 +238,24 @@ int connectToNeighbor(string AD, string HID, string SID);
 void printNeighborInfo();
 
 void processHelloMessage();
+void removeExpiredNeighbor(string neighborHID);
 void checkExpiredNeighbors();
 void processNeighborConnect();
-void processNeighborJoin(const NeighborInfo &neighbor);
-void processNeighborLeave(const NeighborInfo &neighbor);
+void sendNeighborJoin(const NeighborInfo &neighbor);
+void sendNeighborLeave(const NeighborInfo &neighbor);
 
 bool checkSequenceAndTTL(const AdvertisementMessage & msg);
 void deleteCIDRoutes(const AdvertisementMessage & msg);
 void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
 set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg);
-void processNeighborMessage(const NeighborInfo &neighbor);
+
+int handleAdvertisementMessage(string data, const NeighborInfo &neighbor);
+int handleNodeJoinMessage(string data, const NeighborInfo &neighbor);
+int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor);
+int handleNeighborMessage(string data, const NeighborInfo &neighbor);
+int recvMessageFromSock(int sock, string &data);
+int sendMessageToSock(int sock, string data);
+int processNeighborMessage(const NeighborInfo &neighbor);
 
 #endif 
