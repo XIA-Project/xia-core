@@ -819,7 +819,6 @@ void processHelloMessage(){
 		routeState.neighbors[key].port = interface;
 		routeState.neighbors[key].sendSock = sock;
 		routeState.neighbors[key].timer = time(NULL);
-
 		// send to new neighbor everything we know so far about the CID routes
 		sendNeighborJoin(routeState.neighbors[key]);
 		routeState.mtx.unlock();
@@ -840,9 +839,13 @@ void removeExpiredNeighbor(string neighborHID){
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
 	routeState.mtx.lock();
+	// first remove the unused neighbors
+	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
+		removeExpiredNeighbor(*it);
+	}
+	// then remove routes
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		NeighborInfo currNeighbor = routeState.neighbors[*it];
-		removeExpiredNeighbor(*it);
 		sendNeighborLeave(currNeighbor);
 	}
 	routeState.mtx.unlock();
@@ -901,9 +904,31 @@ void processNeighborConnect(){
 
 // function already protected by locks
 void sendNeighborJoin(const NeighborInfo &neighbor){
+
 #ifdef FILTER
+	NodeJoinMessage msg;
+	msg.senderHID = routeState.myHID;
+	msg.seq = routeState.joinSeq;
 
+	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); ++it){
+		string currCID = it->first;
+		string currCIDDest = it->second.dest;
+		uint32_t currCIDCost = it->second.cost;
 
+		if(ttl - currCIDCost - 1 > 0){
+			msg.CID2Info[currCID].ttl = ttl - currCIDCost - 1;
+			msg.CID2Info[currCID].destHID = currCIDDest;
+		}
+	}
+
+	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); ++it){
+		msg.CID2Info[*it].ttl = ttl;
+		msg.CID2Info[*it].destHID = routeState.myHID;
+	}
+
+	msg.send(neighbor.sendSock);
+
+	routeState.joinSeq = (routeState.joinSeq + 1) % MAX_SEQNUM;
 #else
 	//TODO: non-filter version of this
 #endif
@@ -912,14 +937,35 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 // function already protected by locks
 void sendNeighborLeave(const NeighborInfo &neighbor){
 #ifdef FILTER
+	NodeLeaveMessage msg;
+	msg.senderHID = msg.prevHID = routeState.myHID;
+	msg.seq = routeState.leaveSeq;
 
+	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); ++it){
+		string currCID = it->first;
+		string currCIDDest = it->second.dest;
+		string currCIDNextHop = it->second.nextHop;
+		uint32_t currCIDCost = it->second.cost;
 
+		if(currCIDNextHop == neighbor.HID && ttl - currCIDCost - 1 > 0){
+			msg.CID2TTL[currCID] = ttl - currCIDCost - 1;
+			// delete routes to the neighbor
+			xr.delRouteCIDRouting(currCID);
+		}
+	}
+
+	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
+		msg.send(it->second.sendSock);
+	}
+	
+	routeState.leaveSeq = (routeState.leaveSeq + 1) % MAX_SEQNUM;
 
 #else
 	//TODO: non-filter version of this
 #endif
 }
 
+// TODO: do we really need sequence number?
 bool checkSequenceAndTTL(const AdvertisementMessage & msg){
 	// need to check both the sequence number and ttl since message with lower
 	// sequence number but higher ttl need to be propagated further and 
@@ -1149,12 +1195,16 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 	NodeJoinMessage msg;
 	msg.deserialize(data);
 
+	// TODO: need to handle join message
+
 	return 0;
 }
 
 int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	NodeLeaveMessage msg;
 	msg.deserialize(data);
+
+	//TODO: need to handle the leave message
 
 	return 0;
 }
