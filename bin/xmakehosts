@@ -1,0 +1,27 @@
+# create etc/hosts.xia by getting the host dag for our machine
+# plus the specified machines and appending it to the hosts file
+# then copy the file to the specified machines
+#
+# NOTE: works best if you are using ssh keys, otherwise it will
+# do a lot of prompting!
+
+XDIR=$(pwd | sed 's/xia-core.*/xia-core/')
+HOSTSFILE=$XDIR/etc/hosts.xia
+
+rdag() {
+ssh $h <<ENDSSH
+	export XDIR="$XDIR"
+	cd \$XDIR
+	$XDIR/bin/xdag
+ENDSSH
+}
+
+bin/xdag > $HOSTSFILE
+
+for h in $*; do
+	rdag $h 2> /dev/null | tail -n1 >>$HOSTSFILE
+done
+
+for h in $*; do
+	scp $HOSTSFILE $h:$HOSTSFILE
+done
