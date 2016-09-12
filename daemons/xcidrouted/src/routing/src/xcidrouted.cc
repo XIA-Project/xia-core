@@ -111,7 +111,6 @@ string AdvertisementMessage::serialize() const{
 
 	result += to_string(CIDMessage::Advertise) + "^";
 	result += this->senderHID + "^";
-	result += to_string(this->seq) + "^";
 	result += to_string(this->ttl) + "^";
 	result += to_string(this->distance) + "^";
 	
@@ -130,7 +129,7 @@ string AdvertisementMessage::serialize() const{
 
 void AdvertisementMessage::deserialize(string data){
 	size_t found, start;
-	string msg, senderHID, seq_str, ttl_str, distance_str, num_cids_str, cid_str;
+	string msg, senderHID, ttl_str, distance_str, num_cids_str, cid_str;
 
 	start = 0;
 	msg = data;
@@ -139,14 +138,6 @@ void AdvertisementMessage::deserialize(string data){
   	if (found != string::npos) {
   		this->senderHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
-  	}
-
-  	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		seq_str = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  		
-  		this->seq = atoi(seq_str.c_str());
   	}
 
   	found = msg.find("^", start);
@@ -203,7 +194,6 @@ void AdvertisementMessage::deserialize(string data){
 void AdvertisementMessage::print() const{
 	printf("AdvertisementMessage: \n");
 	printf("\tsenderHID: %s\n", this->senderHID.c_str());
-	printf("\tseq: %d\n", this->seq);
 	printf("\tttl: %d\n", this->ttl);
 	printf("\tdistance: %d\n", this->distance);
 
@@ -230,7 +220,6 @@ string NodeJoinMessage::serialize() const{
 
 	result += to_string(CIDMessage::Join) + "^";
 	result += this->senderHID + "^";
-	result += to_string(this->seq) + "^";
 
 	result += to_string(this->CID2Info.size()) + "^";
 	for(auto it = this->CID2Info.begin(); it != this->CID2Info.end(); ++it){
@@ -244,7 +233,7 @@ string NodeJoinMessage::serialize() const{
 
 void NodeJoinMessage::deserialize(string data) {
 	size_t found, start;
-	string msg, seq_str, num_info_str, cid_str, ttl_str, dest_str;
+	string msg, num_info_str, cid_str, ttl_str, dest_str;
 
 	start = 0;
 	msg = data;
@@ -254,14 +243,6 @@ void NodeJoinMessage::deserialize(string data) {
   		this->senderHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
-
-	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		seq_str = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
-  	this->seq = atoi(seq_str.c_str());
 
   	found = msg.find("^", start);
   	if (found != string::npos) {
@@ -299,8 +280,7 @@ void NodeJoinMessage::deserialize(string data) {
 
 void NodeJoinMessage::print() const {
 	printf("NodeJoinMessage: \n");
-	printf("\tsenderHID: %u\n", this->senderHID);
-	printf("\tseq: %u\n", this->seq);
+	printf("\tsenderHID: %s\n", this->senderHID.c_str());
 
 	printf("\tCID2Info:\n");
 	for(auto it = this->CID2Info.begin(); it != this->CID2Info.end(); ++it){
@@ -322,7 +302,6 @@ string NodeLeaveMessage::serialize() const{
 
 	result += to_string(CIDMessage::Leave) + "^";
 	result += this->senderHID + "^";
-	result += to_string(this->seq) + "^";
 	result += this->prevHID + "^";
 
 	result += to_string(this->CID2TTL.size()) + "^";
@@ -336,7 +315,7 @@ string NodeLeaveMessage::serialize() const{
 
 void NodeLeaveMessage::deserialize(string data) {
 	size_t found, start;
-	string msg, seq_str, num_info_str, cid_str, ttl_str;
+	string msg, num_info_str, cid_str, ttl_str;
 
 	start = 0;
 	msg = data;
@@ -346,14 +325,6 @@ void NodeLeaveMessage::deserialize(string data) {
   		this->senderHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
-
-	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		seq_str = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-
-  	this->seq = atoi(seq_str.c_str());
 
   	found = msg.find("^", start);
   	if (found != string::npos) {
@@ -390,7 +361,6 @@ void NodeLeaveMessage::deserialize(string data) {
 void NodeLeaveMessage::print() const {
 	printf("NodeLeaveMessage: \n");
 	printf("\tsenderHID: %s\n", this->senderHID.c_str());
-	printf("\tseq: %u\n", this->seq);
 	printf("\tprevHID: %s\n", this->prevHID.c_str());
 
 	printf("\tCID2TTL:\n");
@@ -618,7 +588,6 @@ void advertiseCIDs(){
 
 	AdvertisementMessage msg;
 	msg.senderHID = routeState.myHID;
-	msg.seq = routeState.lsaSeq;
 	msg.ttl = ttl;
 	msg.distance = 0;
 
@@ -669,8 +638,6 @@ void advertiseCIDs(){
 		}
 
 		routeState.mtx.unlock();
-
-		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQNUM;
 	}
 
 	printf("done\n");
@@ -745,9 +712,6 @@ void initRouteState(){
    	}
 
    	srand(time(NULL));
-   	routeState.lsaSeq = 0;
-   	routeState.joinSeq = 0;
-   	routeState.leaveSeq = 0;
 
    	Graph g = Node() * Node(BHID) * Node(SID_XCIDROUTE);
 	g.fill_sockaddr(&routeState.ddag);
@@ -908,7 +872,6 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 #ifdef FILTER
 	NodeJoinMessage msg;
 	msg.senderHID = routeState.myHID;
-	msg.seq = routeState.joinSeq;
 
 	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); ++it){
 		string currCID = it->first;
@@ -928,7 +891,6 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 
 	msg.send(neighbor.sendSock);
 
-	routeState.joinSeq = (routeState.joinSeq + 1) % MAX_SEQNUM;
 #else
 	//TODO: non-filter version of this
 #endif
@@ -939,7 +901,6 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 #ifdef FILTER
 	NodeLeaveMessage msg;
 	msg.senderHID = msg.prevHID = routeState.myHID;
-	msg.seq = routeState.leaveSeq;
 
 	for(auto it = routeState.CIDRoutesWithFilter.begin(); it != routeState.CIDRoutesWithFilter.end(); ++it){
 		string currCID = it->first;
@@ -957,35 +918,10 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 		msg.send(it->second.sendSock);
 	}
-	
-	routeState.leaveSeq = (routeState.leaveSeq + 1) % MAX_SEQNUM;
 
 #else
 	//TODO: non-filter version of this
 #endif
-}
-
-// TODO: do we really need sequence number?
-bool checkSequenceAndTTL(const AdvertisementMessage & msg){
-	// need to check both the sequence number and ttl since message with lower
-	// sequence number but higher ttl need to be propagated further and 
-	// we could receive message with lower ttl first.
-	if(routeState.HID2Seq.find(msg.senderHID) != routeState.HID2Seq.end() &&
-		msg.seq <= routeState.HID2Seq[msg.senderHID] && routeState.HID2Seq[msg.senderHID] - msg.seq < 1000000){	
-		// we must have seen this sequence number before since all messages 
-		// are sent in order
-		if(routeState.HID2Seq[msg.senderHID] - msg.seq >= MAX_SEQ_DIFF 
-			|| routeState.HID2Seq2TTL[msg.senderHID][msg.seq] >= msg.ttl){
-			return false;
-		} else {
-			routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
-		} 
-	} else {
-		routeState.HID2Seq[msg.senderHID] = msg.seq;
-		routeState.HID2Seq2TTL[msg.senderHID][msg.seq] = msg.ttl;
-	}
-
-	return true;
 }
 
 /**
@@ -1136,13 +1072,6 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
 
-	// check if 
-	// 	message is higher sequence number 
-	// 	OR lower sequence number but have higher TTL
-	if(!checkSequenceAndTTL(msg)){
-		return 0;
-	}
-
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
@@ -1167,7 +1096,6 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 #endif
 		AdvertisementMessage msg2Others;
 		msg2Others.senderHID = msg.senderHID;
-		msg2Others.seq = msg.seq;
 		msg2Others.ttl = msg.ttl - 1;
 		msg2Others.distance = msg.distance + 1;
 

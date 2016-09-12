@@ -39,9 +39,7 @@
 
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
-#define MAX_SEQ_DIFF 5
 #define HELLO_MAX_BUF_SIZE 4096
-#define MAX_SEQNUM 10000000
 #define MAX_TTL 5
 #define HELLO_EXPIRE 3
 
@@ -104,7 +102,6 @@ public:
 	int send(int sock) override;
 
 	string senderHID;			// who is the original sender
-	uint32_t seq; 				// LSA seq of from sender
 	uint32_t ttl;				// ttl to broadcast the advertisement
 	uint32_t distance; 			// # hops to the sender
 
@@ -129,7 +126,6 @@ public:
 	int send(int sock) override;
 
 	string senderHID;
-	uint32_t seq;					
 	map<string, CIDInfo> CID2Info;
 };
 
@@ -145,7 +141,6 @@ public:
 	int send(int sock) override;
 
 	string senderHID;
-	uint32_t seq;
 	string prevHID;					// who send this message previously
 	map<string, uint32_t> CID2TTL;
 };
@@ -175,10 +170,6 @@ typedef struct {
 	int32_t helloSock; 		// socket for routing process
 	int32_t masterSock;	// socket for receiving advertisment
 
-	uint32_t lsaSeq;	// LSA sequence number of this router
-	uint32_t joinSeq;
-	uint32_t leaveSeq;
-
 	sockaddr_x sdag;
 	sockaddr_x ddag;
 
@@ -188,19 +179,6 @@ typedef struct {
 	char mySID[MAX_XID_SIZE];
 
  	map<string, NeighborInfo> neighbors;
-
-	// highest sequence number seen from a router
- 	map<string, uint32_t> HID2Seq;
- 	// TLL associated with each sequence number sent by a router
- 	// need this since advertisement with lower sequence number could
- 	// have higher TTL than what is received before. 
- 	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
- 	
-	// similar to HID2Seq but for node join message
- 	map<string, uint32_t> joinHID2Seq;
-
-	// similar to HID2Seq but for node join message
- 	map<string, uint32_t> leaveHID2Seq;
 
  	/* key data structure for maintaining CID routes */
 	set<string> localCIDs;
@@ -246,7 +224,6 @@ void processNeighborConnect();
 void sendNeighborJoin(const NeighborInfo &neighbor);
 void sendNeighborLeave(const NeighborInfo &neighbor);
 
-bool checkSequenceAndTTL(const AdvertisementMessage & msg);
 void deleteCIDRoutes(const AdvertisementMessage & msg);
 void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
 set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
