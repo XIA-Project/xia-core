@@ -100,6 +100,8 @@ void cleanup(int) {
 	logger->end();
 	delete logger;
 #endif
+
+	exit(0);
 }
 
 void printRoutingTable(){
@@ -562,8 +564,18 @@ int main(int argc, char *argv[]) {
 			}
 
 			Graph g(&theirDAG);
-			printf("finished parse their dag %s\n", g.dag_string().c_str());
-			string neighborHID = g.intent_HID_str();
+			string neighborHID;
+			for(int i = 0; i < g.num_nodes(); ++i){
+				Node curr = g.get_node(i);
+				if(curr.type_string().compare(Node::XID_TYPE_HID_STRING) == 0){
+					neighborHID = curr.to_string();
+					break;
+				}
+			}
+
+			if(neighborHID.empty()){
+				cleanup(0);
+			}
 
 			printf("receive packet from %s\n", neighborHID.c_str());
 

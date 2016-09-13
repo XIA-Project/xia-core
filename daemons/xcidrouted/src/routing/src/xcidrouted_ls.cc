@@ -179,6 +179,8 @@ void cleanup(int) {
 	logger->end();
 	delete logger;
 #endif
+
+	exit(0);
 }
 
 size_t getTotalBytesForCIDRoutes(){
