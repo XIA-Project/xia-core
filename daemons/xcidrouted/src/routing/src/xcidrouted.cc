@@ -1308,15 +1308,15 @@ int recvMessageFromSock(int sock, string &data){
 		cleanup(0);
 	}
 
+	remaining = ntohl(remaining);
+	size = remaining;
+
 	if(remaining > XIA_MAXBUF){
 		printf("received size have invalid size: %lu. Exit\n", remaining);
 		cleanup(0);
 	} else if(remaining == 0) {
 		return -1;
 	}
-
-	remaining = ntohl(remaining);
-	size = remaining;
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
