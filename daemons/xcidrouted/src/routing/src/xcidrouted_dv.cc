@@ -562,6 +562,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			Graph g(&theirDAG);
+			printf("finished parse their dag\n");
 			string neighborHID = g.intent_HID_str();
 
 			printf("receive packet from %s\n", neighborHID.c_str());

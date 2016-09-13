@@ -1444,7 +1444,7 @@ void
 Graph::from_sockaddr(const sockaddr_x *s)
 {
 	// FIXME: check to be sure it's really a sockaddr_x!
-
+	printf("Graph: from_sockaddr");
 	int num_nodes = s->sx_addr.s_count;
 	// First add nodes to the graph and remember their new indices
 	std::vector<uint8_t> graph_indices;
@@ -1454,6 +1454,8 @@ Graph::from_sockaddr(const sockaddr_x *s)
 		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0 means nothing
 		graph_indices.push_back(add_node(n));
 	}
+
+	printf("Graph: added_node");
 
 	// Add the source node
 	uint8_t src_index = add_node(Node());
@@ -1477,6 +1479,8 @@ Graph::from_sockaddr(const sockaddr_x *s)
 				add_edge(from_node, to_node);
 		}
 	}
+
+	printf("Graph: added edges");
 }
 
 
