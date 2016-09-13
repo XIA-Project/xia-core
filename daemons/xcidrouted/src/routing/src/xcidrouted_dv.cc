@@ -415,7 +415,6 @@ int broadcastRIP() {
 		}
 	}
 
-
 	return 0;
 }
 
@@ -432,6 +431,7 @@ void removeOutdatedRoutes(){
   	}
 
   	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
+  		printf("purging: %s\n", it->c_str());
   		route_state.CIDrouteTable.erase(*it);
   	}
 
@@ -540,6 +540,7 @@ int main(int argc, char *argv[]) {
    	string namePrefix = hostname;
    	logger = new Logger(namePrefix + "_dv");
 #endif
+
    	(void) signal(SIGINT, cleanup);
 
    	periodicJobs();
@@ -577,9 +578,11 @@ int main(int argc, char *argv[]) {
 			}
 
 			route_state.mtx.lock();
+
 #ifdef STATS_LOG
 			logger->log("recv " + to_string(n));
-#endif		
+#endif
+
 			if(processRIPUpdate(neighborHID, recv_message) < 0){
 				syslog(LOG_WARNING, "problem with processing RIP update\n");
 			}
