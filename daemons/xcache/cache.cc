@@ -154,6 +154,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	if (!(meta = ctrl->acquire_meta(cid))) {
 		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
 		ctrl->add_meta(start_new_meta(tcp, cid, sid));
+
+		// it's a syn-ack so there's no data to handle yet
 		return;
 	}
 
@@ -251,12 +253,9 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
-//		std::string *data = new std::string(download->data, ntohl(download->header.length));
 
 		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
-
-			//ctrl->__store(NULL, meta, data);
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;
@@ -266,9 +265,7 @@ skip_data:
 			ctrl->enqueue_request_safe(req);
 
 			/* Perform cleanup */
-//			delete data;
 			ongoing_downloads.erase(iter);
-			//free(download->data);
 			free(download);
 		} else {
 			// FIXME: leave this open in case more data is on the wire

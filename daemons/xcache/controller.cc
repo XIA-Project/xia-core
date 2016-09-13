@@ -496,7 +496,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
-	register_meta(meta);
+	std::string cid = "CID:" + meta->get_cid();
+
 	store_manager.store(meta, data);
 
 	meta->set_state(AVAILABLE);
@@ -504,6 +505,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	_map.add_meta(meta);
 
 	meta->unlock();
+
+	register_meta(cid);
 
 	return RET_SENDRESP;
 }
@@ -741,16 +744,13 @@ int xcache_controller::create_sender(void)
 	return xcache_sock;
 }
 
-int xcache_controller::register_meta(xcache_meta *meta)
+int xcache_controller::register_meta(std::string &cid)
 {
 	int rv;
 	std::string empty_str("");
-	std::string temp_cid("CID:");
 
-	temp_cid += meta->get_cid();
-
-	syslog(LOG_DEBUG, "Setting Route for %s.\n", temp_cid.c_str());
-	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
+	syslog(LOG_DEBUG, "Setting Route for %s.\n", cid.c_str());
+	rv = xr.setRoute(cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
 
 	return rv;
 }
@@ -761,14 +761,14 @@ void xcache_controller::enqueue_request_safe(xcache_req *req)
 	request_queue.push(req);
 	pthread_mutex_unlock(&request_queue_lock);
 
-	while(sem_post(&req_sem) != 0);
+	sem_post(&req_sem);
 }
 
 xcache_req *xcache_controller::dequeue_request_safe(void)
 {
 	xcache_req *ret;
 
-	while(sem_wait(&req_sem) != 0);
+	sem_wait(&req_sem);
 
 	pthread_mutex_lock(&request_queue_lock);
 	ret = request_queue.front();
