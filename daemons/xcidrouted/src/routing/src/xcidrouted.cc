@@ -905,7 +905,9 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 		msg.CID2Info[*it].senderHID = routeState.myHID;
 	}
 
-	msg.send(neighbor.sendSock);
+	if(msg.CID2Info.size() > 0){
+		msg.send(neighbor.sendSock);
+	}
 
 #else
 	//TODO: non-filter version of this
@@ -933,8 +935,10 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 		}
 	}
 
-	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
-		msg.send(it->second.sendSock);
+	if(msg.CID2Info.size() > 0){
+		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
+			msg.send(it->second.sendSock);
+		}
 	}
 
 #else
