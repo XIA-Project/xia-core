@@ -36,7 +36,7 @@ using namespace std;
 #define MAX_SEQNUM 10000000
 #define MAX_HOP_COUNT 50
 #define MAX_TTL 2
-#define EXPIRE_TIME 2
+#define EXPIRE_TIME 5
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
 //#define STATS_LOG

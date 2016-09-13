@@ -388,8 +388,6 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 }
 
 int broadcastRIP() {
-	printf("Broadcast CID: \n");
-
 	map<string, vector<string>> neighbor2CID;
 	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 		string neighbor = *it;
@@ -406,6 +404,8 @@ int broadcastRIP() {
 	}
 
 	if(neighbor2CID.size() != 0){
+		printf("Broadcast CID: \n");
+
 		for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 			string neighborHID = *it;
 

@@ -27,7 +27,7 @@ using namespace std;
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
 #define MAX_TTL 2
-#define EXPIRE_TIME 2
+#define EXPIRE_TIME 5
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
 #define ROUTE_XID_DEFAULT "-"
