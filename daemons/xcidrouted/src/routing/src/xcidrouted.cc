@@ -1307,7 +1307,7 @@ int recvMessageFromSock(int sock, string &data){
 	}
 
 	if(remaining > XIA_MAXBUF){
-		printf("received size have invalid size. Exit\n");
+		printf("received size have invalid size: %lu. Exit\n", remaining);
 		cleanup(0);
 	} else if(remaining == 0) {
 		return -1;
