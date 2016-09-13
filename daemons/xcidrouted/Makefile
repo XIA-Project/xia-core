@@ -11,3 +11,5 @@ clean:
 	rm -f ./bin/client
 	rm -f ./bin/server
 	rm -f ./bin/xcidrouted
+	rm -f ./bin/xcidrouted_ls
+	rm -f ./bin/xcidrouted_dv

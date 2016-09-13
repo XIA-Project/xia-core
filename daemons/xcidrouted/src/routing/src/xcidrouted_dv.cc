@@ -273,8 +273,6 @@ void initRouteState() {
 		Xclose(route_state.send_sock);
    		exit(-1);
    	}
-
-   	printf("finished init route state\n");
 }
 
 void periodicJobs(){
@@ -556,13 +554,17 @@ int main(int argc, char *argv[]) {
 		if (selectRetVal > 0) {
 			memset(recv_message, 0, sizeof(recv_message));
 			
+			printf("about to receive something\n");
+
 			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 				perror("Xrecvfrom have a problem");
 			}
-			
+
 			Graph g(&theirDAG);
 			string neighborHID = g.intent_HID_str();
+
+			printf("receive packet from %s\n", neighborHID.c_str());
 
 			route_state.mtx.lock();
 #ifdef STATS_LOG
