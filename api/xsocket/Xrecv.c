@@ -179,6 +179,8 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
+	printf("passed all Xrecvfrom check\n");
+
 	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
 }
 
@@ -194,11 +196,15 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
+	printf("_xrecvfrom: passed rbuf check\n");
+
 	if (addr && *addrlen < sizeof(sockaddr_x)) {
 		LOG("addr is not large enough");
 		errno = EINVAL;
 		return -1;
 	}
+
+	printf("_xrecvfrom: passed addr check\n");
 
 	xia::XSocketMsg xsm;
 	unsigned seq;
@@ -221,6 +227,8 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
+	printf("_xrecvfrom: send to click\n");
+
 	xsm.Clear();
 
 	if ((numbytes = click_reply(sockfd, seq, &xsm)) < 0) {
@@ -235,6 +243,8 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 
 	*iface = xrm->interface_id();
 
+	printf("_xrecvfrom: received from click\n");
+
 	if ((unsigned)paylen <= len) {
 		memcpy(rbuf, payload, paylen);
 
@@ -244,13 +254,20 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		paylen = len;
 	}
 
+	printf("_xrecvfrom: memcpy from click payload\n");
+
 	if (addr) {
 		Graph g(xrm->sender_dag().c_str());
 
 		// FIXME: validate addr
 		g.fill_sockaddr((sockaddr_x*)addr);
 		*addrlen = sizeof(sockaddr_x);
+
+		printf("_xrecvfrom: fill sockaddr_x\n");
+
 	}
+
+	printf("_xrecvfrom: finished everything\n");
 
     return paylen;
 }
