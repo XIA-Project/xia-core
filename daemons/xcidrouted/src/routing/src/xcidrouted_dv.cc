@@ -322,36 +322,27 @@ void updateClickRoutingTable() {
 	distance-cid2
 	...
 */
-string constructBroadcastRIP(vector<string> & cids, string neighborHID){
+string constructBroadcastRIP(vector<string> & cids){
 	std::ostringstream sstream;
-	
-	int num_cids = 0;
+
+	int num_cids = cids.size();
+
+	sstream << num_cids << "^";
 	for (auto i = cids.begin(); i != cids.end(); ++i) {
 		RouteEntry curr = route_state.CIDrouteTable[*i];
-		
-		// split horizon, don't advertise route learned from neighbor
-		// back to neighbor
-		if(curr.cost < ttl && curr.nextHop != neighborHID){
-			num_cids++;
-		}
-	}
-	sstream << num_cids << "^";
-
-	if(num_cids != 0){
-		for (auto i = cids.begin(); i != cids.end(); ++i) {
-			RouteEntry curr = route_state.CIDrouteTable[*i];
-			if(curr.cost < ttl && curr.nextHop != neighborHID){
-				sstream << (*i) << "^";
-				sstream << curr.cost << "^";
-			}
-		}	
-	}
+		sstream << (*i) << "^";
+		sstream << curr.cost << "^";
+	}	
 
 	return sstream.str();
 }
 
 
 int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int start, int end){
+	if(start > end){
+		return 1;
+	}
+
 	int rc1 = 0, rc2 = 0, msglen, buflen;
 	char buffer[XIA_MAXBUF];
 	bzero(buffer, XIA_MAXBUF);
@@ -361,7 +352,7 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 		temp.push_back(cids[i]);
 	}
 
-	string rip = constructBroadcastRIP(temp, neighborHID);
+	string rip = constructBroadcastRIP(temp);
 	msglen = rip.size();
 
 	if(msglen < XIA_MAXBUF){
@@ -397,20 +388,36 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 int broadcastRIP() {
 	printf("Broadcast CID: \n");
 
-	vector<string> allCIDs;
-	for(auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
-		allCIDs.push_back(it->first);
-		printf("CID: %s\n", it->first.c_str());
-		printf("\tnextHop: %s\n", it->second.nextHop.c_str());
-		printf("\tcost: %d\n", it->second.cost);
+	map<string, vector<string>> neighbor2CID;
+	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
+		string neighbor = *it;
+
+		for(auto ij = route_state.CIDrouteTable.begin(); ij != route_state.CIDrouteTable.end(); ++ij){
+			string cid = ij->first;
+			int cost = ij->second.cost;
+			string nextHop = ij->second.nextHop;
+
+			if(cost < ttl && nextHop != neighbor){
+				neighbor2CID[neighbor].push_back(cid);
+			}
+		}
 	}
 
-	if(allCIDs.size() != 0){
+	if(neighbor2CID.size() != 0){
 		for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 			string neighborHID = *it;
-			printf("CIDs are sent to neighborHID: %s\n", neighborHID.c_str());
-			if(broadcastRIPHelper(allCIDs, neighborHID, 0, allCIDs.size() - 1) < 0){
-				syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
+
+			if(neighbor2CID.find(neighborHID) != neighbor2CID.end()){
+				printf("CIDs are sending to neighborHID: %s\n", neighborHID.c_str());
+				for(auto ij = neighbor2CID[neighborHID].begin(); ij !=  neighbor2CID[neighborHID].end(); ++ij){
+					printf("CID: %s\n", ij->c_str());
+					printf("\tnextHop: %s\n", route_state.CIDrouteTable[*ij].nextHop.c_str());
+					printf("\tcost: %d\n", route_state.CIDrouteTable[*ij].cost);
+				}
+
+				if(broadcastRIPHelper(neighbor2CID[neighborHID], neighborHID, 0, neighbor2CID[neighborHID].size() - 1) < 0){
+					syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
+				}
 			}
 		}
 	}
@@ -499,7 +506,7 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   		}
 
   		if(change){
-  			printf("this route is set");
+  			printf("this route is set\n");
   		}
   	}
 
@@ -574,7 +581,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if(neighborHID.empty()){
-				cleanup(0);
+				continue;
 			}
 
 			route_state.mtx.lock();

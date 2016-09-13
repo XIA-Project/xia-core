@@ -82,7 +82,7 @@ void periodicJobs();
 void updateClickRoutingTable();
 void removeOutdatedRoutes();
 
-string constructBroadcastRIP(vector<string> & cids, string neighborHID);
+string constructBroadcastRIP(vector<string> & cids);
 int sendBroadcastRIPHelper(const vector<string> & cids, string neighborHID, int start, int end);
 int broadcastRIP();
 int processRIPUpdate(string neighborHID, string rip_msg);
