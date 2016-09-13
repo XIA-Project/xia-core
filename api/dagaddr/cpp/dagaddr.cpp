@@ -805,14 +805,15 @@ Graph::intent_HID_str() const
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
-//	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
+	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
 		// Save each node visited
 		Node n = get_node(curIndex);
 		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
 			hid = n.to_string();
-//			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+			break;
 		}
 	}
 	return hid;
