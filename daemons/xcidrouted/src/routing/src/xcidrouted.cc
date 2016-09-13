@@ -571,6 +571,7 @@ void cleanCIDRoutes(){
 	}
 }
 #else
+
 void setMinCostCIDRoutes(string cid){
 	if(routeState.CIDRoutes.find(cid) != routeState.CIDRoutes.end()){
 		uint32_t minCost = INT_MAX;
@@ -1270,6 +1271,23 @@ int handleNeighborMessage(string data, const NeighborInfo &neighbor){
   	}
 }
 
+int processNeighborMessage(const NeighborInfo &neighbor){
+	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
+	string data;
+	int status = recvMessageFromSock(neighbor.recvSock, data);
+	if(status < 0){
+		printf("neighbor has closed the connection\n");
+		return -1;	
+	}
+
+	if(handleNeighborMessage(data, neighbor) < 0){
+		printf("handle message failed\n");
+		return -2;
+	}
+
+	return 0;
+}
+
 int recvMessageFromSock(int sock, string &data){
 	int n, to_recv;
 	size_t remaining, size;
@@ -1312,7 +1330,7 @@ int recvMessageFromSock(int sock, string &data){
 	}
 
 	if(data.size() != size){
-		printf("received data have invalid size. Exit\n");
+		printf("received data have invalid size. Should never happen\n");
 		cleanup(0);
 	}
 	
@@ -1357,23 +1375,6 @@ int sendMessageToSock(int sock, string advertisement){
 #ifdef STATS_LOG
 	logger->log("send " + to_string(advertisement.size()));
 #endif
-
-	return 0;
-}
-
-int processNeighborMessage(const NeighborInfo &neighbor){
-	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
-	string data;
-	int status = recvMessageFromSock(neighbor.recvSock, data);
-	if(status < 0){
-		printf("neighbor has closed the connection\n");
-		return -1;	
-	}
-
-	if(handleNeighborMessage(data, neighbor) < 0){
-		printf("handle message failed\n");
-		return -2;
-	}
 
 	return 0;
 }
