@@ -405,7 +405,7 @@ int broadcastRIP() {
 		printf("\tcost: %d\n", it->second.cost);
 	}
 
-	if(allCIDs.size != 0){
+	if(allCIDs.size() != 0){
 		for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 			string neighborHID = *it;
 			printf("CIDs are sent to neighborHID: %s\n", neighborHID.c_str());
