@@ -273,6 +273,8 @@ void initRouteState() {
 		Xclose(route_state.send_sock);
    		exit(-1);
    	}
+
+   	printf("finished init route state\n");
 }
 
 void periodicJobs(){
@@ -403,14 +405,16 @@ int broadcastRIP() {
 		printf("\tcost: %d\n", it->second.cost);
 	}
 
-
-	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
-		string neighborHID = *it;
-		printf("CIDs are sent to neighborHID: %s\n", neighborHID.c_str());
-		if(broadcastRIPHelper(allCIDs, neighborHID, 0, allCIDs.size() - 1) < 0){
-			syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
+	if(allCIDs.size != 0{
+		for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
+			string neighborHID = *it;
+			printf("CIDs are sent to neighborHID: %s\n", neighborHID.c_str());
+			if(broadcastRIPHelper(allCIDs, neighborHID, 0, allCIDs.size() - 1) < 0){
+				syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
+			}
 		}
 	}
+
 
 	return 0;
 }

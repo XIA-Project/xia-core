@@ -265,14 +265,11 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
   if ((size_t) res != cmd.size())
     return sys_err;
 
-  syslog(LOG_INFO, "before write to control socket\n");
   res = ::write(_fd, buf, bufsz);
   if (res < 0)
     return sys_err;
   if (res != bufsz)
     return sys_err;
-
-  syslog(LOG_INFO, "after write to control socket before read from control socket\n");
 
   string cmd_resp;
   string line;
@@ -285,8 +282,6 @@ ControlSocketClient::write(string el, string handler, const char *buf, int bufsz
     cmd_resp += line;
   }
   while (line[3] == '-');
-
-  syslog(LOG_INFO, "after readline and everything\n");
 
   int code = get_resp_code(line);
   if (code != CODE_OK && code != CODE_OK_WARN)
