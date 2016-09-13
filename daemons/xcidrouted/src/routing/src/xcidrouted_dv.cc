@@ -292,6 +292,7 @@ void periodicJobs(){
 			getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
 
+			printf("inside periodicJobs and before removeOutdatedRoutes\n");
 			removeOutdatedRoutes();
 			broadcastRIP();
 
