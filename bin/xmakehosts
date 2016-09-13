@@ -1,0 +1,20 @@
+#!/bin/bash
+xdir="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+rdag() {
+ssh -A $1 <<EOF
+	xdir="$xdir"
+	cd $xdir
+	bin/xdag
+EOF
+}
+
+bin/xdag > etc/hosts.xia
+
+for h in $*; do
+	echo "$(rdag $h 2> /dev/null | tail -n1)" >> etc/hosts.xia
+done
+
+for h in $*; do
+	scp $xdir/etc/hosts.xia $h:$xdir/etc
+done
