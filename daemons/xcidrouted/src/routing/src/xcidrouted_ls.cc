@@ -506,8 +506,11 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 int sendLSA(){
 	int rc = -1;
 	uint32_t seq = 0;
-	if ((rc = sendLSAHelper(seq, 0, route_state.sourceCids.size() - 1)) < 0){
-		return -1;
+
+	if(route_state.sourceCids.size() != 0){
+		if ((rc = sendLSAHelper(seq, 0, route_state.sourceCids.size() - 1)) < 0){
+			return -1;
+		}
 	}
 
 	route_state.lsa_seq++;

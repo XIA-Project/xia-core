@@ -555,8 +555,6 @@ int main(int argc, char *argv[]) {
 		selectRetVal = Xselect(route_state.recv_sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			memset(recv_message, 0, sizeof(recv_message));
-			
-			printf("about to receive something\n");
 
 			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
@@ -564,6 +562,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			Graph g(&theirDAG);
+			
 			string neighborHID;
 			for(int i = 0; i < g.num_nodes(); ++i){
 				Node curr = g.get_node(i);
@@ -576,8 +575,6 @@ int main(int argc, char *argv[]) {
 			if(neighborHID.empty()){
 				cleanup(0);
 			}
-
-			printf("receive packet from %s\n", neighborHID.c_str());
 
 			route_state.mtx.lock();
 #ifdef STATS_LOG
