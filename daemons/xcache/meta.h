@@ -81,14 +81,8 @@ public:
 
 	std::string get_cid() { return cid; }
 
-	int lock(void) { 
-		syslog(LOG_INFO, "%p meta lock\n", this);
-		return pthread_mutex_lock(&meta_lock); 
-	}
-	int unlock(void) { 
-		syslog(LOG_INFO, "%p meta unlock\n", this);
-		return pthread_mutex_unlock(&meta_lock); 
-	}
+	int lock(void) { return 0; return pthread_mutex_lock(&meta_lock); }
+	int unlock(void) { return 0; return pthread_mutex_unlock(&meta_lock); }
 };
 
 

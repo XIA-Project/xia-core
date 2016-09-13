@@ -194,8 +194,8 @@ public:
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);
 
-	int register_meta(xcache_meta *);
 	int unregister_meta(xcache_meta *);
+	int register_meta(std::string &);
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
@@ -204,18 +204,6 @@ public:
 
 	void enqueue_request_safe(xcache_req *req);
 	xcache_req *dequeue_request_safe(void);
-
-	inline int req_sem_wait_safe(void) {
-		while(sem_wait(&req_sem) != 0);
-
-		return 0;
-	}
-
-	inline int req_sem_post_safe(void) {
-		while(sem_post(&req_sem) != 0);
-
-		return 0;
-	}
 };
 
 #endif
