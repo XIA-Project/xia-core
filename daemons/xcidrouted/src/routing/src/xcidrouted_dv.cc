@@ -292,7 +292,7 @@ void periodicJobs(){
 			getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
 
-			printf("inside periodicJobs and before removeOutdatedRoutes\n");
+			printf("inside periodicJobs and before removeOutdatedRoutes\ngit ");
 			removeOutdatedRoutes();
 			broadcastRIP();
 
@@ -417,6 +417,7 @@ int broadcastRIP() {
 					printf("\tnextHop: %s\n", route_state.CIDrouteTable[*ij].nextHop.c_str());
 					printf("\tcost: %d\n", route_state.CIDrouteTable[*ij].cost);
 				}
+
 
 				if(broadcastRIPHelper(neighbor2CID[neighborHID], neighborHID, 0, neighbor2CID[neighborHID].size() - 1) < 0){
 					syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
@@ -565,6 +566,7 @@ int main(int argc, char *argv[]) {
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000; // Main loop runs every 2000 usec
 
+		printf();
 		selectRetVal = Xselect(route_state.recv_sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0) {
 			memset(recv_message, 0, sizeof(recv_message));

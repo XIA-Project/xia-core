@@ -821,6 +821,7 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		removeExpiredNeighbor(*it);
 	}
+
 	// then remove routes
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		NeighborInfo currNeighbor = routeState.neighbors[*it];
