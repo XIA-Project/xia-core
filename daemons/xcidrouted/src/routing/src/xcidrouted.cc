@@ -906,6 +906,7 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() > 0){
+		printf("send neighbor join to %s\n", neighbor.HID.c_str());
 		msg.send(neighbor.sendSock);
 	}
 
@@ -936,6 +937,7 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() > 0){
+		printf("send neighbor leave from neighbor: %s\n", neighbor.HID.c_str());
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			msg.send(it->second.sendSock);
 		}
