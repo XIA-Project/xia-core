@@ -288,9 +288,11 @@ void periodicJobs(){
             route_state.mtx.lock();
             getRouteEntries("HID", currHidRouteEntries);
 			populateNeighborState(currHidRouteEntries);
-
+			
 			getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
+
+			removeOutdatedRoutes();
 			broadcastRIP();
 
 #ifdef STATS_LOG
@@ -438,7 +440,9 @@ void removeOutdatedRoutes(){
   	}
 
   	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
-  		printf("purging: %s\n", it->c_str());
+  		printf("purging: %s with nextHop %s cost %d\n", it->c_str(), route_state.CIDrouteTable[*it].nextHop.c_str(), 
+  				route_state.CIDrouteTable[*it].cost);
+
   		route_state.CIDrouteTable.erase(*it);
   	}
 
