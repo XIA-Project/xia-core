@@ -393,14 +393,20 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 }
 
 int broadcastRIP() {
+	printf("Broadcast CID: \n");
+
 	vector<string> allCIDs;
 	for(auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it){
 		allCIDs.push_back(it->first);
+		printf("CID: %s\n", it->first.c_str());
+		printf("\tnextHop: %s\n", it->second.nextHop.c_str());
+		printf("\tcost: %d\n", it->second.cost);
 	}
+
 
 	for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 		string neighborHID = *it;
-
+		printf("CIDs are sent to neighborHID: %s\n", neighborHID.c_str());
 		if(broadcastRIPHelper(allCIDs, neighborHID, 0, allCIDs.size() - 1) < 0){
 			syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
 		}
@@ -433,6 +439,8 @@ void removeOutdatedRoutes(){
 }
 
 int processRIPUpdate(string neighborHID, string rip_msg) {
+	printf("Receive RIP from neighbor: %s\n", neighborHID.c_str());
+
 	size_t found, start;
 	string msg, cid_num_str, cid, cost;
 
@@ -463,6 +471,8 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   			start = found+1;  // forward the search point
   		}
 
+  		printf("\tcid: %s cost: %s\n", cid.c_str(), cost.c_str());
+
   		int curr_cost = atoi(cost.c_str());
   		if (route_state.CIDrouteTable.find(cid) != route_state.CIDrouteTable.end()){
   			if(route_state.CIDrouteTable[cid].cost > curr_cost + 1){
@@ -471,6 +481,10 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   				route_state.CIDrouteTable[cid].nextHop = neighborHID;
   				route_state.CIDrouteTable[cid].timer = time(NULL);
   				change = true;
+  			} else if (route_state.CIDrouteTable[cid].cost == curr_cost + 1 && 
+  					route_state.CIDrouteTable[cid].nextHop == neighborHID){
+  				// refresh timer for CIDs.
+  				route_state.CIDrouteTable[cid].timer = time(NULL);
   			}
   		} else {
   			route_state.CIDrouteTable[cid].cost = curr_cost + 1;
@@ -478,6 +492,10 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   			route_state.CIDrouteTable[cid].nextHop = neighborHID;
   			route_state.CIDrouteTable[cid].timer = time(NULL);
   			change = true;
+  		}
+
+  		if(change){
+  			printf("this route is set");
   		}
   	}
 
