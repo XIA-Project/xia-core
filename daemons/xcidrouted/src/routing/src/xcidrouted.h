@@ -42,8 +42,6 @@
 #define HELLO_MAX_BUF_SIZE 4096
 #define MAX_TTL 5
 #define HELLO_EXPIRE 3
-
-#define INIT_WAIT_TIME_SEC 30
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
 #define DEFAULT_NAME "router0"
@@ -88,6 +86,12 @@ public:
 	enum MsgType {
         Join, Leave, Advertise
     };
+
+    typedef struct {
+		uint32_t ttl;			// ttl to broadcast the advertisement
+		uint32_t distance;		// # hops to the sender
+		string senderHID;			// who is the original sender
+	} CIDInfo;
 };
 
 class AdvertisementMessage: CIDMessage{
@@ -101,9 +105,7 @@ public:
 
 	int send(int sock) override;
 
-	string senderHID;			// who is the original sender
-	uint32_t ttl;				// ttl to broadcast the advertisement
-	uint32_t distance; 			// # hops to the sender
+	CIDInfo info;
 
 	set<string> newCIDs; 	// new CIDs in the advertisement
 	set<string> delCIDs; 	// CIDs that need deletion
@@ -114,18 +116,12 @@ public:
 	NodeJoinMessage();
 	~NodeJoinMessage();
 
-	typedef struct {
-		uint32_t ttl;
-		string destHID;
-	} CIDInfo;
-
 	string serialize() const override;
 	void deserialize(string data) override;
 	void print() const override;
 
 	int send(int sock) override;
 
-	string senderHID;
 	map<string, CIDInfo> CID2Info;
 };
 
@@ -140,9 +136,8 @@ public:
 
 	int send(int sock) override;
 
-	string senderHID;
 	string prevHID;					// who send this message previously
-	map<string, uint32_t> CID2TTL;
+	map<string, CIDInfo> CID2Info;
 };
 
 class NeighborInfo{
