@@ -820,7 +820,7 @@ void removeExpiredNeighbor(string neighborHID){
 	}
 	routeState.neighbors.erase(neighborHID);
 
-	printf("can we still find this neighbor: %s\n", neighborHID.c_str());
+	printf("we still find this neighbor: %d\n", routeState.neighbors.find() != routeState.neighbors.end());
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
