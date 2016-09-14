@@ -206,6 +206,13 @@ class ClickControl:
             return False
         return True
 
+    # TODO: Add setRVDAG and setRVControlDAG functions here.
+    def setRVDAG(self, router_rv_dag):
+        print "setRVDAG called, but ignored"
+
+    def setRVControlDAG(self, control_plane_dag):
+        print "setRVControlDAG called, but ignored"
+
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":
