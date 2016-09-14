@@ -940,13 +940,14 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 		string currCIDNextHop = it->second.nextHop;
 		uint32_t currCIDCost = it->second.cost;
 
-		if(currCIDNextHop == neighbor.HID && ttl - currCIDCost - 1 > 0){
-			msg.CID2Info[currCID].ttl = ttl - currCIDCost - 1;
-			msg.CID2Info[currCID].distance = currCIDCost + 1;
-			msg.CID2Info[currCID].senderHID = currCIDDest;
-
-			// delete routes to the neighbor
+		if(currCIDNextHop == neighbor.HID){
 			xr.delRouteCIDRouting(currCID);
+
+			if(ttl - currCIDCost - 1 > 0){
+				msg.CID2Info[currCID].ttl = ttl - currCIDCost - 1;
+				msg.CID2Info[currCID].distance = currCIDCost + 1;
+				msg.CID2Info[currCID].senderHID = currCIDDest;
+			}
 		}
 	}
 
