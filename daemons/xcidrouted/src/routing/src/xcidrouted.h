@@ -213,7 +213,7 @@ void printNeighborInfo();
 
 void processHelloMessage();
 void removeExpiredNeighbor(string neighbor);
-void removeExpiredNeighbors(const vector<string>& neighbors);
+void removeExpiredNeighbors(vector<string> neighbors);
 void checkExpiredNeighbors();
 void processNeighborConnect();
 void sendNeighborJoin(const NeighborInfo &neighbor);

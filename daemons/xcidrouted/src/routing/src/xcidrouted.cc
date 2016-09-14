@@ -821,7 +821,7 @@ void removeExpiredNeighbor(string neighbor){
 	routeState.neighbors.erase(neighbor);
 }
 
-void removeExpiredNeighbors(const vector<string>& neighbors){
+void removeExpiredNeighbors(vector<string> neighbors){
 	routeState.mtx.lock();
 	// first remove the unused neighbors
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
@@ -839,6 +839,8 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 
 void checkExpiredNeighbors(){
 	time_t now = time(NULL);
+
+	printNeighborInfo();
 
 	vector<string> candidates;
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
