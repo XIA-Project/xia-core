@@ -2475,7 +2475,9 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
-	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	// get rid of expensive packet push warning
+	//WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 	WritablePacket *p = NULL;
 
