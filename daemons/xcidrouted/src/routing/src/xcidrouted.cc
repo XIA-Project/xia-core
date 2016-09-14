@@ -1256,6 +1256,8 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() != 0){
+		msg.prevHID = routeState.myHID;
+
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			if(it->first != neighbor.HID){
 				msg.send(it->second.sendSock);
