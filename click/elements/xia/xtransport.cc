@@ -336,20 +336,28 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	case RVDAG:
 	{
 		XIAPath rvdag;
+		int iface;
 		if (cp_va_kparse(conf, f, errh,
+						 "IFACE", cpkP + cpkM, cpInteger, &iface,
 						 "RVDAG", cpkP + cpkM, cpXIAPath, &rvdag,
 						 cpEnd) < 0)
+			click_chatter("ERROR: parsing args for rvDAG write handler");
 			return -1;
-		click_chatter("XTRANSPORT: RV DAG is now %s", f->_local_addr.unparse().c_str());
-		String local_addr_str = f->_local_addr.unparse().c_str();
-		// If a RV dag was assigned, this is a router.
-		// So assign the same RV DAG to all interfaces
+
 		for(int i=0; i<f->_num_ports; i++) {
-			if(!f->_interfaces.update_rv_dag(i, local_addr_str)) {
-				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
-				return -1;
+			// If iface=-1, assign rv_dag to all interfaces
+			if(iface == -1 || iface == i) {
+				if(!f->_interfaces.update_rv_dag(i, rvdag.unparse())) {
+					click_chatter("ERROR: Updating dag: %s to iface: %d",
+							rvdag.unparse().c_str(), i);
+					return -1;
+				}
 			}
 		}
+
+		click_chatter("XTRANSPORT: RV DAG is now %s", rvdag.unparse().c_str());
+		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
+
 		break;
 	}
 	case HID:

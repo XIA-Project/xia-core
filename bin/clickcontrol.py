@@ -182,7 +182,7 @@ class ClickControl:
 
     # Assign a Rendezvous DAG to a given router
     def assignRVDAG(self, hostname, hosttype, dag):
-        if not self.writeCommand('%s/xrc/xtransport.rvDAG %s' % (hostname, dag)):
+        if not self.writeCommand('%s/xrc/xtransport.rvDAG 0,%s' % (hostname, dag)):
             return False
         return True
 
