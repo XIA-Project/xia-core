@@ -319,7 +319,7 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 	uint16_t computed_cksum = in_cksum((u_short *)pload, hdr.plen());
 
 	if (cksum != computed_cksum) {
-		WARN("computed checksum (%04x) != reported checksum (%04x), discarding packet", computed_cksum, cksum);
+		WARN("computed checksum (0x%04x) != reported checksum (0x%04x), discarding packet", computed_cksum, cksum);
 		return;
 	}
 
