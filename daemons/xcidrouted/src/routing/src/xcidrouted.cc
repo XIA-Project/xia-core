@@ -788,6 +788,8 @@ void processHelloMessage(){
 
 	string key = msg.AD + msg.HID;
 
+	printf("hello mesage AD: %s HID: %s\n", msg.AD.c_str(), msg.HID.c_str());
+
 	if(routeState.neighbors[key].sendSock == -1) {
 		int sock = connectToNeighbor(msg.AD, msg.HID, msg.SID);
 		if(sock == -1){
@@ -822,12 +824,11 @@ void removeExpiredNeighbor(string neighbor){
 			routeState.neighbors[neighbor].recvSock = -1;
 		}
 
-		printf("erasing: %s\n", neighbor.c_str());
 		routeState.neighbors.erase(it);
 	}
 }
 
-void removeExpiredNeighbors(vector<string> neighbors){
+void removeExpiredNeighbors(const vector<string>& neighbors){
 	routeState.mtx.lock();
 	// first remove the unused neighbors
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
@@ -852,7 +853,7 @@ void checkExpiredNeighbors(){
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
-			candidates.push_back(it->second.AD+it->second.HID);
+			candidates.push_back(it->first);
 		}
 	}
 
