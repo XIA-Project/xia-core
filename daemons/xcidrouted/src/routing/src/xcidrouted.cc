@@ -152,7 +152,7 @@ void AdvertisementMessage::deserialize(string data){
   	if (found != string::npos) {
   		distance_str = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
-  		
+
   		this->info.distance = atoi(distance_str.c_str());
   	}
 
@@ -1126,7 +1126,7 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	
 	routeState.mtx.unlock();
 
-	// update the message and broadcast to other neighbor
+	// 	update the message and broadcast to other neighbor
 	// 	iff there are something meaningful to broadcast
 	// 	AND ttl is not going to be zero
 #ifdef FILTER
@@ -1134,6 +1134,7 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 #else
 	if(msg.info.ttl - 1 > 0 && (msg.newCIDs.size() > 0 || msg.delCIDs.size() > 0)){
 #endif
+		printf("There is an opportunity for relaying the advertisement\n");
 		AdvertisementMessage msg2Others;
 		msg2Others.info.senderHID = msg.info.senderHID;
 		msg2Others.info.ttl = msg.info.ttl - 1;
