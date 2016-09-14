@@ -7,12 +7,12 @@ Logger::Logger(const string name){
 Logger::Logger(const char* hostname){
 	this->startTime = time(0);
 
-	string logFileName("log/");
+	string logFileName("stats/");
 	logFileName += hostname;
 	logFileName += "_";
 	logFileName += ctime(&startTime);
 	logFileName = logFileName.substr(0, logFileName.length() - 1);
-	logFileName += ".log";
+	logFileName += ".dat";
 
 	this->logfile.open(logFileName.c_str());
 	// print out the start time
