@@ -212,7 +212,7 @@ int connectToNeighbor(string AD, string HID, string SID);
 void printNeighborInfo();
 
 void processHelloMessage();
-void removeExpiredNeighbor(string neighborHID);
+void removeExpiredNeighbor(string neighbor);
 void removeExpiredNeighbors(const vector<string>& neighbors);
 void checkExpiredNeighbors();
 void processNeighborConnect();

@@ -809,18 +809,16 @@ void processHelloMessage(){
 	}
 }
 
-void removeExpiredNeighbor(string neighborHID){
-	if(routeState.neighbors[neighborHID].sendSock != -1){
-		Xclose(routeState.neighbors[neighborHID].sendSock);
-		routeState.neighbors[neighborHID].sendSock = -1;
+void removeExpiredNeighbor(string neighbor){
+	if(routeState.neighbors[neighbor].sendSock != -1){
+		Xclose(routeState.neighbors[neighbor].sendSock);
+		routeState.neighbors[neighbor].sendSock = -1;
 	}
-	if(routeState.neighbors[neighborHID].recvSock != -1){
-		Xclose(routeState.neighbors[neighborHID].recvSock);
-		routeState.neighbors[neighborHID].recvSock = -1;
+	if(routeState.neighbors[neighbor].recvSock != -1){
+		Xclose(routeState.neighbors[neighbor].recvSock);
+		routeState.neighbors[neighbor].recvSock = -1;
 	}
-	routeState.neighbors.erase(neighborHID);
-
-	printf("we still find this neighbor: %d\n", routeState.neighbors.find() != routeState.neighbors.end());
+	routeState.neighbors.erase(neighborx);
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
@@ -846,7 +844,7 @@ void checkExpiredNeighbors(){
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
-			candidates.push_back(it->first);
+			candidates.push_back(it->second.AD+it->second.HID);
 		}
 	}
 
