@@ -822,7 +822,6 @@ void removeExpiredNeighbor(string neighborHID){
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
-	routeState.mtx.lock();
 	// first remove the unused neighbors
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		removeExpiredNeighbor(*it);
@@ -834,13 +833,14 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 		printf("neighbor: %s has expired\n", it->c_str());
 		sendNeighborLeave(currNeighbor);
 	}
-	routeState.mtx.unlock();
 }
 
 void checkExpiredNeighbors(){
 	time_t now = time(NULL);
 
 	vector<string> candidates;
+
+	routeState.mtx.lock();
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
@@ -855,6 +855,8 @@ void checkExpiredNeighbors(){
 
 	printf("neighbors after remove expired\n");
 	printNeighborInfo();
+
+	routeState.mtx.unlock();
 }
 
 void processNeighborConnect(){
@@ -889,9 +891,8 @@ void processNeighborConnect(){
 	routeState.neighbors[key].AD = AD;
 	routeState.neighbors[key].HID = HID;
 	routeState.neighbors[key].port = interface;
-	routeState.mtx.unlock();
 	routeState.neighbors[key].timer = time(NULL);
-
+	routeState.mtx.unlock();
 }
 
 // function already protected by locks
@@ -1449,6 +1450,8 @@ int main(int argc, char *argv[]) {
 		FD_SET(routeState.masterSock, &socks);
 
 		highSock = max(routeState.helloSock, routeState.masterSock);
+
+		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			if(it->second.recvSock > highSock){
 				highSock = it->second.recvSock;
@@ -1458,6 +1461,8 @@ int main(int argc, char *argv[]) {
 				FD_SET(it->second.recvSock, &socks);
 			}
 		}
+		routeState.mtx.lock();
+
 
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000;
@@ -1477,6 +1482,7 @@ int main(int argc, char *argv[]) {
 				int status;
 				vector<string> candidates;
 
+				routeState.mtx.lock();
 				for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 					// if we recv a message from one of our established neighbor, procees the message
 					if(it->second.recvSock != -1 && FD_ISSET(it->second.recvSock, &socks)){
@@ -1487,6 +1493,7 @@ int main(int argc, char *argv[]) {
 					}
 				}
 				removeExpiredNeighbors(candidates);
+				routeState.mtx.unlock();
 			}
 		}
 	}
