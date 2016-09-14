@@ -1319,7 +1319,7 @@ int recvMessageFromSock(int sock, string &data){
 	size_t remaining, size;
 	char buf[IO_BUF_SIZE];
 
-	printf("receiving CID advertisement...\n");
+	printf("receiving message...\n");
 
 	n = Xrecv(sock, (char*)&remaining, sizeof(size_t), 0);
 	if (n < 0) {
@@ -1486,6 +1486,7 @@ int main(int argc, char *argv[]) {
 						status = processNeighborMessage(it->second);
 						if(status == -1){
 							candidates.push_back(it->first);
+							printf("need to remove%s\n", it->first.c_str());
 						}
 					}
 				}
