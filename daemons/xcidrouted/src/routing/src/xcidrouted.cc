@@ -822,6 +822,7 @@ void removeExpiredNeighbor(string neighbor){
 			routeState.neighbors[neighbor].recvSock = -1;
 		}
 
+		printf("erasing: %s\n", neighbor.c_str());
 		routeState.neighbors.erase(it);
 	}
 }
