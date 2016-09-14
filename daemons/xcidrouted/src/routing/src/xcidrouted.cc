@@ -1404,6 +1404,18 @@ int sendMessageToSock(int sock, string advertisement){
 	return 0;
 }
 
+void removeOldRoutes(){
+	vector<XIARouteEntry> routeEntries;
+	getRouteEntries("CID", routeEntries);
+
+	for(unsigned i = 0; i < routeEntries.size(); i++){
+		if(routeEntries[i].xid != ROUTE_XID_DEFAULT
+			 && routeEntries[i].port != (unsigned short)DESTINED_FOR_LOCALHOST){
+			xr.delRouteCIDRouting(routeEntries[i].xid);
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
 	int rc, selectRetVal, iteration = 0;
 	int32_t highSock;
@@ -1422,6 +1434,7 @@ int main(int argc, char *argv[]) {
 
 	initRouteState();
    	registerReceiver();
+   	removeOldRoutes();
 
 #if defined(STATS_LOG)
    	logger = new Logger(hostname);

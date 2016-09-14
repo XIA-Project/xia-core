@@ -208,6 +208,7 @@ void CIDAdvertiseTimer();
 
 void registerReceiver();
 void initRouteState();
+void removeOldRoutes();
 int connectToNeighbor(string AD, string HID, string SID);
 void printNeighborInfo();
 
