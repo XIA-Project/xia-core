@@ -1458,6 +1458,9 @@ int main(int argc, char *argv[]) {
 
 		highSock = max(routeState.helloSock, routeState.masterSock);
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
+			printf("for neighbor %s\n", it->first.c_str());
+			printf("for neighbor HID %s\n", it->second.HID.c_str());
+
 			if(it->second.recvSock > highSock){
 				highSock = it->second.recvSock;
 			}
