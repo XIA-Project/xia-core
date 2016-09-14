@@ -824,7 +824,11 @@ void removeExpiredNeighbor(string neighbor){
 			routeState.neighbors[neighbor].recvSock = -1;
 		}
 
+		printNeighborInfo();
+		printf("before remove\n");
 		routeState.neighbors.erase(it);
+		printf("after remove\n");
+		printNeighborInfo();
 	}
 }
 
@@ -846,8 +850,6 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 
 void checkExpiredNeighbors(){
 	time_t now = time(NULL);
-
-	printNeighborInfo();
 
 	vector<string> candidates;
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
@@ -1486,7 +1488,7 @@ int main(int argc, char *argv[]) {
 						status = processNeighborMessage(it->second);
 						if(status == -1){
 							candidates.push_back(it->first);
-							printf("need to remove%s\n", it->first.c_str());
+							printf("need to remove %s\n", it->first.c_str());
 						}
 					}
 				}
