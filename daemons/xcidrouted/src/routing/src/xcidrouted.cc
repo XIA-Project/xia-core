@@ -623,7 +623,6 @@ void advertiseCIDs(){
 	// then find the deleted local CIDs
 	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); it++){
 		if(currLocalCIDs.find(*it) == currLocalCIDs.end()){
-			printf("sending delete CID message: %s\n", it->c_str());
 			msg.delCIDs.insert(*it);
 		}
 	}
@@ -631,7 +630,6 @@ void advertiseCIDs(){
 	// find all the new local CIDs first
 	for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
 		if(routeState.localCIDs.find(*it) == routeState.localCIDs.end()){
-			printf("sending new CID message: %s\n", it->c_str());
 			msg.newCIDs.insert(*it);
 		}
 	}
