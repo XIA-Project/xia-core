@@ -793,6 +793,8 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
+	bool set_full_dag = false;
+
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
@@ -803,8 +805,12 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	// FIXME: why are these different??
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	// NOTE: CID dags arrive here with the last ptr = the SID node,
+	//  so we can't use the last pointer as it's not pointing to the
+	// CID. I don't think this will break existing logic.
+	//XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	XID _destination_xid = dst_path.xid(dst_path.destination_node());
+
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	XIDpair xid_pair;
@@ -867,26 +873,23 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
-				// FIXME: is this the right place/right way to do this???
-				// we have received a syn, flatten the dag so all future packets come to us
 				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-					 // we've received a request for a CID which usually contains a fallback
+					 // we've received a SYN for a CID DAG which usually contains a fallback
 					 // we need to strip out the direct path to the content and only use the
-					 // AD->HID->CID path.
+					 // AD->HID->SID->CID path.
 					 // Additionally, we may be a router which can service the request, so
-					 // don't just flatten the DAG, but make sure it points to us.
-					 // FIXME: are there any implications for multihoming here?
+					 // don't just flatten the DAG, but make sure it points to our cache daemon.
 					 // FIXME: can we do this without having to convert to strings?
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
-//					str_local_addr += _xcache_sid.unparse();
-//					str_local_addr += " ";
+					str_local_addr += _xcache_sid.unparse();
+					str_local_addr += " ";
 					str_local_addr += _destination_xid.unparse();
 
-					sk->dst_path.parse_re(str_local_addr);
+					set_full_dag = true;
+					dst_path.parse_re(str_local_addr);
 				}
 
-				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
@@ -897,6 +900,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				int iface;
 				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 					new_sk->outgoing_iface = iface;
+				}
+				if (set_full_dag) {
+					new_sk->full_src_dag = true;
 				}
 				new_sk->set_key(xid_pair);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
@@ -1295,170 +1301,6 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	return NULL;
 }
 
-
-#if 0
-void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
-{
-	XIAHeader xiah(p_in->xia_header());
-
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
-
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	XID	_source_xid = src_path.xid(src_path.destination_node());
-
-	TransportHeader thdr(p_in);
-
-	XIDpair xid_pair;
-	xid_pair.set_src(_destination_xid);
-	xid_pair.set_dst(_source_xid);
-
-	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-	sock *sk = XID2Sock(_destination_xid);
-
-	if (!sk) {
-		// FIXME: we need to fix the state machine so this doesn't happen!
-		WARN("sk == NULL\n");
-		return;
-	}
-
-	INFO("socket %d received SYN\n", sk->port);
-
-	if (sk->state != LISTEN) {
-		// we aren't marked to accept connecctions, drop it
-		WARN("SYN received on a non-listening socket (port:%u), dropping...\n", sk->port);
-		return;
-	}
-
-	if (sk->pending_connection_buf.size() >= sk->backlog) {
-		// the backlog is full, we can't take it right now, drop it
-
-		WARN("SYN received but backlog is full (port:%u), dropping...\n", sk->port);
-		return;
-	}
-
-	// First, check if this request is already in the pending queue
-	HashTable<XIDpair , struct sock*>::iterator it;
-	it = XIDpairToConnectPending.find(xid_pair);
-
-	if (it != XIDpairToConnectPending.end()) {
-		// we've already seen it, ignore it
-		INFO("Socket %d received duplicate SYN\n", sk->port);
-
-		// FIXME: is this OK?
-		it->second->num_retransmits = 0;
-		return ;
-	}
-
-	// For a CID packet, modify dst_path variable
-	dst_path = alterCIDDstPath(dst_path);
-
-	// if this is new request, put it in the queue
-
-	// send SYNACK to client
-	INFO("Socket %d Handling new SYN\n", sk->port);
-
-	XIAHeaderEncap xiah_new;
-	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-	xiah_new.set_last(LAST_NODE_DEFAULT);
-	xiah_new.set_hlim(HLIM_DEFAULT);
-	xiah_new.set_dst_path(src_path);
-	xiah_new.set_src_path(dst_path);
-
-	WritablePacket *just_payload_part;
-	int payloadLength;
-
-	// FIXME: use SendControlPacket to send the SYNACK instead of building it by hand
-
-	std::cout << "Xcachesock = " <<sk->xcacheSock << "\n";
-	// FIXME: move to a separate function
-	if(!sk->xcacheSock && usingRendezvousDAG(sk->src_path, dst_path)) {
-		XID _destination_xid = dst_path.xid(dst_path.destination_node());
-		INFO("Sending SYNACK with verification for RV DAG");
-		// Destination DAG from the SYN packet
-		String src_path_str = dst_path.unparse();
-
-		// Current timestamp as nonce against replay attacks
-		Timestamp now = Timestamp::now();
-		double timestamp = strtod(now.unparse().c_str(), NULL);
-
-		// Build the payload with DAG for this service and timestamp
-		XIASecurityBuffer synackPayload(1024);
-		synackPayload.pack(src_path_str.c_str(), src_path_str.length());
-		synackPayload.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
-
-		// Sign the synack payload
-		char signature[MAX_SIGNATURE_SIZE];
-		uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-		if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-			ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-			MigrateFailure(sk);
-			return;
-		}
-
-		// Retrieve public key for this host
-		char pubkey[MAX_PUBKEY_SIZE];
-		uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-		if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-			ERROR("ERROR public key not found for %s", _destination_xid.unparse().c_str());
-			MigrateFailure(sk);
-			return;
-		}
-
-		// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
-		XIASecurityBuffer signedPayload(2048);
-		signedPayload.pack(synackPayload.get_buffer(), synackPayload.size());
-		signedPayload.pack(signature, signatureLength);
-		signedPayload.pack((char *)pubkey, pubkeyLength);
-
-		just_payload_part = WritablePacket::make(256, (const void*)signedPayload.get_buffer(), signedPayload.size(), 1);
-		payloadLength = signedPayload.size();
-	} else {
-		const char* dummy = "Connection_pending";
-		just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-		payloadLength = strlen(dummy);
-	}
-
-	WritablePacket *p = NULL;
-
-	xiah_new.set_plen(payloadLength);
-
-	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader(0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
-	p = thdr_new->encap(just_payload_part);
-
-	thdr_new->update();
-	xiah_new.set_plen(payloadLength + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-	p = xiah_new.encap(p, false);
-	delete thdr_new;
-
-	// Prepare new sock for this connection
-	sock *new_sk = new sock();
-	ChangeState(new_sk, SYN_RCVD);
-	new_sk->port = 0; // just for now. This will be updated via Xaccept call
-	new_sk->sock_type = SOCK_STREAM;
-	new_sk->dst_path = src_path;
-	new_sk->src_path = dst_path;
-	new_sk->isAcceptedSocket = true;
-	new_sk->pkt = copy_packet(p, new_sk);
-		int iface;
-		// Interface card matching src_path to use during migration
-		if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
-			new_sk->outgoing_iface = iface;
-		}
-		new_sk->refcount = 1;
-
-	memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
-	memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
-
-	ScheduleTimer(new_sk, ACK_DELAY);
-
-	XIDpairToConnectPending.set(xid_pair, new_sk);
-
-	output(NETWORK_PORT).push(p);
-	INFO("Sent SYNACK from new socket\n");
-}
-#endif
 
 int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 {
@@ -2194,66 +2036,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		idToSock.set(new_id, new_sk);
 
 		sk->pending_connection_buf.pop();
-
-
-
-// FIXME: does this block of code do anything??? I don't see the payload getting used
-// I think it's all happening in the syn handling above?
-/*
-		WritablePacket *just_payload_part;
-		int payloadLength;
-		std::cout << "Xcachesock = " <<sk->xcacheSock << "\n";
-		if((sk->xcacheSock == false) && usingRendezvousDAG(sk->src_path, new_sk->src_path)) {
-			XID _destination_xid = new_sk->src_path.xid(new_sk->src_path.destination_node());
-			INFO("Xaccept: Sending SYNACK with verification for RV DAG");
-			// Destination DAG from the SYN packet
-			String src_path_str = new_sk->src_path.unparse();
-
-			// Current timestamp as nonce against replay attacks
-			Timestamp now = Timestamp::now();
-			double timestamp = strtod(now.unparse().c_str(), NULL);
-
-			// Build the payload with DAG for this service and timestamp
-			XIASecurityBuffer synackPayload(1024);
-			synackPayload.pack(src_path_str.c_str(), src_path_str.length());
-			synackPayload.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
-
-			// Sign the synack payload
-			char signature[MAX_SIGNATURE_SIZE];
-			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-			if (xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-				ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-			}
-
-			// Retrieve public key for this host
-			char pubkey[MAX_PUBKEY_SIZE];
-			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-			if (xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-				ERROR("ERROR public key not found for %s", _destination_xid.unparse().c_str());
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-			}
-
-			// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
-			XIASecurityBuffer signedPayload(2048);
-			signedPayload.pack(synackPayload.get_buffer(), synackPayload.size());
-			signedPayload.pack(signature, signatureLength);
-			signedPayload.pack((char *)pubkey, pubkeyLength);
-
-			just_payload_part = WritablePacket::make(256, (const void*)signedPayload.get_buffer(), signedPayload.size(), 1);
-			payloadLength = signedPayload.size();
-		}
-
-		else {
-			const char* dummy = "Connection_granted";
-			just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-			payloadLength = strlen(dummy);
-		}
-		*/
 
 		// tell APP our id for future communications
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
@@ -3193,18 +2975,19 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 	if (rc == 0) {
 		rc = pktPayloadSize;
 
-		//Recalculate source path
-		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
-		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
-		//Make source DAG _local_addr:SID
-		String dagstr = sk->src_path.unparse_re();
-
-		//Client Mobility...
-		if (dagstr.length() != 0 && dagstr != str_local_addr) {
-			//Moved!
-			// 1. Update 'sk->src_path'
-			sk->src_path.parse_re(str_local_addr);
-		}
+		// FIXME: we can probably delete this block
+		// //Recalculate source path
+		// XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		// String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
+		// //Make source DAG _local_addr:SID
+		// String dagstr = sk->src_path.unparse_re();
+		//
+		// //Client Mobility...
+		// if (dagstr.length() != 0 && dagstr != str_local_addr) {
+		// 	//Moved!
+		// 	// 1. Update 'sk->src_path'
+		// 	sk->src_path.parse_re(str_local_addr);
+		// }
 
 		// Case of initial binding to only SID
 		if (sk->full_src_dag == false) {

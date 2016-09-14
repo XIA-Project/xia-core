@@ -516,15 +516,29 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 	int rc = 0;
 	std::string myCid("CID:");
 
-	struct addrinfo *ai, hints;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_XIA;
-	hints.ai_flags = XAI_FALLBACK;
+	struct addrinfo *ai;
 
 	myCid += cid;
-	if (Xgetaddrinfo(NULL, myCid.c_str(), &hints, &ai) >= 0) {
+
+	// make a direct AD-HID-SID dag for the xcache daemon
+	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
 		if (ai->ai_addr) {
-			memcpy(sax, ai->ai_addr, sizeof(sockaddr_x));
+			// now append the CID to it
+			Node cnode(myCid);
+			Graph spath((sockaddr_x*)ai->ai_addr);
+			spath *= cnode;
+
+			// now make a direct ->CID path
+			Graph cpath = Node() * cnode;
+
+			// make final dag
+			// * => CID is primary
+			// * => AD => HID => SID => CID is fallback
+			Graph dag = cpath + spath;
+
+			sockaddr_x xaddr;
+			dag.fill_sockaddr(&xaddr);
+			memcpy(sax, &xaddr, sizeof(sockaddr_x));
 		} else {
 			rc = -1;
 		}
@@ -721,6 +735,9 @@ int xcache_controller::create_sender(void)
 		syslog(LOG_ERR, "XsetXcacheSID failed\n");
 		return -1;
 	}
+
+	// save our SID in the class struct for later use
+	xcache_sid = sid_string;
 
 	syslog(LOG_INFO, "XcacheSID is %s\n", sid_string);
 

@@ -61,6 +61,8 @@ private:
 	 */
 	std::string hostname;
 
+	std::string xcache_sid;
+
 	/**
 	 * Lookup a context based on context ID.
 	 */
