@@ -649,6 +649,7 @@ void advertiseCIDs(){
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
 		routeState.mtx.lock();
+
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 			printf("sending CID advertisement to neighbor%s\n", it->first.c_str());
 			msg.send(it->second.sendSock);
@@ -821,6 +822,7 @@ void removeExpiredNeighbor(string neighborHID){
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
+	routeState.mtx.lock();
 	// first remove the unused neighbors
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		removeExpiredNeighbor(*it);
@@ -832,21 +834,23 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 		printf("neighbor: %s has expired\n", it->c_str());
 		sendNeighborLeave(currNeighbor);
 	}
+	routeState.mtx.unlock();
 }
 
 void checkExpiredNeighbors(){
 	time_t now = time(NULL);
 
 	vector<string> candidates;
-	routeState.mtx.lock();
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
 			candidates.push_back(it->first);
 		}
 	}
+
 	removeExpiredNeighbors(candidates);
-	routeState.mtx.unlock();
+
+	printNeighborInfo();
 }
 
 void processNeighborConnect(){
@@ -1469,7 +1473,6 @@ int main(int argc, char *argv[]) {
 				int status;
 				vector<string> candidates;
 
-				routeState.mtx.lock();
 				for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 					// if we recv a message from one of our established neighbor, procees the message
 					if(it->second.recvSock != -1 && FD_ISSET(it->second.recvSock, &socks)){
@@ -1480,7 +1483,6 @@ int main(int argc, char *argv[]) {
 					}
 				}
 				removeExpiredNeighbors(candidates);
-				routeState.mtx.unlock();
 			}
 		}
 	}
