@@ -853,6 +853,9 @@ void checkExpiredNeighbors(){
 
 	vector<string> candidates;
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
+		printf("check timer for: %s\n", it->first.c_str());
+		printf("\tHID: %s\n", it->second.HID.c_str());
+
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
 			candidates.push_back(it->first);
