@@ -330,10 +330,12 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 		// src = ping sender, dest = us
 		INFO("PING #%u received: %s\n      => %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
-		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
+
 		// src = us, dest = original sender
 		INFO("PONG #%u sent: %s\n      => %s\n", sn,
 			hdr.dst_path().unparse().c_str(), hdr.src_path().unparse().c_str());
+
+		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
 
 	} else if (xcmph->type == XCMP_ECHOREPLY) {
 		// PONG
