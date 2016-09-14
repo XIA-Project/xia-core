@@ -1225,6 +1225,9 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	NodeLeaveMessage msg;
 	msg.deserialize(data);
 
+	printf("received a node leave message\n");
+	msg.print();
+
 #ifdef FILTER
 	routeState.mtx.lock();
 
