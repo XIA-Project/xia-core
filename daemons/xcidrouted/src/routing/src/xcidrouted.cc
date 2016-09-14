@@ -650,6 +650,7 @@ void advertiseCIDs(){
 		routeState.mtx.lock();
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
+			printf("sending CID advertisement to neighbor%s\n", it->first.c_str());
 			msg.send(it->second.sendSock);
 		}
 
