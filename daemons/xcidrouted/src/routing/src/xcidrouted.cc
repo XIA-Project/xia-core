@@ -818,7 +818,7 @@ void removeExpiredNeighbor(string neighbor){
 		Xclose(routeState.neighbors[neighbor].recvSock);
 		routeState.neighbors[neighbor].recvSock = -1;
 	}
-	routeState.neighbors.erase(neighborx);
+	routeState.neighbors.erase(neighbor);
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
