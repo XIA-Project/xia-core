@@ -307,8 +307,21 @@ XCMP::processPacket(Packet *p_in) {
 // got an xcmp packet, need to either send up or respond with a different xcmp message
 void
 XCMP::gotXCMPPacket(Packet *p_in) {
-	const XIAHeader hdr(p_in);
-	const struct click_xia_xcmp *xcmph = reinterpret_cast<const struct click_xia_xcmp *>(hdr.payload());
+	char pload[1500];
+	XIAHeader hdr(p_in);
+
+	// have to work around const qualifiers
+	memcpy(pload, hdr.payload(), hdr.plen());
+
+	struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(pload);
+	uint16_t cksum = xcmph->cksum;
+	xcmph->cksum = 0;
+	uint16_t computed_cksum = in_cksum((u_short *)pload, hdr.plen());
+
+	if (cksum != computed_cksum) {
+		WARN("computed checksum (%04x) != reported checksum (%04x), discarding packet", computed_cksum, cksum);
+		return;
+	}
 
 	if (xcmph->type == XCMP_ECHO) {
 		// PING
@@ -412,7 +425,7 @@ u_short XCMP::in_cksum(u_short *addr, int len) {
 	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
 	sum += (sum >> 16);					/* add carry */
 	answer = ~sum;						/* truncate to 16 bits */
-	return htons(answer);
+	return answer;
 }
 
 CLICK_ENDDECLS
