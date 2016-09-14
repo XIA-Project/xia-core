@@ -1149,9 +1149,10 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 #endif
 
 		routeState.mtx.lock();
-		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-			if(it->second.HID != neighbor.HID && msg.info.senderHID != neighbor.HID){
-				printf("relaying advertisement to %s\n", it->second.HID.c_str());
+		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
+			printf("relaying advertisement to %s\n", it->second.HID.c_str());
+			if(it->second.HID != neighbor.HID && msg.info.senderHID != it->second.HID){
+				printf("pass relay check\n");
 				msg2Others.send(it->second.sendSock);
 			}
 		}
