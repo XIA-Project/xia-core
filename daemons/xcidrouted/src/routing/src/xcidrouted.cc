@@ -828,6 +828,7 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 	// then remove routes
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
 		NeighborInfo currNeighbor = routeState.neighbors[*it];
+		printf("neighbor: %s has expired\n", it->c_str());
 		sendNeighborLeave(currNeighbor);
 	}
 	routeState.mtx.unlock();
