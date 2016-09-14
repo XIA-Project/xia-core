@@ -458,6 +458,7 @@ void cleanup(int) {
 	routeState.mtx.lock();
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
 		Xclose(it->second.recvSock);
+		Xclose(it->second.sendSock);
 	}
 	routeState.mtx.unlock();
 
@@ -811,9 +812,11 @@ void processHelloMessage(){
 void removeExpiredNeighbor(string neighborHID){
 	if(routeState.neighbors[neighborHID].sendSock != -1){
 		Xclose(routeState.neighbors[neighborHID].sendSock);
+		routeState.neighbors[neighborHID].sendSock = -1;
 	}
 	if(routeState.neighbors[neighborHID].recvSock != -1){
 		Xclose(routeState.neighbors[neighborHID].recvSock);
+		routeState.neighbors[neighborHID].recvSock = -1;
 	}
 	routeState.neighbors.erase(neighborHID);
 }
