@@ -622,6 +622,7 @@ void advertiseCIDs(){
 	// then find the deleted local CIDs
 	for(auto it = routeState.localCIDs.begin(); it != routeState.localCIDs.end(); it++){
 		if(currLocalCIDs.find(*it) == currLocalCIDs.end()){
+			printf("sending delete CID message: %s\n", it->c_str());
 			msg.delCIDs.insert(*it);
 		}
 	}
@@ -629,6 +630,7 @@ void advertiseCIDs(){
 	// find all the new local CIDs first
 	for(auto it = currLocalCIDs.begin(); it != currLocalCIDs.end(); it++){
 		if(routeState.localCIDs.find(*it) == routeState.localCIDs.end()){
+			printf("sending new CID message: %s\n", it->c_str());
 			msg.newCIDs.insert(*it);
 		}
 	}
@@ -1095,6 +1097,9 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
+
+	printf("Received message from neighbor %s\n", neighbor.HID.c_str());
+	msg.print();
 
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
