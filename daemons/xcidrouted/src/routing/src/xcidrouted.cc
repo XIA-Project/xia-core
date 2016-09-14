@@ -788,8 +788,6 @@ void processHelloMessage(){
 
 	string key = msg.AD + msg.HID;
 
-	printf("hello mesage AD: %s HID: %s\n", msg.AD.c_str(), msg.HID.c_str());
-
 	if(routeState.neighbors[key].sendSock == -1) {
 		int sock = connectToNeighbor(msg.AD, msg.HID, msg.SID);
 		if(sock == -1){
@@ -811,38 +809,36 @@ void processHelloMessage(){
 	}
 }
 
-void removeExpiredNeighbor(string neighbor){
-	auto it = routeState.neighbors.find(neighbor);
-
-	if(it != routeState.neighbors.end()){
-		if(routeState.neighbors[neighbor].sendSock != -1){
-			Xclose(routeState.neighbors[neighbor].sendSock);
-			routeState.neighbors[neighbor].sendSock = -1;
-		}
-		if(routeState.neighbors[neighbor].recvSock != -1){
-			Xclose(routeState.neighbors[neighbor].recvSock);
-			routeState.neighbors[neighbor].recvSock = -1;
-		}
-
-		printNeighborInfo();
-		printf("before remove\n");
-		routeState.neighbors.erase(it);
-		printf("after remove\n");
-		printNeighborInfo();
+NeighborInfo removeExpiredNeighbor(string neighbor){
+	if(routeState.neighbors[neighbor].sendSock != -1){
+		Xclose(routeState.neighbors[neighbor].sendSock);
+		routeState.neighbors[neighbor].sendSock = -1;
 	}
+	if(routeState.neighbors[neighbor].recvSock != -1){
+		Xclose(routeState.neighbors[neighbor].recvSock);
+		routeState.neighbors[neighbor].recvSock = -1;
+	}
+
+	NeighborInfo ret = routeState.neighbors[neighbor];
+	routeState.neighbors.erase(neighbor);
+
+	return ret;
 }
 
 void removeExpiredNeighbors(const vector<string>& neighbors){
 	routeState.mtx.lock();
+
+	vector<NeighborInfo> removedNeighbors;
 	// first remove the unused neighbors
 	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
-		removeExpiredNeighbor(*it);
+		NeighborInfo info = removeExpiredNeighbor(*it);
+		removedNeighbors.push_back(info);
 	}
 
 	// then remove routes
-	for(auto it = neighbors.begin(); it != neighbors.end(); ++it){
-		NeighborInfo currNeighbor = routeState.neighbors[*it];
-		printf("neighbor: %s has expired\n", it->c_str());
+	for(auto it = removedNeighbors.begin(); it != removedNeighbors.end(); ++it){
+		NeighborInfo currNeighbor = *it;
+		printf("neighbor %s has expired\n", currNeighbor.HID.c_str());
 		sendNeighborLeave(currNeighbor);
 	}
 	routeState.mtx.unlock();
@@ -853,9 +849,6 @@ void checkExpiredNeighbors(){
 
 	vector<string> candidates;
 	for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
-		printf("check timer for: %s\n", it->first.c_str());
-		printf("\tHID: %s\n", it->second.HID.c_str());
-
 		// if this neighbor is expired
 		if(now - it->second.timer >= HELLO_EXPIRE){
 			candidates.push_back(it->first);
@@ -1458,9 +1451,6 @@ int main(int argc, char *argv[]) {
 
 		highSock = max(routeState.helloSock, routeState.masterSock);
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-			printf("for neighbor %s\n", it->first.c_str());
-			printf("for neighbor HID %s\n", it->second.HID.c_str());
-
 			if(it->second.recvSock > highSock){
 				highSock = it->second.recvSock;
 			}
@@ -1494,7 +1484,6 @@ int main(int argc, char *argv[]) {
 						status = processNeighborMessage(it->second);
 						if(status == -1){
 							candidates.push_back(it->first);
-							printf("need to remove %s\n", it->first.c_str());
 						}
 					}
 				}
