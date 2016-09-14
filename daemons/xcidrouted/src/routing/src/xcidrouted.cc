@@ -810,15 +810,20 @@ void processHelloMessage(){
 }
 
 void removeExpiredNeighbor(string neighbor){
-	if(routeState.neighbors[neighbor].sendSock != -1){
-		Xclose(routeState.neighbors[neighbor].sendSock);
-		routeState.neighbors[neighbor].sendSock = -1;
+	auto it = routeState.neighbors.find(neighbor);
+
+	if(it != routeState.neighbors.end()){
+		if(routeState.neighbors[neighbor].sendSock != -1){
+			Xclose(routeState.neighbors[neighbor].sendSock);
+			routeState.neighbors[neighbor].sendSock = -1;
+		}
+		if(routeState.neighbors[neighbor].recvSock != -1){
+			Xclose(routeState.neighbors[neighbor].recvSock);
+			routeState.neighbors[neighbor].recvSock = -1;
+		}
+
+		routeState.neighbors.erase(it);
 	}
-	if(routeState.neighbors[neighbor].recvSock != -1){
-		Xclose(routeState.neighbors[neighbor].recvSock);
-		routeState.neighbors[neighbor].recvSock = -1;
-	}
-	routeState.neighbors.erase(neighbor);
 }
 
 void removeExpiredNeighbors(vector<string> neighbors){
