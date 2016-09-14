@@ -848,8 +848,12 @@ void checkExpiredNeighbors(){
 		}
 	}
 
+	printf("neighbors before remove expired\n");
+	printNeighborInfo();
+
 	removeExpiredNeighbors(candidates);
 
+	printf("neighbors after remove expired\n");
 	printNeighborInfo();
 }
 
