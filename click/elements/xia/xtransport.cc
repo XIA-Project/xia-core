@@ -340,9 +340,10 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		if (cp_va_kparse(conf, f, errh,
 						 "IFACE", cpkP + cpkM, cpInteger, &iface,
 						 "RVDAG", cpkP + cpkM, cpXIAPath, &rvdag,
-						 cpEnd) < 0)
+						 cpEnd) < 0) {
 			click_chatter("ERROR: parsing args for rvDAG write handler");
 			return -1;
+		}
 
 		for(int i=0; i<f->_num_ports; i++) {
 			// If iface=-1, assign rv_dag to all interfaces
