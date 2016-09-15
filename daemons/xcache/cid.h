@@ -4,12 +4,17 @@
 #include <string>
 #include "Xsocket.h"
 
+#define CID_HEADER_VER 0x01
+
+// options may eventually follow the header, their size should be
+// included in hlen. but the code doesn't support this yet
+// the format for options has not been determined yet either
 struct cid_header {
-	size_t offset;
-	size_t length;
-	size_t total_length;
-	size_t ttl;
-	char cid[CID_HASH_SIZE + 1];
+	uint16_t version;
+	uint16_t hlen;
+	uint32_t length;
+	uint32_t ttl;
+	//char cid[CID_HASH_SIZE];
 } __attribute__((packed));
 
 std::string compute_cid(const char *data, size_t len);

@@ -163,7 +163,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		break;
 
 	case PACKET_NO_DATA:
-		// it's a pure ACK
+		// it's a pure ACK, we can ignore it
 		syslog(LOG_INFO, "data packet is empty!");
 		return;
 
@@ -273,6 +273,10 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	// there's data, append it to the download buffer
 	if (offset >= sizeof(struct cid_header)) {
 		if (download->data == NULL) {
+			syslog(LOG_INFO, "cid header version      = %u", ntohs(download->header.version));
+			syslog(LOG_INFO, "cid header hlen         = %u", ntohs(download->header.hlen));
+			syslog(LOG_INFO, "cid header chunk length = %u", ntohl(download->header.length));
+			syslog(LOG_INFO, "cid header ttl          = %u", ntohl(download->header.ttl));
 			download->data = (char *)calloc(ntohl(download->header.length), 1);
 		}
 		memcpy(download->data + offset - sizeof(struct cid_header), payload, payload_len);

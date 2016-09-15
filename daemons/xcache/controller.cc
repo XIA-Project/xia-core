@@ -137,6 +137,11 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	remaining = ntohl(header.length);
 
+	syslog(LOG_INFO, "fetch remote:\ncid header version      = %u", ntohs(header.version));
+	syslog(LOG_INFO, "cid header hlen         = %u", ntohs(header.hlen));
+	syslog(LOG_INFO, "cid header chunk length = %u", ntohl(header.length));
+	syslog(LOG_INFO, "cid header ttl          = %u", ntohl(header.ttl));
+
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -674,8 +679,16 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath, time_t
 	size_t offset;
 	int sent;
 
+	header.version = htons(CID_HEADER_VER);
+	header.hlen = htons(sizeof(struct cid_header));
 	header.length = htonl(resp.data().length());
 	header.ttl = htonl(ttl);
+
+	syslog(LOG_INFO, "send remote:\ncid header version      = %u", ntohs(header.version));
+	syslog(LOG_INFO, "cid header hlen         = %u", ntohs(header.hlen));
+	syslog(LOG_INFO, "cid header chunk length = %u", ntohl(header.length));
+	syslog(LOG_INFO, "cid header ttl          = %u", ntohl(header.ttl));
+
 	remaining = sizeof(header);
 	offset = 0;
 
