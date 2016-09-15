@@ -649,7 +649,6 @@ void advertiseCIDs(){
 		routeState.mtx.lock();
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
-			printf("sending CID advertisement to neighbor%s\n", it->first.c_str());
 			msg.send(it->second.sendSock);
 		}
 
@@ -836,7 +835,6 @@ void removeExpiredNeighbors(const vector<string>& neighbors){
 	// then remove routes
 	for(auto it = removedNeighbors.begin(); it != removedNeighbors.end(); ++it){
 		NeighborInfo currNeighbor = *it;
-		printf("neighbor %s has expired\n", currNeighbor.HID.c_str());
 		sendNeighborLeave(currNeighbor);
 	}
 	routeState.mtx.unlock();
@@ -918,7 +916,6 @@ void sendNeighborJoin(const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() > 0){
-		printf("send neighbor join to %s\n", neighbor.HID.c_str());
 		msg.send(neighbor.sendSock);
 	}
 
@@ -950,7 +947,8 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() > 0){
-		printf("send neighbor leave from neighbor: %s\n", neighbor.HID.c_str());
+		msg.prevHID = routeState.myHID;
+
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			msg.send(it->second.sendSock);
 		}
@@ -1109,7 +1107,6 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
 
-	printf("Received message from neighbor %s\n", neighbor.HID.c_str());
 	msg.print();
 
 	// our communication to XIA writes to single socket and is
@@ -1134,7 +1131,6 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 #else
 	if(msg.info.ttl - 1 > 0 && (msg.newCIDs.size() > 0 || msg.delCIDs.size() > 0)){
 #endif
-		printf("There is an opportunity for relaying the advertisement\n");
 		AdvertisementMessage msg2Others;
 		msg2Others.info.senderHID = msg.info.senderHID;
 		msg2Others.info.ttl = msg.info.ttl - 1;
@@ -1150,9 +1146,9 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 
 		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
-			printf("relaying advertisement to %s\n", it->second.HID.c_str());
+			// 1st condition: don't advertise back to where we received this message from
+			// 2nd condition: don't advertise to the original sender of this advertisement
 			if(it->second.HID != neighbor.HID && msg.info.senderHID != it->second.HID){
-				printf("pass relay check\n");
 				msg2Others.send(it->second.sendSock);
 			}
 		}
@@ -1259,12 +1255,10 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() != 0){
-		printf("have meaningful stuff to broadcast to neighbor\n");
 		msg.prevHID = routeState.myHID;
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			if(it->first != neighbor.HID){
-				printf("sending to %s\n", it->first.c_str());
 				msg.send(it->second.sendSock);
 			}
 		}		
