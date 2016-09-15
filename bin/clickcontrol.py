@@ -180,9 +180,10 @@ class ClickControl:
             return False
         return True
 
-    # Assign a Rendezvous DAG to a given router
-    def assignRVDAG(self, hostname, hosttype, dag):
-        if not self.writeCommand('%s/xrc/xtransport.rvDAG 0,%s' % (hostname, dag)):
+    # Assign a Rendezvous DAG to an interface. All interfaces by default.
+    def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
             return False
         return True
 
@@ -206,11 +207,8 @@ class ClickControl:
             return False
         return True
 
-    # TODO: Add setRVDAG and setRVControlDAG functions here.
-    def setRVDAG(self, router_rv_dag):
-        print "setRVDAG called, but ignored"
-
-    def setRVControlDAG(self, control_plane_dag):
+    # TODO: Add setRVControlDAG function here.
+    def setRVControlDAG(self, interface, control_plane_dag):
         print "setRVControlDAG called, but ignored"
 
 # If this library is run by itself, it does a unit test that

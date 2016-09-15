@@ -250,15 +250,18 @@ class NetjoinSession(threading.Thread):
             # TODO: Set the Rendezvous DAG into Click
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:
-                if click.setRVDAG(str(router_rv_dag)) == False:
+                if click.assignRVDAG(self.hostname, "XIAEndHost",
+                        str(router_rv_dag), interface) == False:
                     logging.error("Failed updating RV DAG in XIA Stack")
+                    return
                 logging.info("Router DAG sent to Click and processed")
 
             # TODO: Set the Rendezvous Control DAG into Click
             control_rv_dag = str(netjoin_h2.control_rv_dag())
             if control_rv_dag:
-                if click.setRVControlDAG(str(control_rv_dag)) == False:
+                if click.setRVControlDAG(interface, str(control_rv_dag))==False:
                     logging.error("Failed updating Control RV DAG in XIA Stack")
+                    return
                 logging.info("Control RV DAG sent to Click and processed")
 
         # Inform RV service of new network joined
