@@ -1230,13 +1230,9 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	vector<string> candidates;
 	for(auto it = msg.CID2Info.begin(); it != msg.CID2Info.end(); ++it){
 		string currCID = it->first;
-		string currCIDDestHID = it->second.senderHID;
-		uint32_t currCIDCost = it->second.distance;
 
 		if(routeState.CIDRoutesWithFilter.find(currCID) != routeState.CIDRoutesWithFilter.end() && 
-			routeState.CIDRoutesWithFilter[currCID].nextHop == msg.prevHID &&
-			routeState.CIDRoutesWithFilter[currCID].dest == currCIDDestHID &&
-			routeState.CIDRoutesWithFilter[currCID].cost == currCIDCost){
+			routeState.CIDRoutesWithFilter[currCID].nextHop == msg.prevHID){
 			xr.delRouteCIDRouting(currCID);
 
 			if(msg.CID2Info[currCID].ttl - 1 > 0){
