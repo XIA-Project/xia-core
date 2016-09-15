@@ -1176,7 +1176,7 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 		string currCIDDestHID = it->second.senderHID;
 		uint32_t currCIDCost = it->second.distance;
 		bool shouldSetRoute = false;
-		
+
 		if(routeState.CIDRoutesWithFilter.find(currCID) == routeState.CIDRoutesWithFilter.end() 
 			|| routeState.CIDRoutesWithFilter[currCID].cost > currCIDCost){
 			shouldSetRoute = true;
@@ -1259,10 +1259,12 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	}
 
 	if(msg.CID2Info.size() != 0){
+		printf("have meaningful stuff to broadcast to neighbor\n");
 		msg.prevHID = routeState.myHID;
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			if(it->first != neighbor.HID){
+				printf("sending to %s\n", it->first.c_str());
 				msg.send(it->second.sendSock);
 			}
 		}		
@@ -1289,7 +1291,7 @@ int handleNeighborMessage(string data, const NeighborInfo &neighbor){
   	int type = atoi(typeStr.c_str());
   	string actualData = data.substr(found+1);
 
-  	switch(type){
+  	switch(type){x
   		case CIDMessage::Advertise:
   			return handleAdvertisementMessage(actualData, neighbor);
   		case CIDMessage::Join:
