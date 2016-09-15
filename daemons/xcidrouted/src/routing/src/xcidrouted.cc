@@ -1291,7 +1291,7 @@ int handleNeighborMessage(string data, const NeighborInfo &neighbor){
   	int type = atoi(typeStr.c_str());
   	string actualData = data.substr(found+1);
 
-  	switch(type){x
+  	switch(type){
   		case CIDMessage::Advertise:
   			return handleAdvertisementMessage(actualData, neighbor);
   		case CIDMessage::Join:
