@@ -247,9 +247,10 @@ class NetjoinSession(threading.Thread):
                 logging.error("Failed updating Nameserver DAG in XIA Stack")
             logging.info("Nameserver DAG updated")
 
-            # TODO: Set the Rendezvous DAG into Click
+            # Set the Rendezvous DAG into Click
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:
+                # TODO: Switch out router HID with client HID
                 if click.assignRVDAG(self.hostname, "XIAEndHost",
                         str(router_rv_dag), interface) == False:
                     logging.error("Failed updating RV DAG in XIA Stack")
