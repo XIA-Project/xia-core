@@ -135,7 +135,7 @@ def configure_click(click, config):
                     rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
                     rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
                     router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
-                    resolvconf_lines.append('rendezvous=RE %s' % (rv_fallback))
+                    resolvconf_lines.append('rendezvous=%s' % (router_rv_dag))
                     resolvconf_lines.append('rendezvousc=%s' % (rvc_dag))
 
                 # If nameserver running on this router, assign it a dag
