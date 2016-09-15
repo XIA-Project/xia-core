@@ -9,6 +9,10 @@
 
 #define CACHE_PORT 1444
 
+#define PACKET_INVALID	-2
+#define PACKET_NO_DATA	-1
+#define PACKET_OK		 0
+
 class xcache_cache;
 class xcache_controller;
 
@@ -36,7 +40,7 @@ public:
 	}
 
 	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
-	struct xtcp* validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid);
+	int validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp);
 	xcache_meta* start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid);
 	void unparse_xid(struct click_xia_xid_node *node, std::string &xid);
 
