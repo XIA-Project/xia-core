@@ -304,7 +304,7 @@ void XTRANSPORT::push(int port, Packet *p_input)
 ** HANDLER FUNCTIONS
 *************************************************************/
 // ?????????
-enum {DAG, HID, RVDAG};
+enum {DAG, HID, RVDAG, RVCDAG};
 
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
@@ -357,6 +357,34 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		}
 
 		click_chatter("XTRANSPORT: RV DAG is now %s", rvdag.unparse().c_str());
+		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
+
+		break;
+	}
+	case RVCDAG:
+	{
+		XIAPath rvcdag;
+		int iface;
+		if (cp_va_kparse(conf, f, errh,
+						 "IFACE", cpkP + cpkM, cpInteger, &iface,
+						 "RVCDAG", cpkP + cpkM, cpXIAPath, &rvcdag,
+						 cpEnd) < 0) {
+			click_chatter("ERROR: parsing args for rvcDAG write handler");
+			return -1;
+		}
+
+		for(int i=0; i<f->_num_ports; i++) {
+			// If iface=-1, assign rv_control_dag to all interfaces
+			if(iface == -1 || iface == i) {
+				if(!f->_interfaces.update_rv_control_dag(i, rvcdag.unparse())) {
+					click_chatter("ERROR: Updating dag: %s to iface: %d",
+							rvcdag.unparse().c_str(), i);
+					return -1;
+				}
+			}
+		}
+
+		click_chatter("XTRANSPORT: RVCDAG is now %s", rvcdag.unparse().c_str());
 		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
 
 		break;
@@ -452,6 +480,7 @@ void XTRANSPORT::add_handlers()
 	//add_write_handler("local_addr", write_param, (void *)H_MOVE);
 	add_write_handler("dag", write_param, (void *)DAG);
 	add_write_handler("rvDAG", write_param, (void *)RVDAG);
+	add_write_handler("rvcDAG", write_param, (void *)RVCDAG);
 	add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);

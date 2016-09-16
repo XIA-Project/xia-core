@@ -147,6 +147,7 @@ def configure_click(click, config):
                 click.assignDAG(hostname, hosttype, router_dag)
                 if(len(router_rv_dag) > len(router_dag)):
                     click.assignRVDAG(hostname, hosttype, router_rv_dag)
+                    click.assignRVControlDAG(hostname, hosttype, rvc_dag)
 
         # Write resolv.conf contents
         if len(resolvconf_lines) > 0:

@@ -187,6 +187,13 @@ class ClickControl:
             return False
         return True
 
+    # Assign a Rendezvous Control-plane DAG to an interface. default=all.
+    def assignRVControlDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvcDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
     # Set an HID routing table entry
     def setHIDRoute(self, hostname, hid_str, port, flags):
         cmd = "{}/xrc/n/proc/rt_HID.set4 {},{},{},{}".format(
