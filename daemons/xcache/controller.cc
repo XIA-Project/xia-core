@@ -137,6 +137,8 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	remaining = ntohl(header.length);
 
+	meta->set_created();
+	meta->set_ttl(ntohl(header.ttl));
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -229,6 +231,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
+		resp->set_ttl(meta->ttl());
 	}
 
 	syslog(LOG_INFO, "Releasing meta\n");
@@ -267,6 +270,9 @@ void *xcache_controller::__fetch_content(void *__args)
 	struct __fetch_content_args *args = (struct __fetch_content_args *)__args;
 	sockaddr_x addr;
 	size_t daglen;
+
+	// FIXME: should client specify a ttl? or hornor the one sent by the server
+	// or should we not cache locally, or should eviction be manual only on the client?
 
 	daglen = args->cmd->dag().length();
 	memcpy(&addr, args->cmd->dag().c_str(), args->cmd->dag().length());
@@ -494,7 +500,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
-	register_meta(meta);
+	std::string cid = "CID:" + meta->get_cid();
+
 	store_manager.store(meta, data);
 
 	meta->set_state(AVAILABLE);
@@ -502,6 +509,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	_map.add_meta(meta);
 
 	meta->unlock();
+
+	register_meta(cid);
 
 	return RET_SENDRESP;
 }
@@ -511,15 +520,29 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 	int rc = 0;
 	std::string myCid("CID:");
 
-	struct addrinfo *ai, hints;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_XIA;
-	hints.ai_flags = XAI_FALLBACK;
+	struct addrinfo *ai;
 
 	myCid += cid;
-	if (Xgetaddrinfo(NULL, myCid.c_str(), &hints, &ai) >= 0) {
+
+	// make a direct AD-HID-SID dag for the xcache daemon
+	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
 		if (ai->ai_addr) {
-			memcpy(sax, ai->ai_addr, sizeof(sockaddr_x));
+			// now append the CID to it
+			Node cnode(myCid);
+			Graph spath((sockaddr_x*)ai->ai_addr);
+			spath *= cnode;
+
+			// now make a direct ->CID path
+			Graph cpath = Node() * cnode;
+
+			// make final dag
+			// * => CID is primary
+			// * => AD => HID => SID => CID is fallback
+			Graph dag = cpath + spath;
+
+			sockaddr_x xaddr;
+			dag.fill_sockaddr(&xaddr);
+			memcpy(sax, &xaddr, sizeof(sockaddr_x));
 		} else {
 			rc = -1;
 		}
@@ -545,7 +568,6 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// cid was vaidated by in the API call
 	syslog(LOG_INFO, "evict called for cid:%s!\n", cmd->cid().c_str());
-	printf("evict called for cid:%s!\n", cmd->cid().c_str());
 
 	xcache_meta *meta = acquire_meta(cid.c_str());
 
@@ -555,7 +577,6 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 		switch (meta->state()) {
 			case AVAILABLE:
 				rc = xr.delRoute(c);
-				printf("del route returns %d\n", rc);
 				// let the garbage collector do the actual data removal
 				meta->set_state(EVICTING);
 
@@ -639,7 +660,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 
 // FIXME:this should set fetching state so we can't delete the data/route
 // out from under us
-void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath, time_t ttl)
+void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 {
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
@@ -657,8 +678,11 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath, time_t
 	size_t offset;
 	int sent;
 
+	header.version = htons(CID_HEADER_VER);
+	header.hlen = htons(sizeof(struct cid_header));
 	header.length = htonl(resp.data().length());
-	header.ttl = htonl(ttl);
+	header.ttl = htonl(resp.ttl());
+
 	remaining = sizeof(header);
 	offset = 0;
 
@@ -674,7 +698,6 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath, time_t
 		remaining -= sent;
 		offset += sent;
 		syslog(LOG_DEBUG, "Header Send Remaining %lu\n", remaining);
-
 	}
 
 	remaining = resp.data().length();
@@ -718,6 +741,9 @@ int xcache_controller::create_sender(void)
 		return -1;
 	}
 
+	// save our SID in the class struct for later use
+	xcache_sid = sid_string;
+
 	syslog(LOG_INFO, "XcacheSID is %s\n", sid_string);
 
 	if (Xgetaddrinfo(NULL, sid_string, NULL, &ai) != 0)
@@ -740,16 +766,13 @@ int xcache_controller::create_sender(void)
 	return xcache_sock;
 }
 
-int xcache_controller::register_meta(xcache_meta *meta)
+int xcache_controller::register_meta(std::string &cid)
 {
 	int rv;
 	std::string empty_str("");
-	std::string temp_cid("CID:");
 
-	temp_cid += meta->get_cid();
-
-	syslog(LOG_DEBUG, "Setting Route for %s.\n", temp_cid.c_str());
-	rv = xr.setRoute(temp_cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
+	syslog(LOG_DEBUG, "Setting Route for %s.\n", cid.c_str());
+	rv = xr.setRoute(cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
 
 	return rv;
 }
@@ -760,14 +783,14 @@ void xcache_controller::enqueue_request_safe(xcache_req *req)
 	request_queue.push(req);
 	pthread_mutex_unlock(&request_queue_lock);
 
-	while(sem_post(&req_sem) != 0);
+	sem_post(&req_sem);
 }
 
 xcache_req *xcache_controller::dequeue_request_safe(void)
 {
 	xcache_req *ret;
 
-	while(sem_wait(&req_sem) != 0);
+	sem_wait(&req_sem);
 
 	pthread_mutex_lock(&request_queue_lock);
 	ret = request_queue.front();
@@ -823,16 +846,14 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
-		send_content_remote(req->to_sock, (sockaddr_x *)req->data, req->ttl);
+		send_content_remote(req->to_sock, (sockaddr_x *)req->data);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
 		cmd = (xcache_cmd *)req->data;
 		ret = evict(&resp, cmd);
 		if(ret >= 0) {
-			printf("serializeing\n");
 			resp.SerializeToString(&buffer);
-			printf("serialized\n");
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
 		break;

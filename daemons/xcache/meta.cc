@@ -140,7 +140,6 @@ void meta_map::remove_meta(xcache_meta *meta)
 // delete any pending chunks that have stalled for too long
 int meta_map::walk(void)
 {
-	unsigned count = 0;
 	write_lock();
 
 	std::map<std::string, xcache_meta *>::iterator i;
@@ -174,5 +173,5 @@ int meta_map::walk(void)
 	}
 
 	unlock();
-	return count;
+	return 0;
 }

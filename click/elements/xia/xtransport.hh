@@ -256,27 +256,8 @@ public:
 	// socket teardown
 	bool TeardownSocket(sock *sk);
 
-	// TCP state handlers
-	void ProcessAckPacket(WritablePacket *p_in);
 	void ProcessXcmpPacket(WritablePacket*p_in);
-	void ProcessMigratePacket(WritablePacket *p_in);
-	void ProcessMigrateAck(WritablePacket *p_in);
-	void ProcessSynPacket(WritablePacket *p_in);
-	void ProcessSynAckPacket(WritablePacket *p_in);
-	void ProcessStreamDataPacket(WritablePacket *p_in);
-	void ProcessFinPacket(WritablePacket *p_in);
-	void ProcessFinAckPacket(WritablePacket *p_in);
 
-	// timer retransmit handlers
-	bool RetransmitDATA(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitFIN(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitFINACK(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitSYN(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitSYNACK(sock *sk, uint32_t id, Timestamp &now);
-
-	void SendControlPacket(int type, sock *sk, const void *, size_t plen, XIAPath &src_path, XIAPath &dst_path);
-	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 	void CancelRetransmit(sock *sk);
 	sock *XID2Sock(XID dest_xid);

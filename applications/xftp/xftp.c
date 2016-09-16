@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 	say("\n%s (%s)\n", TITLE, VERSION);
 	say("connecting to %s\n\n", name);
 
-	sock = initializeClient(NAME);
+	sock = initializeClient(name);
 	usage();
 
 	while (true) {
