@@ -208,21 +208,10 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	dst_path.remove_node(dst_path.destination_node());
-	if (dst_path.unparse_node_size() < 1) {
+	// don't send undeliverables back to broadcast packets
+	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
 		return;
 	}
-
-	// don't send undeliverables back to broadcast packets
-	XID dst_hid = dst_path.xid(dst_path.destination_node());
-	if(dst_hid == bcast_xid) {
-		return;
-	}
-
-	// don't send undeliverables back to broadcast packets
-//	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
-//		return;
-//	}
 
 	// the xia_path code seems to discard the visited values, so we need to go
 	// into the dags directly
@@ -247,8 +236,6 @@ XCMP::processUnreachable(Packet *p_in)
 
 	if (bad_node >= 0) {
 		unsigned t = htonl(h->node[bad_node].xid.type);
-		printf("\n\nlast node = %d\n", bad_node);
-		printf("type = %04x\n\n", t);
 		switch (t) {
 			case CLICK_XIA_XID_TYPE_AD:
 				code = XCMP_UNREACH_NET;
