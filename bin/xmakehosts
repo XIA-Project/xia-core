@@ -44,11 +44,12 @@ for h in $*; do
 	rdag $h 2> /dev/null | tail -n1 >>$HOSTSFILE
 done
 
+# now make some bad DAGs for xcmp testing
+badhosts
+
+# copy to all of the specified hosts
 for h in $*; do
 	scp $HOSTSFILE $h:$HOSTSFILE
 done
-
-# now make some bad DAGs for xcmp testing
-badhosts
 
 cat $HOSTSFILE
