@@ -98,7 +98,7 @@ public:
 	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
-	void send_content_remote(int sock, sockaddr_x *mypath, time_t ttl);
+	void send_content_remote(int sock, sockaddr_x *mypath);
 
 	bool verify_content(xcache_meta *meta, const std::string *);
 
