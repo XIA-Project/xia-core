@@ -94,7 +94,7 @@ int make_and_getchunk(int sock)
 	char cmd[5120];
 	char url[5120];
 	sockaddr_x addr;
-	char buf[1024 * 1024];
+	void *buf;
 	int ret;
 
 	// send the file request
@@ -110,21 +110,24 @@ int make_and_getchunk(int sock)
 	printf("Got URL %s\n", url);
 
 	url_to_dag(&addr, url, strlen(url));
-	if ((ret = XfetchChunk(&h, buf, 1024 * 1024, 0, &addr,
-			       sizeof(addr))) < 0) {
+	if ((ret = XfetchChunk(&h, &buf, 0, &addr, sizeof(addr))) < 0) {
 		die(-1, "XfetchChunk Failed\n");
 	}
+	free(buf);
 	return 0;
 }
 
 void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
 {
-	char buf[CHUNKSIZE];
+	int rc;
+	char *buf;
 	int i;
 
 	printf("Received Chunk Arrived Event\n");
 
-	printf("XreadChunk returned %d\nData: \n", XreadChunk(h, addr, addrlen, buf, sizeof(buf), 0));
+	rc = XfetchChunk(h, (void**)&buf, 0, addr, addrlen);
+
+	printf("XfetchChunk returned %d\nData: \n", rc);
 	for (i = 0; i < CHUNKSIZE; i++) {
 		if (i % 16 == 0) {
 			printf("%.8x ", i);
@@ -137,6 +140,7 @@ void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, sock
 		if ((i + 1) % 16 == 0)
 			printf("\n");
 	}
+	free(buf);
 }
 
 int initializeClient(const char *name)

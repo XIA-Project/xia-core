@@ -173,7 +173,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
-	if (!(flags & XCF_SKIPCACHE)) {
+	if ((flags & XCF_CACHE)) {
 		if (__store(context, meta, (const std::string *)&data) == RET_FAILED) {
 			delete meta;
 			Xclose(sock);
@@ -561,7 +561,6 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 
 int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	int rc;
 	std::string cid = cmd->cid();
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -576,7 +575,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 
 		switch (meta->state()) {
 			case AVAILABLE:
-				rc = xr.delRoute(c);
+				xr.delRoute(c);
 				// let the garbage collector do the actual data removal
 				meta->set_state(EVICTING);
 
@@ -586,7 +585,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 				break;
 
 			case FETCHING:
-				rc = xr.delRoute(c);
+				xr.delRoute(c);
 				// mark the chunk to be evicted once it's out of fetching state
 				resp->set_status(xcache_cmd::XCACHE_CID_MARKED_FOR_DELETE);
 				break;
