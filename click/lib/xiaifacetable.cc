@@ -198,9 +198,8 @@ void XIAInterfaceTable::_insert(int iface, String dag)
 }
 
 // Erase entry. Caller makes sure entry exist.
-void XIAInterfaceTable::_erase(int iface, String dag)
+void XIAInterfaceTable::_erase(int iface, String /* dag */)
 {
 	interfaces.erase(iface);
 	numInterfaces--;
 }
-
