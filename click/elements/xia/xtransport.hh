@@ -138,7 +138,6 @@ public:
 private:
 	Timer _timer;
 
-	uint32_t _cid_type, _sid_type;
 	XIAPath _local_addr;
 	String _hostname;
 	XID _hid;

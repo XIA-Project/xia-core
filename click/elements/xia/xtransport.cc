@@ -137,7 +137,6 @@ sock::sock() {
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-	cp_xid_type("SID", &_sid_type);	// FIXME: why isn't this a constant?
 	_next_id = INITIAL_ID;
 }
 
@@ -1844,7 +1843,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		XID front_xid = sk->src_path.xid( xids[0] );
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == _sid_type) {
+		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -1955,7 +1954,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == _sid_type) {
+		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
