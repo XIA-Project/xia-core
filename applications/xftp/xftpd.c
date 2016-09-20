@@ -41,6 +41,8 @@
 #define MAXCHUNKSIZE MB(10)
 
 int verbose = 0;
+unsigned ttl = 0;
+bool setdir = false;
 char name[256];
 char rootdir[256];
 unsigned chunksize = MB(1);
@@ -52,15 +54,18 @@ XcacheHandle xcache;
 void help(const char *name)
 {
 	printf("\n%s (%s)\n", TITLE, VERSION);
-	printf("usage: %s [-v] [-n name] [-c chunk_size] [-r root_dir]\n", name);
+	printf("usage: %s [-v] [-n name] [-c chunk_size] [-r root_dir] [-t chunk_lifetime]\n", name);
 	printf("where:\n");
 	printf(" -v : verbose mode\n");
 	printf(" -n : specify service name (default = %s)\n", NAME);
 	printf(" -c : maximum chunk size (default = 1M)\n");
 	printf(" -r : specify the base directory we are running from\n");
+	printf(" -t : specify the ttl for chunks in seconds\n");
 	printf("\n");
 	exit(0);
 }
+
+void say(const char *fmt, ...);
 
 /*
 ** configure the app
@@ -70,11 +75,12 @@ void getConfig(int argc, char** argv)
 	int c;
 
 	strcpy(name, NAME);
-	(void ) getcwd(rootdir, sizeof(rootdir));
+
+	(void*)getcwd(rootdir, sizeof(rootdir));
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "c:hn:r:v")) != -1) {
+	while ((c = getopt(argc, argv, "c:hn:r:t:v")) != -1) {
 		switch (c) {
 			case 'c':
 				if ((chunksize = atoi(optarg)) != 0) {
@@ -93,6 +99,10 @@ void getConfig(int argc, char** argv)
 				break;
 			case 'r':
 				strcpy(rootdir, optarg);
+				setdir = true;
+				break;
+			case 't':
+				ttl = atoi(optarg);
 				break;
 			case '?':
 			case 'h':
@@ -233,12 +243,16 @@ void *recvCmd(void *socketid)
 int registerReceiver()
 {
 	int sock;
+	char ttls[20];
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
+
+	sprintf(ttls, "%u(s)", ttl);
 
 	say ("\n%s (%s)\n", TITLE, VERSION);
 	say("Service Name: %s\n", name);
 	say("Root Directory: %s\n", rootdir);
-	say("Max Chunk Size: %u\n\n", chunksize);
+	say("Max Chunk Size: %u\n", chunksize);
+	say("Time-to-live: %s\n\n", (ttl == 0 ? "forever" : ttls));
 
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
@@ -301,13 +315,17 @@ int main(int argc, char **argv)
 		die(-1, "Unable to initialze the cache subsystem\n");
 	}
 
+	XcacheHandleSetTtl(&xcache, ttl);
+
 	// set the base directory. This affects all paths for the app,
 	// so do it after we've initialized everything otherwise the paths
 	// to /tmp and the keys directory will be incorrect
-	if (chroot(rootdir) < 0) {
-		die(-1, "\nUnable to chroot (sudo is required!): %s\n", strerror(errno));
+	if (setdir) {
+		if (chroot(rootdir) < 0) {
+			die(-1, "\nUnable to chroot to %s: %s\n", rootdir, strerror(errno));
+		}
+		chdir("/");
 	}
-	(void)chdir("/");
 
 	blockingListener((void *)&sock);
 	XcacheHandleDestroy(&xcache);

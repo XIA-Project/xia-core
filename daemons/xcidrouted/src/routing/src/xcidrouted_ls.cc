@@ -462,8 +462,8 @@ string composeLSA(vector<string> & cids, uint32_t seq){
 
 int sendLSAHelper(uint32_t & seq, int start, int end){
 	int rc1 = 0, rc2 = 0, msglen, buflen;
-	char buffer[XIA_MAXBUF];
-	bzero(buffer, XIA_MAXBUF);
+	char buffer[MSG_CUTOFF];
+	bzero(buffer, MSG_CUTOFF);
 
 	vector<string> currCIDs;
 	for(int i = start; i <= end; i++){
@@ -473,7 +473,7 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 	string lsa = composeLSA(currCIDs, seq);
 	msglen = lsa.size();
 
-	if(msglen < XIA_MAXBUF){
+	if(msglen < MSG_CUTOFF){
 		syslog(LOG_INFO, "sending LSA of seq %u start %d end %d\n", seq, start, end);
 
 		strcpy (buffer, lsa.c_str());

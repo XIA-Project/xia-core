@@ -40,7 +40,7 @@
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
 #define HELLO_MAX_BUF_SIZE 4096
-#define MAX_TTL 4
+#define MAX_TTL 20
 #define HELLO_EXPIRE 10
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
@@ -222,8 +222,8 @@ void sendNeighborLeave(const NeighborInfo &neighbor);
 
 void deleteCIDRoutes(const AdvertisementMessage & msg);
 void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
-set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
-set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg);
+void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
+void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg);
 
 int handleAdvertisementMessage(string data, const NeighborInfo &neighbor);
 int handleNodeJoinMessage(string data, const NeighborInfo &neighbor);

@@ -62,18 +62,35 @@ void xcache_cache::unparse_xid(struct click_xia_xid_node *node, std::string &xid
 	xid = std::string(hex);
 }
 
-struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid)
+int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp)
 {
 	struct click_xia *xiah = (struct click_xia *)pkt;
-	struct xtcp *tcp;
+	struct xtcp *x;
 	unsigned total_nodes;
+	size_t xip_size;
+
+	*xtcp = NULL;
 
 	if ((len < sizeof(struct click_xia)) || (htons(xiah->plen) > len) ) {
 		// packet is too small, this had better not happen!
-		return NULL;
+		return PACKET_INVALID;
 	}
 
 	total_nodes = xiah->dnode + xiah->snode;
+	xip_size = sizeof(struct click_xia) + (total_nodes * sizeof(struct click_xia_xid_node));
+	x = (struct xtcp *)(pkt + xip_size);
+
+	// we only see the flow from server to client, so we'll never see a plain SYN here
+	// FIXME: we should probably be smart enough to deal with other flags like RST here eventually
+	if (x->th_flags == XTH_ACK) {
+		ushort hlen = (ushort)(x->th_off) << 2;
+
+		if (hlen == ntohs(xiah->plen)) {
+			// it's empty and not a SYN-ACK or FIN
+			// so we can ignore it
+			return PACKET_NO_DATA;
+		}
+	}
 
 	 // get the associated client SID and destination CID
 	for (unsigned i = 0; i < total_nodes; i++) {
@@ -88,21 +105,19 @@ struct xtcp* xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid,
 
 	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
-		return NULL;
+		return PACKET_INVALID;
 	}
 
-	tcp = (struct xtcp *)((char *)xiah + sizeof(struct click_xia) +
-		 (xiah->dnode + xiah->snode) * sizeof(struct click_xia_xid_node));
-
 	// syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
-	// syslog(LOG_INFO, "XIA plen = %d\n", htons(xiah->plen));
+	// syslog(LOG_INFO, "XIA plen = %d len = %d\n", htons(xiah->plen), len);
 	// syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
-	// syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(tcp->th_ack));
-	// syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(tcp->th_seq));
-	// syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(tcp->th_flags));
-	// syslog(LOG_INFO, "tcp->th_off = %d\n", tcp->th_off);
+	// syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(x->th_ack));
+	// syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(x->th_seq));
+	// syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(x->th_flags));
+	// syslog(LOG_INFO, "tcp->th_off = %d\n", x->th_off);
 
-	return tcp;
+	*xtcp = x;
+	return PACKET_OK;
 }
 
 xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid)
@@ -129,6 +144,7 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 
 void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 {
+	int rc;
 	struct xtcp *tcp;
 	std::string cid = "";
 	std::string sid = "";
@@ -140,14 +156,26 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
 
-	if ((tcp = validate_pkt(pkt, len, cid, sid)) == NULL) {
-		// the packet is not large enough, this better not happen
-		// as this code has no recovery.
-		syslog(LOG_ERR, "packet is not large enough, discarding");
+	rc = validate_pkt(pkt, len, cid, sid, &tcp);
+	switch (rc) {
+	case PACKET_OK:
+		// keep going, it's either a SYN-ACK or contains data
+		break;
+
+	case PACKET_NO_DATA:
+		// it's a pure ACK, we can ignore it
+		syslog(LOG_INFO, "data packet is empty!");
+		return;
+
+	case PACKET_INVALID:
+	default:
+		// the packet is not not a stream pkt or is malformed
+		// we shouldn't see this in real usage
+		syslog(LOG_ERR, "packet doesn't contain valid cid data");
 		return;
 	}
 
-	char *payload = (char *)tcp + (tcp->th_off << 2);
+	char *payload = (char *)tcp + ((ushort)(tcp->th_off) << 2);
 	payload_len = len + (size_t)(pkt - payload);
 	syslog(LOG_DEBUG, "%s Payload length = %lu\n", cid.c_str(), payload_len);
 
@@ -256,6 +284,9 @@ skip_data:
 
 		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
+
+			meta->set_ttl(ntohl(download->header.ttl));
+			meta->set_created();
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;

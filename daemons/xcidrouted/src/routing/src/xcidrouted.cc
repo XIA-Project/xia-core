@@ -971,16 +971,15 @@ void sendNeighborLeave(const NeighborInfo &neighbor){
 
 #ifdef FILTER
 
-set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
-	set<string> routeDeletion;
+void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); it++){
 		string currDelCID = *it;
 
 		if(routeState.CIDRoutesWithFilter.find(currDelCID) != routeState.CIDRoutesWithFilter.end()){
 			CIDRouteEntry currEntry = routeState.CIDRoutesWithFilter[currDelCID];
 
-			// remove an entry only if it is from the same host and follows the same path
-			if(currEntry.dest == msg.info.senderHID && currEntry.cost == msg.info.distance){
+			// remove an entry only if it is from the same host
+			if(currEntry.dest == msg.info.senderHID){
 				routeDeletion.insert(currDelCID);
 #ifdef STATS_LOG
 				logger->log("route deletion");
@@ -991,37 +990,29 @@ set<string> deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 		}
 
 	}
-
-	return routeDeletion;
 }
 
-set<string> setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
-	set<string> routeAddition;
+void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor){
 	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); it++){
 		string currNewCID = *it;
-
-		// if the CID is not stored locally
-		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
-			// and the CID is not encountered before or it is encountered before 
-			// but the distance is longer then
-			if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
-				|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
-				routeAddition.insert(currNewCID);
+		// and the CID is not encountered before or it is encountered before 
+		// but the distance is longer then
+		if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
+			|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
+			routeAddition.insert(currNewCID);
 
 #ifdef STATS_LOG
 				logger->log("route addition");
 #endif
 
-				// set corresponding CID route entries
-				routeState.CIDRoutesWithFilter[currNewCID].cost = msg.info.distance;
-				routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
-				routeState.CIDRoutesWithFilter[currNewCID].nextHop = neighbor.HID;
-				routeState.CIDRoutesWithFilter[currNewCID].dest = msg.info.senderHID;
-				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
-			}
+			// set corresponding CID route entries
+			routeState.CIDRoutesWithFilter[currNewCID].cost = msg.info.distance;
+			routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
+			routeState.CIDRoutesWithFilter[currNewCID].nextHop = neighbor.HID;
+			routeState.CIDRoutesWithFilter[currNewCID].dest = msg.info.senderHID;
+			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 		}
 	}
-	return routeAddition;
 }
 
 #else
@@ -1107,15 +1098,13 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
 
-	msg.print();
-
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
 
 #ifdef FILTER
-	set<string> routeAddition = setCIDRoutesWithFilter(msg, neighbor);
-	set<string> routeDeletion = deleteCIDRoutesWithFilter(msg);
+	setCIDRoutesWithFilter(msg, neighbor);
+	deleteCIDRoutesWithFilter(msg);
 #else
 	deleteCIDRoutes(msg);
 	setCIDRoutes(msg, neighbor);
@@ -1126,23 +1115,13 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	// 	update the message and broadcast to other neighbor
 	// 	iff there are something meaningful to broadcast
 	// 	AND ttl is not going to be zero
-#ifdef FILTER
-	if(msg.info.ttl - 1 > 0 && (routeAddition.size() > 0 || routeDeletion.size() > 0)){
-#else
 	if(msg.info.ttl - 1 > 0 && (msg.newCIDs.size() > 0 || msg.delCIDs.size() > 0)){
-#endif
 		AdvertisementMessage msg2Others;
 		msg2Others.info.senderHID = msg.info.senderHID;
 		msg2Others.info.ttl = msg.info.ttl - 1;
 		msg2Others.info.distance = msg.info.distance + 1;
-
-#ifdef FILTER
-		msg2Others.newCIDs = routeAddition;
-		msg2Others.delCIDs = routeDeletion;
-#else
 		msg2Others.newCIDs = msg.newCIDs;
 		msg2Others.delCIDs = msg.delCIDs;
-#endif
 
 		routeState.mtx.lock();
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){

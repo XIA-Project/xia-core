@@ -90,39 +90,39 @@ int srcSet = 0;
 
 int main(int argc, char **argv)
 {
-    sockaddr_x from;
+	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
 	char s_to[1024], s_from[1024];
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
-        int c = argc;
+		int c = argc;
 		while (*++av[0]) {
-            if (c != argc)
-                break;
-            switch (*av[0]) {
+			if (c != argc)
+				break;
+			switch (*av[0]) {
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
 			case 'q':
 				pingflags |= QUIET;
 				break;
-            case 't':
-                argc--, av++;
-                catcher_timeout = atoi(av[0]);
-                break;
-            case 's':
-                argc--, av++;
-                fromlen = sizeof(wherefrom);
-                srcSet = 1;
-                if (XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
-                    printf("Error Resolving XID\n");
-                    exit(-1);
-                }
-                break;
-            }
-        }
+			case 't':
+				argc--, av++;
+				catcher_timeout = atoi(av[0]);
+				break;
+			case 's':
+				argc--, av++;
+				fromlen = sizeof(wherefrom);
+				srcSet = 1;
+				if (XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
+					printf("Error Resolving XID\n");
+					exit(-1);
+				}
+				break;
+			}
+		}
 		argc--, av++;
 	}
 	if (argc < 1 || argc > 3)  {
@@ -166,16 +166,16 @@ int main(int argc, char **argv)
 	  exit(-1);
 	}
 
-    if (srcSet) {
-        if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
-            printf("Xbind failed");
-            exit(-1);
-        }
-    }
+	if (srcSet) {
+		if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
+			printf("Xbind failed");
+			exit(-1);
+		}
+	}
 
 	Graph g(&whereto);
 	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
-	printf("TRACEROUTE %s:\n\n", s_to);
+	printf("TRACEROUTE (%u hops %lu bytes) to\n%s:\n\n", npackets, datalen, s_to);
 
 	setlinebuf(stdout);
 
@@ -200,6 +200,8 @@ int main(int argc, char **argv)
 		Graph gf(&from);
 		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
 		pr_pack(packet, cc, s_from);
+
+
 		if (!strcmp(s_to,s_from)){
 			finish();
 		}
@@ -241,19 +243,19 @@ void catcher()
 	int waittime;
 
 	pinger();
-    nCatcher+=interval;
-    if (catcher_timeout && nCatcher >= catcher_timeout) {
-        rc = -1;
-        finish();
-    }
+	nCatcher+=interval;
+	if (catcher_timeout && nCatcher >= catcher_timeout) {
+		rc = -1;
+		finish();
+	}
 	if (npackets == 0 || ntransmitted < npackets) {
-        if (interval < 1) {
-            ualarm((int)(interval*1000000),0);
-        }
-        else {
-            alarm((int)interval);
-        }
-    }
+		if (interval < 1) {
+			ualarm((int)(interval*1000000),0);
+		}
+		else {
+			alarm((int)interval);
+		}
+	}
 	else {
 		if (nreceived) {
 			waittime = 2 * tmax / 1000;
@@ -296,8 +298,10 @@ void pinger()
 
 	if (timing) {
 		gettimeofday(&tp, &tz);
-		*(int *)&outpack[8]  = htonl(tp.tv_sec);
-		*(int *)&outpack[12] = htonl(tp.tv_usec);
+		void *p = &outpack[8];
+		*(unsigned *)p = htonl(tp.tv_sec);
+		p = &outpack[12];
+		*(unsigned *)p = htonl(tp.tv_usec);
 	}
 
 	// skip 8 for time
@@ -373,13 +377,15 @@ pr_type(register int t)
  */
 void pr_pack(u_char *buf, int cc, const char *from)
 {
-    struct xip *xp;
+	struct xip *xp;
 	register struct icmp *icp;
 	register long *lp = (long *) packet;
 	register int i;
 	struct timeval tv;
-	struct timeval tp;
-	int hlen, triptime = 0;
+	const char *s;
+	// struct timeval tp;
+	int hlen;
+	// int triptime = 0;
 
 	gettimeofday(&tv, &tz);
 
@@ -396,51 +402,58 @@ void pr_pack(u_char *buf, int cc, const char *from)
 	cc -= hlen;
 	icp = (struct icmp *)(buf + hlen);
 
-	if ((!(pingflags & QUIET)) && icp->icmp_type != ICMP_ECHOREPLY)  {
-		printf("%s\n", from );
-        nreceived++;
-		if (pingflags & VERBOSE) {
-			for(i=0; i<12; i++) {
-			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)), (unsigned int)*lp++);
-			}
+	printf("hop %d", nreceived);
+
+	if (icp->icmp_type == ICMP_TIMXCEED) {
+		printf("\n%s\n", from);
+	} else if (icp->icmp_type == ICMP_UNREACH) {
+		switch(icp->icmp_code) {
+			case 0:
+				s = "network";
+				break;
+			case 1:
+				s = "host";
+				break;
+			case 3:
+				s = "intent";
+				break;
+			default:
+				s = "???";
 		}
-		return;
+		printf(" %s unreachable\n", s);
+	} else {
+		printf(" XCMP type:%u code:%u\n\n", icp->icmp_type, icp->icmp_code);
 	}
-	if (icp->icmp_id != ident)
-		return;			// 'Twas not our ECHO
-
-	if (timing) {
-		int *t = (int *)&icp->icmp_data[0];
-
-		tp.tv_sec  = ntohl(*t);
-		t = (int *)&icp->icmp_data[4];
-		tp.tv_usec  = ntohl(*t);
-
-		tvsub(&tv, &tp);
-		triptime = tv.tv_sec * 1000 + (tv.tv_usec / 1000);
-		tsum += triptime;
-		if (triptime < tmin) {
-			tmin = triptime;
-		}
-		if (triptime > tmax) {
-			tmax = triptime;
+	if (pingflags & VERBOSE) {
+		for(i = 0; i < 12; i++) {
+			printf("x%2.2x: x%8.8x\n", (unsigned int)(i * sizeof(long)), (unsigned int)*lp++);
 		}
 	}
+	printf("\n");
 
-	if (!(pingflags & QUIET)) {
-		if (pingflags != FLOOD) {
-		  printf("%d bytes from %s: icmp_seq=%d", cc, from, icp->icmp_seq);
-		  	if (timing) {
-				printf(" time=%d ms\n", triptime);
-
-			} else {
-				putchar('\n');
-			}
-		} else {
-			putchar('b');
-			fflush(stdout);
-		}
-	}
+	// if (timing) {
+	// 	int *t = (int *)&icp->icmp_data[0];
+	//
+	// 	tp.tv_sec  = ntohl(*t);
+	// 	t = (int *)&icp->icmp_data[4];
+	// 	tp.tv_usec  = ntohl(*t);
+	//
+	// 	tvsub(&tv, &tp);
+	// 	triptime = tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+	// 	tsum += triptime;
+	// 	if (triptime < tmin) {
+	// 		tmin = triptime;
+	// 	}
+	// 	if (triptime > tmax) {
+	// 		tmax = triptime;
+	// 	}
+	// }
+	//
+ 	//	if (timing) {
+	//		printf(" time=%d ms\n", triptime);
+	// } else {
+	//		putchar('\n');
+	// }
 	nreceived++;
 }
 
@@ -483,7 +496,7 @@ int in_cksum(struct icmp *addr, int len)
 	sum = (sum >> 16) + (sum & 0xffff);	// add hi 16 to low 16
 	sum += (sum >> 16);			// add carry
 	answer = ~sum;				/* truncate to 16 bits */
-	return htons(answer);
+	return answer;
 }
 
 /*
@@ -509,9 +522,9 @@ void tvsub(struct timeval *out, struct timeval *in)
  */
 void finish()
 {
-    Xclose(s);
-    int hops = rc ? -1 : nreceived;
-    printf("hops = %d\n", hops);
+	Xclose(s);
+	int hops = rc ? -1 : nreceived;
+	printf("hops = %d\n", hops);
 	fflush(stdout);
 	exit(rc);
 }

@@ -208,21 +208,10 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	dst_path.remove_node(dst_path.destination_node());
-	if (dst_path.unparse_node_size() < 1) {
+	// don't send undeliverables back to broadcast packets
+	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
 		return;
 	}
-
-	// don't send undeliverables back to broadcast packets
-	XID dst_hid = dst_path.xid(dst_path.destination_node());
-	if(dst_hid == bcast_xid) {
-		return;
-	}
-
-	// don't send undeliverables back to broadcast packets
-//	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
-//		return;
-//	}
 
 	// the xia_path code seems to discard the visited values, so we need to go
 	// into the dags directly
@@ -247,8 +236,6 @@ XCMP::processUnreachable(Packet *p_in)
 
 	if (bad_node >= 0) {
 		unsigned t = htonl(h->node[bad_node].xid.type);
-		printf("\n\nlast node = %d\n", bad_node);
-		printf("type = %04x\n\n", t);
 		switch (t) {
 			case CLICK_XIA_XID_TYPE_AD:
 				code = XCMP_UNREACH_NET;
@@ -307,8 +294,21 @@ XCMP::processPacket(Packet *p_in) {
 // got an xcmp packet, need to either send up or respond with a different xcmp message
 void
 XCMP::gotXCMPPacket(Packet *p_in) {
-	const XIAHeader hdr(p_in);
-	const struct click_xia_xcmp *xcmph = reinterpret_cast<const struct click_xia_xcmp *>(hdr.payload());
+	char pload[1500];
+	XIAHeader hdr(p_in);
+
+	// have to work around const qualifiers
+	memcpy(pload, hdr.payload(), hdr.plen());
+
+	struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(pload);
+	uint16_t cksum = xcmph->cksum;
+	xcmph->cksum = 0;
+	uint16_t computed_cksum = in_cksum((u_short *)pload, hdr.plen());
+
+	if (cksum != computed_cksum) {
+		WARN("computed checksum (0x%04x) != reported checksum (0x%04x), discarding packet", computed_cksum, cksum);
+		return;
+	}
 
 	if (xcmph->type == XCMP_ECHO) {
 		// PING
@@ -317,10 +317,12 @@ XCMP::gotXCMPPacket(Packet *p_in) {
 		// src = ping sender, dest = us
 		INFO("PING #%u received: %s\n      => %s\n", sn,
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
-		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
+
 		// src = us, dest = original sender
 		INFO("PONG #%u sent: %s\n      => %s\n", sn,
 			hdr.dst_path().unparse().c_str(), hdr.src_path().unparse().c_str());
+
+		sendXCMPPacket(p_in, XCMP_ECHOREPLY, 0, NULL);
 
 	} else if (xcmph->type == XCMP_ECHOREPLY) {
 		// PONG
@@ -412,7 +414,7 @@ u_short XCMP::in_cksum(u_short *addr, int len) {
 	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
 	sum += (sum >> 16);					/* add carry */
 	answer = ~sum;						/* truncate to 16 bits */
-	return htons(answer);
+	return answer;
 }
 
 CLICK_ENDDECLS

@@ -347,8 +347,8 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 	}
 
 	int rc1 = 0, rc2 = 0, msglen, buflen;
-	char buffer[XIA_MAXBUF];
-	bzero(buffer, XIA_MAXBUF);
+	char buffer[MSG_CUTOFF];
+	bzero(buffer, MSG_CUTOFF);
 
 	vector<string> temp;
 	for(int i = start; i <= end; i++){
@@ -358,7 +358,7 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 	string rip = constructBroadcastRIP(temp);
 	msglen = rip.size();
 
-	if(msglen < XIA_MAXBUF){
+	if(msglen < MSG_CUTOFF){
 		strcpy (buffer, rip.c_str());
 		buflen = strlen(buffer);
 

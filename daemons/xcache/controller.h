@@ -8,6 +8,7 @@
 #include "slice.h"
 #include "meta.h"
 #include "store_manager.h"
+#include "policy_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
 #include "dagaddr.hpp"
@@ -36,6 +37,7 @@ struct xcache_req {
 #define XCFI_CACHE     0x2
 
 	int flags;
+	time_t ttl;
 	int from_sock, to_sock;
 	char *cid;
 	void *data;
@@ -68,6 +70,8 @@ private:
 	 */
 	std::string hostname;
 
+	std::string xcache_sid;
+
 	/**
 	 * Lookup a context based on context ID.
 	 */
@@ -77,12 +81,12 @@ private:
 	 * Manages various content stores.
 	 * @See file store.h for details.
 	 */
+	xcache_policy_manager policy_manager;
 	xcache_store_manager store_manager;
 	xcache_cache cache;
 	LruPolicy* policy;
 	int64_t capacity;
 
-	XIARouter xr;
 	unsigned context_id;
 
 public:
@@ -163,7 +167,7 @@ public:
 	/**
 	 * Stores content locally.
 	 */
-	int store(xcache_cmd *, xcache_cmd *);
+	int store(xcache_cmd *, xcache_cmd *, time_t);
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 

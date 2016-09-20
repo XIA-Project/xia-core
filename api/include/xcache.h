@@ -21,6 +21,7 @@ typedef struct xcache_context {
 	int contextID;
 	int xcacheSock;
 	int notifSock;
+	time_t ttl;
 } XcacheHandle;
 
 typedef struct {
@@ -52,8 +53,9 @@ enum {
  * XcacheHandleInit
  * Initializes XcacheHandle.
  */
-int XcacheHandleInit(XcacheHandle *h); //DONE
+int XcacheHandleInit(XcacheHandle *h);
 int XcacheHandleDestroy(XcacheHandle *h);
+int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl);
 
 
 extern int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *info);  //DONE

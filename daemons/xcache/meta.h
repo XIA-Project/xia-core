@@ -10,6 +10,10 @@
 #include <time.h>
 #include <syslog.h>
 
+// FIXME: HORRIBLE HACK to put this where the garbage collector can get at it.
+// find a better way of making this happen
+#include "XIARouter.hh"
+extern XIARouter xr;
 
 class xcache_content_store;
 
@@ -37,8 +41,10 @@ private:
 	std::string cid;
 	std::string sid;
 
+	time_t _created;
 	time_t _accessed;
 	time_t _updated;
+	time_t _ttl;
 
 	void init();
 
@@ -51,6 +57,9 @@ public:
 
 	time_t updated() { return _updated; }
 	void update() { _updated = time(NULL); }
+
+	time_t created() { return _created; }
+	void set_created() { _created = _updated = _accessed = time(NULL); }
 
 	// account for the tcp overhead in initial pkt
 	void set_seq(uint32_t seq) { initial_seq = seq + 1; }
@@ -66,6 +75,9 @@ public:
 	xcache_content_store *store() { return _store; };
 
 	void set_length(uint64_t length) { this->len = length; }
+
+	void set_ttl(time_t t) { _ttl = t; }
+	time_t ttl() { return _ttl; }
 
 	// Actually read the content.
 	std::string get(void);
