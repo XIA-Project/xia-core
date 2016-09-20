@@ -26,10 +26,12 @@ static int get_connected_socket(void)
 	char sock_name[512];
 
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
-	if(sock < 0)
+	if(sock < 0) {
 		return -1;
+	}
 
 	if(get_xcache_sock_name(sock_name, 512) < 0) {
+		Xclose(sock);
 		return -1;
 	}
 
@@ -39,9 +41,11 @@ static int get_connected_socket(void)
 
 	if(connect(sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0) {
 		printf("%s:%d error:%s\n", __FILE__, __LINE__, strerror(errno));
+		Xclose(sock);
 		return -1;
 	}
 
+	Xclose(sock);
 	return sock;
 }
 
