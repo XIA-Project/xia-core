@@ -138,8 +138,9 @@ void populateNeighborState(vector<XIARouteEntry> & currHidRouteEntries){
 		string checkXid = *it;
 
 		for (auto i = currHidRouteEntries.begin(); i != currHidRouteEntries.end(); ++i) {
-			if((*i).nextHop == checkXid){
+			if((i->nextHop == checkXid){
 				found = true;
+				break;
 			}
 		}
 

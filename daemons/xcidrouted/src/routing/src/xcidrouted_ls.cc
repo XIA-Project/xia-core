@@ -628,8 +628,8 @@ int processLSA(string lsa_msg) {
   	updateClickRoutingTable(CIDrouteTableOld);
 
   	if(ttl - 1 > 0){
-  		char buffer[XIA_MAXBUF];
-		bzero(buffer, XIA_MAXBUF);
+  		char buffer[MSG_CUTOFF];
+		bzero(buffer, MSG_CUTOFF);
 
   		found = msg.find("^", 0);
   		string relayMsg = msg.substr(found);
@@ -732,9 +732,6 @@ void populateNeighborState(std::vector<XIARouteEntry> & currHidRouteEntries){
 				newNeighborEntry.cost = 1;
 				newNeighborEntry.port = eachEntry.port;
 				route_state.neighborTable[eachEntry.nextHop] = newNeighborEntry;
-			} else {
-				route_state.neighborTable[eachEntry.nextHop].cost = 1;
-				route_state.neighborTable[eachEntry.nextHop].port = eachEntry.port;
 			}
 		}
 	}

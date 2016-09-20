@@ -893,7 +893,6 @@ void processNeighborConnect(){
 
 // function already protected by locks
 void sendNeighborJoin(const NeighborInfo &neighbor){
-
 #ifdef FILTER
 	NodeJoinMessage msg;
 
