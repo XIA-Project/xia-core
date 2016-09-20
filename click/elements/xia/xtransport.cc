@@ -1397,8 +1397,11 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
-				teardown_now = false;
-				dynamic_cast<XStream *>(sk)->usrclosed();
+				// FIXME: are these the right states to mask?
+				if (sk->state > LISTEN && sk->state < CLOSED) {
+					teardown_now = false;
+					dynamic_cast<XStream *>(sk)->usrclosed();
+				}
 				break;
 			case SOCK_DGRAM:
 				break;
