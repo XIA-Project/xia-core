@@ -2320,7 +2320,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		int pktcontentslen = pktPayloadSize - headerlen;
 		INFO("Packet size without XIP header:%d", pktcontentslen);
 
-		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
+		WritablePacket *p = WritablePacket::make(p_in->headroom() + headerlen + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
 		p = xiahencap.encap(p, false);
 
 		output(NETWORK_PORT).push(p);
@@ -2366,7 +2366,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		}
 
 		//Add XIA headers
-		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+		WritablePacket *payload = WritablePacket::make(512, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 		if (sk -> get_type() == SOCK_STREAM) {	// why do we need this test, we should always be a stream socket here
 			XStream *st = dynamic_cast<XStream *>(sk);
@@ -2478,9 +2478,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
-	// get rid of expensive packet push warning
-	//WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
-	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + xiah.hdr_size(), (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 	WritablePacket *p = NULL;
 
