@@ -804,7 +804,7 @@ int main(int argc, char *argv[]){
 		if (selectRetVal > 0){
 			memset(&recv_message[0], 0, sizeof(recv_message));
 
-			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
+			n = Xrecvfrom(route_stawte.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 				perror("recvfrom got a problem");
 			}

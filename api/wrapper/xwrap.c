@@ -651,6 +651,7 @@ static bool _isLocalAddr(const char* addr)
 	if (addr == NULL || strlen(addr) == 0)
 		return true;
 
+	string t_addr(addr);
 	address_t::iterator it = find(addresses.begin(), addresses.end(), addr);
 
 	bool found = (it != addresses.end());
