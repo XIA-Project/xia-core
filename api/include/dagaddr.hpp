@@ -63,17 +63,16 @@ public:
 
 	bool equal_to(const Node& r) const;
 
+private:
 	typedef std::map<int, std::string> XidMap;
 	static XidMap xids;
 	static XidMap load_xids();
 
 	
 
-protected:
 	void acquire() const;
 	void release() const;
 
-private:
 	struct container
 	{
 		uint32_t type;
@@ -104,10 +103,6 @@ public:
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
 
-	// TODO: should these be part of public interface?
-	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
-	void add_edge(std::size_t from_id, std::size_t to_id);
-
 	void print_graph() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
@@ -124,10 +119,13 @@ public:
 	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+private:
+	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
+	void add_edge(std::size_t from_id, std::size_t to_id);
+
 	void replace_node_at(int i, const Node& new_node);
 	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
-protected:
 
 	bool is_source(std::size_t id) const;
 	bool is_sink(std::size_t id) const;
@@ -141,7 +139,6 @@ protected:
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
-private:
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);
