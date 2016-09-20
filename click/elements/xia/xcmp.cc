@@ -209,7 +209,7 @@ XCMP::processUnreachable(Packet *p_in)
 	}
 
 	// don't send undeliverables back to broadcast packets
-	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
+	if (dst_path.xid(dst_path.find_intent_hid()) == bcast_xid) {
 		return;
 	}
 
