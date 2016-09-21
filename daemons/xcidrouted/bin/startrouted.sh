@@ -1,4 +1,4 @@
 #!/bin/bash
 
 host=$(hostname | cut -f1 -d".")
-./bin/xcidrouted -h $host -t 3
+./bin/xcidrouted -h $host
