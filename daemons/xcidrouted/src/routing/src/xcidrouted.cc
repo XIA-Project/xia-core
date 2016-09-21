@@ -979,7 +979,6 @@ void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 
 			// remove an entry only if it is from the same host
 			if(currEntry.dest == msg.info.senderHID){
-				routeDeletion.insert(currDelCID);
 #ifdef STATS_LOG
 				logger->log("route deletion");
 #endif
@@ -998,7 +997,6 @@ void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo
 		// but the distance is longer then
 		if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
 			|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
-			routeAddition.insert(currNewCID);
 
 #ifdef STATS_LOG
 				logger->log("route addition");
