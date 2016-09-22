@@ -40,7 +40,7 @@
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
 #define HELLO_MAX_BUF_SIZE 4096
-#define MAX_TTL 3
+#define MAX_TTL 1
 #define HELLO_EXPIRE 10
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
