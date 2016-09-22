@@ -1091,7 +1091,7 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
-	
+
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
