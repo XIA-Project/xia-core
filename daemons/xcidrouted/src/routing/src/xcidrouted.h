@@ -44,6 +44,9 @@
 #define HELLO_EXPIRE 10
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
+#define MAX_SEQ 10000000
+#define MAX_SEQ_DIFF 3
+
 #define DEFAULT_NAME "router0"
 #define APPNAME "xcidrouted"
 
@@ -98,13 +101,14 @@ class AdvertisementMessage: CIDMessage{
 public:
 	AdvertisementMessage();
 	~AdvertisementMessage();
-	
+
 	string serialize() const override;
 	void deserialize(string data) override;
 	void print() const override;
 
 	int send(int sock) override;
 
+	uint32_t seq; 				// LSA seq of from sender
 	CIDInfo info;
 
 	set<string> newCIDs; 	// new CIDs in the advertisement
@@ -165,6 +169,8 @@ typedef struct {
 	int32_t helloSock; 		// socket for routing process
 	int32_t masterSock;	// socket for receiving advertisment
 
+	uint32_t lsaSeq;	// LSA sequence number of this router
+
 	sockaddr_x sdag;
 	sockaddr_x ddag;
 
@@ -172,6 +178,10 @@ typedef struct {
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
 	char mySID[MAX_XID_SIZE];
+
+	// for normal advertisement
+	map<string, uint32_t> HID2Seq;
+ 	map<string, map<uint32_t, uint32_t> > HID2Seq2TTL;
 
  	map<string, NeighborInfo> neighbors;
 
@@ -225,6 +235,7 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo &neighbor);
 void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg);
 
+bool checkSequenceAndTTL(uint32_t seq, uint32_t ttl, string senderHID);
 int handleAdvertisementMessage(string data, const NeighborInfo &neighbor);
 int handleNodeJoinMessage(string data, const NeighborInfo &neighbor);
 int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor);
