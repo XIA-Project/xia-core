@@ -1002,19 +1002,20 @@ void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo
 		string currNewCID = *it;
 		// and the CID is not encountered before or it is encountered before 
 		// but the distance is longer then
-		if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
+		if(routeState.localCIDs.find(currNewCID) == routeState.localCIDs.end()){
+			if(routeState.CIDRoutesWithFilter.find(currNewCID) == routeState.CIDRoutesWithFilter.end() 
 			|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
 
 #ifdef STATS_LOG
-			logger->log("set route " + currNewCID + " locally from " + msg.info.senderHID + " cost " + to_string(msg.info.distance));
+				logger->log("set route " + currNewCID + " locally from " + msg.info.senderHID + " cost " + to_string(msg.info.distance));
 #endif
-
-			// set corresponding CID route entries
-			routeState.CIDRoutesWithFilter[currNewCID].cost = msg.info.distance;
-			routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
-			routeState.CIDRoutesWithFilter[currNewCID].nextHop = neighbor.HID;
-			routeState.CIDRoutesWithFilter[currNewCID].dest = msg.info.senderHID;
-			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+				// set corresponding CID route entries
+				routeState.CIDRoutesWithFilter[currNewCID].cost = msg.info.distance;
+				routeState.CIDRoutesWithFilter[currNewCID].port = neighbor.port;
+				routeState.CIDRoutesWithFilter[currNewCID].nextHop = neighbor.HID;
+				routeState.CIDRoutesWithFilter[currNewCID].dest = msg.info.senderHID;
+				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
+			}
 		}
 	}
 }
