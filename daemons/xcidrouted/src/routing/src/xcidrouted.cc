@@ -1105,10 +1105,12 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
 
+	/*
 	if(!checkSequenceAndTTL(msg.seq, msg.info.ttl, msg.info.senderHID)){
 		return 0;
 	}
-
+	 */
+	
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
