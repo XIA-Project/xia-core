@@ -293,14 +293,9 @@ void periodicJobs(){
 			getRouteEntries("CID", currCidRouteEntries);
 			populateRouteState(currCidRouteEntries);
 
-			printf("inside periodicJobs and before removeOutdatedRoutes\ngit ");
 			removeOutdatedRoutes();
 			broadcastRIP();
 
-#ifdef STATS_LOG
-			size_t totalSize = getTotalBytesForCIDRoutes();
-			logger->log("size " + to_string(totalSize));
-#endif
 			route_state.mtx.unlock();
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
@@ -373,10 +368,6 @@ int broadcastRIPHelper(const vector<string> & cids, string neighborHID, int star
 			return -1;
 		}
 
-#ifdef STATS_LOG
-		logger->log("send " + to_string(buflen));
-#endif
-
 	} else {
 		rc1 = broadcastRIPHelper(cids, neighborHID, start, (start + end)/2);
 		rc2 = broadcastRIPHelper(cids, neighborHID, (start + end)/2 + 1, end);
@@ -406,19 +397,25 @@ int broadcastRIP() {
 	}
 
 	if(neighbor2CID.size() != 0){
-		printf("Broadcast CID: \n");
+
+#ifdef STATS_LOG
+		logger->log("have something meaningful for broadcasting CIDs\n");
+#endif
 
 		for (auto it = route_state.neighbors.begin(); it != route_state.neighbors.end(); it++) {
 			string neighborHID = *it;
 
 			if(neighbor2CID.find(neighborHID) != neighbor2CID.end()){
-				printf("CIDs are sending to neighborHID: %s\n", neighborHID.c_str());
-				for(auto ij = neighbor2CID[neighborHID].begin(); ij !=  neighbor2CID[neighborHID].end(); ++ij){
-					printf("CID: %s\n", ij->c_str());
-					printf("\tnextHop: %s\n", route_state.CIDrouteTable[*ij].nextHop.c_str());
-					printf("\tcost: %d\n", route_state.CIDrouteTable[*ij].cost);
-				}
 
+#ifdef STATS_LOG
+				logger->log("CIDs are sending to neighborHID: " + neighborHID);
+
+				for(auto ij = neighbor2CID[neighborHID].begin(); ij !=  neighbor2CID[neighborHID].end(); ++ij){
+					logger->log("\tCID: " + *ij);
+					logger->log("\t\tnextHop: " + route_state.CIDrouteTable[*ij].nextHop);
+					logger->log("\t\tcost: " + to_string(route_state.CIDrouteTable[*ij].cost));
+				}
+#endif
 
 				if(broadcastRIPHelper(neighbor2CID[neighborHID], neighborHID, 0, neighbor2CID[neighborHID].size() - 1) < 0){
 					syslog(LOG_WARNING, "cannot broad cast to neighborHID: %s\n", neighborHID.c_str());
@@ -437,7 +434,6 @@ void removeOutdatedRoutes(){
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
   		if(now - it->second.timer >= EXPIRE_TIME){
   			xr.delRouteCIDRouting(it->first);
-  			syslog(LOG_INFO, "purging CID route for : %s", it->first.c_str());
   			cidsToRemove.push_back(it->first);
   		}
   	}
@@ -445,19 +441,18 @@ void removeOutdatedRoutes(){
   	for(auto it = cidsToRemove.begin(); it != cidsToRemove.end(); ++it){
   		printf("purging: %s with nextHop %s cost %d\n", it->c_str(), route_state.CIDrouteTable[*it].nextHop.c_str(), 
   				route_state.CIDrouteTable[*it].cost);
+#ifdef STATS_LOG
+		logger->log("purging " + *it + " next hop " + route_state.CIDrouteTable[*it].nextHop + " cost " + to_string(route_state.CIDrouteTable[*it].cost));
+#endif
 
   		route_state.CIDrouteTable.erase(*it);
   	}
-
-#ifdef STATS_LOG
-  	if(cidsToRemove.size() != 0){
-		logger->log("route deletion");
-  	}
-#endif
 }
 
 int processRIPUpdate(string neighborHID, string rip_msg) {
-	printf("Receive RIP from neighbor: %s\n", neighborHID.c_str());
+#ifdef STATS_LOG
+	logger->log("Receive RIP from neighbor: " + neighborHID);
+#endif
 
 	size_t found, start;
 	string msg, cid_num_str, cid, cost;
@@ -475,6 +470,10 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
 
   	int num_cids = atoi(cid_num_str.c_str());
 
+#ifdef STATS_LOG
+	logger->log("\tnumber of cids: " + to_string(num_cids));
+#endif
+
   	bool change = false;
   	for (int i = 0; i < num_cids; ++i) {
   		found = msg.find("^", start);
@@ -489,7 +488,9 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   			start = found+1;  // forward the search point
   		}
 
-  		printf("\tcid: %s cost: %s\n", cid.c_str(), cost.c_str());
+#ifdef STATS_LOG
+		logger->log("\t\tcid: " + cid + " cost: " + cost);
+#endif
 
   		int curr_cost = atoi(cost.c_str());
   		if (route_state.CIDrouteTable.find(cid) != route_state.CIDrouteTable.end()){
@@ -501,6 +502,9 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   				change = true;
   			} else if (route_state.CIDrouteTable[cid].cost == curr_cost + 1 && 
   					route_state.CIDrouteTable[cid].nextHop == neighborHID){
+#ifdef STATS_LOG
+				logger->log("\t\t\trefresh the timer for this route");
+#endif
   				// refresh timer for CIDs.
   				route_state.CIDrouteTable[cid].timer = time(NULL);
   			}
@@ -513,15 +517,14 @@ int processRIPUpdate(string neighborHID, string rip_msg) {
   		}
 
   		if(change){
-  			printf("this route is set\n");
+#ifdef STATS_LOG
+			logger->log("\t\t\tset this route since it is the shortest we have seen");
+#endif
   		}
   	}
 
   	removeOutdatedRoutes();
   	if(change){
-#ifdef STATS_LOG
-		logger->log("route addition");
-#endif
   		updateClickRoutingTable();
    	}
 
@@ -592,10 +595,6 @@ int main(int argc, char *argv[]) {
 			}
 
 			route_state.mtx.lock();
-
-#ifdef STATS_LOG
-			logger->log("recv " + to_string(n));
-#endif
 
 			if(processRIPUpdate(neighborHID, recv_message) < 0){
 				syslog(LOG_WARNING, "problem with processing RIP update\n");

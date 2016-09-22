@@ -40,7 +40,7 @@ using namespace std;
 #define EXPIRE_TIME 10
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
 
-//#define STATS_LOG
+#define STATS_LOG
 
 static unsigned short DESTINE_FOR_LOCALHOST = 65534;
 

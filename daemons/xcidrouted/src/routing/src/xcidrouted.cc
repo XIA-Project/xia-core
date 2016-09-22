@@ -544,13 +544,6 @@ void CIDAdvertiseTimer(){
 
             advertiseCIDs();
 
-#ifdef STATS_LOG
-           // routeState.mtx.lock();
-			//size_t totalSize = getTotalBytesForCIDRoutes();
-			//logger->log("size " + to_string(totalSize));
-			//routeState.mtx.unlock();
-#endif
-
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
         }
     }).detach();
@@ -599,8 +592,6 @@ void resetNonLocalCIDRoutes(const set<string> & delLocal){
 #endif
 
 void advertiseCIDs(){
-	printf("advertising CIDs...\n");
-
 	AdvertisementMessage msg;
 	msg.info.senderHID = routeState.myHID;
 	msg.info.ttl = ttl;
@@ -635,6 +626,7 @@ void advertiseCIDs(){
 	}
 
 	routeState.mtx.lock();
+
 	routeState.localCIDs = currLocalCIDs;
 
 #ifdef FILTER
@@ -642,20 +634,37 @@ void advertiseCIDs(){
 #else
 	resetNonLocalCIDRoutes(msg.delCIDs);
 #endif
+
 	routeState.mtx.unlock();
 
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
 		routeState.mtx.lock();
 
+
+#ifdef STATS_LOG
+		logger->log("I have something meaningful to broadcast");
+
+		for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); ++it){
+			logger->log("\tnew CID: " + (*it));
+		}
+
+		for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); ++it){
+			logger->log("\tdel CID: " + (*it));
+		}
+#endif
+
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); it++){
+
+#ifdef STATS_LOG
+			logger->log("relay to neighbor " + it->second.HID);
+#endif
+
 			msg.send(it->second.sendSock);
 		}
 
 		routeState.mtx.unlock();
 	}
-
-	printf("done\n");
 }
 
 void registerReceiver() {
@@ -980,7 +989,7 @@ void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 			// remove an entry only if it is from the same host
 			if(currEntry.dest == msg.info.senderHID){
 #ifdef STATS_LOG
-				//logger->log("route deletion");
+				logger->log("delete route " + currDelCID + " locally from " + currEntry.dest);
 #endif
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
@@ -999,7 +1008,7 @@ void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo
 			|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
 
 #ifdef STATS_LOG
-				//logger->log("route addition");
+			logger->log("set route " + currNewCID + " locally from " + msg.info.senderHID + " cost " + to_string(msg.info.distance));
 #endif
 
 			// set corresponding CID route entries
@@ -1030,10 +1039,6 @@ void deleteCIDRoutes(const AdvertisementMessage & msg){
 			routeState.CIDRoutes[currDelCID].erase(msg.info.senderHID);
 
 			if(routeState.CIDRoutes[currDelCID].size() == 0){
-#ifdef STATS_LOG
-				//logger->log("route deletion");
-
-#endif
 				// if no more CID routes left for this CID from other sender, just remove the CID routes
 				xr.delRouteCIDRouting(currDelCID);
 			} else {
@@ -1057,10 +1062,6 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 			routeState.CIDRoutes[currNewCID][msg.info.senderHID].port = neighbor.port;
 			routeState.CIDRoutes[currNewCID][msg.info.senderHID].nextHop = neighbor.HID;
 			routeState.CIDRoutes[currNewCID][msg.info.senderHID].dest = msg.info.senderHID;
-			
-#ifdef STATS_LOG
-			//logger->log("route addition");
-#endif
 
 			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 		} else {
@@ -1073,9 +1074,6 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 
 			// only set the routes if current message is the shortest to reach the CID
 			if(minDist > msg.distance){
-#ifdef STATS_LOG
-				//logger->log("route addition");
-#endif
 				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 			}
 
@@ -1099,6 +1097,23 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
 	routeState.mtx.lock();
+
+#ifdef STATS_LOG
+	logger->log("I receive CID advertisement message from " + neighbor.HID);
+	logger->log("\t senderHID: " + msg.info.senderHID);
+	logger->log("\t ttl: " + to_string(msg.info.ttl));
+	logger->log("\t distance: " + to_string(msg.info.distance));
+
+	logger->log("\t new CIDs:");
+	for(auto it = msg.newCIDs.begin(); it != msg.newCIDs.end(); ++it){
+		logger->log("\t\t" + *it);
+	}
+
+	logger->log("\t del CIDs:");
+	for(auto it = msg.delCIDs.begin(); it != msg.delCIDs.end(); ++it){
+		logger->log("\t\t" + *it);
+	}
+#endif
 
 #ifdef FILTER
 	setCIDRoutesWithFilter(msg, neighbor);
@@ -1126,6 +1141,11 @@ int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 			// 1st condition: don't advertise back to where we received this message from
 			// 2nd condition: don't advertise to the original sender of this advertisement
 			if(it->second.HID != neighbor.HID && msg.info.senderHID != it->second.HID){
+
+#ifdef STATS_LOG
+				logger->log("relaying this message to neighbor: " + it->second.HID);
+#endif
+
 				msg2Others.send(it->second.sendSock);
 			}
 		}
@@ -1143,6 +1163,20 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 #ifdef FILTER
 	routeState.mtx.lock();
 
+#ifdef STATS_LOG
+	logger->log("I receive node join message from" + neighbor.HID);
+	for(auto it = msg.CID2Info.begin(); it != msg.CID2Info.end(); ++it){
+		string currCID = it->first;
+		string currCIDDestHID = it->second.senderHID;
+		uint32_t currCIDCost = it->second.distance;
+
+		logger->log("\t" + currCID);
+		logger->log("\t\tttl: " + to_string(it->second.ttl));
+		logger->log("\t\tdest hid: " + currCIDDestHID);
+		logger->log("\t\tcost" + to_string(currCIDCost));
+	}
+#endif
+
 	vector<string> candidates;
 	for(auto it = msg.CID2Info.begin(); it != msg.CID2Info.end(); ++it){
 		string currCID = it->first;
@@ -1156,6 +1190,10 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 		}
 
 		if(shouldSetRoute){
+#ifdef STATS_LOG
+			logger->log("set route " + currCID + " currCIDDest " + currCIDDestHID + " currCIDCost " + to_string(currCIDCost));
+#endif
+
 			routeState.CIDRoutesWithFilter[currCID].dest = currCIDDestHID;
 			routeState.CIDRoutesWithFilter[currCID].nextHop = neighbor.HID;
 			routeState.CIDRoutesWithFilter[currCID].port = neighbor.port;
@@ -1165,6 +1203,9 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 			if(msg.CID2Info[currCID].ttl - 1 > 0){
 				msg.CID2Info[currCID].ttl = msg.CID2Info[currCID].ttl - 1;
 				msg.CID2Info[currCID].distance = msg.CID2Info[currCID].distance + 1;
+#ifdef STATS_LOG
+				logger->log("relay " + currCID + " since it has a longer ttl");
+#endif
 			} else {
 				candidates.push_back(currCID);
 			}
@@ -1180,6 +1221,10 @@ int handleNodeJoinMessage(string data, const NeighborInfo &neighbor){
 	if(msg.CID2Info.size() != 0){
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			if(it->first != neighbor.HID){
+
+#ifdef STATS_LOG
+				logger->log("relay to " + it->first);
+#endif
 				msg.send(it->second.sendSock);
 			}
 		}
@@ -1198,11 +1243,22 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 	NodeLeaveMessage msg;
 	msg.deserialize(data);
 
-	printf("received a node leave message\n");
-	msg.print();
-
 #ifdef FILTER
 	routeState.mtx.lock();
+
+#ifdef STATS_LOG
+	logger->log("I receive node leave message from " + neighbor.HID);
+	for(auto it = msg.CID2Info.begin(); it != msg.CID2Info.end(); ++it){
+		string currCID = it->first;
+		string currCIDDestHID = it->second.senderHID;
+		uint32_t currCIDCost = it->second.distance;
+
+		logger->log("\t" + currCID);
+		logger->log("\t\tttl: " + to_string(it->second.ttl));
+		logger->log("\t\tdest hid: " + currCIDDestHID);
+		logger->log("\t\tcost" + to_string(currCIDCost));
+	}
+#endif
 
 	vector<string> candidates;
 	for(auto it = msg.CID2Info.begin(); it != msg.CID2Info.end(); ++it){
@@ -1210,11 +1266,19 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 
 		if(routeState.CIDRoutesWithFilter.find(currCID) != routeState.CIDRoutesWithFilter.end() && 
 			routeState.CIDRoutesWithFilter[currCID].nextHop == msg.prevHID){
+
+#ifdef STATS_LOG
+			logger->log("delete route " + currCID + " currCIDDest " + it->second.senderHID + " currCIDCost " + to_string(it->second.distance));
+#endif
+
 			xr.delRouteCIDRouting(currCID);
 
 			if(msg.CID2Info[currCID].ttl - 1 > 0){
 				msg.CID2Info[currCID].ttl = msg.CID2Info[currCID].ttl - 1;
 				msg.CID2Info[currCID].distance = msg.CID2Info[currCID].distance + 1;
+#ifdef STATS_LOG
+				logger->log("relay this CID " + currCID);
+#endif	
 			} else {
 				candidates.push_back(it->first);
 			}
@@ -1232,6 +1296,9 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 
 		for(auto it = routeState.neighbors.begin(); it != routeState.neighbors.end(); ++it){
 			if(it->first != neighbor.HID){
+#ifdef STATS_LOG
+				logger->log("relay to " + it->first);
+#endif
 				msg.send(it->second.sendSock);
 			}
 		}		
@@ -1272,11 +1339,6 @@ int handleNeighborMessage(string data, const NeighborInfo &neighbor){
 }
 
 int processNeighborMessage(const NeighborInfo &neighbor){
-	
-#ifdef STATS_LOG
-	logger->log("receive from neighbor AD: " + neighbor.AD + " HID: " + neighbor.HID.c_str());
-#endif
-
 	string data;
 	int status = recvMessageFromSock(neighbor.recvSock, data);
 	if(status < 0){
@@ -1338,10 +1400,6 @@ int recvMessageFromSock(int sock, string &data){
 		cleanup(0);
 	}
 	
-#ifdef STATS_LOG
-	//logger->log("recv " + to_string(data.size()));
-#endif
-
 	return 1;
 }
 
@@ -1375,10 +1433,6 @@ int sendMessageToSock(int sock, string advertisement){
 		remaining -= sent;
 		offset += sent;
 	}
-
-#ifdef STATS_LOG
-	//logger->log("send " + to_string(advertisement.size()));
-#endif
 
 	return 0;
 }

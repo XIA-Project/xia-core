@@ -298,11 +298,6 @@ void periodicJobs(){
 				exit(-1);
 			}
 
-#ifdef STATS_LOG
-			size_t totalSize = getTotalBytesForCIDRoutes();
-			logger->log("size " + to_string(totalSize));
-#endif
-
 			route_state.mtx.unlock();
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
@@ -374,7 +369,7 @@ void calcShortestPath() {
   		if(hop_count < MAX_HOP_COUNT) {
   			// for all the cids of the destination...
   			for (auto i = route_state.networkTable[currDest].dest_cids.begin(); i != route_state.networkTable[currDest].dest_cids.end(); ++i) {
-  				string destCID = i->first;
+  				string destCID = i->first;	
 
   				// if we haven't seen this CID routes before, set the routes
   				if(route_state.CIDrouteTable.find(destCID) == route_state.CIDrouteTable.end()){
@@ -399,11 +394,11 @@ void calcShortestPath() {
 void removeOutdatedRoutes(const map<string, RouteEntry> & prevRoutes) {
   	for (auto it = prevRoutes.begin(); it != prevRoutes.end(); ++it) {
   		if(route_state.CIDrouteTable.find(it->first) == route_state.CIDrouteTable.end()){
+
 #ifdef STATS_LOG
-			logger->log("route deletion");
-#endif
+			logger->log("purging CID route " + it->first + " from " + it->second.dest);
+#endif	
   			xr.delRouteCIDRouting(it->first);
-  			syslog(LOG_INFO, "purging CID route for : %s", it->first.c_str());
   		}
   	}
 }
@@ -412,11 +407,12 @@ void updateClickRoutingTable(const map<string, RouteEntry> & prevRoutes) {
   	int rc;
   	for (auto it =route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
 
-		if(prevRoutes.find(it->first) == prevRoutes.end()){
+		if(prevRoutes.find(it->first) == prevRoutes.end()){		
 
 #ifdef STATS_LOG
-			logger->log("route addition");
-#endif
+			logger->log("set CID route " + it->first + " from " + it->second.dest);
+#endif	
+
 			if ((rc = xr.setRouteCIDRouting(it->first, it->second.port, it->second.nextHop, 0xffff)) != 0){
 				syslog(LOG_ERR, "error setting route %d", rc);
 			}
@@ -474,7 +470,7 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 	msglen = lsa.size();
 
 	if(msglen < MSG_CUTOFF){
-		syslog(LOG_INFO, "sending LSA of seq %u start %d end %d\n", seq, start, end);
+		printf("sending LSA of seq %u start %d end %d\n", seq, start, end);
 
 		strcpy (buffer, lsa.c_str());
 		buflen = strlen(buffer);
@@ -484,10 +480,6 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
 			return -1;
 		}
-
-#ifdef STATS_LOG
-		logger->log("send " + to_string(buflen));
-#endif
 
 		seq++;
 	} else {
@@ -508,6 +500,13 @@ int sendLSA(){
 	uint32_t seq = 0;
 
 	if(route_state.sourceCids.size() != 0){
+
+#ifdef STATS_LOG
+		logger->log("sending LSA");
+		for(auto it = route_state.sourceCids.begin(); it != route_state.sourceCids.end(); ++it){
+			logger->log("CID " + *it);
+		}
+#endif
 		if ((rc = sendLSAHelper(seq, 0, route_state.sourceCids.size() - 1)) < 0){
 			return -1;
 		}
@@ -557,7 +556,7 @@ int processLSA(string lsa_msg) {
   	if (found!=string::npos) {
   		destHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
-  	}
+  	}	
 
   	// we don't want message from myself
   	if(destHID == route_state.myHID){
@@ -577,6 +576,14 @@ int processLSA(string lsa_msg) {
   		}
   	}
 
+#ifdef STATS_LOG
+	logger->log("Receive valid LSA");
+	logger->log("\t destHID " + destHID);
+	logger->log("\t ttl " + ttl_str);
+	logger->log("\t cid_num " + cid_num);
+	logger->log("\t lsa_seq " + lsa_seq);
+#endif
+
 	route_state.networkTable[destHID].seq = lsa_seq_num;
 	route_state.networkTable[destHID].cid_nums.insert(cid_msg_num);
 
@@ -587,12 +594,21 @@ int processLSA(string lsa_msg) {
   		start = found+1;  // forward the search point
   	}
 
+#ifdef STATS_LOG
+	logger->log("\t num_dest_cids " + num_dest_cids);
+#endif
+
   	int dest_cids_num = atoi(num_dest_cids.c_str());
   	for (int i = 0; i < dest_cids_num; ++i) {
 		// read CID
 		found=msg.find("^", start);
   		if (found!=string::npos) {
   			dest_cid = msg.substr(start, found-start);
+
+#ifdef STATS_LOG
+			logger->log("\t\tdest_cid " + dest_cid);
+#endif		
+
 			route_state.networkTable[destHID].dest_cids[dest_cid] = time(NULL);
   			start = found+1;  // forward the search point
   		}
@@ -605,6 +621,10 @@ int processLSA(string lsa_msg) {
   		start = found+1;  // forward the search point
   	}
 
+#ifdef STATS_LOG
+	logger->log("\t num_neighbors " + num_neighbors);
+#endif	
+
   	int neighbors_num = atoi(num_neighbors.c_str());
   	route_state.networkTable[destHID].num_neighbors = neighbors_num;
   	route_state.networkTable[destHID].neighbor_hids.clear();
@@ -615,6 +635,10 @@ int processLSA(string lsa_msg) {
   		if (found!=string::npos) {
   			neighbor_hid = msg.substr(start, found-start);
   			start = found+1;  // forward the search point
+
+#ifdef STATS_LOG
+			logger->log("\t\t neighbor_hid " + neighbor_hid);
+#endif	
 
   			route_state.networkTable[destHID].neighbor_hids.push_back(neighbor_hid);
   		}
@@ -628,6 +652,11 @@ int processLSA(string lsa_msg) {
   	updateClickRoutingTable(CIDrouteTableOld);
 
   	if(ttl - 1 > 0){
+
+#ifdef STATS_LOG
+		logger->log("have something to relay to neighbor");
+#endif
+
   		char buffer[MSG_CUTOFF];
 		bzero(buffer, MSG_CUTOFF);
 
@@ -641,10 +670,6 @@ int processLSA(string lsa_msg) {
 			syslog(LOG_DEBUG, "problem with Xsendto");
 			return -1;
 		}
-  		
-#ifdef STATS_LOG
-		logger->log("send " + to_string(newMsg.size()));
-#endif
   	}
 
 	return 1;
@@ -790,7 +815,6 @@ int main(int argc, char *argv[]){
 
    	periodicJobs();
 
-
 	// main event loop
 	while(1){
 		iteration++;
@@ -810,10 +834,6 @@ int main(int argc, char *argv[]){
 			}
 
 			route_state.mtx.lock();
-
-#ifdef STATS_LOG
-			logger->log("recv " + to_string(n));
-#endif
 
 			processLSA(recv_message);
 
