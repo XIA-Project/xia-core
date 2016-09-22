@@ -545,10 +545,10 @@ void CIDAdvertiseTimer(){
             advertiseCIDs();
 
 #ifdef STATS_LOG
-            routeState.mtx.lock();
-			size_t totalSize = getTotalBytesForCIDRoutes();
-			logger->log("size " + to_string(totalSize));
-			routeState.mtx.unlock();
+           // routeState.mtx.lock();
+			//size_t totalSize = getTotalBytesForCIDRoutes();
+			//logger->log("size " + to_string(totalSize));
+			//routeState.mtx.unlock();
 #endif
 
             this_thread::sleep_for(chrono::milliseconds(nextTimeMilisecond));
@@ -980,7 +980,7 @@ void deleteCIDRoutesWithFilter(const AdvertisementMessage & msg){
 			// remove an entry only if it is from the same host
 			if(currEntry.dest == msg.info.senderHID){
 #ifdef STATS_LOG
-				logger->log("route deletion");
+				//logger->log("route deletion");
 #endif
 				routeState.CIDRoutesWithFilter.erase(currDelCID);
 				xr.delRouteCIDRouting(currDelCID);
@@ -999,7 +999,7 @@ void setCIDRoutesWithFilter(const AdvertisementMessage & msg, const NeighborInfo
 			|| routeState.CIDRoutesWithFilter[currNewCID].cost > msg.info.distance){
 
 #ifdef STATS_LOG
-				logger->log("route addition");
+				//logger->log("route addition");
 #endif
 
 			// set corresponding CID route entries
@@ -1031,7 +1031,8 @@ void deleteCIDRoutes(const AdvertisementMessage & msg){
 
 			if(routeState.CIDRoutes[currDelCID].size() == 0){
 #ifdef STATS_LOG
-				logger->log("route deletion");
+				//logger->log("route deletion");
+
 #endif
 				// if no more CID routes left for this CID from other sender, just remove the CID routes
 				xr.delRouteCIDRouting(currDelCID);
@@ -1058,7 +1059,7 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 			routeState.CIDRoutes[currNewCID][msg.info.senderHID].dest = msg.info.senderHID;
 			
 #ifdef STATS_LOG
-			logger->log("route addition");
+			//logger->log("route addition");
 #endif
 
 			xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
@@ -1073,7 +1074,7 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 			// only set the routes if current message is the shortest to reach the CID
 			if(minDist > msg.distance){
 #ifdef STATS_LOG
-				logger->log("route addition");
+				//logger->log("route addition");
 #endif
 				xr.setRouteCIDRouting(currNewCID, neighbor.port, neighbor.HID, 0xffff);
 			}
@@ -1271,7 +1272,11 @@ int handleNeighborMessage(string data, const NeighborInfo &neighbor){
 }
 
 int processNeighborMessage(const NeighborInfo &neighbor){
-	printf("receive from neighbor AD: %s HID: %s\n", neighbor.AD.c_str(), neighbor.HID.c_str());
+	
+#ifdef STATS_LOG
+	logger->log("receive from neighbor AD: " + neighbor.AD + " HID: " + neighbor.HID.c_str());
+#endif
+
 	string data;
 	int status = recvMessageFromSock(neighbor.recvSock, data);
 	if(status < 0){
@@ -1334,7 +1339,7 @@ int recvMessageFromSock(int sock, string &data){
 	}
 	
 #ifdef STATS_LOG
-	logger->log("recv " + to_string(data.size()));
+	//logger->log("recv " + to_string(data.size()));
 #endif
 
 	return 1;
@@ -1372,7 +1377,7 @@ int sendMessageToSock(int sock, string advertisement){
 	}
 
 #ifdef STATS_LOG
-	logger->log("send " + to_string(advertisement.size()));
+	//logger->log("send " + to_string(advertisement.size()));
 #endif
 
 	return 0;

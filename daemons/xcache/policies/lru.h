@@ -17,7 +17,7 @@ public:
 		strcat(config, "/etc/xcache.ini");
 
 		max_entries = ini_getl("lru", "max_entries", 0, config);
-		max_size = ini_getl("lru", "max_size", 0, config);
+		max_size = ini_getl("lru", "max_size", 0, config)*1000000;
 
 		cache_size = 0.0;
 	}
