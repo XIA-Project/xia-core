@@ -110,7 +110,6 @@ string AdvertisementMessage::serialize() const{
 	string result;
 
 	result += to_string(CIDMessage::Advertise) + "^";
-	result += to_string(this->seq) + "^";
 	result += this->info.senderHID + "^";
 	result += to_string(this->info.ttl) + "^";
 	result += to_string(this->info.distance) + "^";
@@ -130,19 +129,10 @@ string AdvertisementMessage::serialize() const{
 
 void AdvertisementMessage::deserialize(string data){
 	size_t found, start;
-	string msg, seq_str, senderHID, ttl_str, distance_str, num_cids_str, cid_str;
+	string msg, senderHID, ttl_str, distance_str, num_cids_str, cid_str;
 
 	start = 0;
 	msg = data;
-
-	found = msg.find("^", start);
-  	if (found != string::npos) {
-  		seq_str = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-
-  		this->seq = atoi(seq_str.c_str());
-  	}
-
 
 	found = msg.find("^", start);
   	if (found != string::npos) {
@@ -203,7 +193,6 @@ void AdvertisementMessage::deserialize(string data){
 
 void AdvertisementMessage::print() const{
 	printf("AdvertisementMessage: \n");
-	printf("\tseq: %u\n", this->seq);
 	printf("\tsenderHID: %s\n", this->info.senderHID.c_str());
 	printf("\tttl: %d\n", this->info.ttl);
 	printf("\tdistance: %d\n", this->info.distance);
@@ -650,7 +639,6 @@ void advertiseCIDs(){
 	// start advertise to each of my neighbors
 	if(msg.delCIDs.size() > 0 || msg.newCIDs.size() > 0){
 		routeState.mtx.lock();
-		msg.seq = routeState.lsaSeq;
 
 #ifdef STATS_LOG
 		logger->log("I have something meaningful to broadcast");
@@ -673,7 +661,6 @@ void advertiseCIDs(){
 			msg.send(it->second.sendSock);
 		}
 
-		routeState.lsaSeq = (routeState.lsaSeq + 1) % MAX_SEQ;
 		routeState.mtx.unlock();
 	}
 }
@@ -1104,12 +1091,6 @@ void setCIDRoutes(const AdvertisementMessage & msg, const NeighborInfo &neighbor
 int handleAdvertisementMessage(string data, const NeighborInfo &neighbor){
 	AdvertisementMessage msg;
 	msg.deserialize(data);
-
-	/*
-	if(!checkSequenceAndTTL(msg.seq, msg.info.ttl, msg.info.senderHID)){
-		return 0;
-	}
-	 */
 	
 	// our communication to XIA writes to single socket and is
 	// not thread safe.
@@ -1330,25 +1311,6 @@ int handleNodeLeaveMessage(string data, const NeighborInfo &neighbor){
 #endif
 
 	return 0;
-}
-
-bool checkSequenceAndTTL(uint32_t seq, uint32_t ttl, string senderHID){
-	if(routeState.HID2Seq.find(senderHID) != routeState.HID2Seq.end() &&
-		seq <= routeState.HID2Seq[senderHID] && routeState.HID2Seq[senderHID] - seq < 1000000){	
-		// we must have seen this sequence number before since all messages 
-		// are sent in order
-		if(routeState.HID2Seq[senderHID] - seq >= MAX_SEQ_DIFF 
-			|| routeState.HID2Seq2TTL[senderHID][seq] >= ttl){
-			return false;
-		} else {
-			routeState.HID2Seq2TTL[senderHID][seq] = ttl;
-		}
-	} else {
-		routeState.HID2Seq[senderHID] = seq;
-		routeState.HID2Seq2TTL[senderHID][seq] = ttl;
-	}
-
-	return true;
 }
 
 int handleNeighborMessage(string data, const NeighborInfo &neighbor){
