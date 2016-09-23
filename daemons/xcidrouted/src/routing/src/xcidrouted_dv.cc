@@ -307,9 +307,11 @@ void updateClickRoutingTable() {
 	int rc;
 
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
-		if ((rc = xr.setRouteCIDRouting(it->first, it->second.port, it->second.nextHop, 0xffff)) != 0){
-			syslog(LOG_ERR, "error setting route %d", rc);
-		}
+  		if(it->second.port != DESTINE_FOR_LOCALHOST){
+  			if ((rc = xr.setRouteCIDRouting(it->first, it->second.port, it->second.nextHop, 0xffff)) != 0){
+				syslog(LOG_ERR, "error setting route %d", rc);
+			}
+  		}
   	}
 }
 
