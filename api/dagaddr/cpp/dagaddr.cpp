@@ -45,7 +45,17 @@ Node::XidMap Node::load_xids()
 	unsigned len = sizeof(path);
 	char *p;
 
-	p = XrootDir(path, len);
+	if ((p = getenv("XIADIR")) != NULL) {
+		strncpy(path, p, len);
+	} else if (!getcwd(path, len)) {
+		path[0] = 0;
+	}
+
+	p = strstr(path, SOURCE_DIR);
+	if (p) {
+		p += sizeof(SOURCE_DIR) - 1;
+		*p = '\0';
+	}
 	strncat(path, "/etc/xids", len);
 
 	FILE *f = fopen(path, "r");
