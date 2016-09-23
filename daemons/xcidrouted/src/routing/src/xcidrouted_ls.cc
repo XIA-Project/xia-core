@@ -835,6 +835,10 @@ int main(int argc, char *argv[]){
 
 			route_state.mtx.lock();
 
+#if defined(STATS_LOG)
+			logger->log("got a new LSA message\n");
+#endif
+
 			processLSA(recv_message);
 
 			route_state.mtx.unlock();
