@@ -26,7 +26,7 @@ using namespace std;
 
 #define MAX_XID_SIZE 100
 #define MAX_DAG_SIZE 512
-#define MAX_TTL 5
+#define MAX_TTL 3
 #define MSG_CUTOFF 1200
 #define EXPIRE_TIME 10
 #define CID_ADVERT_UPDATE_RATE_PER_SEC 1
