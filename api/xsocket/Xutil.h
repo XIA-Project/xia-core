@@ -20,6 +20,7 @@
 #ifndef _Xutil_h
 #define _Xutil_h
 
+#define SOURCE_DIR "xia-core"
 #define PATH_SIZE 4096
 
 #ifdef DEBUG
