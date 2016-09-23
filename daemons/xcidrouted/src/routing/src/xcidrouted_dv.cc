@@ -432,7 +432,7 @@ void removeOutdatedRoutes(){
 	vector<string> cidsToRemove;
 
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
-  		if(now - it->second.timer >= EXPIRE_TIME){
+  		if(now - it->second.timer >= EXPIRE_TIME && it->second.port != DESTINE_FOR_LOCALHOST){
   			xr.delRouteCIDRouting(it->first);
   			cidsToRemove.push_back(it->first);
   		}
@@ -553,7 +553,7 @@ int main(int argc, char *argv[]) {
 
    	initRouteState();
 
-#if defined(STATS_LOG)
+#ifdef STATS_LOG
    	string namePrefix = hostname;
    	logger = new Logger(namePrefix + "_dv");
 #endif
