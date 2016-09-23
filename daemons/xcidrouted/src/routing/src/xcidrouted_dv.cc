@@ -432,8 +432,10 @@ void removeOutdatedRoutes(){
 	vector<string> cidsToRemove;
 
   	for (auto it = route_state.CIDrouteTable.begin(); it != route_state.CIDrouteTable.end(); ++it) {
-  		if(now - it->second.timer >= EXPIRE_TIME && it->second.port != DESTINE_FOR_LOCALHOST){
-  			xr.delRouteCIDRouting(it->first);
+  		if(now - it->second.timer >= EXPIRE_TIME){
+  			if(it->second.port != DESTINE_FOR_LOCALHOST){
+  				xr.delRouteCIDRouting(it->first);
+  			}
   			cidsToRemove.push_back(it->first);
   		}
   	}
