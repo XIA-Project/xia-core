@@ -707,13 +707,8 @@ void initRouteState() {
 	}
 	memcpy(&route_state.sdag, ai_recv->ai_addr, sizeof(sockaddr_x));
 
-	// make the dest DAG (the one the routing process send to)
-	struct addrinfo *ai_send;
-	if (Xgetaddrinfo(NULL, SID_XROUTE_SEND, NULL, &ai_send) != 0) {
-		syslog(LOG_ALERT, "unable to create source DAG");
-		exit(-1);
-	}
-	memcpy(&route_state.ddag, ai_send->ai_addr, sizeof(sockaddr_x));
+	Graph g = Node() * Node(BHID) * Node(SID_XROUTE_SEND);
+	g.fill_sockaddr(&route_state.ddag);
 
 	// bind to the src DAG
    	if (Xbind(route_state.recv_sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
@@ -826,7 +821,7 @@ int main(int argc, char *argv[]){
 
 		selectRetVal = Xselect(route_state.recv_sock + 1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0){
-			memset(&recv_message[0], 0, sizeof(recv_message));
+			memset(recv_message, 0, sizeof(recv_message));
 
 			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
