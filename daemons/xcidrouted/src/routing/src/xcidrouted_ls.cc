@@ -360,16 +360,34 @@ void calcShortestPath() {
   		string currDest = it->first;
   		string currNode = currDest;
   		
+  		vector<string> path;
+  		path.push_back(currNode);
+
   		int hop_count = 0;
   		while (route_state.networkTable[currNode].prevNode != route_state.myHID && hop_count < MAX_HOP_COUNT) {
   			currNode = route_state.networkTable[currNode].prevNode;
+  			path.insert(path.begin(), currNode);
   			hop_count++;
   		}
 
   		if(hop_count < MAX_HOP_COUNT) {
+
+#ifdef STATS_LOG
+			logger->log("network table has destination HID: "+ currDest);
+			string paths;
+			for(auto it = path.begin(); it != path.end(); ++it){
+				paths += *it + " ";
+			}
+			logger->log("path: " + paths);
+#endif	
+
   			// for all the cids of the destination...
   			for (auto i = route_state.networkTable[currDest].dest_cids.begin(); i != route_state.networkTable[currDest].dest_cids.end(); ++i) {
   				string destCID = i->first;	
+
+#ifdef STATS_LOG
+  				logger->log("\ndest CID at that destination: " + destCID);
+#endif
 
   				// if we haven't seen this CID routes before, set the routes
   				if(route_state.CIDrouteTable.find(destCID) == route_state.CIDrouteTable.end()){
