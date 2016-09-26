@@ -473,10 +473,11 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 		strcpy (buffer, lsa.c_str());
 		buflen = strlen(buffer);
 
-		rc1 = Xsendto(route_state.send_sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-		
-		printf("sent %d bytes expect to send %d bytes\n", rc1, msglen);
+		sockaddr_x ddag;
+		Graph g = Node() * Node(BHID) * Node(SID_XROUTE_RECV);
+		g.fill_sockaddr(&ddag);
 
+		rc1 = Xsendto(route_state.send_sock, buffer, buflen, 0, (struct sockaddr*)&ddag, sizeof(sockaddr_x));
 		if(rc1 != buflen) {
 			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
 			return -1;
@@ -708,8 +709,12 @@ void initRouteState() {
 	}
 	memcpy(&route_state.sdag, ai_recv->ai_addr, sizeof(sockaddr_x));
 
-	Graph g = Node() * Node(BHID) * Node(SID_XROUTE_SEND);
-	g.fill_sockaddr(&route_state.ddag);
+	struct addrinfo *ai_send;
+	if (Xgetaddrinfo(NULL, SID_XROUTE_SEND, NULL, &ai_send) != 0) {
+		syslog(LOG_ALERT, "unable to create source DAG");
+		exit(-1);
+	}
+	memcpy(&route_state.ddag, ai_send->ai_addr, sizeof(sockaddr_x));
 
 	// bind to the src DAG
    	if (Xbind(route_state.recv_sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
@@ -820,8 +825,7 @@ int main(int argc, char *argv[]){
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000;
 
-		printf("before Xselect\n");
-		selectRetVal = Xselect(route_state.recv_sock + 1, &socks, NULL, NULL, &timeoutval);
+		selectRetVal = Xselect(route_state.recv_sock+1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0){
 			memset(recv_message, 0, sizeof(recv_message));
 
