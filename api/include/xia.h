@@ -36,6 +36,13 @@
 #define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
 #define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
 
+#define XID_TYPE_AD CLICK_XIA_XID_TYPE_AD
+#define XID_TYPE_HID CLICK_XIA_XID_TYPE_HID
+#define XID_TYPE CID CLICK_XIA_XID_TYPE_CID
+#define XID_TYPE_SID CLICX_XIA_XID_TYPE_SID
+#define XID_TYPE_IP CLICX_XIA_XID_TYPE_IP
+#define XID_TYPE_DUMMY_SOURCE CLICX_XIA_XID_TYPE_DUMMY
+/*
 enum XID_TYPE {
 	XID_TYPE_AD = 0x10,  // TODO: why does swig complain when these are uint32_t?
 	XID_TYPE_HID = 0x11,
@@ -44,7 +51,6 @@ enum XID_TYPE {
 	XID_TYPE_IP = 0x14,
 	XID_TYPE_DUMMY_SOURCE = 0xff,
 };
-
 typedef struct {
 	unsigned int  s_type;
 	unsigned char s_id[XID_SIZE];
@@ -54,11 +60,15 @@ typedef struct {
 	xid_t         s_xid;
 	unsigned char s_edge[EDGES_MAX];
 } node_t;
+*/
 
+typedef struct clicx_xia_xid xid_t;
+typedef struct click_xia_xid_node node_t;
 typedef struct {
 	unsigned char s_count;
 	node_t        s_addr[NODES_MAX];
 } x_addr_t;
+
 
 
 typedef struct {
