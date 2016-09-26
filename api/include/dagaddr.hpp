@@ -139,6 +139,7 @@ private:
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
+	void from_wire_format(uint8_t num_nodes, const node_t *buf);
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);
