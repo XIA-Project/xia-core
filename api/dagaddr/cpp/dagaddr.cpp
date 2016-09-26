@@ -1411,6 +1411,53 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 	}
 }
 
+/**
+ * @ Fills an empty graph from our binary wire format
+ *
+ * Fills an empty graph from a memory buffer containing the graph in
+ * serialized wire form.
+ *
+ * @param num_nodes The number of nodes in the graph
+ * @param buf The memory buffer containing graph in serialized wire format
+ */
+void
+Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
+{
+	// First add nodes to the graph and remember their new indices
+	std::vector<uint8_t> graph_indices;
+	for (int i = 0; i < num_nodes; i++)
+	{
+		const node_t *node = &(buf[i]);
+		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0=dummy
+		graph_indices.push_back(add_node(n));
+	}
+
+	// Add the source node
+	uint8_t src_index = add_node(Node());
+
+	// Add edges
+	for (int i = 0; i < num_nodes; i++)
+	{
+		const node_t *node = &(buf[i]);
+
+		int from_node;
+		if (i == num_nodes-1) {
+			from_node = src_index;
+		} else {
+			from_node = graph_indices[i];
+		}
+
+		for (int j = 0; j < EDGES_MAX; j++)
+		{
+			int to_node = node->s_edge[j];
+
+			if (to_node != EDGE_UNUSED) {
+				add_edge(from_node, to_node);
+			}
+		}
+	}
+}
+
 
 /**
 * @brief Fills an empty graph from a sockaddr_x.
@@ -1423,40 +1470,14 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 void
 Graph::from_sockaddr(const sockaddr_x *s)
 {
-	// FIXME: check to be sure it's really a sockaddr_x!
-
-	int num_nodes = s->sx_addr.s_count;
-	// First add nodes to the graph and remember their new indices
-	std::vector<uint8_t> graph_indices;
-	for (int i = 0; i < num_nodes; i++)
-	{
-		const node_t *node = &(s->sx_addr.s_addr[i]);
-		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0 means nothing
-		graph_indices.push_back(add_node(n));
+	// FIXME: This function should return an error instead of empty Graph
+	if(s->sx_family != AF_XIA) {
+		printf("Graph::from_sockaddr: Error: sockaddr_x family is not XIA\n");
+		return;
 	}
 
-	// Add the source node
-	uint8_t src_index = add_node(Node());
-
-	// Add edges
-	for (int i = 0; i < num_nodes; i++)
-	{
-		const node_t *node = &(s->sx_addr.s_addr[i]);
-
-		int from_node;
-		if (i == num_nodes-1)
-			from_node = src_index;
-		else
-			from_node = graph_indices[i];
-
-		for (int j = 0; j < EDGES_MAX; j++)
-		{
-			int to_node = node->s_edge[j];
-
-			if (to_node != EDGE_UNUSED)
-				add_edge(from_node, to_node);
-		}
-	}
+	uint8_t num_nodes = s->sx_addr.s_count;
+	from_wire_format(num_nodes, s->sx_addr.s_addr);
 }
 
 
