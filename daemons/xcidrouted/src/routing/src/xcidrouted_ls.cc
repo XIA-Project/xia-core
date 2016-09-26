@@ -820,14 +820,18 @@ int main(int argc, char *argv[]){
 		timeoutval.tv_sec = 0;
 		timeoutval.tv_usec = 2000;
 
+		printf("before Xselect\n");
 		selectRetVal = Xselect(route_state.recv_sock + 1, &socks, NULL, NULL, &timeoutval);
 		if (selectRetVal > 0){
 			memset(recv_message, 0, sizeof(recv_message));
 
+			printf("before recv from\n");
 			n = Xrecvfrom(route_state.recv_sock, recv_message, XIA_MAXBUF, 0, (struct sockaddr*)&theirDAG, &dlen);
 			if (n < 0) {
 				perror("recvfrom got a problem");
 			}
+
+			printf("before processLSA\n");
 
 			route_state.mtx.lock();
 
