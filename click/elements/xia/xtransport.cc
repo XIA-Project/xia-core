@@ -137,7 +137,6 @@ sock::sock() {
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-	cp_xid_type("SID", &_sid_type);	// FIXME: why isn't this a constant?
 	_next_id = INITIAL_ID;
 }
 
@@ -1844,7 +1843,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		XID front_xid = sk->src_path.xid( xids[0] );
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == _sid_type) {
+		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -1955,7 +1954,7 @@ void XTRANSPORT::XbindPush(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 
 		struct click_xia_xid head_xid = front_xid.xid();
 		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == _sid_type) {
+		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -2857,116 +2856,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		XStream *st = dynamic_cast<XStream *>(sk);
 
 		st->usrmigrate();
-
-#if 0
-		// Send MIGRATE message to each corresponding endpoint
-		// src_DAG, dst_DAG, timestamp - Signed by private key
-		// plus the public key (Should really exchange at SYN/SYNACK)
-		uint8_t *payload;
-		uint8_t *payloadptr;
-		uint32_t maxpayloadlen;
-		uint32_t payloadlen;
-		String src_path = sk->src_path.unparse();
-		String dst_path = sk->dst_path.unparse();
-		INFO("MIGRATING %s - %s", src_path.c_str(), dst_path.c_str());
-		int src_path_len = strlen(src_path.c_str()) + 1;
-		int dst_path_len = strlen(dst_path.c_str()) + 1;
-		Timestamp now = Timestamp::now();
-		String timestamp = now.unparse();
-		int timestamp_len = strlen(timestamp.c_str()) + 1;
-		// Get the public key to include in packet
-		char pubkey[MAX_PUBKEY_SIZE];
-		uint16_t pubkeylen = MAX_PUBKEY_SIZE;
-		XID src_xid = sk->src_path.xid(sk->src_path.destination_node());
-		INFO("Retrieving pubkey for xid:%s:", src_xid.unparse().c_str());
-		if (xs_getPubkey(src_xid.unparse().c_str(), pubkey, &pubkeylen)) {
-			INFO("ERROR: Pubkey not found:%s:", src_xid.unparse().c_str());
-			return;
-		}
-		INFO("Pubkey:%s:", pubkey);
-		maxpayloadlen = src_path_len + dst_path_len + timestamp_len + sizeof(uint16_t) + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + pubkeylen;
-		payload = (uint8_t *)calloc(maxpayloadlen, 1);
-		if (payload == NULL) {
-			ERROR("ERROR: Cannot allocate memory for Migrate packet");
-			return;
-		}
-		// Build the payload
-		payloadptr = payload;
-		// Source DAG with new AD
-		memcpy(payloadptr, src_path.c_str(), src_path_len);
-		INFO("MIGRATE Source DAG: %s", payloadptr);
-		payloadptr += src_path_len;
-		// Destination DAG
-		memcpy(payloadptr, dst_path.c_str(), dst_path_len);
-		INFO("MIGRATE Dest DAG: %s", payloadptr);
-		payloadptr += dst_path_len;
-		// Timestamp of this MIGRATE message
-		memcpy(payloadptr, timestamp.c_str(), timestamp_len);
-		INFO("MIGRATE Timestamp: %s", timestamp.c_str());
-		payloadptr += timestamp_len;
-		// Sign(SourceDAG, DestinationDAG, Timestamp)
-		uint8_t signature[MAX_SIGNATURE_SIZE];
-		uint16_t siglen = MAX_SIGNATURE_SIZE;
-		if (xs_sign(src_xid.unparse().c_str(), payload, payloadptr - payload, signature, &siglen)) {
-			ERROR("ERROR: Signing Migrate packet");
-			return;
-		}
-		// Signature length
-		memcpy(payloadptr, &siglen, sizeof(uint16_t));
-		payloadptr += sizeof(uint16_t);
-		// Signature
-		memcpy(payloadptr, signature, siglen);
-		payloadptr += siglen;
-		// Public key length
-		memcpy(payloadptr, &pubkeylen, sizeof(uint16_t));
-		payloadptr += sizeof(uint16_t);
-		// Public key of source SID
-		memcpy(payloadptr, pubkey, pubkeylen);
-		INFO("MIGRATE: Pubkey:%s: Length: %d", pubkey, pubkeylen);
-		payloadptr += pubkeylen;
-		// Total payload length
-		payloadlen = payloadptr - payload;
-		INFO("MIGRATE payload length: %d", payloadlen);
-
-		//Add XIA headers
-		XIAHeaderEncap xiah;
-		xiah.set_nxt(CLICK_XIA_NXT_TRN);
-		xiah.set_last(LAST_NODE_DEFAULT);
-		xiah.set_hlim(sk->hlim);
-		xiah.set_dst_path(sk->dst_path);
-		xiah.set_src_path(sk->src_path);
-
-		WritablePacket *just_payload_part = WritablePacket::make(256, payload, payloadlen, 0);
-		free(payload);
-
-		WritablePacket *p = NULL;
-
-		TransportHeaderEncap *thdr = TransportHeaderEncap::MakeMIGRATEHeader( 0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length
-
-		p = thdr->encap(just_payload_part);
-
-		thdr->update();
-		xiah.set_plen(payloadlen + thdr->hlen()); // XIA payload = transport header + transport-layer data
-
-		p = xiah.encap(p, false);
-
-		delete thdr;
-
-		// Store the migrate packet for potential retransmission
-		sk->migrate_pkt = copy_packet(p, sk);
-		sk->num_migrate_tries++;
-		sk->last_migrate_ts = timestamp;
-
-		// Set timer
-		sk->migrating = true;
-		ScheduleTimer(sk, MIGRATEACK_DELAY);
-
-		idToSock.set(_migrateid, sk);
-		if (_migrateid != sk->id) {
-			ERROR("ERROR _sport %d, sk->port %d", _migrateid, sk->id);
-		}
-		output(NETWORK_PORT).push(p);
-#endif
 	}
 
 	ReturnResult(_sport, xia_socket_msg);
