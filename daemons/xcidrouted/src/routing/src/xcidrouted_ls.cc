@@ -315,7 +315,7 @@ void calcShortestPath() {
 
 	for (auto it = route_state.neighborTable.begin(); it != route_state.neighborTable.end(); ++it) {
 		string neighbor = it->first;
-		
+
 		if(route_state.networkTable.find(neighbor) != route_state.networkTable.end()){
 			route_state.networkTable[neighbor].cost = 1;
 			route_state.networkTable[neighbor].prevNode = route_state.myHID;
@@ -470,12 +470,13 @@ int sendLSAHelper(uint32_t & seq, int start, int end){
 	msglen = lsa.size();
 
 	if(msglen < MSG_CUTOFF){
-		printf("sending LSA of seq %u start %d end %d\n", seq, start, end);
-
 		strcpy (buffer, lsa.c_str());
 		buflen = strlen(buffer);
 
 		rc1 = Xsendto(route_state.send_sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+		
+		printf("sent %d bytes expect to send %d bytes\n", rc1, msglen);
+
 		if(rc1 != buflen) {
 			syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc1);
 			return -1;
