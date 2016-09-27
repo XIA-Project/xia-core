@@ -20,6 +20,8 @@
 
 #define CLICK_XIA_XID_ID_LEN        20
 
+#define CLICK_XIA_ADDR_MAX_NODES	20
+
 struct click_xia_xid {
     uint32_t type;
     uint8_t id[CLICK_XIA_XID_ID_LEN];
@@ -67,6 +69,30 @@ struct click_xia {
     int8_t last;			/* index of last visited node (note: integral) */
     click_xia_xid_node node[0];         /* XID node list */
 };
+
+typedef struct click_xia_xid xid_t;
+
+typedef struct click_xia_xid_node node_t;
+
+typedef struct {
+    unsigned char s_count;
+    node_t        s_addr[CLICK_XIA_ADDR_MAX_NODES];
+} x_addr_t;
+
+
+
+typedef struct {
+    // common sockaddr fields
+#ifdef __APPLE__
+    unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
+    unsigned char sx_family;
+#else
+    unsigned short sx_family;
+#endif
+
+    // XIA specific fields
+    x_addr_t      sx_addr;
+} sockaddr_x;
 
 #define CLICK_XIA_NXT_DATA		0
 #define CLICK_XIA_NXT_XCMP		0x01

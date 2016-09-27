@@ -12,7 +12,12 @@
 #include <vector>
 #include <string>
 #include <map>
+
+#ifdef CLICK_USERLEVEL
+#include <clicknet/xia.h>
+#else
 #include "xia.h"
+#endif
 
 class Graph;
 
@@ -20,14 +25,6 @@ class Node
 {
 public:
 	static const std::size_t ID_LEN = 20;
-
-	static const unsigned int XID_TYPE_UNKNOWN = 0;
-	static const unsigned int XID_TYPE_DUMMY_SOURCE = 0xff;
-	static const unsigned int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
-	static const unsigned int XID_TYPE_HID = 0x11;
-	static const unsigned int XID_TYPE_CID = 0x12;
-	static const unsigned int XID_TYPE_SID = 0x13;
-	static const unsigned int XID_TYPE_IP = 0x14;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
 	static const std::string XID_TYPE_DUMMY_SOURCE_STRING;

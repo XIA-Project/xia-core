@@ -12,6 +12,7 @@
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"
+#include "click/dagaddr.hpp"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
 
@@ -3381,4 +3382,4 @@ CLICK_ENDDECLS
 EXPORT_ELEMENT(XTRANSPORT)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_MT_SAFE(XTRANSPORT)
-ELEMENT_LIBS(-lcrypto -lssl -lprotobuf)
+ELEMENT_LIBS(-lcrypto -lssl -lprotobuf -L/home/nitingup/work/git/mobility-xia-core/api/lib -ldagaddr)

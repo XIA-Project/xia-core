@@ -64,36 +64,36 @@ static node_t str_to_node(char *xidstr)
 #define STREQ(__str, __constr) (strncasecmp((__str), (__constr), strlen(__constr)) == 0)
 	if(STREQ(pos, "CID")) {
 		printf("CID\n");
-		node.s_xid.s_type = XID_TYPE_CID;
+		node.xid.type = XID_TYPE_CID;
 		pos += 3;
 	} else if(STREQ(pos, "HID")) {
 		printf("HID\n");
-		node.s_xid.s_type = XID_TYPE_HID;
+		node.xid.type = XID_TYPE_HID;
 		pos += 3;
 	} else if(STREQ(pos, "AD")) {
 		printf("AD\n");
-		node.s_xid.s_type = XID_TYPE_AD;
+		node.xid.type = XID_TYPE_AD;
 		pos += 2;
 	} else if(STREQ(pos, "SID")) {
-		node.s_xid.s_type = XID_TYPE_SID;
+		node.xid.type = XID_TYPE_SID;
 		printf("SID\n");
 		pos += 3;
 	} else if(STREQ(pos, "IP")) {
-		node.s_xid.s_type = XID_TYPE_IP;
+		node.xid.type = XID_TYPE_IP;
 		printf("Unrecognized type\n");
 		pos += 2;
 	} else if(STREQ(pos, "SRC")) {
-		node.s_xid.s_type = XID_TYPE_DUMMY_SOURCE;
+		node.xid.type = XID_TYPE_DUMMY_SOURCE;
 		printf("Source\n");
 		pos += 3;
 	}
 
 	pos++;
 
-	str2hex(node.s_xid.s_id, XID_SIZE, pos, strlen(pos));
+	str2hex(node.xid.id, XID_SIZE, pos, strlen(pos));
 
 	for(i = 0; i < EDGES_MAX; i++) {
-		node.s_edge[i] = EDGE_UNUSED;
+		node.edge[i].idx = EDGE_UNUSED;
 	}
 
 	return node;
@@ -130,8 +130,8 @@ static void add_edge(node_t *node, int dest)
 	int i;
 
 	for(i = 0; i < EDGES_MAX; i++) {
-		if(node->s_edge[i] == EDGE_UNUSED) {
-			node->s_edge[i] = dest;
+		if(node->edge[i].idx == EDGE_UNUSED) {
+			node->edge[i].idx = dest;
 			return;
 		}
 	}
@@ -150,7 +150,7 @@ static int get_path_recursive(sockaddr_x *scratch, int path[], int *pathlen, int
 
 	printf("For Node %d\n", node);
 	for(i = 0; i < EDGES_MAX; i++) {
-		int edge = scratch->sx_addr.s_addr[node].s_edge[i];
+		int edge = scratch->sx_addr.s_addr[node].edge[i].idx;
 		printf("\tEdge %d\n", edge);
 
 		if(edge == EDGE_UNUSED) {
@@ -162,14 +162,14 @@ static int get_path_recursive(sockaddr_x *scratch, int path[], int *pathlen, int
 		if(edge == scratch->sx_addr.s_count - 1) {
 			printf("\tIntent\n", edge);
 			path[(*pathlen)++] = edge;
-			scratch->sx_addr.s_addr[node].s_edge[i] = EDGE_UNUSED;
+			scratch->sx_addr.s_addr[node].edge[i].idx = EDGE_UNUSED;
 			return 0;
 		}
 
 		printf("\tRecursive Try\n", edge);
 		ret = get_path_recursive(scratch, path, pathlen, edge);
 		if(ret < 0) {
-			scratch->sx_addr.s_addr[node].s_edge[i] = EDGE_UNUSED;
+			scratch->sx_addr.s_addr[node].edge[i].idx = EDGE_UNUSED;
 		} else {
 			path[(*pathlen)++] = edge;
 			return ret;
@@ -208,8 +208,8 @@ int dag_to_url(char *url, size_t urlsize, sockaddr_x *addr)
 	for(i = 0; i < addr->sx_addr.s_count; i++) {
 		char type[256], id[256], xid[256];
 
-		strcpy(type, get_xid_str(addr->sx_addr.s_addr[i].s_xid.s_type));
-		hex2str(id, 256, addr->sx_addr.s_addr[i].s_xid.s_id, XID_SIZE);
+		strcpy(type, get_xid_str(addr->sx_addr.s_addr[i].xid.type));
+		hex2str(id, 256, addr->sx_addr.s_addr[i].xid.id, XID_SIZE);
 
 		snprintf(xid, 256, "%s%s", type, id);
 		sprintf(lurl + strlen(lurl), ".%s", xid);
@@ -220,18 +220,18 @@ int dag_to_url(char *url, size_t urlsize, sockaddr_x *addr)
 		char id[256];
 
 		for(i = ret - 1; i >= 0; i--) {
-			hex2str(id, 256, addr->sx_addr.s_addr[path[i]].s_xid.s_id, XID_SIZE);
+			hex2str(id, 256, addr->sx_addr.s_addr[path[i]].xid.id, XID_SIZE);
 			if(ret == 1) {
 				snprintf(url + strlen(url), urlsize, "%s%s",
-					 get_xid_str(addr->sx_addr.s_addr[path[i]].s_xid.s_type),
+					 get_xid_str(addr->sx_addr.s_addr[path[i]].xid.type),
 					 id);
 			} else if(i == ret - 1) {
 				snprintf(url + strlen(url), urlsize, ".fallback-%s%s",
-					 get_xid_str(addr->sx_addr.s_addr[path[i]].s_xid.s_type),
+					 get_xid_str(addr->sx_addr.s_addr[path[i]].xid.type),
 					 id);
 			} else {
 				snprintf(url + strlen(url), urlsize, "-%s%s",
-					 get_xid_str(addr->sx_addr.s_addr[path[i]].s_xid.s_type),
+					 get_xid_str(addr->sx_addr.s_addr[path[i]].xid.type),
 					 id);
 			}
 			printf(" %d", path[i]);
@@ -354,9 +354,9 @@ void print_sockaddr(sockaddr_x *a)
 	for(i = 0; i < a->sx_addr.s_count; i++) {
 		node_t *node = &a->sx_addr.s_addr[i];
 
-		print_var(node->s_xid.s_type);
+		print_var(node->xid.type);
 		for(j = 0; j < EDGES_MAX; j++) {
-			print_var(node->s_edge[j]);
+			print_var(node->edge[j].idx);
 		}
 	}
 }

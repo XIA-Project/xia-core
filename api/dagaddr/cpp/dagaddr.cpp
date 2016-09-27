@@ -513,7 +513,7 @@ Graph::operator*=(const Graph& r)
 	for (std::size_t i = 0; i < r.nodes_.size(); i++)
 		if (r.is_source(i))
 		{
-			if (r.nodes_[i].type() == Node::XID_TYPE_DUMMY_SOURCE)
+			if (r.nodes_[i].type() == XID_TYPE_DUMMY_SOURCE)
 			{
 				for (std::vector<std::size_t>::const_iterator it = r.out_edges_[i].begin(); it != r.out_edges_[i].end(); ++it)
 					vector_push_back_unique(sources, *it);
@@ -676,7 +676,7 @@ Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool 
 	node_mapping.clear();
 
 	for (std::vector<Node>::const_iterator it = r.nodes_.begin(); it != r.nodes_.end(); ++it)
-		if (allow_duplicate_nodes && (*it).type() == Node::XID_TYPE_DUMMY_SOURCE) // don't add r's source node to the middle of this graph
+		if (allow_duplicate_nodes && (*it).type() == XID_TYPE_DUMMY_SOURCE) // don't add r's source node to the middle of this graph
 			node_mapping.push_back(-1);
 		else
 		{
@@ -685,7 +685,7 @@ Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool 
 
 	for (std::size_t from_id = 0; from_id < r.out_edges_.size(); from_id++)
 	{
-		if (allow_duplicate_nodes && r.nodes_[from_id].type() == Node::XID_TYPE_DUMMY_SOURCE) continue;
+		if (allow_duplicate_nodes && r.nodes_[from_id].type() == XID_TYPE_DUMMY_SOURCE) continue;
 		for (std::vector<std::size_t>::const_iterator it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it)
 			add_edge(node_mapping[from_id], node_mapping[*it]);
 	}
@@ -1018,7 +1018,7 @@ Graph::next_hop(const Node& n)
 	// find the next intent node (the final intent of the new DAG)
 	// for now, we we'll only consider CIDs and SIDs to be intent nodes
 	std::size_t intentIndex = nIndex;
-	while (intentIndex == nIndex || (nodes_[intentIndex].type() != Node::XID_TYPE_CID && nodes_[intentIndex].type() != Node::XID_TYPE_SID))
+	while (intentIndex == nIndex || (nodes_[intentIndex].type() != XID_TYPE_CID && nodes_[intentIndex].type() != XID_TYPE_SID))
 	{
 		if (is_sink(intentIndex)) {
 			break;
@@ -1389,8 +1389,8 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 		node_t* node = (node_t*)&(s->sx_addr.s_addr[i]); // check this
 
 	    // Set the node's XID and type
-		node->s_xid.s_type = get_node(i).type();
-	    memcpy(&(node->s_xid.s_id), get_node(i).id(), Node::ID_LEN);
+		node->xid.type = get_node(i).type();
+	    memcpy(&(node->xid.id), get_node(i).id(), Node::ID_LEN);
 
 	    // Get the node's out edge list
 	    std::vector<std::size_t> out_edges;
@@ -1404,9 +1404,9 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 	    for (uint8_t j = 0; j < EDGES_MAX; j++)
 	    {
 	        if (j < out_edges.size())
-	            node->s_edge[j] = out_edges[j];
+	            node->edge[j].idx = out_edges[j];
 	        else
-	            node->s_edge[j] = EDGE_UNUSED;
+	            node->edge[j].idx = EDGE_UNUSED;
 	    }
 	}
 }
@@ -1428,7 +1428,7 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 	for (int i = 0; i < num_nodes; i++)
 	{
 		const node_t *node = &(buf[i]);
-		Node n = Node(node->s_xid.s_type, &(node->s_xid.s_id), 0); // 0=dummy
+		Node n = Node(node->xid.type, &(node->xid.id), 0); // 0=dummy
 		graph_indices.push_back(add_node(n));
 	}
 
@@ -1449,7 +1449,7 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 
 		for (int j = 0; j < EDGES_MAX; j++)
 		{
-			int to_node = node->s_edge[j];
+			int to_node = node->edge[j].idx;
 
 			if (to_node != EDGE_UNUSED) {
 				add_edge(from_node, to_node);
