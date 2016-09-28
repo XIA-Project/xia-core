@@ -265,17 +265,22 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 	ptr_->ref_count = 1;
     memset(ptr_->id,0,Node::ID_LEN); // zero the ID
 
-	if (type_str == XID_TYPE_AD_STRING)
+	std::string typestr;
+
+	// Convert type_str to uppercase for string comparison
+	transform(type_str.begin(), type_str.end(), typestr.begin(), ::toupper);
+
+	if (typestr == XID_TYPE_AD_STRING)
 		ptr_->type = XID_TYPE_AD;
-	else if (type_str == XID_TYPE_HID_STRING)
+	else if (typestr == XID_TYPE_HID_STRING)
 		ptr_->type = XID_TYPE_HID;
-	else if (type_str == XID_TYPE_CID_STRING)
+	else if (typestr == XID_TYPE_CID_STRING)
 		ptr_->type = XID_TYPE_CID;
-	else if (type_str == XID_TYPE_SID_STRING)
+	else if (typestr == XID_TYPE_SID_STRING)
 		ptr_->type = XID_TYPE_SID;
-	else if (type_str == XID_TYPE_IP_STRING)
+	else if (typestr == XID_TYPE_IP_STRING)
 		ptr_->type = XID_TYPE_IP;
-	else if (type_str == XID_TYPE_DUMMY_SOURCE_STRING)
+	else if (typestr == XID_TYPE_DUMMY_SOURCE_STRING)
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
 	{
@@ -285,7 +290,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 
 		for (itr = Node::xids.begin(); itr != Node::xids.end(); itr++) {
 
-			if (type_str == (*itr).second) {
+			if (typestr == (*itr).second) {
 				found = 1;
 				ptr_->type = (*itr).first;
 				break;
@@ -294,7 +299,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 
 		if (!found) {
 			ptr_->type = 0;
-			printf("WARNING: Unrecognized XID type: %s\n", type_str.c_str());
+			printf("WARNING: Unrecognized XID type: %s\n", typestr.c_str());
 		}
 	}
 
