@@ -112,10 +112,13 @@ public:
 	uint8_t num_nodes() const;
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
+	size_t fill_wire_buffer(node_t *buf) const;
 	void fill_sockaddr(sockaddr_x *s) const;
+	void from_wire_format(uint8_t num_nodes, const node_t *buf);
 	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+	bool flatten();
 private:
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
@@ -136,7 +139,6 @@ private:
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
-	void from_wire_format(uint8_t num_nodes, const node_t *buf);
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);

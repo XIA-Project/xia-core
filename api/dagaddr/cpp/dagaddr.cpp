@@ -1372,26 +1372,18 @@ Graph::check_re_string(std::string re_string)
 }
 
 /**
-* @brief Fill a sockaddr_x with this DAG
+* @brief Fill a wire buffer with this DAG
 *
-* Fill the provided sockaddr_x with this DAG
+* Fill the provided buffer with this DAG
 *
-* @param s The sockaddr_x struct to be filled in (allocated by caller)
+* @param s The wire buffer struct to be filled in (allocated by caller)
 */
-void
-Graph::fill_sockaddr(sockaddr_x *s) const
+size_t
+Graph::fill_wire_buffer(node_t *buf) const
 {
-	s->sx_family = AF_XIA;
-#ifdef __APPLE__
-	// the length field is not big enough for the size of a sockaddr_x
-	// we don't use it anywhere in our code, so just set it to a known state.
-	s->sx_len = 0;
-#endif
-	s->sx_addr.s_count = num_nodes();
-
 	for (int i = 0; i < num_nodes(); i++)
 	{
-		node_t* node = (node_t*)&(s->sx_addr.s_addr[i]); // check this
+		node_t* node = buf + i; // check this
 
 	    // Set the node's XID and type
 		node->xid.type = get_node(i).type();
@@ -1414,6 +1406,28 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 	            node->edge[j].idx = EDGE_UNUSED;
 	    }
 	}
+	return num_nodes();
+}
+
+/**
+* @brief Fill a sockaddr_x with this DAG
+*
+* Fill the provided sockaddr_x with this DAG
+*
+* @param s The sockaddr_x struct to be filled in (allocated by caller)
+*/
+void
+Graph::fill_sockaddr(sockaddr_x *s) const
+{
+	s->sx_family = AF_XIA;
+#ifdef __APPLE__
+	// the length field is not big enough for the size of a sockaddr_x
+	// we don't use it anywhere in our code, so just set it to a known state.
+	s->sx_len = 0;
+#endif
+	s->sx_addr.s_count = num_nodes();
+
+	(void) fill_wire_buffer(s->sx_addr.s_addr);
 }
 
 /**
@@ -1565,4 +1579,18 @@ Graph::get_nodes_of_type(unsigned int type) const
 	}
 
 	return nodes;
+}
+
+/**
+* @brief Flatten the direct edge from source to intent, if it exists
+*
+* Try to flatten a graph with a direct edge between the source and intent
+* by removing that edge.
+*
+* @return success or failure in flattening the direct edge from source
+* to intent node.
+*/
+bool
+Graph::flatten()
+{
 }
