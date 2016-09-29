@@ -650,6 +650,11 @@ string capitalize_XID(string dagUrl){
         dagUrl[i + found] = toupper(dagUrl[i + found]);
     }
 
+    found = dagUrl.find(XIA_SID);
+    for (int i = 0; i < 3; ++i) {
+        dagUrl[i + found] = toupper(dagUrl[i + found]);
+    }
+
     return dagUrl;
 }
 

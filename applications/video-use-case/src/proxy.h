@@ -23,6 +23,7 @@
 #define XIA_AD "ad"
 #define XIA_HID "hid"
 #define XIA_CID "cid"
+#define XIA_SID "sid"
 
 #define MAX_CLIENTS 30
 
