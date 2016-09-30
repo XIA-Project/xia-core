@@ -7,6 +7,7 @@
 #include <click/packet.hh>
 #include <click/vector.hh>
 #include <click/xid.hh>
+#include <click/dagaddr.hpp>
 
 #define INVALID_NODE_HANDLE 2048
 
@@ -18,8 +19,6 @@ class XIAPath { public:
     XIAPath(const XIAPath& r);
 
     XIAPath& operator=(const XIAPath& r);
-
-    void reset();
 
     // parse a string representation prefixed by its type (DAG or RE)
     bool parse(const String& s, const Element* context = NULL);
@@ -102,9 +101,6 @@ class XIAPath { public:
     // remove a node (will invalidate handles)
     bool remove_node(handle_t node);
 
-    // remove a edge
-    bool remove_edge(handle_t from_node, handle_t to_node);
-
     // set the source node
     void set_source_node(handle_t node);
 
@@ -115,9 +111,6 @@ class XIAPath { public:
 	// forcing us to take the fallback path
 	bool flatten();
 
-    // increment the XID whose order is order
-    void incr(size_t order);
-
     // debug
     void dump_state() const;
 
@@ -125,16 +118,14 @@ class XIAPath { public:
 	int compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad);
 
 	// Compare two XIAPath objects for equality
-	int compare(XIAPath& other);
+	//int compare(XIAPath& other);
 
 	bool operator== (XIAPath& other);
 
 	bool operator!= (XIAPath& other);
 
-protected:
-    bool topological_ordering();
-
 private:
+
     struct Node {
         XID xid;
         Vector<handle_t> edges;
@@ -147,6 +138,7 @@ private:
     Vector<Node> _nodes;
     handle_t _src;
     handle_t _dst;
+    Graph g;
 };
 
 CLICK_ENDDECLS
