@@ -680,19 +680,30 @@ Graph::merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool 
 {
 	node_mapping.clear();
 
-	for (std::vector<Node>::const_iterator it = r.nodes_.begin(); it != r.nodes_.end(); ++it)
-		if (allow_duplicate_nodes && (*it).type() == XID_TYPE_DUMMY_SOURCE) // don't add r's source node to the middle of this graph
+	// Walk through the other graph's nodes
+	for (std::vector<Node>::const_iterator it = r.nodes_.begin(); it != r.nodes_.end(); ++it) {
+		if (allow_duplicate_nodes && (*it).type() == XID_TYPE_DUMMY_SOURCE) {
+			// don't add r's source node to the middle of this graph
 			node_mapping.push_back(-1);
-		else
-		{
+		} else {
+			// Add all of other graph's nodes to this one (skip dups if needed)
+			// Store the newly added nodes' indexes in node_mapping
+			// Use indexes of existing nodes when duplicates are seen
 			node_mapping.push_back(add_node(*it, allow_duplicate_nodes));
 		}
+	}
 
-	for (std::size_t from_id = 0; from_id < r.out_edges_.size(); from_id++)
-	{
-		if (allow_duplicate_nodes && r.nodes_[from_id].type() == XID_TYPE_DUMMY_SOURCE) continue;
-		for (std::vector<std::size_t>::const_iterator it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it)
+	// Now walk the nodes in the other graph
+	for (std::size_t from_id = 0; from_id < r.out_edges_.size(); from_id++) {
+		if (allow_duplicate_nodes) {
+		   if(r.nodes_[from_id].type() == XID_TYPE_DUMMY_SOURCE) {
+			   continue;
+		   }
+		}
+		// Out edges for each node in the other graph
+		for (std::vector<std::size_t>::const_iterator it = r.out_edges_[from_id].begin(); it != r.out_edges_[from_id].end(); ++it) {
 			add_edge(node_mapping[from_id], node_mapping[*it]);
+		}
 	}
 }
 
@@ -1587,10 +1598,129 @@ Graph::get_nodes_of_type(unsigned int type) const
 * Try to flatten a graph with a direct edge between the source and intent
 * by removing that edge.
 *
-* @return success or failure in flattening the direct edge from source
-* to intent node.
+* @return result of flattening the direct edge from source to intent node.
 */
 bool
 Graph::flatten()
 {
+	std::size_t source_idx = source_index();
+	std::size_t sink_idx = final_intent_index();
+	if (source_idx == (std::size_t)-1 || sink_idx == (std::size_t)-1) {
+		return false;
+	}
+	if (out_edges_[source_idx].size() > 0) {
+		if (out_edges_[source_idx][0] == sink_idx) {
+			out_edges_[source_idx].erase(out_edges_[source_idx].begin());
+			in_edges_[sink_idx].erase(in_edges_[sink_idx].begin());
+		}
+	}
+	// if there was no edge to flatten, we still return success
+	return true;
+}
+
+/**
+  * @brief Recursively walk from given node to sink
+  *
+  * Recursively walk from given node to sink, adding each node encountered
+  * to the paths vector. When called on the source node of a graph this
+  * results in nodes for all possible paths from source node to sink added
+  * to 'paths'. Making it possible to compare two graphs even if they
+  * are not stored identically in nodes_, out_edges_ and in_edges.
+  *
+  * @param node index of node to start walking down from
+  *
+  * @param paths list of nodes seen so far, while following paths to sink
+  *
+  * @return false if infinite recursion is encountered, true otherwise
+  *
+  */
+bool
+Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
+{
+	// Break out with error if we are headed to infinite recursion
+	if(paths.size() > Graph::MAX_XIDS_IN_ALL_PATHS) {
+		printf("ERROR: Infinite recursion while walking Graph\n");
+		return false;
+	}
+
+	// Add current node to 'paths'
+	paths.push_back(nodes_[node]);
+
+	// Follow all outgoing edges; sink with have none
+	std::vector<std::size_t> out_edges = get_out_edges(node);
+	std::vector<std::size_t>::const_iterator it;
+	for(it = out_edges.begin(); it != out_edges.end(); it++) {
+		// Recursively follow each outgoing edge
+		if(depth_first_walk(*it, paths) == false) {
+			return false;
+		}
+	}
+
+	// We reached the sink node or all outgoing edges have been handled
+	return true;
+}
+
+/**
+  * @brief List of nodes in each possible path to sink, ordered by fallback
+  *
+  * Get a list of all nodes encountered in walking from source to sink
+  * while taking all possible fallbacks.
+  *
+  * Example:
+  *     *--> AD1 ----------------------> HID1 -> SID1
+  *            \-> AD2 -> HID2 -> SID2 -/
+  *
+  * Result:
+  *     [ * AD1 HID1 SID1 AD1 AD2 HID2 SID2 HID1 SID1 ]
+  *
+  * @return list of all nodes in all possible paths from source to sink
+  */
+bool
+Graph::ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const
+{
+	paths_to_sink.clear();
+	return depth_first_walk(source_index(), paths_to_sink);
+}
+
+/**
+  * @brief Compare two graphs logically
+  *
+  * Two graphs can be represented differently in memory or as a string
+  * We compare them logically by walking all possible paths from source
+  * to sink and comparing the order of nodes on each path with those
+  * in the other graph.
+  *
+  * @param g The other graph to compare against
+  *
+  * @return are the graphs logically equal?
+  *
+  */
+bool
+Graph::operator==(const Graph &g) const
+{
+	std::vector<Node> my_paths;
+	std::vector<Node> their_paths;
+
+	if(ordered_paths_to_sink(my_paths) == false) {
+		return false;
+	}
+
+	if(g.ordered_paths_to_sink(their_paths) == false) {
+		return false;
+	}
+
+	if(my_paths.size() != their_paths.size()) {
+		return false;
+	}
+
+	std::vector<Node>::const_iterator my_it, their_it;
+	my_it = my_paths.begin();
+	their_it = their_paths.begin();
+
+	for(;my_it!=my_paths.end()||their_it!=their_paths.end();my_it++,their_it++){
+		if ( !((*my_it).equal_to(*their_it)) ) {
+			return false;
+		}
+	}
+	return true;
 }

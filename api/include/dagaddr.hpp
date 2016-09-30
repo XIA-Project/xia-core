@@ -99,7 +99,9 @@ public:
 	Graph operator+(const Graph& r) const;
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
+	bool operator==(const Graph& r) const;
 
+	static const std::size_t MAX_XIDS_IN_ALL_PATHS = 30;
 	void print_graph() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
@@ -143,6 +145,9 @@ private:
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
+
+	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
+	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
 	std::vector<Node> nodes_;
 	std::vector<std::vector<std::size_t> > out_edges_;
