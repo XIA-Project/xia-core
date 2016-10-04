@@ -15,7 +15,7 @@ else
 endif
 
 
-LDFLAGS=-L $(TOOLCHAINDIR)/lib -lpthread
+LDFLAGS=-L $(TOOLCHAINDIR)/lib -lwave -lpthread
 
 export PATH:=$(TOOLCHAINDIR)/bin/:/$(PATH) # adds toolchain dir to path
 OBJDIR= ./
