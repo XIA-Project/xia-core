@@ -15,7 +15,7 @@ else
 endif
 
 
-LDFLAGS=-L $(TOOLCHAINDIR)/lib -lwave -lpthread
+LDFLAGS=-L $(TOOLCHAINDIR)/lib -lpthread
 
 export PATH:=$(TOOLCHAINDIR)/bin/:/$(PATH) # adds toolchain dir to path
 OBJDIR= ./
@@ -23,14 +23,14 @@ OBJDIR= ./
 INCS= -I $(TOOLCHAINDIR)/include/
 INCS+= -I $(OBJDIR)
 
-ALL=waveserver
+ALL=waveserverip
 
 all: $(ALL)
 
 %.o: %.cc
 	$(CPP) $(CPPFLAGS) $(INCS) -c $< -o $@
 
-waveserver: waveserver.o configfile.o
+waveserverip: waveserverip.o configfile.o
 	$(CPP) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
 
 clean:
