@@ -13,7 +13,7 @@ npm-debug.log
 _SpecRunner.html
 reports
 jsdoc
-dist
+#dist
 build/temp
 coverage/
 
