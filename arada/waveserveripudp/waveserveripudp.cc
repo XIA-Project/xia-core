@@ -12,7 +12,6 @@
 #include <fstream> // std::ifstream
 #include <iostream> // std::cout, std::cerr
 #include <sstream> // std::istringstream, std::ostringstream
-#include <chrono> // std::chrono
 #include <thread> // std::this_thread::sleep_for()
 #include <iomanip> // std::hex, etc
 #include <map> // std::map
@@ -25,6 +24,7 @@
 #include <cstdint> // uint*_t
 #include <cstring> // strerror(), memcpy(), memset()
 #include <cassert> // assert()
+#include <ctime> // time()
 
 // unix headers
 #include <unistd.h> // getpid()
@@ -214,20 +214,39 @@ void* receiver_thread(void *arg){
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
+  assert(_waveSockFd != 0); // the socket must be ready by thread launch!
+
   uint8_t rcvBuf[MTU], waveRcvBuf[MTU];
   ssize_t rxlen = 0;
 
   struct sockaddr_in sndrAddr;
   size_t sndrAddrLen = sizeof(sndrAddr);
   size_t clickCliAddrLen = sizeof(_clickCliAddr);
-
-  assert(_waveSockFd != 0); // the socket must be ready by thread launch!
+  
+  unsigned long long nBytesRx = 0;
+  time_t prevTime = time(NULL);
 
   // infinite read loop
   while (true){
 
     if ((rxlen = recvfrom(_waveSockFd, waveRcvBuf, MTU, /*flags*/ 0,
         (struct sockaddr *) &sndrAddr, &sndrAddrLen)) > 0){ // error!
+
+      // print out the current rx throughput
+      nBytesRx += rxlen;
+      time_t curTime = time(NULL);
+
+      if (curTime > prevTime){
+
+        double mbits = ((double)nBytesRx)*8/1000000/(curTime-prevTime);
+
+        std::cout << std::setiosflags(std::ios::fixed) << \
+          std::setprecision(3) << "RX @ " << mbits << std::endl;
+          
+        // reset state
+        prevTime = curTime;
+        nBytesRx = 0;
+      }
 
       // if there is someone listening
       if (_isClickCliConn > 0){
@@ -244,7 +263,7 @@ void* receiver_thread(void *arg){
           srcMacInt += (uint64_t) macByte * pow(16, exp);
           exp += 2;
         }
-        
+
         if (srcMacInt == myWaveMacInt){ // ignore and move on!
             continue;
         }
@@ -255,7 +274,7 @@ void* receiver_thread(void *arg){
         memcpy(&rcvBuf[0], &totalPktLenNet, 2);
 
         // copy data contents
-        memcpy(&rcvBuf[2], waveRcvBuf, rxlen);
+        memcpy(&rcvBuf[2], waveRcvBuf, rxlen);        
 
 #ifdef DEBUG
 if (rxlen > 350){
@@ -323,27 +342,6 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
                      std::map<uint64_t,std::string> &macIpMap,
                      const uint16_t wavePort){
 
-
-  // limit send rate by dropping packets that arrive too soon after another
-  static std::chrono::milliseconds lastSendMillis = \
-    std::chrono::duration_values<std::chrono::milliseconds>::zero();
-
-  std::chrono::milliseconds nowMillis = \
-    std::chrono::duration_cast<std::chrono::milliseconds>( \
-    std::chrono::system_clock::now().time_since_epoch());
-    
-  if (lastSendMillis >= nowMillis){ // 1 ms difference minimum
-
-#ifdef DEBUG
-    std::cout << "Wave TX: dropping packet due to rate limitation (1000 Hz)" \
-      << std::endl;
-#endif
-
-    return 0;
-  }
-  
-  // update send time
-  lastSendMillis = nowMillis;
 
   assert(pktLen >= 20); // 6 for our header plus 14 for the ethernet header
 
@@ -444,6 +442,24 @@ if (conLen > 350){
       (struct sockaddr *) &dstAddr, sizeof(dstAddr)) < 0) {
     std::cerr << "handleClient(), sendto(wave): " << strerror(errno) << \
         std::endl;
+  }
+
+  // register send rate
+  static unsigned long long nBytesTx = 0;
+  static time_t prevTime = time(NULL);
+
+  time_t curTime = time(NULL);
+
+  if (curTime > prevTime){
+
+    double mbits = ((double)nBytesTx)*8/1000000/(curTime-prevTime);
+
+    std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(3) \
+      << "TX @ " << mbits << std::endl;
+
+    // reset state
+    prevTime = curTime;
+    nBytesTx = 0;
   }
 
   return 0;
