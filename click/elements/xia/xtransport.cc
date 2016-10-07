@@ -1878,11 +1878,14 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
         return false;
     }
     // Skip inactive ports
-    if (sk->state != CONNECTED) {
-        INFO("skipping migration for non-connected port");
+    if (sk->state == INACTIVE
+			|| sk->state == LISTEN
+			|| sk->state == TIME_WAIT) {
+        INFO("skipping migration for inactive/listening port");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
         return false;
     }
+	INFO("migrating socket in state %d", sk->state);
     // Skip sockets not using the interface whose dag changed
     if(sk->outgoing_iface != changed_iface) {
         INFO("skipping migration for unchanged interface");
