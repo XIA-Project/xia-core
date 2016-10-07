@@ -4,6 +4,7 @@ include ../../../xia.mk
 
 LDFLAGS += $(LIBS)
 TARGETS = video_publisher manifest_server proxy
+CFLAGS += -I/usr/include/libxml2
 
 all: $(TARGETS)
 
