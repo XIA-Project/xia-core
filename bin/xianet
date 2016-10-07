@@ -29,7 +29,7 @@ SCRIPT=""
 NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
 
-ALL_PROCESSES="click xrouted xnetjd xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0

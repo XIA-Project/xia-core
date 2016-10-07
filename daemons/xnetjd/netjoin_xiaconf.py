@@ -70,7 +70,7 @@ class NetjoinXIAConf(object):
         pem_key = self.der_to_pem(der_key)
         return self.pem_key_hash_hex(pem_key)
 
-        '''
+	'''
     def get_raw_hid(self):
         hid_hex_str = self.get_hid()
         return binascii.unhexlify(hid_hex_str)
@@ -105,9 +105,9 @@ class NetjoinXIAConf(object):
         hid = None
         ad = None
         addrconfpath = os.path.join(self.conf_dir, "address.conf")
-	with open(addrconfpath, "r") as addrconf:
+        with open(addrconfpath, "r") as addrconf:
             for line in addrconf:
-		match = self.addrconfpattern.match(line)
+                match = self.addrconfpattern.match(line)
                 if not match:
                     continue
 
