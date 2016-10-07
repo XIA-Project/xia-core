@@ -700,6 +700,32 @@ XIAPath::find_intent_hid()
 	return intent_hid_node;
 }
 
+XIAPath::handle_t
+XIAPath::find_intent_sid()
+{
+	click_chatter("XIAPath::find_intent_sid called");
+	handle_t current_node = source_node();
+	handle_t dst = destination_node();
+	handle_t intent_sid_node = INVALID_NODE_HANDLE;
+	// Walk from src to dst on first hops, finding all HIDs on path
+	while(current_node != dst) {
+		if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_SID)) {
+			intent_sid_node = current_node;
+		}
+		current_node = first_hop_from_node(current_node);
+	}
+	// Include destination node in the search for last HID
+	// Most likely, this is the intent HID node
+	if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_SID)) {
+		intent_sid_node = current_node;
+	}
+
+	if(intent_sid_node == INVALID_NODE_HANDLE) {
+		click_chatter("XIAPath: ERROR Intent SID not found");
+	}
+	return intent_sid_node;
+}
+
 Vector<XIAPath::handle_t>
 XIAPath::next_nodes(handle_t node) const
 {

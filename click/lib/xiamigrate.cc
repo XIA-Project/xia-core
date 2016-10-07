@@ -282,7 +282,7 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
         return false;
     }
 
-    XID my_xid = our_addr.xid(our_addr.destination_node());
+    XID my_xid = our_addr.xid(our_addr.find_intent_sid());
     // Sign and include public key
     if(!_sign_and_pack(migrateack_msg, migrateack_payload, my_xid)) {
         click_chatter("Failed to sign and create migrate message");
@@ -357,7 +357,7 @@ bool valid_migrateack_message(XIASecurityBuffer &migrateack_msg,
 {
     uint16_t payloadlen = 1024;
     char payload[payloadlen];
-    XID their_xid = their_addr.xid(their_addr.destination_node());
+    XID their_xid = their_addr.xid(their_addr.find_intent_sid());
 
     // Unpack and verify signature, then return payload
     if(! _unpack_and_verify(migrateack_msg, their_xid, payload, &payloadlen)) {
