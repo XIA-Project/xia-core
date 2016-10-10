@@ -14,7 +14,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <syslog.h>
 
 using namespace std;
 
