@@ -2,13 +2,13 @@
 #define __META_H__
 
 #include "clicknet/xia.h"
+#include <iostream>
 #include <map>
 #include <iostream>
 #include <stdint.h>
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 #include <time.h>
-#include <syslog.h>
 
 // FIXME: HORRIBLE HACK to put this where the garbage collector can get at it.
 // find a better way of making this happen
@@ -103,18 +103,9 @@ public:
 	meta_map();
 	~meta_map();
 
-	int read_lock(void) {
-		syslog(LOG_INFO, "%p read lock\n", this);
-		return pthread_rwlock_wrlock(&rwlock); 
-	};
-	int write_lock(void) { 
-		syslog(LOG_INFO, "%p write lock\n", this);
-		return pthread_rwlock_rdlock(&rwlock); 
-	};
-	int unlock(void) { 
-		syslog(LOG_INFO, "%p read/write unlock\n", this);
-		return pthread_rwlock_unlock(&rwlock); 
-	};
+	int read_lock(void)  { return pthread_rwlock_wrlock(&rwlock); };
+	int write_lock(void) { return pthread_rwlock_rdlock(&rwlock); };
+	int unlock(void)     { return pthread_rwlock_unlock(&rwlock); };
 
 	xcache_meta *acquire_meta(std::string cid);
 	void release_meta(xcache_meta *meta);
