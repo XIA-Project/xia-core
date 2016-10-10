@@ -179,7 +179,6 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		return -1;
 	}
 
-
 	return _xrecvfrom(sockfd, rbuf, len, flags, (sockaddr_x *)addr, addrlen, &iface);
 }
 
@@ -244,7 +243,6 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		memcpy(rbuf, payload, len);
 		paylen = len;
 	}
-
 
 	if (addr) {
 		Graph g(xrm->sender_dag().c_str());
