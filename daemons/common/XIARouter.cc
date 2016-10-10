@@ -185,10 +185,8 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 	else
 		entry = mutableXID + "," + itoa(port) + "," + next + "," + itoa(flags);
 
-
-	if ((_cserr = _cs.write(table, cmd, entry)) != 0){
+	if ((_cserr = _cs.write(table, cmd, entry)) != 0)
 		return XR_CLICK_ERROR;
-	}
 	
 	return XR_OK;
 }
@@ -203,20 +201,10 @@ int XIARouter::setRoute(const std::string &xid, int port, const std::string &nex
 	return updateRoute("set4", xid, port, next, flags);
 }
 
-int XIARouter::setRouteCIDRouting(const std::string &xid, int port, const std::string &next, unsigned long flags)
-{
-	return updateRoute("set4CID", xid, port, next, flags);
-}
-
 int XIARouter::delRoute(const std::string &xid)
 {
 	string next = "";
 	return updateRoute("remove", xid, 0, next, 0);
-}
-
-int XIARouter::delRouteCIDRouting(const std::string &xid){
-	string next = "";
-	return updateRoute("removeCID", xid, 0, next, 0);
 }
 
 const char *XIARouter::cserror()

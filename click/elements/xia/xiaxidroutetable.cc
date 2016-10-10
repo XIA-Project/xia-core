@@ -67,9 +67,7 @@ XIAXIDRouteTable::add_handlers()
 	add_write_handler("set", set_handler, (void*)1);
 	add_write_handler("add4", set_handler4, 0);
 	add_write_handler("set4", set_handler4, (void*)1);
-	add_write_handler("set4CID", set_handler4CID, 0);
 	add_write_handler("remove", remove_handler, 0);
-	add_write_handler("removeCID", remove_handlerCID, 0);
 	add_write_handler("load", load_routes_handler, 0);
 	add_write_handler("generate", generate_routes_handler, 0);
 	add_data_handlers("drops", Handler::OP_READ, &_drops);
@@ -245,70 +243,6 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 }
 
 int
-XIAXIDRouteTable::set_handler4CID(const String &conf, Element *e, void *, ErrorHandler *errh)
-{
-	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
-
-	Vector<String> args;
-	int port = 0;
-	unsigned flags = 0;
-	String xid_str;
-	XID *nexthop = NULL;
-
-	cp_argvec(conf, args);
-
-	if (args.size() < 2 || args.size() > 4)
-		return errh->error("invalid route: ", conf.c_str());
-
-	xid_str = args[0];
-
-	if (!cp_integer(args[1], &port))
-		return errh->error("invalid port: ", conf.c_str());
-
-	if (args.size() == 4) {
-		if (!cp_integer(args[3], &flags))
-			return errh->error("invalid flags: ", conf.c_str());
-	}
-
-	if (args.size() >= 3 && args[2].length() > 0) {
-	    String nxthop = args[2];
-		nexthop = new XID;
-		cp_xid(nxthop, nexthop, e);
-		if (!nexthop->valid()) {
-			delete nexthop;
-			return errh->error("invalid next hop xid: ", conf.c_str());
-		}
-	}
-
-	XID xid;
-	if (!cp_xid(xid_str, &xid, e)) {
-		if (nexthop) delete nexthop;
-		return errh->error("invalid XID: ", xid_str.c_str());
-	}
-
-	if(ntohl(xid.type()) != CLICK_XIA_XID_TYPE_CID){
-		if (nexthop) delete nexthop;
-		return errh->error("invalid CID: ", xid_str.c_str());
-	}
-
-	HashTable<XID, XIARouteData*>::iterator it = table->_rts.find(xid);
-	// if CID route is stored before and it's defined for local host, don't change a thing
-	if(it != table->_rts.end() && table->_rts[xid]->port == DESTINED_FOR_LOCALHOST){
-		if (nexthop) delete nexthop;
-		return errh->error("local CID route exists: ", xid_str.c_str());
-	} else {
-		XIARouteData *xrd = new XIARouteData();
-		
-		xrd->port = port;
-		xrd->flags = flags;
-		xrd->nexthop = nexthop;
-		table->_rts[xid] = xrd;
-	}
-
-	return 0;
-}
-
-int
 XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
 {
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
@@ -343,45 +277,6 @@ XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 		table->_rts.erase(it);
 		delete xrd;
 	}
-	return 0;
-}
-
-int
-XIAXIDRouteTable::remove_handlerCID(const String &xid_str, Element *e, void *, ErrorHandler *errh)
-{
-	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
-
-	if (xid_str.length() == 0){
-		// ignore empty entry
-		return 0;
-	}
-
-	XID xid;
-	if (!cp_xid(xid_str, &xid, e)){
-		return errh->error("invalid XID: ", xid_str.c_str());
-	}
-
-	if(ntohl(xid.type()) != CLICK_XIA_XID_TYPE_CID){
-		return errh->error("invalid CID: ", xid_str.c_str());
-	}
-
-	HashTable<XID, XIARouteData*>::iterator it = table->_rts.find(xid);
-	if (it == table->_rts.end()){
-		return errh->error("nonexistent CID: ", xid_str.c_str());
-	}
-
-	XIARouteData *xrd = (XIARouteData*)it.value();
-	if(xrd->port == DESTINED_FOR_LOCALHOST){
-		return errh->error("cannot remove locally cached CID: ", xid_str.c_str());
-	}
-
-	if (xrd->nexthop) {
-		delete xrd->nexthop;
-	}
-
-	table->_rts.erase(it);
-	delete xrd;
-
 	return 0;
 }
 
