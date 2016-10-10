@@ -785,20 +785,6 @@ int xcache_controller::register_meta(std::string &cid)
 	return rv;
 }
 
-int xcache_controller::unregister_meta(xcache_meta *meta) {
-	int rv;
-	std::string empty_str("");
-	std::string temp_cid("CID:");
-
-	temp_cid += meta->get_cid();
-
-	syslog(LOG_DEBUG, "[thread %lu] Removing Route for %s.\n", pthread_self(), temp_cid.c_str());
-	rv = xr.delRoute(temp_cid);
-	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
-
-	return rv;
-}
-
 void xcache_controller::enqueue_request_safe(xcache_req *req)
 {
 	pthread_mutex_lock(&request_queue_lock);
@@ -959,7 +945,6 @@ void xcache_controller::run(void)
 
 	if((rc = xr.connect()) != 0) {
 		syslog(LOG_ERR, "Unable to connect to click %d \n", rc);
-		delete policy;
 		return;
 	}
 

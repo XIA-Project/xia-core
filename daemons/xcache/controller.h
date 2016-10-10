@@ -16,18 +16,13 @@
 #include "xcache.h"
 
 
-#define MB(__mb) (KB(__mb) * 1024)
-#define KB(__kb) ((__kb) * 1024)
-
 #define DEFAULT_THREADS 2
-#define DEFAULT_CAPACITY -1 // default unlimited capacity
 #define MAX_XID_SIZE 100
 #define GC_INTERVAL 5
 
 struct xcache_conf {
 	char hostname[128];
 	int threads;
-	int64_t capacity;
 };
 
 struct xcache_req {
@@ -84,8 +79,6 @@ private:
 	xcache_policy_manager policy_manager;
 	xcache_store_manager store_manager;
 	xcache_cache cache;
-	LruPolicy* policy;
-	int64_t capacity;
 
 	unsigned context_id;
 
@@ -198,7 +191,6 @@ public:
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);
 
-	int unregister_meta(xcache_meta *);
 	int register_meta(std::string &);
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
