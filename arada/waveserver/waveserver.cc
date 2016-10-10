@@ -51,6 +51,7 @@ uint32_t _pPsid = 5;
 
 static WMEApplicationRequest _wmeReq;
 
+unsigned long long nTx=0, nRx=0;
 
 /**
  * Kills the program the poise and grace of a harakiri.
@@ -132,7 +133,8 @@ void* receiver_thread(void */*arg*/){
                 memcpy(&rcvBuf[2], &rxPkt.data.contents, rxPkt.data.length);
 
 #ifdef DEBUG
-                std::cout << "Received wsm, " << std::dec << rxPkt.data.length \
+if (rxPkt.data.length > 400){
+                std::cout << "Received wsm " << std::dec << nRx++ << ", " << std::dec << rxPkt.data.length \
                 << " bytes, from mac: ";
 
                 for (int i=0; i < IEEE80211_ADDR_LEN; i++){
@@ -144,6 +146,7 @@ void* receiver_thread(void */*arg*/){
                     }
                 }
                 std::cout << std::endl;
+}
 #endif
 
                 if (write(_cliSockFd, rcvBuf, totalPktLen) < 0){
@@ -213,7 +216,8 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
     
 
 #ifdef DEBUG
-    std::cout << "Sending wsm, " << std::dec << conLen << " bytes, from mac: ";
+if (conLen > 400){
+    std::cout << "Sending wsm " << std::dec << nTx++ << ", " << std::dec << conLen << " bytes, from mac: ";
 
     for (int i=0; i < IEEE80211_ADDR_LEN; i++){
         const uint8_t byte = wsmReq.srcmacaddr[i];
@@ -234,6 +238,7 @@ void parseAndSendWSM(uint8_t *pktBuf, uint16_t pktLen){
         }
     }
     std::cout << std::endl;
+}
 #endif
 
     // the packet is now fully assembled and ready to be sent
