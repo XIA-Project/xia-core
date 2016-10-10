@@ -25,7 +25,6 @@
 #include <click/routerthread.hh>
 #include <click/master.hh>
 #include <fcntl.h>
-#include "elements/xia/xlog.hh"
 #if HAVE_ALLOW_KQUEUE
 # include <sys/event.h>
 # if HAVE_EV_SET_UDATA_POINTER
@@ -477,9 +476,8 @@ SelectSet::run_selects_poll(RouterThread *thread)
 		// 31.Oct.2003 - Peter Swain: _pollfds may have grown or
 		// shrunk!
 		p = my_pollfds.begin() + pi;
-		if (p < my_pollfds.end() && fd != p->fd){
-            p--;
-        }
+		if (p < my_pollfds.end() && fd != p->fd)
+		    p--;
 	    }
 }
 
