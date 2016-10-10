@@ -12,8 +12,6 @@
 
 class xcache_eviction_policy  {
 public:
-	virtual ~xcache_eviction_policy(){};
-
 	virtual int store(xcache_meta *) {
 		return 0;
 	};
