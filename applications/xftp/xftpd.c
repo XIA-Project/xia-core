@@ -75,7 +75,6 @@ void getConfig(int argc, char** argv)
 	int c;
 
 	strcpy(name, NAME);
-
 	(void*)getcwd(rootdir, sizeof(rootdir));
 
 	opterr = 0;
@@ -91,6 +90,7 @@ void getConfig(int argc, char** argv)
 					}
 				}
 				break;
+
 			case 'v':
 				verbose = 1;
 				break;
