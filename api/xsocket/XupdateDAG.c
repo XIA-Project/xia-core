@@ -119,7 +119,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
   		return -1;
  	}
 
-	if (localhostDAG == NULL || local4ID == NULL) {
+	if (localhostDAG == NULL) {
 		LOG("NULL pointer!");
 		errno = EINVAL;
 		return -1;
@@ -154,12 +154,14 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 			LOGF("ERROR: DAG buffer too short: %u, needed: %u", lenDAG, actualdaglen);
 			return -1;
 		}
-		if(len4ID < actual4idlen) {
+		if(local4ID && (len4ID < actual4idlen)) {
 			LOGF("ERROR: 4ID buffer too short: %u, needed: %u", len4ID, actual4idlen);
 			return -1;
 		}
 		strncpy(localhostDAG, (_msg->dag()).c_str(), lenDAG);
-		strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
+		if (local4ID) {
+			strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
+		}
 		rc = 0;
 	} else {
 		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");
