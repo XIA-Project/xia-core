@@ -236,57 +236,6 @@ XIAPath::destination_node() const
 }
 
 XIAPath::handle_t
-XIAPath::hid_node_for_destination_node() const
-{
-    // Get the source and destination node handles
-    handle_t src = source_node();
-    handle_t dest = destination_node();
-	/*
-    // Verify that the destination is an SID or CID
-    XID destXID(xid(dest).unparse());
-    if(destXID.type() != htonl(CLICK_XIA_XID_TYPE_SID)) {
-		if(destXID.type() != htonl(CLICK_XIA_XID_TYPE_CID)) {
-            click_chatter("XIAPath:hid_node...() destination node not SID:%s: type:%d:", destXID.unparse().c_str(), destXID.type());
-            return INVALID_NODE_HANDLE;
-		}
-    }
-	*/
-    // Walk from source to destination
-    handle_t current_node = src;
-    do {
-        // Find the next nodes for current_node
-        Vector<XIAPath::handle_t> child_nodes = next_nodes(current_node);
-        Vector<XIAPath::handle_t>::iterator it;
-        //click_chatter("XIAPath::hid_node...() next nodes:");
-        //for(it = child_nodes.begin(); it!=child_nodes.end(); it++) {
-            //click_chatter("%s", xid(*it).unparse().c_str());
-        //}
-        it = child_nodes.begin();
-        // See if the first node points to the destination
-        if(*it == dest) {
-            XID currentNodeXID(xid(current_node).unparse());
-            if(currentNodeXID.type() != htonl(CLICK_XIA_XID_TYPE_HID)) {
-                click_chatter("XIAPath::hid_node...() skipping:%s:", currentNodeXID.unparse().c_str());
-                return INVALID_NODE_HANDLE;
-            } else {
-                return current_node;
-            }
-        } else {
-            // If not, that node becomes the next node to check
-            if(current_node == *it) {
-                click_chatter("XIAPath::hid_node...() ERROR detected infinite loop, breaking out");
-                break;
-            }
-            current_node = *it;
-        }
-    } while(current_node != dest);
-
-
-    return INVALID_NODE_HANDLE;
-
-}
-
-XIAPath::handle_t
 XIAPath::first_ad_node() const
 {
 	handle_t src = source_node();

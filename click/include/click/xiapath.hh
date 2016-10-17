@@ -64,9 +64,6 @@ class XIAPath { public:
     // get the handle of the destination node
     handle_t destination_node() const;
 
-	// get the handle of HID node preceding the destination SID/CID node
-	handle_t hid_node_for_destination_node() const;
-
 	// get the handle of the first AD node in DAG towards destination
 	handle_t first_ad_node() const;
 
