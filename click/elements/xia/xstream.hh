@@ -19,6 +19,9 @@
 #include "xtransport.hh"
 #include <clicknet/tcp_fsm.h>
 #include <cstdint> // uint32_t
+#include <click/task.hh>
+
+#include "taskident.hh"
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -180,13 +183,18 @@ class XStream  : public sock {
 
 public:
 	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
-	XStream(){};
+	XStream() : _outputTask(NULL, 0) {}; 
 	~XStream() {};
+
+	const char *class_name() const      { return "XStream"; }
+    
+    bool run_task(Task*);
+
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
 	void check_for_and_handle_pending_recv();
 	/* TCP related core functions */
 	void 	tcp_input(WritablePacket *p);
-	void 	tcp_output();
+	void    tcp_output();
 	int		usrsend(WritablePacket *p);
 	void	usrmigrate();
 	void	usrclosed() ;
@@ -210,6 +218,7 @@ public:
 	// XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
 	sock *listening_sock;
+        
 private:
 	void set_state(const HandlerState s);
 
@@ -241,6 +250,8 @@ private:
 	// holding location for when xmit buffer is full and we are blocking
 	WritablePacket *_staged;
 	unsigned _staged_seq;
+    
+    TaskIdent _outputTask;
 };
 
 /* THE method where we register, and handle any TCP State Updates */

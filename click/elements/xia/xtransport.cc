@@ -15,6 +15,8 @@
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
 
+#include "taskident.hh" 
+
 /*
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
@@ -160,8 +162,8 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_tcp_globals.tcp_keepintvl 		= 120;
 	_tcp_globals.tcp_maxidle   		= 120;
 	_tcp_globals.tcp_now 			= 0;
-	_tcp_globals.so_recv_buffer_size = 0x10000;
-	_tcp_globals.tcp_mssdflt		= 1024;
+	_tcp_globals.so_recv_buffer_size = 0x100000;
+	_tcp_globals.tcp_mssdflt		= 1234;
 	_tcp_globals.tcp_rttdflt		= TCPTV_SRTTDFLT / PR_SLOWHZ;
 	_tcp_globals.so_flags	   	 	= 0;
 	_tcp_globals.so_idletime		= 0;
@@ -169,7 +171,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	/* TODO: window_scale and use_timestamp were being used uninitialized
 	   setting them to 0 and false respectively for now but need to revisit
 	   especially for the window scale */
-	_tcp_globals.window_scale		= 0;
+	_tcp_globals.window_scale		= 4;
 	_tcp_globals.use_timestamp		= false;
 
 	_verbosity 						= VERB_ERRORS;
@@ -261,7 +263,7 @@ int XTRANSPORT::initialize(ErrorHandler *)
 	_reaper = new Timer(this);
 	_reaper->initialize(this);
 	_reaper->schedule_after_msec(700);
-
+    
 	return 0;
 }
 
@@ -445,7 +447,9 @@ void XTRANSPORT::add_handlers()
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);
+    
 }
+
 
 
 
@@ -851,6 +855,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
 				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
+                
+                new_sk->initialize(ErrorHandler::default_handler());
+                
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
@@ -1125,6 +1132,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	switch (sock_type) {
 	case SOCK_STREAM: {
 		sk = new XStream(this, _sport, id);
+        sk->initialize(ErrorHandler::default_handler());
 		break;
 	}
 	case SOCK_RAW:
@@ -2599,9 +2607,31 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	}
 }
 
+
+/**
+ * Executes socket task, which is used by XStream to output packets.
+ */
+bool XTRANSPORT::run_task(Task* task){
+  
+  bool retval = false;
+  
+  TaskIdent* taskIdent = static_cast<TaskIdent*>(task); // living on the edge!
+  const uint32_t taskId = taskIdent->get_id();
+
+  sock *sk = idToSock.get(taskId);
+  
+  if (sk){ // did we find a mapping?
+    retval = sk->run_task(task);
+  }
+  
+  return retval;
+}
+
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XTRANSPORT)
+EXPORT_ELEMENT(sock)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_MT_SAFE(XTRANSPORT)
 ELEMENT_LIBS(-lcrypto -lssl -lprotobuf)
