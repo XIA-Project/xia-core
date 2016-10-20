@@ -100,8 +100,10 @@ public:
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
 	bool operator==(const Graph& r) const;
+	void append_node_str(std::string node_str);
 
 	static const std::size_t MAX_XIDS_IN_ALL_PATHS = 30;
+	static const std::size_t INVALID_GRAPH_INDEX = 255;
 	void print_graph() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
@@ -120,8 +122,24 @@ public:
 	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
+	bool replace_intent_HID(std::string new_hid_str);
+	size_t unparse_node_size() const;
 	bool flatten();
+	bool first_hop_is_sid() const;
+	bool remove_intent_sid_node();
+	bool remove_intent_node();
+
+	// TODO: We need to stop exposing internal Graph indices with these
+	// Need to refactor code that uses these functions
+	std::string xid_str_from_index(std::size_t node) const;
+	std::size_t final_intent_index() const;
+
+	int compare_except_intent_AD(Graph other) const;
 private:
+	std::size_t intent_XID_index(uint32_t xid_type) const;
+	std::size_t intent_AD_index() const;
+	std::size_t intent_HID_index() const;
+
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
 
@@ -133,7 +151,6 @@ private:
 	bool is_sink(std::size_t id) const;
 
 	std::size_t source_index() const;
-	std::size_t final_intent_index() const;
 
 	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool allow_duplicate_nodes = false);
 
@@ -155,15 +172,15 @@ private:
 };
 
 /**
-* @brief Make a graph by appending a node
-*
-* Make a graph by appending a node to this node. The resulting graph will have
-* one edge from this node to the supplied node.
-*
-* @param r The node to append
-*
-* @return The resulting graph
-*/
+ * @brief Make a graph by appending a node
+ *
+ * Make a graph by appending a node to this node. The resulting graph will have
+ * one edge from this node to the supplied node.
+ *
+ * @param r The node to append
+ *
+ * @return The resulting graph
+ */
 inline Graph Node::operator*(const Node& r) const
 {
 	return Graph(*this) * Graph(r);

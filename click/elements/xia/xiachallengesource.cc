@@ -290,7 +290,7 @@ XIAChallengeSource::src_hid_str(Packet *p)
 {
 	XIAHeader xiah(p->xia_header());
 	XIAPath src_dag = xiah.src_path();
-	return src_dag.xid(src_dag.find_intent_hid()).unparse();
+	return (src_dag.intent_hid_str()).c_str();
 }
 
 // Check whether pack/et's source HID has been verified
@@ -321,11 +321,11 @@ XIAChallengeSource::send_challenge(Packet *p)
 	XIASecurityBuffer buf = XIASecurityBuffer(128);
 
 	// Source HID
-	String src_hid_str = src_dag.xid(src_dag.find_intent_hid()).unparse();
+	String src_hid_str = (src_dag.intent_hid_str()).c_str();
 	buf.pack(src_hid_str.c_str(), src_hid_str.length());
 
 	// Destination HID
-	String dst_hid_str = dst_dag.xid(dst_dag.find_intent_hid()).unparse();
+	String dst_hid_str = (dst_dag.intent_hid_str()).c_str();
 	buf.pack(dst_hid_str.c_str(), dst_hid_str.length());
 
 	// Interface

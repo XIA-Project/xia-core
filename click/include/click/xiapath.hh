@@ -58,35 +58,39 @@ class XIAPath { public:
     // check if the path is valid
     bool is_valid() const;
 
-    // get the handle of the source node
-    handle_t source_node() const;
-
     // get the handle of the destination node
     handle_t destination_node() const;
 
+	// Get the intent AD as a string
+	std::string intent_ad_str() const;
+
+	// Get the intent HID as a string
+	std::string intent_hid_str() const;
+
 	// get the handle of the first AD node in DAG towards destination
-	handle_t first_ad_node() const;
+	//handle_t first_ad_node() const;
 
     // get XID of the node
     XID xid(handle_t node) const;
-
-	// replace XID of matching nodes with a new one
-	bool replace_node_xid(String oldXIDstr, String newXIDstr);
 
 	// First child node for the given node
 	handle_t first_hop_from_node(handle_t node) const;
 
 	// Find the intent HID - last HID in path to dest node
-	handle_t find_intent_hid();
+	//handle_t find_intent_hid();
 
 	// Replace intent HID node with a new one
 	bool replace_intent_hid(XID new_hid);
 
     // get handles of connected (next) nodes to the node
-    Vector<handle_t> next_nodes(handle_t node) const;
+    //Vector<handle_t> next_nodes(handle_t node) const;
 
     //// path manipulation methods
 
+	// append a node to the end of this DAG
+	bool append_node(const XID& xid);
+
+	/*
     // add a new node
     // returns the handle of the new node
     handle_t add_node(const XID& xid);
@@ -94,26 +98,40 @@ class XIAPath { public:
     // connect two nodes with an prioritized edge
     // priority of 0 is the highest
     bool add_edge(handle_t from_node, handle_t to_node, size_t priority = static_cast<size_t>(-1));
+	*/
 
     // remove a node (will invalidate handles)
-    bool remove_node(handle_t node);
+    //bool remove_node(handle_t node);
+
+	// Remove intent node without consideration for type
+	bool remove_intent_node();
+
+	// Remove intent SID node from dag
+	bool remove_intent_sid_node();
 
     // set the source node
     void set_source_node(handle_t node);
 
+	/*
     // set the destination node
     void set_destination_node(handle_t node);
+	*/
 
 	// if first edge of DAG points to intent, delete edge
 	// forcing us to take the fallback path
 	bool flatten();
 
     // debug
-    void dump_state() const;
+    //void dump_state() const;
 
+	int compare_except_intent_ad(XIAPath& other);
 	// Compare two XIAPath objects but allow a named XID exception
-	int compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad);
+	//int compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad);
 
+	// Check if the first hop from source node is an SID
+	bool first_hop_is_sid() const;
+
+	const Graph& get_graph() const;
 	// Compare two XIAPath objects for equality
 	//int compare(XIAPath& other);
 

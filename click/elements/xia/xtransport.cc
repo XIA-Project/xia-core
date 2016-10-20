@@ -954,8 +954,28 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 		return false;
 	}
 	INFO("DAG possibly modified by a rendezvous server");
+
 	// Find local AD as of now
 	XIAPath local_dag = local_addr();
+
+	// The AD in packet must match our current AD
+	std::string local_ad_str = local_dag.intent_ad_str();
+	std::string pkt_ad_str = pkt_dag.intent_ad_str();
+	if (pkt_ad_str != local_ad_str) {
+		INFO("AD was:%s but local AD is:%s", pkt_ad_str.c_str(),
+				local_ad_str.c_str());
+		return false;
+	}
+
+
+	// Compare our DAG in packet with the one we bound to
+	if (bound_dag.compare_except_intent_ad(pkt_dag)) {
+		ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
+		ERROR("Current network:%s", local_ad_str.c_str());
+		ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		return false;
+	}
+	/*
 	XID local_ad = local_dag.xid(local_dag.first_ad_node());
 	XID bound_ad = bound_dag.xid(bound_dag.first_ad_node());
 	XID packet_ad = pkt_dag.xid(pkt_dag.first_ad_node());
@@ -971,6 +991,7 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 		ERROR("ERROR: Wrong AD in packet pkt_dag:%s", pkt_dag.unparse().c_str());
 		return false;
 	}
+	*/
 	INFO("Allowing DAG different from bound dag");
 	return true;
 }
@@ -1810,12 +1831,17 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg
 int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
 {
 	XIAPath interface_dag = sidPath;
+	if (interface_dag.remove_intent_sid_node()) {
+		return -1;
+	}
+	/*
 	//TODO: check dest node in sidPath is an SID
 	if(interface_dag.remove_node(interface_dag.destination_node()) != true) {
 		// TODO: XIAPath::remove_node always returns true. Remove this check
 		click_chatter("Xtransport::IfaceFromSIDPath couldn't remove node");
 		return -1;
 	}
+	*/
 	return _interfaces.getIfaceID(interface_dag.unparse());
 }
 
@@ -1840,11 +1866,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		sk->port = _sport;
 
 		//Check if binding to full DAG or just to SID only
-		Vector<XIAPath::handle_t> xids = sk->src_path.next_nodes( sk->src_path.source_node() );
-		XID front_xid = sk->src_path.xid( xids[0] );
-		struct click_xia_xid head_xid = front_xid.xid();
-		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
+		if (sk->src_path.first_hop_is_sid()) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -2681,10 +2703,13 @@ bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
     XIAPath new_dag = new_host_dag;
     INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
     INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
+	new_dag.append_node(dest_xid);
+	/*
     XIAPath::handle_t hid_handle = new_dag.destination_node();
     XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
     new_dag.add_edge(hid_handle, xid_handle);
     new_dag.set_destination_node(xid_handle);
+	*/
     INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
     INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
     sk->src_path = new_dag;
@@ -2724,13 +2749,12 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	old_dag.parse(_interfaces.getDAG(interface));
 
 	// Retrieve AD from old DAG for this interface
-	XIAPath::handle_t h = old_dag.first_ad_node();
-	if(h != INVALID_NODE_HANDLE) {
-		XID old_ad = old_dag.xid(h);
+	std::string old_ad = old_dag.intent_ad_str();
+	if (old_ad.length() > XID_SIZE) {    // XID_SIZE is 20 bytes
 
 		// Delete route for the old AD
 		cmd = ad_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_ad.unparse().c_str(), this);
+		HandlerCall::call_write(cmd.c_str(), old_ad.c_str(), this);
 	}
 
 	// Retrieve RHID corresponding to the router for this interface
@@ -2743,14 +2767,14 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	}
 
 	// Retrieve new AD from router_dag
-	XID new_ad = router_dag.xid(router_dag.first_ad_node());
+	std::string new_ad = router_dag.intent_ad_str();
 
 	// Retrieve new RHID from router_dag
-	XID new_rhid = router_dag.xid(router_dag.find_intent_hid());
+	std::string new_rhid = router_dag.intent_hid_str();
 
 	// Add DESTINED_FOR_LOCALHOST route for new AD
 	cmd = ad_table_str + ".add";
-	cmdargs = new_ad.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+	cmdargs = String(new_ad.c_str()) + " " + String(DESTINED_FOR_LOCALHOST);
 	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	click_chatter("XTRANSPORT::Xupdatedag Added localhost route for new AD");
@@ -2761,25 +2785,25 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 		// Set default AD to point to new RHID
 		cmd = ad_table_str + ".set4";
-		cmdargs = default_AD + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_AD + ",0," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default HID to point to new RHID
 		cmd = hid_table_str + ".set4";
-		cmdargs = default_HID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_HID + ",0," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default AD to point to new RHID
 		cmd = ip_table_str + ".set4";
-		cmdargs = default_4ID + ",0," + new_rhid.unparse() + "," + String(0xffff);
+		cmdargs = default_4ID + ",0," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 	}
 	// Add new RHID route pointing to new RHID
 	cmd = hid_table_str + ".add";
-	cmdargs = new_rhid.unparse() + " " + new_rhid.unparse();
+	cmdargs = new_rhid.c_str() + String(" ") + new_rhid.c_str();
 	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	// Replace intent HID in router's DAG to form new_dag
@@ -2794,7 +2818,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	NOTICE("Iface: %d: new addr: %s", interface, new_dag.unparse().c_str());
 
 	// Add the corresponding rhid also
-	_interfaces.update_rhid(interface, new_rhid.unparse());
+	_interfaces.update_rhid(interface, new_rhid.c_str());
 
 	// Put the new DAG back into the xia_socket_msg to return to API
 	x_updatedag_msg->set_dag(new_dag.unparse().c_str());

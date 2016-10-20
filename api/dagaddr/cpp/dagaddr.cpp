@@ -505,6 +505,13 @@ Graph::operator=(const Graph& r)
 	return *this;
 }
 
+void
+Graph::append_node_str(std::string node_str)
+{
+	Node node(node_str);
+	*this *= Graph(node);
+}
+
 Graph&
 Graph::operator*=(const Graph& r)
 {
@@ -616,6 +623,46 @@ Graph::print_graph() const
 			printf(" [SNK]");
 		printf("\n");
 	}
+}
+
+bool
+Graph::remove_intent_sid_node()
+{
+	// Ensure that the sink node is an SID
+	std::size_t intent_index = final_intent_index();
+	if (nodes_[intent_index].type() != XID_TYPE_SID) {
+		printf("Graph::remove_intent_sid() Intent node was not SID\n");
+		return false;
+	}
+	return remove_intent_node();
+}
+
+bool
+Graph::remove_intent_node()
+{
+	std::size_t intent_index = final_intent_index();
+
+	// Ensure that there's just one incoming edge to the SID node
+	if (in_edges_[intent_index].size() != 1) {
+		printf("Graph::remove_intent_sid() SID must have 1 incoming edge\n");
+		return false;
+	}
+
+	// Remove the incoming edge to SID node
+	for (size_t i=0; i<nodes_.size(); i++) {
+		std::vector<std::size_t>::iterator it;
+		for(it=out_edges_[i].begin(); it!=out_edges_[i].end(); ++it) {
+			if (*it == intent_index) {
+				out_edges_[i].erase(it);
+			}
+		}
+	}
+
+	// Remove the SID node
+	nodes_.erase(nodes_.begin() + intent_index);
+	in_edges_.erase(in_edges_.begin() + intent_index);
+	out_edges_.erase(out_edges_.begin() + intent_index);
+	return true;
 }
 
 std::size_t
@@ -774,6 +821,74 @@ Graph::index_from_dag_string_index(int32_t dag_string_index, std::size_t source_
 	return real_index;
 }
 
+std::size_t
+Graph::intent_XID_index(uint32_t xid_type) const
+{
+	std::size_t curIndex;
+	std::size_t source = source_index();
+	std::size_t intent = final_intent_index();
+	// Build first_path by walking first hops from source to intent node
+	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+		if (nodes_[curIndex].type() == xid_type) {
+			return curIndex;
+		}
+	}
+	return INVALID_GRAPH_INDEX;
+}
+
+std::size_t
+Graph::intent_HID_index() const
+{
+	return intent_XID_index(XID_TYPE_HID);
+}
+
+std::size_t
+Graph::intent_AD_index() const
+{
+	return intent_XID_index(XID_TYPE_AD);
+}
+
+bool
+Graph::replace_intent_HID(std::string new_hid_str)
+{
+	std::size_t intent_hid_index = intent_HID_index();
+	if (intent_hid_index == INVALID_GRAPH_INDEX) {
+		return false;
+	}
+	Node new_hid(new_hid_str);
+	nodes_[intent_hid_index] = new_hid;
+	return true;
+}
+
+/**
+  * @brief Compare two graphs while ignoring intent AD
+  *
+  * @return 0 if the graphs are same except intent AD, -1 otherwise
+  */
+int
+Graph::compare_except_intent_AD(Graph other) const
+{
+	// Find our and their intent AD
+	size_t intent_ad = intent_AD_index();
+	if (intent_ad == INVALID_GRAPH_INDEX) {
+		return -1;
+	}
+	size_t their_intent_ad = other.intent_AD_index();
+	if (their_intent_ad == INVALID_GRAPH_INDEX) {
+		return -1;
+	}
+
+	// Replace their intent AD with ours
+	other.nodes_[their_intent_ad] = nodes_[intent_ad];
+
+	// Compare them with us
+	if (*this == other) {
+		return 0;
+	}
+
+	return -1;
+}
+
 /**
  * @brief Return the AD for the Graph's intent node
  *
@@ -786,20 +901,11 @@ std::string
 Graph::intent_AD_str() const
 {
 	std::string ad;
-	std::size_t curIndex;
-	std::size_t source = source_index();
-	std::size_t intent = final_intent_index();
-//	printf("Graph::intent_AD_str called on %s.\n", this->dag_string().c_str());
-	// Build first_path by walking first hops from source to intent node
-	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
-		// Save each node visited
-		Node n = get_node(curIndex);
-		if(n.type_string().compare(Node::XID_TYPE_AD_STRING) == 0) {
-			ad = n.to_string();
-//			printf("Graph::intent_AD_str Found ad: %s\n", ad.c_str());
-		}
+	std::size_t ad_index = intent_AD_index();
+	if (ad_index == INVALID_GRAPH_INDEX) {
+		return "";
 	}
-	return ad;
+	return nodes_[ad_index].to_string();
 }
 
 /*
@@ -814,20 +920,11 @@ std::string
 Graph::intent_HID_str() const
 {
 	std::string hid;
-	std::size_t curIndex;
-	std::size_t source = source_index();
-	std::size_t intent = final_intent_index();
-//	printf("Graph::intent_HID_str called on %s.\n", this->dag_string().c_str());
-	// Build first_path by walking first hops from source to intent node
-	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
-		// Save each node visited
-		Node n = get_node(curIndex);
-		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
-			hid = n.to_string();
-//			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
-		}
+	std::size_t hid_index = intent_HID_index();
+	if (hid_index == INVALID_GRAPH_INDEX) {
+		return "";
 	}
-	return hid;
+	return nodes_[hid_index].to_string();
 }
 
 /**
@@ -937,6 +1034,23 @@ Graph::final_intent_index() const
 
 	printf("Warning: source_index: no sink node found\n");
 	return -1;
+}
+
+/**
+* @brief Return XID as a string for node at specified index
+*
+* Get the XID in string format from nodes_ at specified index.
+*
+* @return XID string
+*/
+std::string
+Graph::xid_str_from_index(std::size_t node) const
+{
+	if (node < nodes_.size()) {
+		printf("Error: Graph::xid_str_from_index(): invalid index\n");
+		return "";
+	}
+	return nodes_[node].to_string();
 }
 
 /**
@@ -1723,4 +1837,44 @@ Graph::operator==(const Graph &g) const
 		}
 	}
 	return true;
+}
+
+/**
+  * @brief Number of nodes in this graph
+  *
+  * Get the number of nodes in this graph or 0 if there are no nodes
+  * Note: we may return 0 on failure
+  *
+  * @return number of nodes in graph minus source node
+  */
+size_t
+Graph::unparse_node_size() const
+{
+	size_t num_nodes_ = num_nodes();
+	if (num_nodes_ <= 0) {
+		return 0;
+	}
+	return num_nodes_ - 1;
+}
+
+/**
+  * @brief Is the first hop from source node an SID?
+  *
+  * @return True if first hop from source node is SID
+  *
+  */
+bool
+Graph::first_hop_is_sid() const
+{
+	// Get the source node
+	size_t source = source_index();
+	// Then it's first hop
+	std::vector<std::size_t> edges = out_edges_[source];
+	size_t first_hop = edges[0];
+	// Test type of first hop
+	Node first_hop_node = get_node(first_hop);
+	if (first_hop_node.type() == XID_TYPE_SID) {
+		return true;
+	}
+	return false;
 }

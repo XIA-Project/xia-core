@@ -208,7 +208,7 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	dst_path.remove_node(dst_path.destination_node());
+	dst_path.remove_intent_node();
 	if (dst_path.unparse_node_size() < 1) {
 		return;
 	}

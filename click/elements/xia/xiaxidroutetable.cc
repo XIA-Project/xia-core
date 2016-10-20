@@ -563,9 +563,8 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     if (_bcast_xid == node.xid) {
     	// Broadcast packet
 
-    	XIAPath source_path = xiah.src_path();
-    	source_path.remove_node(source_path.destination_node());
-    	XID source_hid = source_path.xid(source_path.destination_node());
+    	std::string intent_hid_str = xiah.src_path().intent_hid_str();
+    	XID source_hid(intent_hid_str.c_str());
 
     	if(_local_hid == source_hid) {
     	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)

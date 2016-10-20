@@ -193,11 +193,7 @@ XIAPath::unparse_re(const Element* context)
 size_t
 XIAPath::unparse_node_size() const
 {
-	int num_nodes = g.num_nodes();
-	if (num_nodes == 0) {
-		return 0;
-	}
-	return num_nodes - 1;
+	return g.unparse_node_size();
 }
 
 size_t
@@ -224,166 +220,62 @@ XIAPath::is_valid() const
 }
 
 XIAPath::handle_t
-XIAPath::source_node() const
-{
-    return _src;
-}
-
-XIAPath::handle_t
 XIAPath::destination_node() const
 {
-    return _dst;
+    return g.final_intent_index();
 }
 
-XIAPath::handle_t
-XIAPath::first_ad_node() const
+std::string
+XIAPath::intent_ad_str() const
 {
-	handle_t src = source_node();
-	handle_t dst = destination_node();
-	handle_t current_node = src;
-	while(current_node != dst) {
-		XID currentNodeXID(xid(current_node).unparse());
-		if(currentNodeXID.type() == htonl(CLICK_XIA_XID_TYPE_AD)) {
-			return current_node;
-		} else {
-			Vector<XIAPath::handle_t> child_nodes = next_nodes(current_node);
-			Vector<XIAPath::handle_t>::iterator it;
-			it = child_nodes.begin();
-			current_node = *it;
-		}
-	}
-	click_chatter("XIAPath::first_ad_node: ERROR: No AD found");
-	return INVALID_NODE_HANDLE;
+	return g.intent_AD_str();
 }
 
+std::string
+XIAPath::intent_hid_str() const
+{
+	return g.intent_HID_str();
+}
+
+/**
+  * @brief return XID corresponding to handle 'node'
+  *
+  * 'node' is an index into the internal Graph.
+  * 
+  * @return XID corresponding to the given handle
+  *
+  */
 XID
 XIAPath::xid(handle_t node) const
 {
-    return XID(_nodes[node].xid);
-}
-
-bool
-XIAPath::replace_node_xid(String oldXIDstr, String newXIDstr)
-{
-	for(int i=0; i<_nodes.size(); i++) {
-		if(oldXIDstr.equals(_nodes[i].xid.unparse().c_str(), _nodes[i].xid.unparse().length())) {
-			click_chatter("XIAPath: replacing %s with %s", oldXIDstr.c_str(), newXIDstr.c_str());
-			_nodes[i].xid.parse(newXIDstr);
-		}
-	}
-	return true;
-}
-
-XIAPath::handle_t
-XIAPath::first_hop_from_node(XIAPath::handle_t node) const
-{
-	Vector<XIAPath::handle_t> child_nodes = next_nodes(node);
-	Vector<XIAPath::handle_t>::iterator it = child_nodes.begin();
-	return *it;
+    return XID(String(g.xid_str_from_index(node).c_str()));
 }
 
 bool
 XIAPath::replace_intent_hid(XID new_hid)
 {
-	handle_t intent_hid_node = find_intent_hid();
-	if(intent_hid_node == INVALID_NODE_HANDLE) {
-		return false;
-	}
-	// If we found the node, replace the HID with the new one
-	_nodes[intent_hid_node].xid = new_hid;
+	return g.replace_intent_HID(new_hid.unparse().c_str());
+}
+
+bool
+XIAPath::append_node(const XID& xid)
+{
+	g.append_node_str(xid.unparse().c_str());
 	return true;
 }
 
-XIAPath::handle_t
-XIAPath::find_intent_hid()
+bool
+XIAPath::remove_intent_sid_node()
 {
-	handle_t current_node = source_node();
-	handle_t dst = destination_node();
-	handle_t intent_hid_node = INVALID_NODE_HANDLE;
-	// Walk from src to dst on first hops, finding all HIDs on path
-	while(current_node != dst) {
-		if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_HID)) {
-			intent_hid_node = current_node;
-		}
-		current_node = first_hop_from_node(current_node);
-	}
-	// Include destination node in the search for last HID
-	// Most likely, this is the intent HID node
-	if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_HID)) {
-		intent_hid_node = current_node;
-	}
-
-	if(intent_hid_node == INVALID_NODE_HANDLE) {
-		click_chatter("XIAPath: ERROR Intent HID not found");
-		return false;
-	}
-	return intent_hid_node;
-}
-
-Vector<XIAPath::handle_t>
-XIAPath::next_nodes(handle_t node) const
-{
-    return _nodes[node].edges;
-}
-
-XIAPath::handle_t
-XIAPath::add_node(const XID& xid)
-{
-    Node n;
-    n.xid = xid;
-
-    _nodes.push_back(n);
-
-    return _nodes.size() - 1;
+	return g.remove_intent_sid_node();
 }
 
 bool
-XIAPath::add_edge(handle_t from_node, handle_t to_node, size_t priority)
+XIAPath::remove_intent_node()
 {
-    if (priority < static_cast<size_t>(_nodes[from_node].edges.size()))
-        _nodes[from_node].edges.insert(&_nodes[from_node].edges[priority], to_node);
-    else
-        _nodes[from_node].edges.push_back(to_node);
-    return true;
+	return g.remove_intent_node();
 }
 
-bool
-XIAPath::remove_node(handle_t node)
-{
-    _nodes.erase(&_nodes[node]);
-    for (int i = 0; i < _nodes.size(); i++) {
-        int num_edges =_nodes[i].edges.size();
-        for (int j = 0; j < num_edges; j++) {
-            if (_nodes[i].edges[j] == node) {
-                // remove all incoming edges
-                _nodes[i].edges.erase(&_nodes[i].edges[j]);
-                j--;
-                num_edges--;
-            }
-            else if (_nodes[i].edges[j] > node) {
-                // adjust edge handle
-                _nodes[i].edges[j]--;
-            }
-        }
-    }
-    if (_src != _npos &&_src >= node)
-        _src--;
-    if (_dst != _npos && _dst >= node)
-        _dst--;
-    return true;
-}
-
-void
-XIAPath::set_source_node(handle_t node)
-{
-    _src = node;
-}
-
-void
-XIAPath::set_destination_node(handle_t node)
-{
-    _dst = node;
-}
 
 bool
 XIAPath::flatten()
@@ -392,36 +284,21 @@ XIAPath::flatten()
 }
 
 int
-XIAPath::compare_with_exception(XIAPath& other, XID& my_ad, XID& their_ad)
+XIAPath::compare_except_intent_ad(XIAPath& other)
 {
-	String this_path_str = unparse();
-	click_chatter("XIAPath: this path:%s", this_path_str.c_str());
-	String other_path_str = other.unparse();
-	click_chatter("XIAPath: other path:%s", other_path_str.c_str());
+	return g.compare_except_intent_AD(other.get_graph());
+}
 
-	int my_ad_c_str_len = strlen(my_ad.unparse().c_str())+1;
-	int their_ad_c_str_len = strlen(their_ad.unparse().c_str())+1;
-	int this_path_c_str_len = this_path_str.length()+1;
+const Graph&
+XIAPath::get_graph() const
+{
+	return g;
+}
 
-	char *my_ad_c_str = (char *) calloc(my_ad_c_str_len, 1);
-	char *their_ad_c_str = (char *) calloc(their_ad_c_str_len, 1);
-	char *this_path_c_str = (char *) calloc(this_path_c_str_len, 1);
-
-	strcpy(my_ad_c_str, my_ad.unparse().c_str());
-	strcpy(their_ad_c_str, their_ad.unparse().c_str());
-	strcpy(this_path_c_str, this_path_str.c_str());
-
-	// Find first occurence of my AD in the path
-	char *offset = strstr(this_path_c_str, my_ad_c_str);
-	// Replace it with their ad
-	strncpy(offset, their_ad_c_str, their_ad_c_str_len-1);
-	// The modified path must match the other XIAPath
-	String modified_this_path(this_path_c_str);
-	click_chatter("XIAPath: modified this path:%s", modified_this_path.c_str());
-	if(modified_this_path == other_path_str) {
-		return 0;
-	}
-	return 1;
+bool
+XIAPath::first_hop_is_sid() const
+{
+	return g.first_hop_is_sid();
 }
 
 bool XIAPath::operator== (XIAPath& other) {
@@ -432,6 +309,7 @@ bool XIAPath::operator!= (XIAPath& other) {
 	return !(g == other.g);
 }
 
+/*
 void
 XIAPath::dump_state() const
 {
@@ -451,6 +329,7 @@ XIAPath::dump_state() const
     click_chatter("%s\n", String(sa.data(), sa.length()).c_str());
 #endif
 }
+*/
 
 #ifndef NDEBUG_XIA
 struct XIASelfTest {
@@ -508,10 +387,10 @@ struct XIASelfTest {
         }
 
         // path manipulation test
+		/*
         {
             XIAPath p;
             XIAPath::handle_t src_node = p.add_node(XID());
-            p.set_source_node(src_node);
             XIAPath::handle_t dst_node = p.add_node(XID("AD:0000000000000000000000000000000000000000"));
             p.set_destination_node(dst_node);
             p.add_edge(src_node, dst_node);
@@ -549,6 +428,7 @@ struct XIASelfTest {
             assert(p.is_valid());
             click_chatter("%s\n", p.unparse_re().c_str());
         }
+		*/
 
         click_chatter("test passed.\n");
     }
