@@ -255,27 +255,8 @@ public:
 	// socket teardown
 	bool TeardownSocket(sock *sk);
 
-	// TCP state handlers
-	void ProcessAckPacket(WritablePacket *p_in);
 	void ProcessXcmpPacket(WritablePacket*p_in);
-	void ProcessMigratePacket(WritablePacket *p_in);
-	void ProcessMigrateAck(WritablePacket *p_in);
-	void ProcessSynPacket(WritablePacket *p_in);
-	void ProcessSynAckPacket(WritablePacket *p_in);
-	void ProcessStreamDataPacket(WritablePacket *p_in);
-	void ProcessFinPacket(WritablePacket *p_in);
-	void ProcessFinAckPacket(WritablePacket *p_in);
 
-	// timer retransmit handlers
-	bool RetransmitDATA(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitFIN(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitFINACK(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitSYN(sock *sk, uint32_t id, Timestamp &now);
-	bool RetransmitSYNACK(sock *sk, uint32_t id, Timestamp &now);
-
-	void SendControlPacket(int type, sock *sk, const void *, size_t plen, XIAPath &src_path, XIAPath &dst_path);
-	void MigrateFailure(sock *sk);
 	void ScheduleTimer(sock *sk, int delay);
 	void CancelRetransmit(sock *sk);
 	sock *XID2Sock(XID dest_xid);
@@ -329,6 +310,8 @@ class sock : public Element {
     void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
+    uint8_t get_hop_count() {return hop_count;}
+    void set_hop_count(uint8_t n) {hop_count = n;}
     bool is_full_src_dag() {return full_src_dag;}
     void set_full_src_dag(bool f) {full_src_dag = f;}
     String get_sdag() {return sdag;}
@@ -371,6 +354,7 @@ class sock : public Element {
 	XIAPath src_path;			// peer DAG
 	XIAPath dst_path;			// our DAG
 	uint8_t hlim;				// hlim/ttl
+	uint8_t hop_count;
 
 	bool full_src_dag;			// bind to full dag or just to SID
 

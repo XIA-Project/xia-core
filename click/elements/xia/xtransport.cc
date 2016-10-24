@@ -20,8 +20,6 @@
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
 ** - see various FIXMEs in the code
-** - replace copy_packet with uniqueify. not needed for migration in reliable transport
-**	 still needed for datagram and cid??
 */
 
 CLICK_DECLS
@@ -208,7 +206,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 		_tcp_globals.window_scale = TCP_MAX_WINSHIFT;
 
 
-    /* TODO: How should we choose xcacheSid? */
+    // temporary value, will be reset by the cache daemon
     random_xid("SID", xidString);
     _xcache_sid.parse(xidString);
 
@@ -524,7 +522,7 @@ Packet *XTRANSPORT::UDPIPPrep(Packet *p_in, int dport)
 
 char *XTRANSPORT::random_xid(const char *type, char *buf)
 {
-	// This is a stand-in function until we get certificate based names
+	// FIXME: This is a stand-in function until we get certificate based names
 	//
 	// note: buf must be at least 45 characters long
 	// (longer if the XID type gets longer than 3 characters)
@@ -610,17 +608,6 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 			XIDpairToConnectPending.erase(xid_pair);
 			XIDpairToSock.erase(xid_pair);
 		}
-
-		// FIXME:delete these too
-		//queue<sock*> pending_connection_buf;
-		//queue<xia::XSocketMsg*> pendingAccepts;
-		// MERGE - why is this commented out now?
-		// for (int i = 0; i < sk->send_buffer_size; i++) {
-		// 	if (sk->send_buffer[i] != NULL) {
-		// 		sk->send_buffer[i]->kill();
-		// 		sk->send_buffer[i] = NULL;
-		// 	}
-		// }
 	}
 
 	if (!sk->isAcceptedSocket) {
@@ -669,35 +656,6 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 
 
 
-
-bool XTRANSPORT::RetransmitMIGRATE(sock *sk, uint32_t id, Timestamp &now)
-{
-	UNUSED(sk);
-	UNUSED(id);
-	UNUSED(now);
-	bool rc = false;
-#if 0
-	if (sk->num_migrate_tries <= MAX_RETRANSMIT_TRIES) {
-		DBG("Socket %d MIGRATE retransmit\n", _sport);
-
-		sk->timer_on = true;
-		sk->migrating = true;
-		sk->expiry = now + Timestamp::make_msec(MIGRATEACK_DELAY);
-		sk->num_migrate_tries++;
-
-		WritablePacket *copy = copy_packet(sk->migrate_pkt, sk);
-		output(NETWORK_PORT).push(copy);
-
-	} else {
-		WARN("Socket %d MIGRATE retransmit count exceeded\n", _sport);
-		// FIXME: send RST?
-		CancelRetransmit(sk);
-		sk->migrating = false;
-		rc = true;
-	}
-#endif
-	return rc;
-}
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
@@ -831,6 +789,8 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
+	bool set_full_dag = false;
+
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
@@ -841,8 +801,12 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
-	// FIXME: why are these different??
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	// NOTE: CID dags arrive here with the last ptr = the SID node,
+	//  so we can't use the last pointer as it's not pointing to the
+	// CID. I don't think this will break existing logic.
+	//XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	XID _destination_xid = dst_path.xid(dst_path.destination_node());
+
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	XIDpair xid_pair;
@@ -850,29 +814,24 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	xid_pair.set_dst(_source_xid);
 	StreamHeader thdr(p_in);
 
-	// printf("process stream: flags = %08x\n", thdr.flags());
+	// DBG("process stream: flags = %08x\n", thdr.flags());
 
 	sock *handler;
-	if ((handler = XIDpairToSock.get(xid_pair)) != NULL)
-	{
-		// INFO("We are in the normal case");
-
+	if ((handler = XIDpairToSock.get(xid_pair)) != NULL) {
 		// FIXME: is this ok?
 		// switch over to use the DAG given to us by the other end
 		handler->dst_path = src_path;
 
 		((XStream *)handler) -> push(p_in);
-	} else if ((handler = XIDpairToConnectPending.get(xid_pair)) != NULL)
-	{
-		// INFO("We are in the second case");
 
+	} else if ((handler = XIDpairToConnectPending.get(xid_pair)) != NULL) {
 		// FIXME: is this ok?
 		// switch over to use the DAG given to us by the other end
 		handler->dst_path = src_path;
 
 		((XStream *)handler) -> push(p_in);
-	}
-	else {
+
+	} else {
 		if (thdr.flags() & XTH_SYN) {
 			// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
 			sock *sk = XID2Sock(_destination_xid);
@@ -905,26 +864,27 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
-				// FIXME: is this the right place/right way to do this???
-				// we have received a syn, flatten the dag so all future packets come to us
-				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-					 // we've received a request for a CID which usually contains a fallback
-					 // we need to strip out the direct path to the content and only use the
-					 // AD->HID->CID path.
-					 // Additionally, we may be a router which can service the request, so
-					 // don't just flatten the DAG, but make sure it points to us.
-					 // FIXME: are there any implications for multihoming here?
-					 // FIXME: can we do this without having to convert to strings?
+				uint8_t hop_count = -1;
+				// we have received a syn for CID,
+				if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+					hop_count = HLIM_DEFAULT - xiah.hlim();
+
+					// we've received a SYN for a CID DAG which usually contains a fallback
+					// we need to strip out the direct path to the content and only use the
+					// AD->HID->SID->CID path.
+					// Additionally, we may be a router which can service the request, so
+					// don't just flatten the DAG, but make sure it points to our cache daemon.
+					// FIXME: can we do this without having to convert to strings?
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
-//					str_local_addr += _xcache_sid.unparse();
-//					str_local_addr += " ";
+					str_local_addr += _xcache_sid.unparse();
+					str_local_addr += " ";
 					str_local_addr += _destination_xid.unparse();
 
-					sk->dst_path.parse_re(str_local_addr);
+					set_full_dag = true;
+					dst_path.parse_re(str_local_addr);
 				}
 
-				// send SYNACK to client
 				// INFO("Socket %d Handling new SYN\n", sk->port);
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
@@ -936,7 +896,11 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 					new_sk->outgoing_iface = iface;
 				}
+				if (set_full_dag) {
+					new_sk->full_src_dag = true;
+				}
 				new_sk->set_key(xid_pair);
+				new_sk->set_hop_count(hop_count);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
 				new_sk->push(p_in);
 			}
@@ -998,310 +962,6 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 
 
 
-// FIXME: look into eliminating the common setup code in all of these function
-// pass all as params?
-void XTRANSPORT::ProcessMigratePacket(WritablePacket *p_in)
-{
-	UNUSED(p_in);
-#if 0
-	XIAHeader xiah(p_in->xia_header());
-
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
-
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	XID	_source_xid = src_path.xid(src_path.destination_node());
-
-	TransportHeader thdr(p_in);
-
-	XIDpair xid_pair;
-	xid_pair.set_src(_destination_xid);
-	xid_pair.set_dst(_source_xid);
-
-	sock *sk = XIDpairToSock.get(xid_pair);
-
-	if (!sk) {
-		WARN("ProcessMigratePacket: sk == NULL\n");
-		return;
-	}
-
-	DBG("ProcessMigrate: %s from port %d at %ld.\n", _source_xid.unparse().c_str(), sk->port, Timestamp::now());
-
-	// Verify the MIGRATE request and start using new DAG
-	// No need to wait for an ACK because the operation is idempotent
-	// 1. Retrieve payload (srcDAG, destDAG, seqnum) Signature, Pubkey
-	const uint8_t *payload = thdr.payload();
-	//int payload_len = xiah.plen() - thdr.hlen();
-	const uint8_t *payloadptr = payload;
-	String remote_DAG((char *)payloadptr, strlen((char *) payloadptr));
-	payloadptr += strlen((char *)payloadptr) + 1;
-	INFO("MIGRATE: remote DAG: %s", remote_DAG.c_str());
-	String my_DAG((char *)payloadptr, strlen((char *) payloadptr));
-	payloadptr += strlen((char *)payloadptr) + 1;
-	INFO("MIGRATE: my DAG: %s", my_DAG.c_str());
-	String timestamp((char *)payloadptr, strlen((char *) payloadptr));
-	payloadptr += strlen((char *)payloadptr) + 1;
-	INFO("MIGRATE: Timestamp: %s", timestamp.c_str());
-	uint16_t siglen;
-	memcpy(&siglen, payloadptr, sizeof(uint16_t));
-	payloadptr += sizeof(uint16_t);
-	INFO("MIGRATE: Signature length: %d", siglen);
-	uint8_t *signature = (uint8_t *) calloc(siglen, 1);
-	memcpy(signature, payloadptr, siglen);
-	payloadptr += siglen;
-	uint16_t pubkeylen;
-	memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
-	payloadptr += sizeof(uint16_t);
-	INFO("MIGRATE: Pubkey length: %d", pubkeylen);
-	char *pubkey = (char *) calloc(pubkeylen, 1);
-	memcpy(pubkey, payloadptr, pubkeylen);
-	INFO("MIGRATE: Pubkey:%s:", pubkey);
-	payloadptr += pubkeylen;
-	INFO("MIGRATE: pkt len: %d", payloadptr - payload);
-
-	// 2. Verify hash of pubkey matches srcDAG destination node
-	if (src_path.parse(remote_DAG) == false) {
-		INFO("MIGRATE: ERROR parsing remote DAG:%s:", remote_DAG.c_str());
-	}
-	String src_SID_string = src_path.xid(src_path.destination_node()).unparse();
-	const char *sourceSID = xs_XIDHash(src_SID_string.c_str());
-	uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
-	char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-	xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
-	xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-	if (strcmp(pubkeyhash_hexdigest, sourceSID) != 0) {
-		INFO("ERROR: MIGRATE pubkey hash: %s SourceSID: %s", pubkeyhash_hexdigest, sourceSID);
-	}
-	INFO("MIGRATE: Source SID matches pubkey hash");
-
-	// 3. Verify Signature using Pubkey
-	size_t signed_datalen = remote_DAG.length() + my_DAG.length() + timestamp.length() + 3;
-	if (!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
-		INFO("ProcessNetworkPacket: ERROR: MIGRATE with invalid signature");
-	}
-	free(signature);
-	free(pubkey);
-	INFO("MIGRATE: Signature validated");
-
-	// 4. Update socket state dst_path with srcDAG
-	sk->dst_path = src_path;
-	assert(sk->state == CONNECTED);
-
-	// 5. Return MIGRATEACK to notify mobile host of change
-	// Construct the payload - 'data'
-	// For now (timestamp) signature, Pubkey
-	uint8_t *data;
-	uint8_t *dataptr;
-	uint32_t maxdatalen;
-	uint32_t datalen;
-	char mypubkey[MAX_PUBKEY_SIZE];
-	uint16_t mypubkeylen = MAX_PUBKEY_SIZE;
-
-	INFO("MIGRATE: building MIGRATEACK");
-	XID my_xid = sk->src_path.xid(sk->src_path.destination_node());
-	INFO("MIGRATE: MIGRATEACK get pubkey for:%s:", my_xid.unparse().c_str());
-	if (xs_getPubkey(my_xid.unparse().c_str(), mypubkey, &mypubkeylen)) {
-		ERROR("ERROR: getting Pubkey for MIGRATEACK");
-	}
-	maxdatalen = remote_DAG.length() + 1 + timestamp.length() + 1 + MAX_SIGNATURE_SIZE + sizeof(uint16_t) + mypubkeylen;
-	data = (uint8_t *) calloc(maxdatalen, 1);
-	if (data == NULL) {
-		ERROR("ERROR allocating memory for MIGRATEACK");
-	}
-	dataptr = data;
-
-	// Insert the mobile host DAG whose migration has been accepted
-	strcpy((char *)dataptr, remote_DAG.c_str());
-	INFO("MIGRATE: MIGRATEACK remoteDAG: %s", (char *)dataptr);
-	dataptr += remote_DAG.length() + 1; // null-terminated string
-
-	// Insert timestamp into payload
-	strcpy((char *)dataptr, timestamp.c_str());
-	INFO("MIGRATE: MIGRATEACK timestamp: %s", (char *)dataptr);
-	dataptr += timestamp.length() + 1; // null-terminated string
-
-	// Sign(mobileDAG, Timestamp)
-	uint8_t mysignature[MAX_SIGNATURE_SIZE];
-	uint16_t mysiglen = MAX_SIGNATURE_SIZE;
-	if (xs_sign(my_xid.unparse().c_str(), data, dataptr - data, mysignature, &mysiglen)) {
-		ERROR("ERROR signing MIGRATEACK");
-	}
-
-	// Signature length
-	memcpy(dataptr, &mysiglen, sizeof(uint16_t));
-	INFO("MIGRATE: MIGRATEACK siglen: %d", mysiglen);
-	dataptr += sizeof(uint16_t);
-
-	// Signature
-	memcpy(dataptr, mysignature, mysiglen);
-	dataptr += mysiglen;
-
-	// Public key length
-	memcpy(dataptr, &mypubkeylen, sizeof(uint16_t));
-	INFO("MIGRATE: MIGRATEACK pubkeylen: %d", mypubkeylen);
-	dataptr += sizeof(uint16_t);
-
-	// Public key
-	memcpy(dataptr, mypubkey, mypubkeylen);
-	INFO("MIGRATE: MIGRATEACK pubkey:%s:", dataptr);
-	dataptr += mypubkeylen;
-
-	// Total payload length
-	datalen = dataptr - data;
-	INFO("MIGRATE: MIGRATEACK len: %d", datalen);
-
-	// Create a packet with the payload
-	XIAHeaderEncap xiah_new;
-	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-	xiah_new.set_last(LAST_NODE_DEFAULT);
-	xiah_new.set_hlim(HLIM_DEFAULT);
-	xiah_new.set_dst_path(src_path);
-	xiah_new.set_src_path(dst_path);
-
-	WritablePacket *just_payload_part = WritablePacket::make(256, data, datalen, 0);
-	free(data);
-
-	WritablePacket *p = NULL;
-
-	xiah_new.set_plen(datalen);
-
-	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeMIGRATEACKHeader( 0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length
-	p = thdr_new->encap(just_payload_part);
-
-	thdr_new->update();
-	xiah_new.set_plen(datalen + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-	p = xiah_new.encap(p, false);
-
-	delete thdr_new;
-	output(NETWORK_PORT).push(p);
-
-	// 6. Notify the api of MIGRATE reception
-	//   Do we need to? -Nitin
-#endif
-}
-
-
-
-void XTRANSPORT::ProcessMigrateAck(WritablePacket *p_in)
-{
-	UNUSED(p_in);
-/*
-	XIAHeader xiah(p_in->xia_header());
-
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
-
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	XID	_source_xid = src_path.xid(src_path.destination_node());
-
-	TransportHeader thdr(p_in);
-
-	XIDpair xid_pair;
-	xid_pair.set_src(_destination_xid);
-	xid_pair.set_dst(_source_xid);
-
-	sock *sk = XIDpairToSock.get(xid_pair);
-	if (!sk) {
-		ERROR("sk == NULL\n");
-		return;
-	}
-	unsigned short _dport = sk->port;
-
-	if (sk->state != CONNECTED) {
-		// This should never happen!
-		ERROR("socket is not connected\n");
-		return;
-	}
-
-	DBG("%s from port %d at %ld.\n", _source_xid.unparse().c_str(), _dport, Timestamp::now());
-
-	// Verify the MIGRATEACK and start using new DAG
-	// 1. Retrieve payload (migratedDAG, timestamp) signature, Pubkey
-	const uint8_t *payload = thdr.payload();
-	int payload_len = xiah.plen() - thdr.hlen();
-	const uint8_t *payloadptr = payload;
-	size_t signed_datalen;
-
-	// Extract the migrated DAG that the fixed host accepted
-	String migrated_DAG((char *)payloadptr, strlen((char *) payloadptr));
-	payloadptr += strlen((char *)payloadptr) + 1;
-	INFO("MIGRATEACK: migrated DAG: %s", migrated_DAG.c_str());
-
-	// Extract the timestamp corresponding to the migration message that was sent
-	// Helps handle a second migration before the first migration is completed
-	String timestamp((char *)payloadptr, strlen((char *) payloadptr));
-	payloadptr += strlen((char *)payloadptr) + 1;
-	signed_datalen = payloadptr - payload;
-	INFO("MIGRATEACK: timestamp: %s", timestamp.c_str());
-
-	// Get the signature (migrated_DAG, timestamp)
-	uint16_t siglen;
-	memcpy(&siglen, payloadptr, sizeof(uint16_t));
-	INFO("MIGRATEACK: siglen: %d", siglen);
-	payloadptr += sizeof(uint16_t);
-	uint8_t *signature = (uint8_t *) calloc(siglen, 1);
-	memcpy(signature, payloadptr, siglen);
-	payloadptr += siglen;
-
-	// Get the Public key of the fixed host
-	uint16_t pubkeylen;
-	memcpy(&pubkeylen, payloadptr, sizeof(uint16_t));
-	INFO("MIGRATEACK: pubkeylen: %d", pubkeylen);
-	payloadptr += sizeof(uint16_t);
-	char *pubkey = (char *) calloc(pubkeylen, 1);
-	memcpy(pubkey, payloadptr, pubkeylen);
-	INFO("MIGRATEACK: pubkey:%s:", pubkey);
-	payloadptr += pubkeylen;
-	if (payloadptr - payload != payload_len) {
-		WARN("MIGRATEACK expected payload len=%d, got %d", payload_len, payloadptr - payload);
-	}
-	//assert(payloadptr-payload == payload_len);
-
-	// 2. Verify hash of pubkey matches the fixed host's SID
-	String fixed_SID_string = sk->dst_path.xid(sk->dst_path.destination_node()).unparse();
-	uint8_t pubkeyhash[SHA_DIGEST_LENGTH];
-	char pubkeyhash_hexdigest[XIA_SHA_DIGEST_STR_LEN];
-	xs_getPubkeyHash(pubkey, pubkeyhash, sizeof pubkeyhash);
-	xs_hexDigest(pubkeyhash, sizeof pubkeyhash, pubkeyhash_hexdigest, sizeof pubkeyhash_hexdigest);
-	if (strcmp(pubkeyhash_hexdigest, xs_XIDHash(fixed_SID_string.c_str())) != 0) {
-		ERROR("ERROR: MIGRATEACK: Mismatch: fixedSID: %s, pubkeyhash: %s", fixed_SID_string.c_str(), pubkeyhash_hexdigest);
-	}
-	INFO("Hash of pubkey matches fixed SID");
-
-	// 3. Verify Signature using Pubkey
-	if (!xs_isValidSignature(payload, signed_datalen, signature, siglen, pubkey, pubkeylen)) {
-		ERROR("ERROR: MIGRATEACK: MIGRATE with invalid signature");
-	}
-	INFO("MIGRATEACK: Signature verified");
-	free(signature);
-	free(pubkey);
-
-	// 4. Verify timestamp matches the latest migrate message
-	if (strcmp(sk->last_migrate_ts.c_str(), timestamp.c_str()) != 0) {
-		WARN("timestamp sent:%s:, migrateack has:%s:", sk->last_migrate_ts.c_str(), timestamp.c_str());
-	}
-	INFO("MIGRATEACK: verified timestamp");
-
-	// 5. Update socket state src_path to use the new DAG
-	// TODO: Verify migrated_DAG's destination node is the same as src_path's
-	//	   before replacing with the migrated_DAG
-	sk->src_path.parse(migrated_DAG);
-	INFO("MIGRATEACK: updated sock state with newly acknowledged DAG");
-
-	// 6. The data retransmissions can now resume
-	sk->migrating = false;
-	sk->num_migrate_tries = 0;
-
-	portToSock.set(_dport, sk);
-	if (_dport != sk->port) {
-		INFO("MIGRATEACK: ERROR _dport %d, sk->port %d", _dport, sk->port);
-	}
-*/
-}
-
-
-
 void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 {
 	list<uint32_t>::iterator i;
@@ -1317,23 +977,6 @@ void XTRANSPORT::ProcessXcmpPacket(WritablePacket *p_in)
 }
 
 
-
-void XTRANSPORT::MigrateFailure(sock *sk)
-{
-	if (sk->polling) {
-		// tell API we are in trouble
-		ProcessPollEvent(sk->port, POLLHUP);
-	}
-
-	if (sk->isBlocking && sk->recv_pending) {
-		// The api is blocking on a recv, return an error
-		ReturnResult(sk->port, sk->pending_recv_msg, -1, ESTALE);
-
-		sk->recv_pending = false;
-		delete sk->pending_recv_msg;
-		sk->pending_recv_msg = NULL;
-	}
-}
 
 sock *XTRANSPORT::XID2Sock(XID dest_xid)
 {
@@ -1354,170 +997,6 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	return NULL;
 }
 
-
-#if 0
-void XTRANSPORT::ProcessSynPacket(WritablePacket *p_in)
-{
-	XIAHeader xiah(p_in->xia_header());
-
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
-
-	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	XID	_source_xid = src_path.xid(src_path.destination_node());
-
-	TransportHeader thdr(p_in);
-
-	XIDpair xid_pair;
-	xid_pair.set_src(_destination_xid);
-	xid_pair.set_dst(_source_xid);
-
-	// unlike the other stream handlers, there is no pair yet, so use dest_xid to get port
-	sock *sk = XID2Sock(_destination_xid);
-
-	if (!sk) {
-		// FIXME: we need to fix the state machine so this doesn't happen!
-		WARN("sk == NULL\n");
-		return;
-	}
-
-	INFO("socket %d received SYN\n", sk->port);
-
-	if (sk->state != LISTEN) {
-		// we aren't marked to accept connecctions, drop it
-		WARN("SYN received on a non-listening socket (port:%u), dropping...\n", sk->port);
-		return;
-	}
-
-	if (sk->pending_connection_buf.size() >= sk->backlog) {
-		// the backlog is full, we can't take it right now, drop it
-
-		WARN("SYN received but backlog is full (port:%u), dropping...\n", sk->port);
-		return;
-	}
-
-	// First, check if this request is already in the pending queue
-	HashTable<XIDpair , struct sock*>::iterator it;
-	it = XIDpairToConnectPending.find(xid_pair);
-
-	if (it != XIDpairToConnectPending.end()) {
-		// we've already seen it, ignore it
-		INFO("Socket %d received duplicate SYN\n", sk->port);
-
-		// FIXME: is this OK?
-		it->second->num_retransmits = 0;
-		return ;
-	}
-
-	// For a CID packet, modify dst_path variable
-	dst_path = alterCIDDstPath(dst_path);
-
-	// if this is new request, put it in the queue
-
-	// send SYNACK to client
-	INFO("Socket %d Handling new SYN\n", sk->port);
-
-	XIAHeaderEncap xiah_new;
-	xiah_new.set_nxt(CLICK_XIA_NXT_TRN);
-	xiah_new.set_last(LAST_NODE_DEFAULT);
-	xiah_new.set_hlim(HLIM_DEFAULT);
-	xiah_new.set_dst_path(src_path);
-	xiah_new.set_src_path(dst_path);
-
-	WritablePacket *just_payload_part;
-	int payloadLength;
-
-	// FIXME: use SendControlPacket to send the SYNACK instead of building it by hand
-
-	std::cout << "Xcachesock = " <<sk->xcacheSock << "\n";
-	// FIXME: move to a separate function
-	if(!sk->xcacheSock && usingRendezvousDAG(sk->src_path, dst_path)) {
-		XID _destination_xid = dst_path.xid(dst_path.destination_node());
-		INFO("Sending SYNACK with verification for RV DAG");
-		// Destination DAG from the SYN packet
-		String src_path_str = dst_path.unparse();
-
-		// Current timestamp as nonce against replay attacks
-		Timestamp now = Timestamp::now();
-		double timestamp = strtod(now.unparse().c_str(), NULL);
-
-		// Build the payload with DAG for this service and timestamp
-		XIASecurityBuffer synackPayload(1024);
-		synackPayload.pack(src_path_str.c_str(), src_path_str.length());
-		synackPayload.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
-
-		// Sign the synack payload
-		char signature[MAX_SIGNATURE_SIZE];
-		uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-		if(xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-			ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-			MigrateFailure(sk);
-			return;
-		}
-
-		// Retrieve public key for this host
-		char pubkey[MAX_PUBKEY_SIZE];
-		uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-		if(xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-			ERROR("ERROR public key not found for %s", _destination_xid.unparse().c_str());
-			MigrateFailure(sk);
-			return;
-		}
-
-		// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
-		XIASecurityBuffer signedPayload(2048);
-		signedPayload.pack(synackPayload.get_buffer(), synackPayload.size());
-		signedPayload.pack(signature, signatureLength);
-		signedPayload.pack((char *)pubkey, pubkeyLength);
-
-		just_payload_part = WritablePacket::make(256, (const void*)signedPayload.get_buffer(), signedPayload.size(), 1);
-		payloadLength = signedPayload.size();
-	} else {
-		const char* dummy = "Connection_pending";
-		just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-		payloadLength = strlen(dummy);
-	}
-
-	WritablePacket *p = NULL;
-
-	xiah_new.set_plen(payloadLength);
-
-	TransportHeaderEncap *thdr_new = TransportHeaderEncap::MakeSYNACKHeader(0, 0, 0, calc_recv_window(sk)); // #seq, #ack, length, recv_wind
-	p = thdr_new->encap(just_payload_part);
-
-	thdr_new->update();
-	xiah_new.set_plen(payloadLength + thdr_new->hlen()); // XIA payload = transport header + transport-layer data
-
-	p = xiah_new.encap(p, false);
-	delete thdr_new;
-
-	// Prepare new sock for this connection
-	sock *new_sk = new sock();
-	ChangeState(new_sk, SYN_RCVD);
-	new_sk->port = 0; // just for now. This will be updated via Xaccept call
-	new_sk->sock_type = SOCK_STREAM;
-	new_sk->dst_path = src_path;
-	new_sk->src_path = dst_path;
-	new_sk->isAcceptedSocket = true;
-	new_sk->pkt = copy_packet(p, new_sk);
-		int iface;
-		// Interface card matching src_path to use during migration
-		if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
-			new_sk->outgoing_iface = iface;
-		}
-		new_sk->refcount = 1;
-
-	memset(new_sk->send_buffer, 0, new_sk->send_buffer_size * sizeof(WritablePacket*));
-	memset(new_sk->recv_buffer, 0, new_sk->recv_buffer_size * sizeof(WritablePacket*));
-
-	ScheduleTimer(new_sk, ACK_DELAY);
-
-	XIDpairToConnectPending.set(xid_pair, new_sk);
-
-	output(NETWORK_PORT).push(p);
-	INFO("Sent SYNACK from new socket\n");
-}
-#endif
 
 int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 {
@@ -1653,9 +1132,6 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XPOLL:
 		Xpoll(_sport, id, &xia_socket_msg);
-		break;
-	case xia::XUPDATERV:
-		Xupdaterv(_sport, id, &xia_socket_msg);
 		break;
 	case xia::XFORK:
 		Xfork(_sport, id, &xia_socket_msg);
@@ -1953,60 +1429,6 @@ void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /
 }
 
 
-#if 0
-// FIXME: This way of doing things is a bit hacky.
-void XTRANSPORT::XbindPush(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
-{
-	int rc = 0, ec = 0;
-
-	xia::X_BindPush_Msg *x_bindpush_msg = xia_socket_msg->mutable_x_bindpush();
-
-	String sdag_string(x_bindpush_msg->sdag().c_str(), x_bindpush_msg->sdag().size());
-
-	DBG("\nbind requested to %s\n", sdag_string.c_str());
-
-	//Set the source DAG in sock
-	sock *sk = portToSock.get(_sport);
-	if (sk->src_path.parse(sdag_string)) {
-		ChangeState(sk, INACTIVE);
-		sk->initialized = true;
-
-		//Check if binding to full DAG or just to SID only
-		Vector<XIAPath::handle_t> xids = sk->src_path.next_nodes( sk->src_path.source_node() );
-		XID front_xid = sk->src_path.xid( xids[0] );
-
-		struct click_xia_xid head_xid = front_xid.xid();
-		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == CLICK_XIA_XID_TYPE_SID) {
-			sk->full_src_dag = false;
-		} else {
-			sk->full_src_dag = true;
-		}
-
-		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
-		//TODO: Add a check to see if XID is already being used
-
-		// Map the source XID to source port (for now, for either type of tranports)
-		XIDtoPushPort.set(source_xid, _sport);
-		addRoute(source_xid);
-
-		portToSock.set(_sport, sk);
-		if (_sport != sk->port) {
-			ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
-		}
-
-	} else {
-		rc = -1;
-		ec = EADDRNOTAVAIL;
-		ERROR("ERROR: SOCKET PUSH BIND !!!\\n");
-	}
-
-	// (for Ack purpose) Reply with a packet with the destination port=source port
-	ReturnResult(_sport, xia_socket_msg, rc, ec);
-}
-#endif
-
-
 void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	int ref;
@@ -2091,7 +1513,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 			ReturnResult(_sport, xia_socket_msg, -1, EALREADY);
 		}
 
-// FIXMEFIXMEFIXME: need id here?
 		tcp_conn->dst_path = dst_path;
 		tcp_conn->port = _sport;
 		ChangeState(tcp_conn, SYN_SENT);
@@ -2146,9 +1567,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		tcp_conn->so_error = EINPROGRESS;
 		ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
 	}
-	// // Prepare SYN packet
-	// const char *payload = "SYN";
-	// SendControlPacket(TransportHeader::SYN, sk, payload, strlen(payload), dst_path, sk->src_path);
 }
 
 
@@ -2255,70 +1673,10 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 		sk->pending_connection_buf.pop();
 
-
-
-// FIXME: does this block of code do anything??? I don't see the payload getting used
-// I think it's all happening in the syn handling above?
-/*
-		WritablePacket *just_payload_part;
-		int payloadLength;
-		std::cout << "Xcachesock = " <<sk->xcacheSock << "\n";
-		if((sk->xcacheSock == false) && usingRendezvousDAG(sk->src_path, new_sk->src_path)) {
-			XID _destination_xid = new_sk->src_path.xid(new_sk->src_path.destination_node());
-			INFO("Xaccept: Sending SYNACK with verification for RV DAG");
-			// Destination DAG from the SYN packet
-			String src_path_str = new_sk->src_path.unparse();
-
-			// Current timestamp as nonce against replay attacks
-			Timestamp now = Timestamp::now();
-			double timestamp = strtod(now.unparse().c_str(), NULL);
-
-			// Build the payload with DAG for this service and timestamp
-			XIASecurityBuffer synackPayload(1024);
-			synackPayload.pack(src_path_str.c_str(), src_path_str.length());
-			synackPayload.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
-
-			// Sign the synack payload
-			char signature[MAX_SIGNATURE_SIZE];
-			uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-			if (xs_sign(_destination_xid.unparse().c_str(), (unsigned char *)synackPayload.get_buffer(), synackPayload.size(), (unsigned char *)signature, &signatureLength)) {
-				ERROR("ERROR unable to sign the SYNACK using private key for %s", _destination_xid.unparse().c_str());
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-			}
-
-			// Retrieve public key for this host
-			char pubkey[MAX_PUBKEY_SIZE];
-			uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-			if (xs_getPubkey(_destination_xid.unparse().c_str(), pubkey, &pubkeyLength)) {
-				ERROR("ERROR public key not found for %s", _destination_xid.unparse().c_str());
-				rc = -1;
-				ec = ESTALE;
-				goto Xaccept_done;
-			}
-
-			// Prepare a signed payload (serviceDAG, timestamp)Signature, Pubkey
-			XIASecurityBuffer signedPayload(2048);
-			signedPayload.pack(synackPayload.get_buffer(), synackPayload.size());
-			signedPayload.pack(signature, signatureLength);
-			signedPayload.pack((char *)pubkey, pubkeyLength);
-
-			just_payload_part = WritablePacket::make(256, (const void*)signedPayload.get_buffer(), signedPayload.size(), 1);
-			payloadLength = signedPayload.size();
-		}
-
-		else {
-			const char* dummy = "Connection_granted";
-			just_payload_part = WritablePacket::make(256, dummy, strlen(dummy), 0);
-			payloadLength = strlen(dummy);
-		}
-		*/
-
 		// tell APP our id for future communications
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
 		x_accept_msg->set_new_id(new_sk->get_id());
-
+		x_accept_msg->set_hop_count(new_sk->get_hop_count());
 		// Get remote DAG to return to app
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
@@ -2336,104 +1694,6 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 Xaccept_done:
 	ReturnResult(_sport, xia_socket_msg, rc, ec);
-}
-
-
-
-void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
-{
-	UNUSED(_sport);
-	UNUSED(id);
-	UNUSED(xia_socket_msg);
-#if 0
-	sock *sk = portToSock.get(_sport);
-
-	// Retrieve rendezvous service DAG from user provided argument
-	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
-	int iface = x_updaterv_msg->interface();
-	String rendezvousDAGstr(x_updaterv_msg->rvdag().c_str());
-
-	// Update XIAInterfaceTable with new rendezvous control dag.
-	// Note: If DAG is an empty string, it will be silently ignored.
-	_interfaces.update_rv_control_dag(iface, rendezvousDAGstr);
-
-	XIAInterface interface = _interfaces.getInterface(iface);
-	// Return if we don't have a valid RV Control DAG to send a control msg to
-	if(!interface.has_rv_control_dag()) {
-		return;
-	}
-
-	// Send a control message to the rendezvous service to tell our location
-	XIAPath rendezvousDAG;
-	rendezvousDAG.parse(interface.rv_control_dag(), NULL);
-
-	// HID of this host
-	String ifaceHID = interface.hid().c_str();
-
-	// Current local DAG for this host
-	String ifaceDAGstr = interface.dag();
-
-	// Current timestamp as nonce against replay attacks
-	Timestamp now = Timestamp::now();
-	double timestamp = strtod(now.unparse().c_str(), NULL);
-
-	// Message going out to the rendezvous server
-	INFO("RV DAG:%s", rendezvousDAGstr.c_str());
-	INFO("for:%s", ifaceHID.c_str());
-	INFO("at:%s", ifaceDAGstr.c_str());
-	INFO("timestamp: %f", timestamp);
-
-	// Prepare control message for rendezvous service
-	XIASecurityBuffer controlMsg = XIASecurityBuffer(1024);
-	controlMsg.pack(ifaceHID.c_str(), ifaceHID.length());
-	controlMsg.pack(ifaceDAGstr.c_str(), ifaceDAGstr.length());
-	controlMsg.pack((const char *)&timestamp, (uint16_t) sizeof timestamp);
-
-	// Sign the control message
-	char signature[MAX_SIGNATURE_SIZE];
-	uint16_t signatureLength = MAX_SIGNATURE_SIZE;
-	xs_sign(ifaceHID.c_str(), (unsigned char *)controlMsg.get_buffer(), controlMsg.size(), (unsigned char *)signature, &signatureLength);
-
-	// Retrieve public key for this host
-	char pubkey[MAX_PUBKEY_SIZE];
-	uint16_t pubkeyLength = MAX_PUBKEY_SIZE;
-	if(xs_getPubkey(ifaceHID.c_str(), pubkey, &pubkeyLength)) {
-		ERROR("ERROR public key not found for %s", ifaceHID.c_str());
-		return;
-	}
-
-	// Build signed message (hid, newDAG, timestamp)Signature, Pubkey
-	XIASecurityBuffer signedMsg = XIASecurityBuffer(2048);
-	signedMsg.pack(controlMsg.get_buffer(), controlMsg.size());
-	signedMsg.pack(signature, signatureLength);
-	signedMsg.pack((char *)pubkey, pubkeyLength);
-
-	// Prepare XIP header
-	XIAHeaderEncap xiah;
-	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(sk->hlim);
-	xiah.set_dst_path(rendezvousDAG);
-	xiah.set_src_path(sk->src_path);
-
-	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)signedMsg.get_buffer(), signedMsg.size(), 1);
-
-	WritablePacket *p = NULL;
-
-	xiah.set_nxt(CLICK_XIA_NXT_TRN);
-	xiah.set_plen(signedMsg.size());
-
-	//Add XIA Transport headers
-	TransportHeaderEncap *thdr = TransportHeaderEncap::MakeDGRAMHeader(0); // length
-	p = thdr->encap(just_payload_part);
-
-	thdr->update();
-	xiah.set_plen(signedMsg.size() + thdr->hlen()); // XIA payload = transport header + transport-layer data
-
-	p = xiah.encap(p, false);
-	delete thdr;
-
-	output(NETWORK_PORT).push(p);
-#endif
 }
 
 
@@ -2678,11 +1938,14 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
         return false;
     }
     // Skip inactive ports
-    if (sk->state != CONNECTED) {
-        INFO("skipping migration for non-connected port");
+    if (sk->state == INACTIVE
+			|| sk->state == LISTEN
+			|| sk->state == TIME_WAIT) {
+        INFO("skipping migration for inactive/listening port");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
         return false;
     }
+	INFO("migrating socket in state %d", sk->state);
     // Skip sockets not using the interface whose dag changed
     if(sk->outgoing_iface != changed_iface) {
         INFO("skipping migration for unchanged interface");
@@ -3145,18 +2408,19 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 	if (rc == 0) {
 		rc = pktPayloadSize;
 
-		//Recalculate source path
-		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
-		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
-		//Make source DAG _local_addr:SID
-		String dagstr = sk->src_path.unparse_re();
-
-		//Client Mobility...
-		if (dagstr.length() != 0 && dagstr != str_local_addr) {
-			//Moved!
-			// 1. Update 'sk->src_path'
-			sk->src_path.parse_re(str_local_addr);
-		}
+		// FIXME: we can probably delete this block
+		// //Recalculate source path
+		// XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		// String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse();
+		// //Make source DAG _local_addr:SID
+		// String dagstr = sk->src_path.unparse_re();
+		//
+		// //Client Mobility...
+		// if (dagstr.length() != 0 && dagstr != str_local_addr) {
+		// 	//Moved!
+		// 	// 1. Update 'sk->src_path'
+		// 	sk->src_path.parse_re(str_local_addr);
+		// }
 
 		// Case of initial binding to only SID
 		if (sk->full_src_dag == false) {
@@ -3200,12 +2464,6 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 			} else {
 //				DBG("(%d) sent packet to %s, from %s\n", _sport, sk->dst_path.unparse_re().c_str(), sk->src_path.unparse_re().c_str());
 			}
-
-//			// FIXME: what is this for? we should already be in the table
-//			portToSock.set(_sport, sk);
-//			if (_sport != sk->port) {
-//				ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
-//			}
 		}
 	}
 
@@ -3287,7 +2545,9 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
-	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	// get rid of expensive packet push warning
+	//WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 	WritablePacket *p = NULL;
 

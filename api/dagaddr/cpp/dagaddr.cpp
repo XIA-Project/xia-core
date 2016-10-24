@@ -467,7 +467,11 @@ Graph::Graph(const Graph& r)
 */
 Graph::Graph(std::string dag_string)
 {
-	if (dag_string.find("DAG") != std::string::npos)
+	if (dag_string.find("http://") != std::string::npos)
+	{
+		construct_from_http_url_string(dag_string);
+	}
+	else if (dag_string.find("DAG") != std::string::npos)
 	{
 		construct_from_dag_string(dag_string);
 	}
@@ -837,6 +841,12 @@ Graph::intent_XID_index(uint32_t xid_type) const
 }
 
 std::size_t
+Graph::intent_SID_index() const
+{
+	return intent_XID_index(XID_TYPE_SID);
+}
+
+std::size_t
 Graph::intent_HID_index() const
 {
 	return intent_XID_index(XID_TYPE_HID);
@@ -927,6 +937,26 @@ Graph::intent_HID_str() const
 	return nodes_[hid_index].to_string();
 }
 
+/*
+ * @brief Return the SID for the Graph's intent node
+ *
+ * Get the SID string on first path to intent node
+ * Note: This function is essentially identical to intent_AD_str()
+ *
+ * @return The SID if found, empty string otherwise
+ */
+std::string
+Graph::intent_SID_str() const
+{
+	std::string sid;
+	std::size_t sid_index = intent_SID_index();
+	if (sid_index == INVALID_GRAPH_INDEX) {
+		return "";
+	}
+	return nodes_[sid_index].to_string();
+}
+
+
 /**
 * @brief Return the graph in string form
 *
@@ -994,6 +1024,14 @@ Graph::dag_string() const
 	return dag_string;
 }
 
+std::string 
+Graph::http_url_string() const{
+	std::string dag_string = this->dag_string();
+	dag_string.erase(std::remove(dag_string.begin(), dag_string.end(), '\n'), dag_string.end());
+	std::replace(dag_string.begin(), dag_string.end(), ' ', '.');
+	std::replace(dag_string.begin(), dag_string.end(), ':', '$');
+	return "http://" + dag_string;
+}
 
 /**
 * @brief Get the index of the souce node
@@ -1325,6 +1363,14 @@ Graph::get_out_edges(int i) const
 	}
 
 	return out_edges;
+}
+
+void
+Graph::construct_from_http_url_string(std::string url_string){
+	std::string dag_string = url_string.substr(7, std::string::npos);
+	std::replace(dag_string.begin(), dag_string.end(), '.', ' ');
+	std::replace(dag_string.begin(), dag_string.end(), '$', ':');
+	this->construct_from_dag_string(dag_string);
 }
 
 

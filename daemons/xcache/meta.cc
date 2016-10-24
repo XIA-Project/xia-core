@@ -4,10 +4,16 @@
 
 #define IGNORE_PARAM(__param) ((void)__param)
 
+
+// FIXME: HORRIBLE HACK to put this where the garbage collector can get at it.
+// find a better way of making this happen
+XIARouter xr;
+
 void xcache_meta::init()
 {
 	_store = NULL;
 	len = 0;
+	_ttl = 0;
 	initial_seq = 0;
 	pthread_mutex_init(&meta_lock, NULL);
 	_updated = _accessed = time(NULL);
@@ -58,6 +64,11 @@ bool xcache_meta::is_stale()
 
 	if (state() == OVERHEARING) {
 		if (time(NULL) - updated() > TOO_OLD) {
+			stale = true;
+		}
+	} else if (state() == AVAILABLE && _ttl != 0) {
+		time_t now = time(NULL);
+		if ((now - created()) > ttl()) {
 			stale = true;
 		}
 	}
@@ -129,7 +140,6 @@ void meta_map::remove_meta(xcache_meta *meta)
 // delete any pending chunks that have stalled for too long
 int meta_map::walk(void)
 {
-	unsigned count = 0;
 	write_lock();
 
 	std::map<std::string, xcache_meta *>::iterator i;
@@ -137,21 +147,31 @@ int meta_map::walk(void)
 	for (i = _map.begin(); i != _map.end(); ) {
 		xcache_meta *m = i->second;
 
-		if (m->is_stale()) {
-			syslog(LOG_INFO, "removing stalled stream for %s", m->get_cid().c_str());
-			delete m;
-			_map.erase(i++);
+		std::string c = "CID:" + m->get_cid();
 
-		} else if (m->state() == EVICTING) {
-			syslog(LOG_INFO, "evicting chunk %s", m->get_cid().c_str());
+		if (m->is_stale()) {
+			if (m->state() == AVAILABLE) {
+				m->set_state(EVICTING);
+
+			} else {
+				syslog(LOG_INFO, "removing stalled cid:%s", c.c_str());
+				delete m;
+				_map.erase(i++);
+			}
+		}
+
+		if (m->state() == EVICTING) {
+			syslog(LOG_INFO, "evicting chunk %s", c.c_str());
+			xr.delRoute(c);
 			m->store()->remove(m);
 			delete m;
 			_map.erase(i++);
+
 		} else {
 			++i;
 		}
 	}
 
 	unlock();
-	return count;
+	return 0;
 }

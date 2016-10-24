@@ -13,7 +13,7 @@ from netjoin_message_pb2 import SignedMessage
 
 class NetjoinXIAConf(object):
     def __init__(self, hostname=socket.gethostname()):
-        self.hostname = hostname
+        self.hostname = hostname.split('.')[0]
         cwd = os.getcwd()
         self.src_dir = cwd[:cwd.rindex('xia-core')+len('xia-core')]
         self.conf_dir = os.path.join(self.src_dir, "etc")
@@ -118,7 +118,6 @@ class NetjoinXIAConf(object):
                     continue
                 host_type = match.group(2)
                 hid = match.group(3)
-
                 if "Router" in host_type:
                     ad, hid = hid.split(' ')
                 break

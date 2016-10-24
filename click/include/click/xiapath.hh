@@ -67,6 +67,9 @@ class XIAPath { public:
 	// Get the intent HID as a string
 	std::string intent_hid_str() const;
 
+	// Get the intent SID as a string
+	std::string intent_sid_str() const;
+
 	// get the handle of the first AD node in DAG towards destination
 	//handle_t first_ad_node() const;
 
@@ -78,6 +81,9 @@ class XIAPath { public:
 
 	// Find the intent HID - last HID in path to dest node
 	//handle_t find_intent_hid();
+
+	// Find the intent SID - last SID in path to dest node
+	//handle_t find_intent_sid();
 
 	// Replace intent HID node with a new one
 	bool replace_intent_hid(XID new_hid);

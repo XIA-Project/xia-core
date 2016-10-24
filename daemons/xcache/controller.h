@@ -8,11 +8,13 @@
 #include "slice.h"
 #include "meta.h"
 #include "store_manager.h"
+#include "policy_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
 #include "dagaddr.hpp"
 #include <errno.h>
 #include "xcache.h"
+
 
 #define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100
@@ -30,10 +32,12 @@ struct xcache_req {
 #define XCFI_CACHE     0x2
 
 	int flags;
+	time_t ttl;
 	int from_sock, to_sock;
 	char *cid;
 	void *data;
 	size_t datalen;
+	unsigned hop_count;
 };
 
 class xcache_controller {
@@ -61,6 +65,8 @@ private:
 	 */
 	std::string hostname;
 
+	std::string xcache_sid;
+
 	/**
 	 * Lookup a context based on context ID.
 	 */
@@ -70,10 +76,10 @@ private:
 	 * Manages various content stores.
 	 * @See file store.h for details.
 	 */
+	xcache_policy_manager policy_manager;
 	xcache_store_manager store_manager;
 	xcache_cache cache;
 
-	XIARouter xr;
 	unsigned context_id;
 
 public:
@@ -94,7 +100,7 @@ public:
 	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
-	void send_content_remote(int sock, sockaddr_x *mypath);
+	void send_content_remote(xcache_req *req, sockaddr_x *mypath);
 
 	bool verify_content(xcache_meta *meta, const std::string *);
 
@@ -154,7 +160,7 @@ public:
 	/**
 	 * Stores content locally.
 	 */
-	int store(xcache_cmd *, xcache_cmd *);
+	int store(xcache_cmd *, xcache_cmd *, time_t);
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 
@@ -185,7 +191,8 @@ public:
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);
 
-	int register_meta(xcache_meta *);
+	int register_meta(std::string &);
+
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);
@@ -193,18 +200,6 @@ public:
 
 	void enqueue_request_safe(xcache_req *req);
 	xcache_req *dequeue_request_safe(void);
-
-	inline int req_sem_wait_safe(void) {
-		while(sem_wait(&req_sem) != 0);
-
-		return 0;
-	}
-
-	inline int req_sem_post_safe(void) {
-		while(sem_post(&req_sem) != 0);
-
-		return 0;
-	}
 };
 
 #endif

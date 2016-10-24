@@ -118,6 +118,7 @@ message X_Accept_Msg {
   optional bool sendmypath = 4;
   optional string self_dag = 5;
   optional uint32 new_id = 6;
+  optional uint32 hop_count = 7;
 }
 
 message X_Sendto_Msg {

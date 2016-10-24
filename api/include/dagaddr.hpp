@@ -105,9 +105,11 @@ public:
 	static const std::size_t MAX_XIDS_IN_ALL_PATHS = 30;
 	static const std::size_t INVALID_GRAPH_INDEX = 255;
 	void print_graph() const;
+	std::string http_url_string() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
+	std::string intent_SID_str() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
 	Graph next_hop(const Node& n);
@@ -139,6 +141,7 @@ private:
 	std::size_t intent_XID_index(uint32_t xid_type) const;
 	std::size_t intent_AD_index() const;
 	std::size_t intent_HID_index() const;
+	std::size_t intent_SID_index() const;
 
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
@@ -158,6 +161,7 @@ private:
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
+	void construct_from_http_url_string(std::string dag_string);
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);

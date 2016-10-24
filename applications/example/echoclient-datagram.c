@@ -211,7 +211,8 @@ int process(int sock)
 		die(-4, "Send error %d on socket %d\n", errno, sock);
 	}
 
-	say("Xsock %4d sent %d bytes\n", sock, sent);
+	const char *msg = (sent == size) ? "" : "(Packet Truncated)\n";
+	say("Xsock %4d sent %d bytes %s\n", sock, sent, msg, size);
 
 	struct pollfd pfds[2];
 	pfds[0].fd = sock;

@@ -307,8 +307,10 @@ void pinger()
 
 	if (timing) {
 		gettimeofday(&tp, &tz);
-		*(int *)&outpack[8]  = htonl(tp.tv_sec);
-		*(int *)&outpack[12] = htonl(tp.tv_usec);
+		void *p = &outpack[8];
+		*(unsigned *)p  = htonl(tp.tv_sec);
+		p = &outpack[12];
+		*(unsigned *)p = htonl(tp.tv_usec);
 	}
 
 	// skip 8 for time
@@ -496,7 +498,7 @@ u_short in_cksum(struct icmp *addr, int len)
 	sum = (sum >> 16) + (sum & 0xffff);	// add hi 16 to low 16
 	sum += (sum >> 16);			// add carry
 	answer = ~sum;				// truncate to 16 bits
-	return htons(answer);
+	return answer;
 }
 
 /*
