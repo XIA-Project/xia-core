@@ -134,6 +134,7 @@ XIAPath::unparse_dag(const Element* context)
 	return g.dag_string().c_str();
 }
 
+/*
 // TODO NITIN every call to unparse_re using it to manipulate dags must
 // be refactored to use an XIAPath function to do the manipulation
 String
@@ -187,8 +188,9 @@ XIAPath::unparse_re(const Element* context)
         else
             return "";     // unable to represent in RE
     }
-    return String(sa.data(), sa.length() - 1 /* exclusing the last space character */);
+    return String(sa.data(), sa.length() - 1 );
 }
+*/
 
 size_t
 XIAPath::unparse_node_size() const
@@ -389,6 +391,7 @@ struct XIASelfTest {
         }
 
         // RE test
+		/*
         {
             const char* s[] = {
                 "AD:0000000000000000000000000000000000000000",
@@ -404,6 +407,7 @@ struct XIASelfTest {
                 assert(p.unparse_re() == s[i]);
             }
         }
+		*/
 
         // DAG test
         {

@@ -875,6 +875,10 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					// Additionally, we may be a router which can service the request, so
 					// don't just flatten the DAG, but make sure it points to our cache daemon.
 					// FIXME: can we do this without having to convert to strings?
+					XIAPath new_addr = _local_addr;
+					new_addr.append_node(_xcache_sid);
+					new_addr.append_node(_destination_xid);
+					/*
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
 					str_local_addr += _xcache_sid.unparse();
@@ -883,6 +887,8 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 					set_full_dag = true;
 					dst_path.parse_re(str_local_addr);
+					*/
+					dst_path = new_addr;
 				}
 
 				// INFO("Socket %d Handling new SYN\n", sk->port);
@@ -1517,8 +1523,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		tcp_conn->port = _sport;
 		ChangeState(tcp_conn, SYN_SENT);
 		tcp_conn->num_connect_tries++;
-
-		String str_local_addr = _local_addr.unparse_re();
 
 		// API sends a temporary DAG, if permanent not assigned by bind
 		if (x_connect_msg->has_sdag()) {
@@ -2425,11 +2429,17 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		// Case of initial binding to only SID
 		if (sk->full_src_dag == false) {
 			sk->full_src_dag = true;
+			std::string src_xid_str = sk->src_path.intent_sid_str();
+			XIAPath new_src_path = _local_addr;
+			new_src_path.append_node(XID(src_xid_str.c_str()));
+			sk->src_path = new_src_path;
+			/*
 			String str_local_addr = _local_addr.unparse_re();
 			XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
 			String xid_string = front_xid.unparse();
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 			sk->src_path.parse_re(str_local_addr);
+			*/
 		}
 
 		//Add XIA headers
@@ -2500,13 +2510,23 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 			INFO("sk->port was %d setting to %d", sk->port, _sport);
 		}
 		sk->port = _sport;
-		String str_local_addr = _local_addr.unparse_re();
 
+		// Create a random XID
 		char xid_string[50];
 		random_xid("SID", xid_string);
+		XID new_xid(xid_string);
+
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(new_xid);
+		sk->src_path = new_addr;
+
+		/*
+		String str_local_addr = _local_addr.unparse_re();
+
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 		sk->src_path.parse_re(str_local_addr);
+		*/
 
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
@@ -2517,20 +2537,36 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	// Case of initial binding to only SID
 	if (sk->full_src_dag == false) {
 		sk->full_src_dag = true;
-		String str_local_addr = _local_addr.unparse_re();
+
 		XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(front_xid);
+		sk->src_path = new_addr;
+		/*
+		String str_local_addr = _local_addr.unparse_re();
 		String xid_string = front_xid.unparse();
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 		sk->src_path.parse_re(str_local_addr);
+		*/
 	}
 
 
+	if (sk->src_path.is_valid()) {
+		//Recalculate source path
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(source_xid);
+		sk->src_path = new_addr;
+	}
+
+	/*
 	if (sk->src_path.unparse_re().length() != 0) {
 		//Recalculate source path
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse(); //Make source DAG _local_addr:SID
 		sk->src_path.parse(str_local_addr);
 	}
+	*/
 
 	idToSock.set(id, sk);
 	if (_sport != sk->port) {

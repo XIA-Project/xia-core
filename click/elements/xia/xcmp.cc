@@ -201,7 +201,7 @@ XCMP::processUnreachable(Packet *p_in)
 	bcast_xid.parse(broadcast_xid);
 
 	if (!dst_path.is_valid()) {
-		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str());
+		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse().c_str());
 		INFO("Sending Unreachable from %s\n   to %s\n   for %s\n",
 			 _src_path.unparse().c_str(),
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());

@@ -43,7 +43,7 @@ class XIAPath { public:
     String unparse_dag(const Element* context = NULL);
 
     // unparse to a RE string representation
-    String unparse_re(const Element* context = NULL);
+    //String unparse_re(const Element* context = NULL);
 
     // size of unparsed node list
     size_t unparse_node_size() const;
