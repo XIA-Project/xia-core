@@ -60,8 +60,6 @@ template <typename InputIterator>
 void
 XIAPath::parse_node(InputIterator node_begin, InputIterator node_end)
 {
-    //reset();
-
     if (node_begin == node_end)
         return;
 
@@ -73,37 +71,6 @@ XIAPath::parse_node(InputIterator node_begin, InputIterator node_end)
 		++current_node;
 	}
 	g.from_wire_format(count, node_begin);
-	/*
-	while (current_node != node_end) {
-        Node graph_node;
-
-        graph_node.xid = (*current_node).xid;
-
-        for (size_t j = 0; j < CLICK_XIA_XID_EDGE_NUM; j++) {
-            size_t idx = (*current_node).edge[j].idx;
-            if (idx == CLICK_XIA_XID_EDGE_UNUSED)
-                continue;
-            graph_node.edges.push_back(idx);
-        }
-
-        _nodes.push_back(graph_node);
-        ++current_node;
-    }
-
-    // duplicate the last node
-    _nodes.push_back(_nodes[_nodes.size() - 1]);
-
-    _dst = _nodes.size() - 2;
-    _src = _nodes.size() - 1;
-
-    // remove edges from the destination node
-    _nodes[_dst].edges.clear();
-
-    // remove XID from the source node
-    _nodes[_src].xid = XID();
-
-    //dump_state();
-	*/
 }
 
 template void XIAPath::parse_node(const struct click_xia_xid_node*, const struct click_xia_xid_node*);
@@ -114,7 +81,6 @@ void
 XIAPath::parse_node(InputIterator node_begin, size_t n)
 {
 	g.from_wire_format(n, node_begin);
-    //parse_node(node_begin, node_begin + n);
 }
 
 template void XIAPath::parse_node(const struct click_xia_xid_node*, size_t);
@@ -133,64 +99,6 @@ XIAPath::unparse_dag(const Element* context)
 	(void) context;
 	return g.dag_string().c_str();
 }
-
-/*
-// TODO NITIN every call to unparse_re using it to manipulate dags must
-// be refactored to use an XIAPath function to do the manipulation
-String
-XIAPath::unparse_re(const Element* context)
-{
-    if (!is_valid())
-        return "(invalid)";
-
-    // try to unparse to RE string representation directly from the graph
-
-    StringAccum sa;
-    size_t prev_node = _src;
-    while (true) {
-        if (_nodes[prev_node].edges.size() == 0)    // destination
-            break;
-        else if (_nodes[prev_node].edges.size() == 1 || _nodes[prev_node].edges.size() == 2) {
-            size_t next_primary_node = _nodes[prev_node].edges[0];
-
-            if (_nodes[prev_node].edges.size() == 2) {
-                // output fallback nodes
-                sa << "( ";
-                size_t next_fallback_node = _nodes[prev_node].edges[1];
-                while (true) {
-                    sa << _nodes[next_fallback_node].xid.unparse_pretty(context);
-                    sa << ' ';
-
-                    if (_nodes[next_fallback_node].edges.size() == 1) {
-                        if (_nodes[next_fallback_node].edges[0] == next_primary_node)
-                            break;
-                        else
-                            return "";     // unable to represent in RE
-                    }
-                    else if (_nodes[next_fallback_node].edges.size() == 2) {
-                        if (_nodes[next_fallback_node].edges[0] == next_primary_node)
-                            next_fallback_node = _nodes[next_fallback_node].edges[1];
-                        else
-                            return "";     // unable to represent in RE
-                    }
-                    else
-                        return "";     // unable to represent in RE
-                }
-                sa << ") ";
-            }
-
-            // output primary node
-            sa << _nodes[next_primary_node].xid.unparse_pretty(context);
-            sa << ' ';
-
-            prev_node = next_primary_node;
-        }
-        else
-            return "";     // unable to represent in RE
-    }
-    return String(sa.data(), sa.length() - 1 );
-}
-*/
 
 size_t
 XIAPath::unparse_node_size() const
@@ -265,35 +173,6 @@ XIAPath::intent_sid_str() const
 	return g.intent_SID_str();
 }
 
-/*
-XIAPath::handle_t
-XIAPath::find_intent_sid()
-{
-	click_chatter("XIAPath::find_intent_sid called");
-	handle_t current_node = source_node();
-	handle_t dst = destination_node();
-	handle_t intent_sid_node = INVALID_NODE_HANDLE;
-	// Walk from src to dst on first hops, finding all HIDs on path
-	while(current_node != dst) {
-		if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_SID)) {
-			intent_sid_node = current_node;
-		}
-		current_node = first_hop_from_node(current_node);
-	}
-	// Include destination node in the search for last HID
-	// Most likely, this is the intent HID node
-	if(xid(current_node).type() == htonl(CLICK_XIA_XID_TYPE_SID)) {
-		intent_sid_node = current_node;
-	}
-
-	if(intent_sid_node == INVALID_NODE_HANDLE) {
-		click_chatter("XIAPath: ERROR Intent SID not found");
-	}
-	return intent_sid_node;
-}
-*/
-
-
 bool
 XIAPath::append_node(const XID& xid)
 {
@@ -345,28 +224,6 @@ bool XIAPath::operator== (XIAPath& other) {
 bool XIAPath::operator!= (XIAPath& other) {
 	return !(g == other.g);
 }
-
-/*
-void
-XIAPath::dump_state() const
-{
-#ifndef NDEBUG_XIA
-    StringAccum sa;
-    sa << "_nodes =\n";
-    for (int i = 0; i < _nodes.size(); i++) {
-        sa << i << ": ";
-        sa << _nodes[i].xid << ' ';
-        for (int j = 0; j < _nodes[i].edges.size(); j++)
-            sa << _nodes[i].edges[j] << ' ';
-        sa << '(' << _nodes[i].order << ") ";
-        sa << '\n';
-    }
-    sa << "_src = " << _src << '\n';
-    sa << "_dst = " << _dst << '\n';
-    click_chatter("%s\n", String(sa.data(), sa.length()).c_str());
-#endif
-}
-*/
 
 #ifndef NDEBUG_XIA
 struct XIASelfTest {
