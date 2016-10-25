@@ -265,10 +265,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 	ptr_->ref_count = 1;
     memset(ptr_->id,0,Node::ID_LEN); // zero the ID
 
-	std::string typestr;
+	std::string typestr = type_str;
 
 	// Convert type_str to uppercase for string comparison
-	transform(type_str.begin(), type_str.end(), typestr.begin(), ::toupper);
+	transform(typestr.begin(), typestr.end(), typestr.begin(), ::toupper);
 
 	if (typestr == XID_TYPE_AD_STRING)
 		ptr_->type = XID_TYPE_AD;
