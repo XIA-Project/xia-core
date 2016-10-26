@@ -343,6 +343,103 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	return 0;
 }
 
+int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen){
+	int sock;
+	int rc;
+	int result;
+	sockaddr_x ns_dag;
+	char pkt[NS_MAX_PACKET_SIZE];
+
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!addr || !addrlen || *addrlen < sizeof(sockaddr_x)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
+
+        // check to see if name is actually a dag to begin with
+        Graph gcheck(name);
+
+        // check to see if the returned dag was valid
+        // we may want a better check for this in the future
+        if (gcheck.num_nodes() > 0) {
+            std::string s = gcheck.dag_string();
+            gcheck.fill_sockaddr((sockaddr_x*)addr);
+            *addrlen = sizeof(sockaddr_x);
+            return 0;
+        }
+    }
+
+	// not found locally, check the name server
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	//Read the nameserver DAG (the one that the name-query will be sent to)
+	if ( XreadNameServerDAG(sock, &ns_dag) < 0 ) {
+		LOG("Unable to find nameserver address");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+
+	//Construct a name-query packet
+	ns_pkt query_pkt;
+	query_pkt.type = NS_TYPE_ANYCAST_QUERY;
+	query_pkt.flags = 0;
+	query_pkt.name = name;
+	query_pkt.dag = NULL;
+	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
+
+	//Send a name query to the name server
+	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
+		int err = errno;
+		LOGF("Error sending name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	//Check the response from the name server
+	memset(pkt, 0, sizeof(pkt));
+	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
+		int err = errno;
+		LOGF("Error retrieving name query (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	ns_pkt resp_pkt;
+	get_ns_packet(pkt, rc, &resp_pkt);
+
+	switch (resp_pkt.type) {
+	case NS_TYPE_ANYCAST_RESPONSE_QUERY:
+		result = 1;
+		break;
+	case NS_TYPE_ANYCAST_RESPONSE_ERROR:
+		result = -1;
+		break;
+	default:
+		LOG("Unknown nameserver response");
+		result = -1;
+		break;
+	}
+	Xclose(sock);
+
+	if (result < 0) {
+		return result;
+	}
+
+	Graph g(resp_pkt.dag);
+	g.fill_sockaddr(addr);
+	*addrlen = sizeof(sockaddr_x);
+	return 0;
+}
+
 #define MAX_RV_DAG_SIZE 1024
 #define MAX_XID_STR_SIZE 64
 int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG)
@@ -516,6 +613,104 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 */
 int XregisterName(const char *name, sockaddr_x *DAG) {
 	return _xregister(name, DAG, 0);
+}
+
+int XregisterAnycastName(const char *name, sockaddr_x *DAG){
+	int sock;
+	int rc;
+	int result;
+	sockaddr_x ns_dag;
+	char pkt[NS_MAX_PACKET_SIZE];
+
+	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	//Read the nameserver DAG (the one that the name-registration will be sent to)
+	if (XreadNameServerDAG(sock, &ns_dag) < 0) {
+		LOG("Unable to find nameserver address");
+		errno = NO_RECOVERY;
+		return -1;
+	}
+
+	if (!name || *name == 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!DAG) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (DAG->sx_family != AF_XIA) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	Graph g(DAG);
+	if (g.num_nodes() <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	std::string dag_string = g.dag_string();
+
+	//Construct a registration packet
+	ns_pkt register_pkt;
+	register_pkt.type = NS_TYPE_ANYCAST_REGISTER;
+	register_pkt.flags = 0;
+	register_pkt.name = name;
+	register_pkt.dag = dag_string.c_str();
+	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
+
+	//Send the name registration packet to the name server
+	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
+		int err = errno;
+		LOGF("Error sending name registration (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+	struct timeval timeout;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+	if(Xselect(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
+		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
+		return -1;
+	}
+
+	//Check the response from the name server
+	memset(pkt, 0, sizeof(pkt));
+	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
+		int err = errno;
+		LOGF("Error sending name registration (%d)", rc);
+		Xclose(sock);
+		errno = err;
+		return -1;
+	}
+
+	ns_pkt resp_pkt;
+	get_ns_packet(pkt, rc, &resp_pkt);
+
+	switch (resp_pkt.type) {
+	case NS_TYPE_ANYCAST_RESPONSE_REGISTER:
+		result = 0;
+		break;
+	case NS_TYPE_ANYCAST_RESPONSE_ERROR:
+		result = -1;
+		break;
+	default:
+		LOGF("Unknown NS packet type (%d)", resp_pkt.type);
+		result = -1;
+		break;
+	 }
+
+	Xclose(sock);
+	return result;
 }
 
 
@@ -706,21 +901,39 @@ int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
 			strcpy(end, np->dag);
 			end += strlen(np->dag) + 1;
 			break;
-
+		case NS_TYPE_ANYCAST_REGISTER:
+			if (np->name == NULL || np->dag == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+ 
+			strcpy(end, np->dag);
+			end += strlen(np->dag) + 1;
+			break;
 		case NS_TYPE_QUERY:
 			if (np->name == NULL)
 				return 0;
 			strcpy(end, np->name);
 			end += strlen(np->name) + 1;
 			break;
-
+		case NS_TYPE_ANYCAST_QUERY:
+			if (np->name == NULL)
+				return 0;
+			strcpy(end, np->name);
+			end += strlen(np->name) + 1;
+			break;
 		case NS_TYPE_RESPONSE_QUERY:
 			if (np->dag == NULL)
 				return 0;
 			strcpy(end, np->dag);
 			end += strlen(np->dag) + 1;
 			break;
-
+		case NS_TYPE_ANYCAST_RESPONSE_QUERY:
+			if (np->dag == NULL)
+				return 0;
+			strcpy(end, np->dag);
+			end += strlen(np->dag) + 1;
+			break;
 		case NS_TYPE_RQUERY:
 			if (np->dag == NULL)
 				return 0;
@@ -758,24 +971,29 @@ void get_ns_packet(char *pkt, int sz, ns_pkt *np)
 		case NS_TYPE_QUERY:
 			np->name = &pkt[2];
 			break;
-
+		case NS_TYPE_ANYCAST_QUERY:
+			np->name = &pkt[2];
+			break;
 		case NS_TYPE_RQUERY:
 			np->dag = &pkt[2];
 			break;
-
 		case NS_TYPE_REGISTER:
 			np->name = &pkt[2];
 			np->dag = np->name + strlen(np->name) + 1;
 			break;
-
+		case NS_TYPE_ANYCAST_REGISTER:
+			np->name = &pkt[2];
+			np->dag = np->name + strlen(np->name) + 1;
+			break;
 		case NS_TYPE_RESPONSE_QUERY:
 			np->dag = &pkt[2];
 			break;
-
 		case NS_TYPE_RESPONSE_RQUERY:
 			np->name = &pkt[2];
 			break;
-
+		case NS_TYPE_ANYCAST_RESPONSE_QUERY:
+			np->dag = &pkt[2];
+			break;
 		default:
 			break;
 	}

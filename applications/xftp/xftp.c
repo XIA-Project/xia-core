@@ -25,9 +25,13 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sys/time.h>
 #include "Xsocket.h"
 #include "xcache.h"
 #include "dagaddr.h"
+#include "dagaddr.hpp"
 
 #define VERSION "v2.0"
 #define TITLE "XIA Basic FTP client"
@@ -37,6 +41,7 @@
 // global configuration options
 int verbose = 0;
 char name[256];
+double totalElapseTime = 0.0;
 
 XcacheHandle h;
 
@@ -159,6 +164,9 @@ int getResponse(int sock, char *reply, int sz)
 int retrieveChunk(FILE *fd, char *url)
 {
 	char *saveptr, *token;
+
+	double elapsedTime;
+    struct timeval t1, t2;
 	char *buf = (char*)malloc(MAX_CHUNKSIZE);
 
 	token = strtok_r(url, " ", &saveptr);
@@ -169,14 +177,25 @@ int retrieveChunk(FILE *fd, char *url)
 		say("Fetching URL %s\n", token);
 		url_to_dag(&addr, token, strlen(token));
 
-//		Graph g(&addr);
-//		printf("------------------------\n");
-//		g.print_graph();
-//		printf("------------------------\n");
-
+        gettimeofday(&t1, NULL);
 		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
+		gettimeofday(&t2, NULL);
+
+		Graph g(&addr);
+		printf("------------------------\n");
+		g.print_graph();
+		say("fetch hop count is %d\n", XgetPrevFetchHopCount());
+		printf("------------------------\n");
+
+
+		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+        elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+
+        say("current elapsedTime: %f\n", elapsedTime);
+
+        totalElapseTime += elapsedTime; 		// in ms
 
 		say("Got Chunk\n");
 		fwrite(buf, 1, ret, fd);
@@ -233,6 +252,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	}
 
 	say("Received file %s\n", fout);
+	say("Total elapsedTime: %f\n", totalElapseTime);
 	sendCmd(sock, "done");
 	return status;
 }

@@ -128,7 +128,7 @@ class NetjoinReceiver(threading.Thread):
             del self.client_sessions[session_id]
         elif session_id in self.server_sessions:
             session = self.server_sessions[session_id]
-            del self.client_sessions[session_id]
+            del self.server_sessions[session_id]
         else:
             logging.error("Completed session not known to receiver")
             return

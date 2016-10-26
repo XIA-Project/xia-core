@@ -14,6 +14,7 @@ struct cid_header {
 	uint16_t hlen;
 	uint32_t length;
 	uint32_t ttl;
+	unsigned hop_count;
 	//char cid[CID_HASH_SIZE];
 } __attribute__((packed));
 

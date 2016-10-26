@@ -464,6 +464,11 @@ inline int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 }
 
 /* Content Fetching APIs */
+static int hopCount = -1;
+int XgetPrevFetchHopCount(){
+	return hopCount;
+}
+
 int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x *addr, socklen_t len)
 {
 	xcache_cmd cmd;
@@ -498,6 +503,7 @@ int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x
 		to_copy = MIN(cmd.data().length(), buflen);
 		memcpy(buf, cmd.data().c_str(), to_copy);
 		fprintf(stderr, "Fetch: Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
+		hopCount = cmd.hop_count();
 
 		return to_copy;
 	}

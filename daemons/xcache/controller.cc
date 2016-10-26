@@ -110,6 +110,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	struct cid_header header;
 	size_t remaining;
 	size_t offset;
+	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
 	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
@@ -136,7 +137,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	}
 
 	remaining = ntohl(header.length);
-
+	hop_count = ntohl(header.hop_count);
 	meta->set_created();
 	meta->set_ttl(ntohl(header.ttl));
 
@@ -190,6 +191,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if (resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
+		resp->set_hop_count(hop_count);
 	}
 
 	Xclose(sock);
@@ -231,6 +233,7 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
+		resp->set_hop_count(0);
 		resp->set_ttl(meta->ttl());
 	}
 
@@ -469,8 +472,7 @@ int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-int xcache_controller::__store_policy(xcache_meta *meta)
-{
+int xcache_controller::__store_policy(xcache_meta *meta) {
 	return policy_manager.cacheable(meta);
 }
 
@@ -487,6 +489,8 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 {
 	meta->lock();
 
+	syslog(LOG_DEBUG, "[thread %lu] after locking meta map and meta\n", pthread_self());
+
 	if (verify_content(meta, data) == false) {
 		// Content Verification Failed
 		syslog(LOG_ERR, "Content Verification Failed");
@@ -494,11 +498,13 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 		return RET_FAILED;
 	}
 
+	meta->set_length(data->size());	// size of the data in bytes
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
 		meta->unlock();
 		return RET_FAILED;
 	}
+	syslog(LOG_DEBUG, "[thread %lu] after store policy\n", pthread_self());
 
 	std::string cid = "CID:" + meta->get_cid();
 
@@ -660,7 +666,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 
 // FIXME:this should set fetching state so we can't delete the data/route
 // out from under us
-void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
+void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 {
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
@@ -681,6 +687,7 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	header.version = htons(CID_HEADER_VER);
 	header.hlen = htons(sizeof(struct cid_header));
 	header.length = htonl(resp.data().length());
+	header.hop_count = htonl(req->hop_count);
 	header.ttl = htonl(resp.ttl());
 
 	remaining = sizeof(header);
@@ -689,11 +696,11 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	syslog(LOG_DEBUG, "Header Send Start\n");
 
 	while (remaining > 0) {
-		sent = Xsend(sock, (char *)&header + offset, remaining, 0);
+		sent = Xsend(req->to_sock, (char *)&header + offset, remaining, 0);
 		if (sent < 0) {
 			syslog(LOG_ALERT, "Receiver Closed the connection %s", strerror(errno));
 			assert(0);
-			Xclose(sock);
+			Xclose(req->to_sock);
 		}
 		remaining -= sent;
 		offset += sent;
@@ -706,13 +713,13 @@ void xcache_controller::send_content_remote(int sock, sockaddr_x *mypath)
 	syslog(LOG_DEBUG, "Content Send Start\n");
 
 	while (remaining > 0) {
-		sent = Xsend(sock, (char *)resp.data().c_str() + offset,
+		sent = Xsend(req->to_sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
 		syslog(LOG_DEBUG, "Sent = %d\n", sent);
 		if (sent < 0) {
 			syslog(LOG_ALERT, "Receiver Closed the connection: %s", strerror(errno));
 			assert(0);
-			Xclose(sock);
+			Xclose(req->to_sock);
 		}
 		remaining -= sent;
 		offset += sent;
@@ -771,8 +778,9 @@ int xcache_controller::register_meta(std::string &cid)
 	int rv;
 	std::string empty_str("");
 
-	syslog(LOG_DEBUG, "Setting Route for %s.\n", cid.c_str());
+	syslog(LOG_DEBUG, "[thread %lu] Setting Route for %s.\n",  pthread_self(), cid.c_str());
 	rv = xr.setRoute(cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
+	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
 
 	return rv;
 }
@@ -846,7 +854,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
-		send_content_remote(req->to_sock, (sockaddr_x *)req->data);
+		send_content_remote(req, (sockaddr_x *)req->data);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
@@ -989,6 +997,8 @@ repeat:
 									&mypath_len, NULL, NULL)) < 0) {
 			syslog(LOG_ERR, "XacceptAs failed");
 		} else {
+			// FIXME: reply back the hop count
+			unsigned hop_count = XgetPrevAcceptHopCount();
 			xcache_req *req = new xcache_req();
 
 			syslog(LOG_INFO, "XacceptAs Succeeded\n");
@@ -1002,6 +1012,7 @@ repeat:
 			req->from_sock = sendersocket;
 			req->to_sock = accept_sock;
 			req->data = malloc(mypath_len);
+			req->hop_count = hop_count;
 			memcpy(req->data, &mypath, mypath_len);
 			req->datalen = mypath_len;
 			/* Indicates that after sending, remove the fd */

@@ -826,13 +826,17 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
 
-				 if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-					 // we've received a SYN for a CID DAG which usually contains a fallback
-					 // we need to strip out the direct path to the content and only use the
-					 // AD->HID->SID->CID path.
-					 // Additionally, we may be a router which can service the request, so
-					 // don't just flatten the DAG, but make sure it points to our cache daemon.
-					 // FIXME: can we do this without having to convert to strings?
+				uint8_t hop_count = -1;
+				// we have received a syn for CID,
+				if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+					hop_count = HLIM_DEFAULT - xiah.hlim();
+
+					// we've received a SYN for a CID DAG which usually contains a fallback
+					// we need to strip out the direct path to the content and only use the
+					// AD->HID->SID->CID path.
+					// Additionally, we may be a router which can service the request, so
+					// don't just flatten the DAG, but make sure it points to our cache daemon.
+					// FIXME: can we do this without having to convert to strings?
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
 					str_local_addr += _xcache_sid.unparse();
@@ -858,6 +862,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					new_sk->full_src_dag = true;
 				}
 				new_sk->set_key(xid_pair);
+				new_sk->set_hop_count(hop_count);
 				XIDpairToConnectPending.set(xid_pair, new_sk);
 				new_sk->push(p_in);
 			}
@@ -1611,7 +1616,7 @@ void XTRANSPORT::Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		// tell APP our id for future communications
 		xia::X_Accept_Msg *x_accept_msg = xia_socket_msg->mutable_x_accept();
 		x_accept_msg->set_new_id(new_sk->get_id());
-
+		x_accept_msg->set_hop_count(new_sk->get_hop_count());
 		// Get remote DAG to return to app
 		x_accept_msg->set_remote_dag(new_sk->dst_path.unparse().c_str()); // remote endpoint is dest from our perspective
 
@@ -1873,11 +1878,14 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
         return false;
     }
     // Skip inactive ports
-    if (sk->state != CONNECTED) {
-        INFO("skipping migration for non-connected port");
+    if (sk->state == INACTIVE
+			|| sk->state == LISTEN
+			|| sk->state == TIME_WAIT) {
+        INFO("skipping migration for inactive/listening port");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
         return false;
     }
+	INFO("migrating socket in state %d", sk->state);
     // Skip sockets not using the interface whose dag changed
     if(sk->outgoing_iface != changed_iface) {
         INFO("skipping migration for unchanged interface");

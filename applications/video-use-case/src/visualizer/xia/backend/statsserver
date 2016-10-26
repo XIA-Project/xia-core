@@ -1,0 +1,154 @@
+#! /usr/bin/python
+
+import time
+from twisted.web import server, resource
+from twisted.internet import reactor
+from optparse import OptionParser
+
+TITLE = "XIAStatsServer/0.1"
+
+PORT = 8888
+EXPIRED = 10
+
+CONNECTIONS = '/connections'
+FINAL = '/final'
+NEXT = '/next'
+STATS = '/stats'
+
+connections = {}
+final = {}
+next = {}
+
+def say(msg):
+	global options
+
+	if options.verbose:
+		print msg
+
+
+def updateConnections(data):
+	lines = data.split()
+
+	key = ''
+	c = []
+	for line in lines:
+		(name, ad, hid, kind, port, next) = line.split(',')
+		k = hid
+
+		if k != key:
+			if len(c) != 0:
+				connections[key] = c
+				c = []
+			key = k
+
+		c.append({'time': time.time(), 'data': line})
+
+	if key != '':
+		connections[key] = c
+
+
+def getConnections():
+	global options
+	s = ''
+
+	expired = time.time() - options.expired
+
+	for c in connections.itervalues():
+
+		# remove all expired entries
+		# this still leaves the device key in the hash table, but the list of entries is empty
+		# probably would be good to clean this up at some point, but not worth worrying about right now
+		c[:] = (cc for cc in c if cc['time'] > expired)
+
+		# add any non-expired entries to the result
+		for cc in c:
+			s += cc['data'] + '\n'
+
+	return s
+
+
+def updateStats(data):
+	global final
+	global next
+
+	for line in data.split():
+		(kind, line) = line.split(',', 1)
+		(hid, port, io, counts) = line.split(',', 3)
+		key = ('%s:%s:%s') % (hid, port, io)
+
+		if kind == 'final':
+			final[key] = line
+		else:
+			next[key] = line
+
+
+def getStats(kind):
+	global final
+	global next
+
+	s = ''
+	if kind == 'final':
+		for k, v in final.items():
+			s += v + '\n'
+	else:
+		for k, v in next.items():
+			s += v + '\n'
+
+	return s
+
+
+class StatsResource(resource.Resource):
+	isLeaf = True
+
+	def render_PUT(self, request):
+		message ='OK'
+		request.setResponseCode(200)
+		data = request.content.getvalue()
+
+#        pageNumber=request.args.get("pagenumber",(0,))[0]
+#        (responseCode,message) = self._savePage(request.args["keynumber"][0], self.userId,pageNumber,dataPage)
+	
+		if request.path == CONNECTIONS:
+			updateConnections(data)
+
+		elif request.path == STATS:
+			updateStats(data)
+
+		else:
+			print 'bad request: ', request.path
+			request.setResponseCode(404)
+			message = 'Invalid URL'
+
+		return message
+
+	
+	def render_GET(self, request):
+		request.setHeader("content-type", "text/plain")
+
+		if request.path == CONNECTIONS:
+			return getConnections()
+		elif request.path == FINAL:
+			return getStats('final')
+		elif request.path == NEXT:
+			return getStats('next')
+		else:
+			return "Valid URLs are /connections, /final, and /next"
+
+
+def main():
+	global options
+
+	parser = OptionParser()
+	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
+	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+	parser.add_option("-e", "--expires", dest="expired", help="connection table expiration time", default=EXPIRED)
+
+	(options, args) = parser.parse_args()
+
+	say(TITLE)
+	reactor.listenTCP(options.port, server.Site(StatsResource()))
+	reactor.run()
+
+if __name__ == '__main__':
+	main()
+
