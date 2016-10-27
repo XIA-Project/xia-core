@@ -37,9 +37,9 @@
  * Definitions of the TCP timers.  These timers are counted
  * down PR_SLOWHZ times a second.
  */
-#define PR_SLOWHZ       10
-#define TCP_SLOW_TICK_MS 100
-#define TCP_FAST_TICK_MS 50
+#define PR_SLOWHZ       100
+#define TCP_SLOW_TICK_MS 10
+#define TCP_FAST_TICK_MS 5
 
 #define	TCPT_NTIMERS	5
 #define	TCPT_REXMT	0		/* retransmit */
@@ -99,7 +99,7 @@
 #define	TCPTV_KEEPINTVL	( 75*PR_SLOWHZ)		/* default probe interval */
 #define	TCPTV_KEEPCNT	8			/* max probes before drop */
 
-#define	TCPTV_MIN	(  1*PR_SLOWHZ) /*1*PR_SLOWHZ*/		/* minimum allowable value */
+#define	TCPTV_MIN	(  1) /*1*PR_SLOWHZ*/		/* minimum allowable value */
 #define	TCPTV_REXMTMAX	( 64*PR_SLOWHZ)		/* max allowable REXMT value */
 
 #define	TCP_LINGERTIME	120			/* linger at most 2 minutes */

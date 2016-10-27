@@ -125,7 +125,7 @@ public:
 	tcp_seq_t tailseq() { return _q_tail ? _q_tail->seq : 0; }
 	tcp_seq_t last()  { return _q_last ? _q_last->seq : 0; }
 	tcp_seq_t last_nxt()  { return _q_last ? _q_last->seq_nxt : 0; }
-	tcp_seq_t bytes_ok() { return _q_last ? _q_last->seq - _q_first->seq : 0; }
+	tcp_seq_t bytes_ok() { return (_q_last && _q_first) ? _q_last->seq - _q_first->seq : 0; }
 	bool is_empty() { return _q_first ? false : true; }
 	//FIXME: Returns true even if there is a hole at the front! Decide whether
 	//to rethink what we mean by "ordered"
