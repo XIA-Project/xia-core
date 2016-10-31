@@ -1313,7 +1313,7 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg
 int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
 {
 	XIAPath interface_dag = sidPath;
-	if (interface_dag.remove_intent_sid_node()) {
+	if (interface_dag.remove_intent_sid_node() == false) {
 		return -1;
 	}
 	/*

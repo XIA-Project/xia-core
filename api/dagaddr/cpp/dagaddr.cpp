@@ -646,18 +646,25 @@ Graph::remove_intent_node()
 {
 	std::size_t intent_index = final_intent_index();
 
-	// Ensure that there's just one incoming edge to the SID node
+	// If there's just one node in graph, return error
+	if (num_nodes() <= 1) {
+		printf("Graph::remove_intent_node() removal would empty the graph\n");
+		return false;
+	}
+
+	// Ensure that there's just one incoming edge to the intent node
 	if (in_edges_[intent_index].size() != 1) {
 		printf("Graph::remove_intent_sid() SID must have 1 incoming edge\n");
 		return false;
 	}
 
-	// Remove the incoming edge to SID node
+	// Remove the incoming edge to intent node
 	for (size_t i=0; i<nodes_.size(); i++) {
 		std::vector<std::size_t>::iterator it;
-		for(it=out_edges_[i].begin(); it!=out_edges_[i].end(); ++it) {
+		for(it=out_edges_[i].begin(); it!=out_edges_[i].end(); it++) {
 			if (*it == intent_index) {
 				out_edges_[i].erase(it);
+				break;
 			}
 		}
 	}
@@ -837,6 +844,12 @@ Graph::intent_XID_index(uint32_t xid_type) const
 			return curIndex;
 		}
 	}
+
+	// Check if the intent node is the one we are looking for
+	if (nodes_[curIndex].type() == xid_type) {
+		printf("Graph::intent_XID_index: returning index:%zu\n", curIndex);
+		return curIndex;
+	}
 	return INVALID_GRAPH_INDEX;
 }
 
@@ -932,6 +945,7 @@ Graph::intent_HID_str() const
 	std::string hid;
 	std::size_t hid_index = intent_HID_index();
 	if (hid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_HID_str: HID index not found\n");
 		return "";
 	}
 	return nodes_[hid_index].to_string();
@@ -1070,7 +1084,7 @@ Graph::final_intent_index() const
 		if (is_sink(i)) return i;
 	}
 
-	printf("Warning: source_index: no sink node found\n");
+	printf("Warning: Graph::final_intent_index: no sink node found\n");
 	return -1;
 }
 
