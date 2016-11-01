@@ -29,6 +29,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdint.h> // for uint8_t
+#include <execinfo.h> // for backtrace, backtrace_symbols_fd
 
 static const std::size_t vector_find_npos = std::size_t(-1);
 
@@ -629,6 +630,16 @@ Graph::print_graph() const
 	}
 }
 
+void
+Graph::dump_stack_trace() const
+{
+	void *stack_entries[50];
+	size_t size;
+
+	size = backtrace(stack_entries, 50);
+	backtrace_symbols_fd(stack_entries, size, STDERR_FILENO);
+}
+
 bool
 Graph::remove_intent_sid_node()
 {
@@ -1081,7 +1092,11 @@ Graph::final_intent_index() const
 {
 	for (std::size_t i = 0; i < nodes_.size(); i++)
 	{
-		if (is_sink(i)) return i;
+		if (is_sink(i)) {
+			if (i != source_index()) {
+				return i;
+			}
+		}
 	}
 
 	printf("Warning: Graph::final_intent_index: no sink node found\n");
@@ -1098,7 +1113,7 @@ Graph::final_intent_index() const
 std::string
 Graph::xid_str_from_index(std::size_t node) const
 {
-	if (node < nodes_.size()) {
+	if (node >= nodes_.size()) {
 		printf("Error: Graph::xid_str_from_index(): invalid index\n");
 		return "";
 	}

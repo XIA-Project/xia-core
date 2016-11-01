@@ -170,6 +170,7 @@ private:
 	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
 	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
+	void dump_stack_trace() const;
 	std::vector<Node> nodes_;
 	std::vector<std::vector<std::size_t> > out_edges_;
 	std::vector<std::vector<std::size_t> > in_edges_;
