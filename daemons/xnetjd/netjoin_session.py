@@ -7,6 +7,7 @@ import struct
 import logging
 import threading
 import Queue
+import dagaddr
 import c_xsocket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
@@ -308,6 +309,13 @@ class NetjoinSession(threading.Thread):
                 logging.error("Failed setting route for {}".format(client_hid))
             else:
                 logging.info("Route set up for {}".format(client_hid))
+            # Inform local xrouted about this HID registration
+            router_register_msg = "2^{}^".format(client_hid)
+            rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
+            router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
+            c_xsocket.Xsendto(rsockfd, router_register_msg, 0, router_dag_str)
+            c_xsocket.Xclose(rsockfd)
+
         # Tell client that gateway side configuration is now complete
         logging.info("Sending handshake four")
         client_session = netjoin_h3.get_client_session_id()
