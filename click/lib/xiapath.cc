@@ -512,36 +512,49 @@ XIAPath::topological_ordering()
 bool
 XIAPath::is_valid() const
 {
+
+    size_t nnodes = _nodes.size();
+
     // valid source/destination node?
-    if (_src >= static_cast<size_t>(_nodes.size()))
+    if (_src >= static_cast<size_t>(nnodes))
         return false;
 
-    if (_dst >= static_cast<size_t>(_nodes.size()))
+    if (_dst >= static_cast<size_t>(nnodes))
         return false;
 
     // non-degenerative path?
     if (_src == _dst)
         return false;
 
-    int indegree[_nodes.size()];
-    for (int i = 0; i < _nodes.size(); i++)
+    int indegree[nnodes];
+    for (size_t i = 0; i < nnodes; i++)
         indegree[i] = 0;
 
-    for (int i = 0; i < _nodes.size(); i++) {
+    for (size_t i = 0; i < nnodes; i++) {
+        
+        size_t nedges = _nodes[i].edges.size();
+    
         // incorrect destination node?
-        if (_nodes[i].edges.size() == 0 && i != static_cast<int>(_dst))
+        // only the destination can have no outgoing edges
+        if (nedges == 0 && i != static_cast<size_t>(_dst))
             return false;
         // too high outdegree?
-        if (_nodes[i].edges.size() > CLICK_XIA_XID_EDGE_NUM)
+        if (nedges > CLICK_XIA_XID_EDGE_NUM or nedges > nnodes)
             return false;
 
-        for (int j = 0; j < _nodes[i].edges.size(); j++)
-            indegree[_nodes[i].edges[j]]++;
+        for (size_t j = 0; j < nedges; j++){
+            handle_t targetNode = _nodes[i].edges[j];
+            if (targetNode < nnodes){
+                indegree[targetNode]++;
+            } else { // reference to non-existing node!
+                return false;
+            }
+        }
     }
 
-    for (int i = 0; i < _nodes.size(); i++) {
+    for (size_t i = 0; i < nnodes; i++) {
         // incorrect source node?
-        if (indegree[i] == 0 && i != static_cast<int>(_src))
+        if (indegree[i] == 0 && i != static_cast<size_t>(_src))
             return false;
     }
 
