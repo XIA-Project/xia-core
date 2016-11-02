@@ -1925,11 +1925,11 @@ Graph::operator==(const Graph &g) const
 size_t
 Graph::unparse_node_size() const
 {
-	size_t num_nodes_ = num_nodes();
-	if (num_nodes_ <= 0) {
+	uint8_t num_nodes_ = num_nodes();
+	if (num_nodes_ == (uint8_t) -1) {
 		return 0;
 	}
-	return num_nodes_ - 1;
+	return (size_t) num_nodes_;
 }
 
 /**
