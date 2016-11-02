@@ -258,7 +258,7 @@ class NetjoinSession(threading.Thread):
                 logging.info("Router DAG sent to Click and processed")
 
             # TODO: Set the Rendezvous Control DAG into Click
-            control_rv_dag = str(netjoin_h2.control_rv_dag())
+            control_rv_dag = netjoin_h2.control_rv_dag()
             if control_rv_dag:
                 if click.assignRVControlDAG(self.hostname, "XIAEndHost",
                         str(control_rv_dag), interface)==False:
