@@ -314,7 +314,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	{
 		XIAPath dag;
 		if (cp_va_kparse(conf, f, errh,
-						 "DAG", cpkP + cpkM, cpXIAPath, &dag,
+						 "ADDR", cpkP + cpkM, cpXIAPath, &dag,
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = dag;

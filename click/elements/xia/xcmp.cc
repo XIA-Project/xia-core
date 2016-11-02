@@ -59,7 +59,7 @@ int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler
 	case DAG:
 	{
 		XIAPath dag;
-		if (cp_va_kparse(conf, f, errh, "DAG", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
+		if (cp_va_kparse(conf, f, errh, "ADDR", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
 			return -1;
 		}
 		f->_src_path = dag;
