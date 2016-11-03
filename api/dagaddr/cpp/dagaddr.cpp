@@ -1586,7 +1586,7 @@ Graph::fill_wire_buffer(node_t *buf) const
 		node_t* node = buf + i; // check this
 
 	    // Set the node's XID and type
-		node->xid.type = get_node(i).type();
+	    node->xid.type = htonl(get_node(i).type());
 	    memcpy(&(node->xid.id), get_node(i).id(), Node::ID_LEN);
 
 	    // Get the node's out edge list
@@ -1604,6 +1604,9 @@ Graph::fill_wire_buffer(node_t *buf) const
 	            node->edge[j].idx = out_edges[j];
 	        else
 	            node->edge[j].idx = EDGE_UNUSED;
+
+	        // On creation, none of the edges have been visited
+	        node->edge[j].visited = 0;
 	    }
 	}
 	return num_nodes();
@@ -1647,7 +1650,7 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 	for (int i = 0; i < num_nodes; i++)
 	{
 		const node_t *node = &(buf[i]);
-		Node n = Node(node->xid.type, &(node->xid.id), 0); // 0=dummy
+		Node n = Node(ntohl(node->xid.type), &(node->xid.id), 0); // 0=dummy
 		graph_indices.push_back(add_node(n));
 	}
 
