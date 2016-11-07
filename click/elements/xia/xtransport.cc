@@ -1493,12 +1493,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		// Map the source XID to source port
 		XIDtoSock.set(source_xid, tcp_conn);
 
-		// Make us routable
-		addRoute(source_xid);
-		tcp_conn->usropen();
-		ChangeState(tcp_conn, SYN_SENT);
-		ChangeState(sk, SYN_SENT);
-
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 		// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 		// will wait until it gets another message from xtransport notifying it that
@@ -1506,6 +1500,12 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 		tcp_conn->so_error = EINPROGRESS;
 		ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
+
+		// Make us routable
+		addRoute(source_xid);
+		ChangeState(tcp_conn, SYN_SENT);
+		ChangeState(sk, SYN_SENT);
+		tcp_conn->usropen();
 	}
 }
 

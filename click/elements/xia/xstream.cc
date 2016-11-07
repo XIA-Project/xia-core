@@ -215,7 +215,7 @@ XStream::tcp_input(WritablePacket *p)
 					// We can now drop data we know was recieved by the other side
 					_q_usr_input.drop_until(acked);
 					tp->snd_una = ti.ti_ack;
-                    
+
                     if (_staged) { // because drop_until frees up queue space
                         unstage_data();
                     }
@@ -623,6 +623,10 @@ XStream::tcp_input(WritablePacket *p)
 		get_transport() -> XIDpairToSock.set(xid_pair, this);
 		// push this socket into pending_connection_buf and let Xaccept handle that
 
+		// finish the connection handshake
+		get_transport() -> XIDpairToConnectPending.erase(key);
+		get_transport() -> ChangeState(this, CONNECTED);
+
 		// If the app is ready for a new connection, alert it
 		if (!listening_sock->pendingAccepts.empty()) {
 			xia::XSocketMsg *acceptXSM = listening_sock->pendingAccepts.front();
@@ -634,9 +638,6 @@ XStream::tcp_input(WritablePacket *p)
 			// tell API we are writeable
 			get_transport()->ProcessPollEvent(listening_sock->get_id(), POLLIN|POLLOUT);
 		}
-		// finish the connection handshake
-		get_transport() -> XIDpairToConnectPending.erase(key);
-		get_transport() -> ChangeState(this, CONNECTED);
 
 		tcp_set_state(TCPS_ESTABLISHED);
 		if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) ==
@@ -1402,6 +1403,13 @@ send:
 	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
 	delete send_hdr;
+
+	if (win > 0 && SEQ_GT(tp->rcv_nxt + win, tp->rcv_adv)) {
+		tp->rcv_adv = tp->rcv_nxt + win;
+	}
+	tp->last_ack_sent = tp->rcv_nxt;
+	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
+
 	get_transport()->output(NETWORK_PORT).push(tcp_payload);
 	// printf("1207\n");
 	//printf("\t\t\ttcpoutput flag is %d\n", ti.th_flags);
@@ -1414,11 +1422,6 @@ send:
 	 * sequence numbered segment than before this window announcement, we record
 	 * the new highest sequence number which the sener is allowed to send to us.
 	 * (tp->rcv_adv). Any pending ACK has now been sent. */
-	if (win > 0 && SEQ_GT(tp->rcv_nxt + win, tp->rcv_adv)) {
-		tp->rcv_adv = tp->rcv_nxt + win;
-	}
-	tp->last_ack_sent = tp->rcv_nxt;
-	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
 
 	if (sendalot) {
 		goto again;
