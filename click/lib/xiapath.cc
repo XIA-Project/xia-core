@@ -123,7 +123,7 @@ XIAPath::unparse_node(struct click_xia_xid_node* node, size_t n) const
 bool
 XIAPath::is_valid() const
 {
-	if (g.num_nodes() > 1) {
+	if (g.num_nodes() >= 1) {
 		return true;
 	}
 	return false;
