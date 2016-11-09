@@ -320,7 +320,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 456 Transitioning FROM tp->t_state TO... */
 	switch (tp->t_state){
 		case TCPS_CLOSED:
-		case TCPS_LISTEN:
+		case TCPS_LISTEN: // this is where we process SYN packets
 			/* If the RST flag is set */
 			if (tiflags & XTH_RST)
 				goto drop;
@@ -346,7 +346,7 @@ XStream::tcp_input(WritablePacket *p)
 			tp->irs = ti.ti_seq;
 			_tcp_sendseqinit(tp);
 			_tcp_rcvseqinit(tp);
-			tp->t_flags |= TF_ACKNOW;
+			tp->t_flags |= TF_ACKNOW; // must send synack!
 			tcp_set_state(TCPS_SYN_RECEIVED);
 			tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
 			get_transport()->_tcpstat.tcps_accepts++;
@@ -360,7 +360,7 @@ XStream::tcp_input(WritablePacket *p)
 			goto trimthenstep6;
 
 			/* 530 */
-		case TCPS_SYN_SENT:
+		case TCPS_SYN_SENT: // this is where we process synack
 			if ((tiflags & TH_ACK) &&
 				(SEQ_LEQ(ti.ti_ack, tp->iss) ||
 				 SEQ_GT(ti.ti_ack, tp->snd_max))){
@@ -374,7 +374,7 @@ XStream::tcp_input(WritablePacket *p)
 				goto drop;
 			}
             
-			if ((tiflags & TH_SYN) == 0){
+			if ((tiflags & TH_SYN) == 0){ // must have syn flag to be a synack!
 				goto drop;
             }
 			/* 554 */
@@ -619,7 +619,7 @@ XStream::tcp_input(WritablePacket *p)
 	assert(tiflags & XTH_ACK);
 
 	/* 791 ack processing */
-	switch (tp->t_state) {
+	switch (tp->t_state) { //3-way handshake ack processing
 	case TCPS_SYN_RECEIVED:
 		if (SEQ_GT(tp->snd_una, ti.ti_ack) || SEQ_GT(ti.ti_ack, tp->snd_max)){
 			goto dropwithreset;
@@ -1020,12 +1020,12 @@ dropwithreset:
 	 * Don't bother to respond if destination was broadcast/multicast.
 	 */
 	if (tiflags & XTH_ACK){
-		tcp_respond((tcp_seq_t)0, ti.ti_ack, XTH_RST);
+		tcp_respond((tcp_seq_t)0+1, ti.ti_ack, XTH_RST);
     } else{
 		if (tiflags & TH_SYN){
 			ti.ti_len++;
         }
-		tcp_respond(ti.ti_seq+ti.ti_len, (tcp_seq_t)0, XTH_RST|XTH_ACK);
+		tcp_respond(ti.ti_seq+ti.ti_len+1, (tcp_seq_t)0, XTH_RST|XTH_ACK);
 	}
 	return;
 
@@ -1475,7 +1475,7 @@ send:
 }
 
 void
-XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
+XStream::tcp_respond(tcp_seq_t seq, tcp_seq_t ack, int flags)
 {
 	xtcp th;
 
@@ -1490,7 +1490,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 	}
 
 	th.th_nxt = CLICK_XIA_NXT_DATA;
-	th.th_seq =   htonl(seq+1);
+	th.th_seq =   htonl(seq);
 	th.th_ack =   htonl(ack);
 	th.th_flags = htons(flags);
 	th.th_off = sizeof(xtcp) >> 2;
@@ -1584,27 +1584,32 @@ XStream::tcp_timers (int timer) {
 		  tp->t_force = 0;
 		  break;
 		case TCPT_KEEP:
-		  if (tp->t_state < TCPS_ESTABLISHED){
-			goto dropit;
-		  }
-		  if (tp->so_flags & SO_KEEPALIVE && tp->t_state <= TCPS_CLOSE_WAIT){
+        
+          if (tp->t_state == TCPS_SYN_SENT || tp->t_state == TCPS_SYN_RECEIVED){
+            // retransmit syn of synack, whatever was last sent
+          
+            get_transport()->_tcpstat.tcps_keepprobe++;
+            tcp_respond(tp->rcv_nxt, tp->snd_una, tcp_outflags[tp->t_state]);
+            tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;          
+        
+          } else if((tp->t_state == TCPS_ESTABLISHED || \
+                      tp->t_state == TCPS_CLOSE_WAIT) && \
+                    tp->so_flags & SO_KEEPALIVE){
 
-			if (tp->t_idle >= get_transport()->globals()->tcp_keepidle +
-			get_transport()->globals()->tcp_maxidle){
-                goto dropit;
+            if (tp->t_idle >= get_transport()->globals()->tcp_keepidle + \
+  			    get_transport()->globals()->tcp_maxidle){
+
+              get_transport()->_tcpstat.tcps_keepdrops++;
+              tcp_drop(ETIMEDOUT);
+              break;
             }
+
 			get_transport()->_tcpstat.tcps_keepprobe++;
-			tcp_respond(tp->rcv_nxt, tp->snd_una, 0);
+			tcp_respond(tp->rcv_nxt+1, tp->snd_una, 0);
 			tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepintvl;
 		  } else{
 			tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepidle;
           }
-		  break;
-dropit:
-		  get_transport()->_tcpstat.tcps_keepdrops++;
-		  tcp_drop(ETIMEDOUT);
-		  //todo this should go to close and not to drop
-
 		  break;
 		case TCPT_REXMT:
 

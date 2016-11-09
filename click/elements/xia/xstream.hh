@@ -224,7 +224,7 @@ private:
 
 	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr);
-	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
+	void 		tcp_respond(tcp_seq_t seq, tcp_seq_t ack, int flags);
 	void		tcp_setpersist();
 	void		tcp_drop(int err);
 	void		tcp_xmit_timer(short rtt);
@@ -273,7 +273,7 @@ XStream::tcp_set_state(short state) {
 		set_state(CLOSE);
 		get_transport() -> ChangeState(this, CLOSED);
 		//printf("\t\t\t\tchanged to be reaped\n");
-		reap = true;
+		reap =  true;
 		break;
 	case TCPS_LISTEN:
 		get_transport() -> ChangeState(this, LISTEN);

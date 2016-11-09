@@ -89,12 +89,12 @@
 #define	TCPTV_MSL	( 30*PR_SLOWHZ)		/* max seg lifetime (hah!) */
 #define	TCPTV_SRTTBASE	0			/* base roundtrip time;
 						   if 0, no idea yet */
-#define	TCPTV_SRTTDFLT	(  3*PR_SLOWHZ)		/* assumed RTT if no info */
+#define	TCPTV_SRTTDFLT	(  2*PR_SLOWHZ)		/* assumed RTT if no info */
 
-#define	TCPTV_PERSMIN	(  5*PR_SLOWHZ)		/* retransmit persistance */
-#define	TCPTV_PERSMAX	( 60*PR_SLOWHZ)		/* maximum persist interval */
+#define	TCPTV_PERSMIN	(  3*PR_SLOWHZ)		/* retransmit persistance */
+#define	TCPTV_PERSMAX	( 50*PR_SLOWHZ)		/* maximum persist interval */
 
-#define	TCPTV_KEEP_INIT	( 75*PR_SLOWHZ)		/* initial connect keep alive */
+#define	TCPTV_KEEP_INIT	( 50*PR_SLOWHZ)		/* initial connect keep alive */
 #define	TCPTV_KEEP_IDLE	(120*60*PR_SLOWHZ)	/* dflt time before probing */
 #define	TCPTV_KEEPINTVL	( 75*PR_SLOWHZ)		/* default probe interval */
 #define	TCPTV_KEEPCNT	8			/* max probes before drop */
