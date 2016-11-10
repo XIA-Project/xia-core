@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include "dagaddr.hpp"
+#include <arpa/inet.h>
 
 static struct {
 	int xid_type;
@@ -21,7 +22,7 @@ const char *get_xid_str(int id)
 	unsigned i;
 
 	for(i = 0; i < sizeof(xidmap)/sizeof(xidmap[0]); i++) {
-		if(xidmap[i].xid_type == id)
+		if(xidmap[i].xid_type == ntohl(id))
 			return xidmap[i].xid_str;
 	}
 
@@ -87,6 +88,8 @@ static node_t str_to_node(char *xidstr)
 		printf("Source\n");
 		pos += 3;
 	}
+	// Convert the xid type to network byte order
+	node.xid.type = htonl(node.xid.type);
 
 	pos++;
 
