@@ -878,6 +878,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					XIAPath new_addr = _local_addr;
 					new_addr.append_node(_xcache_sid);
 					new_addr.append_node(_destination_xid);
+					set_full_dag = true;
 					/*
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
@@ -885,7 +886,6 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					str_local_addr += " ";
 					str_local_addr += _destination_xid.unparse();
 
-					set_full_dag = true;
 					dst_path.parse_re(str_local_addr);
 					*/
 					dst_path = new_addr;
