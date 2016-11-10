@@ -330,7 +330,7 @@ XStream::tcp_input(WritablePacket *p)
 			/* If the SYN flag is not set exclusively */
 			if (!(tiflags & XTH_SYN))
 				goto drop;
-
+            
 			/*479 no need to do socket stuff */
 
 			/* 506 we don't use a template */
@@ -377,6 +377,7 @@ XStream::tcp_input(WritablePacket *p)
 			if ((tiflags & TH_SYN) == 0){ // must have syn flag to be a synack!
 				goto drop;
             }
+            
 			/* 554 */
 			if (tiflags & TH_ACK){
 				tp->snd_una = ti.ti_ack;
@@ -674,6 +675,13 @@ XStream::tcp_input(WritablePacket *p)
 	case TCPS_CLOSING:
 	case TCPS_LAST_ACK:
 	case TCPS_TIME_WAIT:
+    
+        // ack duplicate synacks to prevent deadlock when ack is lost
+        // and client has no data to send (e.g. XfetchChunk)
+        if (ti.ti_flags & XTH_SYN && ti.ti_flags & XTH_ACK && \
+            ti.ti_ack == tp->snd_una && ti.ti_seq == tp->rcv_nxt){
+            goto dropafterack;
+        }
 
 		if (SEQ_LEQ(ti.ti_ack, tp->snd_una)){
 			if (ti.ti_len == 0 && tiwin == tp->snd_wnd){
@@ -1560,7 +1568,7 @@ XStream::slowtimo() {
 }
 
 int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
-	{ 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
+	{ 1, 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64 };
 
 void
 XStream::tcp_timers (int timer) {
@@ -1585,13 +1593,11 @@ XStream::tcp_timers (int timer) {
 		  break;
 		case TCPT_KEEP:
         
-          if (tp->t_state == TCPS_SYN_SENT || tp->t_state == TCPS_SYN_RECEIVED){
-            // retransmit syn of synack, whatever was last sent
-          
-            get_transport()->_tcpstat.tcps_keepprobe++;
-            tcp_respond(tp->rcv_nxt, tp->snd_una, tcp_outflags[tp->t_state]);
-            tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;          
-        
+          if (tp->t_state < TCPS_ESTABLISHED){
+            get_transport()->_tcpstat.tcps_keepdrops++;
+            tcp_drop(ETIMEDOUT);
+            break;
+
           } else if((tp->t_state == TCPS_ESTABLISHED || \
                       tp->t_state == TCPS_CLOSE_WAIT) && \
                     tp->so_flags & SO_KEEPALIVE){
