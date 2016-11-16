@@ -1257,6 +1257,11 @@ send:
 	// TODO: Ensure we are not exceeding max packet size with all options
 	if (migrating){
 
+	  if (tp->t_timer[TCPT_REXMT] == 0 && tp->t_timer[TCPT_PERSIST] == 0){
+	    tp->t_rxtshift = 0;
+	    tcp_setpersist();
+	  }
+
 		int migratelen, padlen;
 
 		u_char *migrateoptptr = opt + optlen;
@@ -2076,7 +2081,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					last_migrate_ts = migrate_ts;
 					dst_path = new_dst_path;
 					migrateacking = true;
-                    tcp_output();
+          tcp_output();
 					break;
 				}
 			case TCPOPT_MIGRATEACK:
