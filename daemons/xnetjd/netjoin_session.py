@@ -205,6 +205,9 @@ class NetjoinSession(threading.Thread):
         # Send handshake two
         self.send_netjoin_message(netjoin_h2, interface, theirmac)
 
+        # We don't need to retransmit handshake 2
+        self.disable_retransmission()
+
         # Now we will wait for handshake 3
         self.state = self.HS_3_WAIT
 
