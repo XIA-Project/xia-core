@@ -1271,14 +1271,12 @@ send:
 
 		// Build a migrate message
 		XIASecurityBuffer migrate_msg(900);
-		String migrate_ts;
-		if (build_migrate_message(migrate_msg, src_path, dst_path, migrate_ts)
+		if (build_migrate_message(migrate_msg, src_path, dst_path, last_migrate_ts)
 				== false){
 			click_chatter("ERROR: Failed to build MIGRATE message");
 			migrating = false;
 			return; // didn't send anything
 		}
-		last_migrate_ts = migrate_ts;
 
 		// option size is migrate length + two bytes for kind and option len
 		// plus, pad with zeroes at end to make a multiple of 4
@@ -1874,6 +1872,7 @@ XStream::usrsend(WritablePacket *p)
 void
 XStream::usrmigrate()
 {
+    last_migrate_ts = Timestamp::now().unparse();
     tcp_output();
 }
 
