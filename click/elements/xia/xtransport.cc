@@ -1886,9 +1886,9 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
         return false;
     }
     // Skip inactive ports
-    if (sk->state == INACTIVE
-			|| sk->state == LISTEN
-			|| sk->state == TIME_WAIT) {
+    if (!(sk->state == SYN_RCVD
+				|| sk->state == SYN_SENT
+				|| sk->state == CONNECTED)) {
         INFO("skipping migration for inactive/listening port");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
         return false;
