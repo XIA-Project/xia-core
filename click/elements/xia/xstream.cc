@@ -1193,12 +1193,10 @@ void XStream::tcp_output(){
 	// XIA active session migration
 	// TODO: skip migration if not in established state
 	if (migrating){
-		click_chatter("Sending migrate msg for sock id %u", this->id);
 		goto send;
 	}
 
 	if (migrateacking){
-		click_chatter("Sending migrateack for sock id %u", this->id);
 		goto send;
 	}
 
@@ -1257,6 +1255,7 @@ send:
 	// TODO: Ensure we are not exceeding max packet size with all options
 	if (migrating){
 
+
 	  if (tp->t_timer[TCPT_REXMT] == 0 && tp->t_timer[TCPT_PERSIST] == 0){
 	    tp->t_rxtshift = 0;
 	    tcp_setpersist();
@@ -1293,11 +1292,15 @@ send:
 		memcpy(migrateoptptr+2, migrate_msg.get_buffer(), migrate_msg.size());
 
 		optlen += migratelen;
+        
+        click_chatter("Tx migrate msg for sock id %u len %d", this->id, \
+            optlen-2);
 	}
 
 	// Include the MIGRATEACK option if the migrateacking flag is set
 	if (migrateacking){
-		int migrateacklen, padlen;
+		
+        int migrateacklen, padlen;
 
 		u_char *migrateackoptptr = opt + optlen;
 
@@ -1325,6 +1328,9 @@ send:
 		// We don't retransmit MIGRATEACK messages, so set flag to false
 		migrateacking = false;
 		optlen += migrateacklen;
+        
+        click_chatter("Tx migrateack for sock id %u len %d", this->id, \
+            optlen-2);
 	}
 	hdrlen += optlen;
 
