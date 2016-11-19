@@ -1193,12 +1193,12 @@ void XStream::tcp_output(){
 	// XIA active session migration
 	// TODO: skip migration if not in established state
 	if (migrating){
-		click_chatter("MIGRATING flag was set");
+		click_chatter("Sending migrate msg for sock id %u", this->id);
 		goto send;
 	}
 
 	if (migrateacking){
-		click_chatter("MIGRATEACK needs to be sent");
+		click_chatter("Sending migrateack for sock id %u", this->id);
 		goto send;
 	}
 
@@ -2071,14 +2071,16 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				tp->t_flags |=  TF_RCVD_SCALE;
 
 				// kind=*cp, len=*(cp+1)<<2, cp[2] is zeroed, cp[3] is the scale
-				tp->requested_s_scale = min(cp[3], TCP_MAX_WINSHIFT);
+				tp->requested_s_scale = min(cp[ 3], TCP_MAX_WINSHIFT);
 				//debug_output(VERB_DEBUG, "[%s] WSCALE set, flags [%x], req_s_sc [%x]\n", SPKRNAME,
 				break;
 			case TCPOPT_MIGRATE:
 				{
 					String migrate_ts;
+                    
+                    click_chatter("Rx migrate msg for sock id %u, len %d", \
+                        this->id, optlen-2);
 
-					click_chatter("Got migrate of len %d", optlen-2);
 					XIASecurityBuffer migrate((const char *)cp+2, optlen-2);
 					if (!valid_migrate_message(migrate, dst_path, src_path,
 								new_dst_path, migrate_ts)){
@@ -2104,7 +2106,9 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 				}
 			case TCPOPT_MIGRATEACK:
 				{
-					click_chatter("Got migrateack of len %d", optlen+2);
+                    click_chatter("Rx migrateack msg for sock id %u, len %d", \
+                        this->id, optlen-2);
+
 					XIASecurityBuffer migrateack((const char *)cp+2, optlen-2);
 					if (!valid_migrateack_message(migrateack, dst_path,
 								src_path, last_migrate_ts)){
