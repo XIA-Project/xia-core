@@ -1629,31 +1629,35 @@ XStream::tcp_timers (int timer) {
 		case TCPT_REXMT:
 
 		  if (++tp->t_rxtshift > TCP_MAXRXTSHIFT){
-			tp->t_rxtshift = TCP_MAXRXTSHIFT;
-      click_chatter("xstream: tcpdrop due to maxrxtshift exceeded");
-			tcp_drop(ETIMEDOUT);
-			break;
+        tp->t_rxtshift = TCP_MAXRXTSHIFT;
+        click_chatter("xstream: tcpdrop due to maxrxtshift exceeded sock id \
+%d", this->id);
+        tcp_drop(ETIMEDOUT);
+        break;
 		  }
+      
 		  rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 		  TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		  		tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
-
-		  if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4){
-			/* in_losing(tp->t_inpcb);
-			notification of lower layers after 4 failed
-			retransmissions is not implemented
-			*/
-			tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
-			tp->t_srtt = 0;
-		  }
-		  tp->snd_nxt = tp->snd_una;
-		  tp->t_rtt = 0;
-
-      printf("%lu REXMT timer #%d fired for sock id %d\n", \
+      
+        printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d rttvar %d\n", \
         ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
         std::chrono::system_clock::now().time_since_epoch()).count()), \
-        tp->t_rxtshift, this->id); // rui
+        tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar); // rui
+
+		  if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4){
+        /* in_losing(tp->t_inpcb);
+        notification of lower layers after 4 failed
+        retransmissions is not implemented
+        */
+        tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
+        tp->t_srtt = 0;
+        }
+        tp->snd_nxt = tp->snd_una;
+        tp->t_rtt = 0;
+
+    
           
           // fast recovery upon rexmt timeout, don't go back to slow start
           // a change made by Rui
