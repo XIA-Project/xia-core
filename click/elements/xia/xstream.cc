@@ -1576,8 +1576,8 @@ XStream::slowtimo() {
     }
 }
 
-int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
-	{ 1, 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64 };
+int	tcp_backoff[TCP_MAXRXTSHIFT + 1] = {1, 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, \
+  64, 64, 64 ,64 ,64 ,64 ,64, 64, 64, 64, 64, 64, 64, 64 };
 
 void
 XStream::tcp_timers (int timer) {
@@ -1630,6 +1630,7 @@ XStream::tcp_timers (int timer) {
 
 		  if (++tp->t_rxtshift > TCP_MAXRXTSHIFT){
 			tp->t_rxtshift = TCP_MAXRXTSHIFT;
+      click_chatter("xstream: tcpdrop due to maxrxtshift exceeded");
 			tcp_drop(ETIMEDOUT);
 			break;
 		  }

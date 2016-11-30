@@ -104,7 +104,7 @@
 
 #define	TCP_LINGERTIME	120			/* linger at most 2 minutes */
 
-#define	TCP_MAXRXTSHIFT	12			/* maximum retransmits */
+#define	TCP_MAXRXTSHIFT	24			/* maximum retransmits rui: was 12 */
 
 #ifdef	TCPTIMERS
 char *tcptimers[] =
