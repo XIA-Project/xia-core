@@ -12,7 +12,7 @@
 
 #include <fcntl.h>
 #include <cstdint> // uint32_t
-//#include <chrono> // rui, only for debugging
+#include <chrono> // rui, only for debugging
 #include <cassert>
 
 #include "xstream.hh"
@@ -1649,8 +1649,11 @@ XStream::tcp_timers (int timer) {
 		  }
 		  tp->snd_nxt = tp->snd_una;
 		  tp->t_rtt = 0;
-          
- //        printf("%lu REXMT sndNxt=%u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_nxt); // rui
+
+      printf("%lu REXMT timer #%d fired for sock id %d\n", \
+        ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
+        std::chrono::system_clock::now().time_since_epoch()).count()), \
+        tp->t_rxtshift, this->id); // rui
           
           // fast recovery upon rexmt timeout, don't go back to slow start
           // a change made by Rui
