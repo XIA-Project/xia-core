@@ -1879,7 +1879,7 @@ void
 XStream::usrmigrate()
 {
     last_migrate_ts = Timestamp::now().unparse();
-    
+/*
     // if we are waiting to retransmit, do it now
     if (tp->t_timer[TCPT_REXMT] > 0){
         tp->t_timer[TCPT_REXMT] = 0;
@@ -1887,8 +1887,9 @@ XStream::usrmigrate()
         tp->t_srtt = 0;
         tcp_timers(TCPT_REXMT); // tcp_output() called inside
     } else { // no data to send
+*/
         tcp_output();
-    }
+/*    }*/
 }
 
 /* user request 424*/
@@ -2097,7 +2098,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					last_migrate_ts = migrate_ts;
 					dst_path = new_dst_path;
 					migrateacking = true;
-                    
+                /*
                     // if we are waiting to retransmit, do it now
                     if (tp->t_timer[TCPT_REXMT] > 0){
                         tp->t_timer[TCPT_REXMT] = 0;
@@ -2105,8 +2106,9 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
                         tp->t_srtt = 0;
                         tcp_timers(TCPT_REXMT); // tcp_output() called inside
                     } else { // no data to send
+                    */
                         tcp_output();
-                    }
+                    /*}*/
                     
 					break;
 				}
