@@ -76,6 +76,10 @@ class NetjoinReceiver(threading.Thread):
             # TODO: It might be possible to drop all HS1 from existing sessions
             logging.info("A session with this client already exists")
             session_state = self.existing_sessions[identifier].state
+            if session_state == NetjoinSession.HS_3_WAIT:
+                self.existing_sessions[identifier].push(message_tuple)
+                return
+
             if session_state != NetjoinSession.HS_DONE:
                 logging.info("Session not in DONE state, skip this HS1")
                 return

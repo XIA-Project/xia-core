@@ -23,6 +23,12 @@ from netjoin_handshake_four import NetjoinHandshakeFour
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
     next_session_ID = 1
+    (START,
+                BEACON_RCVD, HS_1_RCVD,
+                HS_2_WAIT, HS_2_RCVD,
+                HS_3_WAIT, HS_3_RCVD,
+                HS_4_WAIT, HS_4_RCVD,
+                HS_DONE) = range(10)
 
     # auth is set on gateway side, new one created on client for handshake 1
     # beacon_id is set only on client side
@@ -31,12 +37,6 @@ class NetjoinSession(threading.Thread):
             receiver=None,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
-        (self.START,
-                self.BEACON_RCVD, self.HS_1_RCVD,
-                self.HS_2_WAIT, self.HS_2_RCVD,
-                self.HS_3_WAIT, self.HS_3_RCVD,
-                self.HS_4_WAIT, self.HS_4_RCVD,
-                self.HS_DONE) = range(10)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
@@ -445,6 +445,8 @@ class NetjoinSession(threading.Thread):
             if self.state == self.HS_3_WAIT:
                 if message_type == "handshake_three":
                     self.handle_handshake_three(message_tuple)
+                elif message_type == "handshake_one":
+                    self.handle_handshake_one(message_tuple)
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake three.")
