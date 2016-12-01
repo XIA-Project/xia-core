@@ -367,7 +367,6 @@ XStream::tcp_input(WritablePacket *p)
 
 			if (tiflags & TH_RST){
 				if (tiflags & TH_ACK){
-          printf("tcp_drop #5\n");
 					tcp_drop(ECONNREFUSED);
 				}
 				goto drop;
@@ -613,7 +612,6 @@ XStream::tcp_input(WritablePacket *p)
 	/* 778 */
 	/* drop SYN or !ACK during connection */
 	if (tiflags & XTH_SYN) {
-    printf("tcp_drop #1\n");
 		tcp_drop(ECONNRESET);
 		goto dropwithreset;
 	}
@@ -1614,7 +1612,6 @@ XStream::tcp_timers (int timer) {
         
       if (tp->t_state < TCPS_ESTABLISHED){
         get_transport()->_tcpstat.tcps_keepdrops++;
-        printf("tcp_drop #2\n");
         tcp_drop(ETIMEDOUT);
         break;
         
@@ -1626,7 +1623,6 @@ XStream::tcp_timers (int timer) {
             get_transport()->globals()->tcp_maxidle){
 
           get_transport()->_tcpstat.tcps_keepdrops++;
-          printf("tcp_drop #3\n");
           tcp_drop(ETIMEDOUT);
           break;
       }
@@ -1644,7 +1640,6 @@ XStream::tcp_timers (int timer) {
         tp->t_rxtshift = TCP_MAXRXTSHIFT;
         click_chatter("xstream: tcpdrop due to maxrxtshift exceeded sock id \
 %d", this->id);
-        printf("tcp_drop #4\n");
         tcp_drop(ETIMEDOUT);
         break;
 		  }

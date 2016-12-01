@@ -158,9 +158,9 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	/* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
 
-	_tcp_globals.tcp_keepidle 		= 120;
-	_tcp_globals.tcp_keepintvl 		= 120;
-	_tcp_globals.tcp_maxidle   		= 120;
+	_tcp_globals.tcp_keepidle 		= 12000;
+	_tcp_globals.tcp_keepintvl 		= 12000;
+	_tcp_globals.tcp_maxidle   		= 12000;
 	_tcp_globals.tcp_now 			= 0;
 	_tcp_globals.so_recv_buffer_size = 0x100000;
 	_tcp_globals.tcp_mssdflt		= 1234;

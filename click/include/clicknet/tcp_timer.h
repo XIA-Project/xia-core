@@ -94,9 +94,9 @@
 #define	TCPTV_PERSMIN	(  3*PR_SLOWHZ)		/* retransmit persistance */
 #define	TCPTV_PERSMAX	( 50*PR_SLOWHZ)		/* maximum persist interval */
 
-#define	TCPTV_KEEP_INIT	( 50*PR_SLOWHZ)		/* initial connect keep alive */
-#define	TCPTV_KEEP_IDLE	(120*60*PR_SLOWHZ)	/* dflt time before probing */
-#define	TCPTV_KEEPINTVL	( 75*PR_SLOWHZ)		/* default probe interval */
+#define	TCPTV_KEEP_INIT	( 320*PR_SLOWHZ)		/* initial connect keep alive */
+#define	TCPTV_KEEP_IDLE	(1200*PR_SLOWHZ)	/* dflt time before probing */
+#define	TCPTV_KEEPINTVL	( 750*PR_SLOWHZ)		/* default probe interval */
 #define	TCPTV_KEEPCNT	8			/* max probes before drop */
 
 #define	TCPTV_MIN	(  1) /*1*PR_SLOWHZ*/		/* minimum allowable value */
