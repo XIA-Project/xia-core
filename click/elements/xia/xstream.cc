@@ -1644,10 +1644,22 @@ XStream::tcp_timers (int timer) {
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
       
       printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d \
-rttvar %d\n", \
+rttvar %d tcp_state %u", \
         ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
         std::chrono::system_clock::now().time_since_epoch()).count()), \
-        tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar);
+        tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar, \
+        tp->t_state);
+
+
+      if (tp->t_rxtshift > 7){
+      
+        printf("dst_path %s src_path %s \n", this->dst_path.unparse().c_str(),
+          this->src_path.unparse().c_str());
+        
+      } else{
+        printf("\n");
+      }
+
 
 
 		  if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4){
