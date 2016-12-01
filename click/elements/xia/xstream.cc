@@ -1446,7 +1446,13 @@ send:
 
     //static unsigned nacks = 0;
     //printf("%lu TX ACK #%u: up to %u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, ++nacks, ntohl(ti.th_ack)); // rui
-    
+  
+  if (flags & XTH_SYN){
+    static unsigned ntx = 0;
+    printf("%lu TX SYN #%u sock %u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), ++ntx, this->id, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
+    }
+  
+  
 	XIAHeaderEncap xiah;
 	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
 	xiah.set_last(LAST_NODE_DEFAULT);
