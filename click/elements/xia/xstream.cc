@@ -1576,8 +1576,10 @@ XStream::slowtimo() {
     }
 }
 
-int	tcp_backoff[TCP_MAXRXTSHIFT + 1] = {1, 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, \
-  64, 64, 64 ,64 ,64 ,64 ,64, 64, 64, 64, 64, 64, 64, 64 };
+int	tcp_backoff[TCP_MAXRXTSHIFT + 1] = {1, 1, 2, 4, 8, 16, 32, 64, 128, 128, \
+                                        256, 256, 512, 512, 1024, 1024, \
+                                        1024, 2048, 2048, 2048, 2048, 4096, \
+                                        4096, 4096, 4096};
 
 void
 XStream::tcp_timers (int timer) {
@@ -1600,24 +1602,25 @@ XStream::tcp_timers (int timer) {
           tcp_output();
 		  tp->t_force = 0;
 		  break;
+
 		case TCPT_KEEP:
         
-          if (tp->t_state < TCPS_ESTABLISHED){
-            get_transport()->_tcpstat.tcps_keepdrops++;
-            tcp_drop(ETIMEDOUT);
-            break;
+      if (tp->t_state < TCPS_ESTABLISHED){
+        get_transport()->_tcpstat.tcps_keepdrops++;
+        tcp_drop(ETIMEDOUT);
+        break;
+        
+      } else if((tp->t_state == TCPS_ESTABLISHED || \
+                tp->t_state == TCPS_CLOSE_WAIT) && \
+                tp->so_flags & SO_KEEPALIVE){
 
-          } else if((tp->t_state == TCPS_ESTABLISHED || \
-                      tp->t_state == TCPS_CLOSE_WAIT) && \
-                    tp->so_flags & SO_KEEPALIVE){
+        if (tp->t_idle >= get_transport()->globals()->tcp_keepidle + \
+            get_transport()->globals()->tcp_maxidle){
 
-            if (tp->t_idle >= get_transport()->globals()->tcp_keepidle + \
-  			    get_transport()->globals()->tcp_maxidle){
-
-              get_transport()->_tcpstat.tcps_keepdrops++;
-              tcp_drop(ETIMEDOUT);
-              break;
-            }
+          get_transport()->_tcpstat.tcps_keepdrops++;
+          tcp_drop(ETIMEDOUT);
+          break;
+      }
 
 			get_transport()->_tcpstat.tcps_keepprobe++;
 			tcp_respond(tp->rcv_nxt+1, tp->snd_una, 0);
@@ -1637,47 +1640,54 @@ XStream::tcp_timers (int timer) {
 		  }
       
 		  rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
-		  TCPT_RANGESET(tp->t_rxtcur, rexmt,
-		  		tp->t_rttmin, TCPTV_REXMTMAX);
+		  TCPT_RANGESET(tp->t_rxtcur, rexmt, tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
       
-        printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d rttvar %d\n", \
+      printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d \
+rttvar %d\n", \
         ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
         std::chrono::system_clock::now().time_since_epoch()).count()), \
-        tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar); // rui
+        tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar);
+
 
 		  if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4){
-        /* in_losing(tp->t_inpcb);
-        notification of lower layers after 4 failed
-        retransmissions is not implemented
-        */
+        /* If we backed off this far, our srtt estimate is probably bogus.
+         * Clobber it so we'll take the next rtt measurement as our srtt;
+         * move the current srtt into rttvar to keep the current retransmit 
+         * times until then.
+         *
+         * We could also notify the lower layer to try a different route, but
+         * that is not implemented at this point.
+         */
         tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
         tp->t_srtt = 0;
-        }
-        tp->snd_nxt = tp->snd_una;
-        tp->t_rtt = 0;
+      }
+    
+      tp->snd_nxt = tp->snd_una;
+      tp->t_rtt = 0;
 
-    
-          
-          // fast recovery upon rexmt timeout, don't go back to slow start
-          // a change made by Rui
-          {
-          u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
+      // fast recovery upon rexmt timeout, don't go back to slow start
+      // a change made by Rui
+      {
+        u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 / tp->t_maxseg;
         
-          if (win < 4)
-			win = 4;
-          //debug_output(VERB_TCP, "%u: cwnd: %u, TCPT_REXMT", get_transport()->tcp_now(), tp->snd_cwnd);
-          tp->snd_ssthresh = win * tp->t_maxseg;
-		  tp->snd_cwnd = tp->snd_ssthresh;
-          tp->t_dupacks = 0;
-          }
+        if (win < 4){
+          win = 4;
+        }
+  
+        /*debug_output(VERB_TCP, "%u: cwnd: %u, TCPT_REXMT", \
+          get_transport()->tcp_now(), tp->snd_cwnd);*/
+        tp->snd_ssthresh = win * tp->t_maxseg;
+        tp->snd_cwnd = tp->snd_ssthresh;
+        tp->t_dupacks = 0;
+      }
     
-    	  tcp_output();
+      tcp_output();
 		  break;
-		  case TCPT_IDLE:
-		  	usrclosed();
-		  break;
-	}
+    case TCPT_IDLE:
+      usrclosed();
+      break;
+  }
 }
 
 void
@@ -1883,21 +1893,25 @@ XStream::usrsend(WritablePacket *p)
 }
 
 /* requesting a stream session migration to new address */
-void
-XStream::usrmigrate()
-{
-    last_migrate_ts = Timestamp::now().unparse();
-/*
-    // if we are waiting to retransmit, do it now
-    if (tp->t_timer[TCPT_REXMT] > 0){
-        tp->t_timer[TCPT_REXMT] = 0;
-        tp->t_rxtshift = 0;
-        tp->t_srtt = 0;
-        tcp_timers(TCPT_REXMT); // tcp_output() called inside
-    } else { // no data to send
-*/
-        tcp_output();
-/*    }*/
+void XStream::usrmigrate(){
+
+  last_migrate_ts = Timestamp::now().unparse();
+
+  // if we are waiting to retransmit, do it now
+  if (tp->t_timer[TCPT_REXMT] > 0){
+
+    tp->t_timer[TCPT_REXMT] = 0;
+    tp->t_rxtshift = 0;
+    // set srtt to zero but first pass it on to rttvar so we don't
+    // retransmit too soon
+    tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
+    tp->t_srtt = 0;
+    tcp_timers(TCPT_REXMT); // tcp_output() called inside
+    
+  } else { // no data to send
+    tcp_output();
+  }
+
 }
 
 /* user request 424*/
@@ -2106,18 +2120,22 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 					last_migrate_ts = migrate_ts;
 					dst_path = new_dst_path;
 					migrateacking = true;
-                /*
-                    // if we are waiting to retransmit, do it now
-                    if (tp->t_timer[TCPT_REXMT] > 0){
-                        tp->t_timer[TCPT_REXMT] = 0;
-                        tp->t_rxtshift = 0;
-                        tp->t_srtt = 0;
-                        tcp_timers(TCPT_REXMT); // tcp_output() called inside
-                    } else { // no data to send
-                    */
-                        tcp_output();
-                    /*}*/
-                    
+          
+          // if we are waiting to retransmit, do it now
+          if (tp->t_timer[TCPT_REXMT] > 0){
+          
+            tp->t_timer[TCPT_REXMT] = 0;
+            tp->t_rxtshift = 0;
+            // set srtt to zero but first pass it on to rttvar so we don't
+            // retransmit too soon
+            tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
+            tp->t_srtt = 0;
+            tcp_timers(TCPT_REXMT); // tcp_output() called inside
+
+          } else { // no data to send
+          
+            tcp_output();
+          }
 					break;
 				}
 			case TCPOPT_MIGRATEACK:
