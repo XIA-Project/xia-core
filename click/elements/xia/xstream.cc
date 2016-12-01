@@ -135,10 +135,8 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_win = ntohl(tcph->th_win);
 	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 
- /*
-    static unsigned nrx = 0;
-    printf("%lu RX #%u seq %u to %u len(%u) rcvWnd=%u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, ++nrx, ti.ti_seq, ti.ti_seq+ti.ti_len, ti.ti_len, tp->rcv_wnd); // rui
-    */
+  printf("%lu RX sock %u seq %u to %u len(%u) ack=%u rcv_nxt=%u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), this->id, ti.ti_seq, ti.ti_seq+ti.ti_len, ti.ti_len, ti.ti_ack, tp->rcv_nxt, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
+  
 	/*205 packet should be sane, skip tests */
 	off = ti.ti_off << 2;
 
@@ -1653,7 +1651,7 @@ rttvar %d tcp_state %u", \
 
       if (tp->t_rxtshift > 7){
       
-        printf("dst_path %s src_path %s \n", this->dst_path.unparse().c_str(),
+        printf(" dst_path %s src_path %s \n", this->dst_path.unparse().c_str(),
           this->src_path.unparse().c_str());
         
       } else{
