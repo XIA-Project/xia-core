@@ -1899,6 +1899,8 @@ void XStream::usrmigrate(){
 
   // if we are waiting to retransmit, do it now
   if (tp->t_timer[TCPT_REXMT] > 0){
+  
+    click_chatter("usrmigrate branch #1");
 
     tp->t_timer[TCPT_REXMT] = 0;
     tp->t_rxtshift = 0;
@@ -1909,6 +1911,8 @@ void XStream::usrmigrate(){
     tcp_timers(TCPT_REXMT); // tcp_output() called inside
     
   } else { // no data to send
+  
+  click_chatter("usrmigrate branch #2");
     tcp_output();
   }
 
@@ -2124,6 +2128,8 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
           // if we are waiting to retransmit, do it now
           if (tp->t_timer[TCPT_REXMT] > 0){
           
+            click_chatter("dooptions migrate branch #1");
+          
             tp->t_timer[TCPT_REXMT] = 0;
             tp->t_rxtshift = 0;
             // set srtt to zero but first pass it on to rttvar so we don't
@@ -2133,6 +2139,8 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
             tcp_timers(TCPT_REXMT); // tcp_output() called inside
 
           } else { // no data to send
+          
+            click_chatter("dooptions migrate branch #2");
           
             tcp_output();
           }
