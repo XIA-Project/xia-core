@@ -1652,20 +1652,20 @@ XStream::tcp_timers (int timer) {
 		  TCPT_RANGESET(tp->t_rxtcur, rexmt, tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
       
-      /* ddebugging now unnecessary
+      // debugging now unnecessary
       printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d \
 rttvar %d tcp_state %u", \
         ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
         std::chrono::system_clock::now().time_since_epoch()).count()), \
         tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar, \
         tp->t_state);
-
+/*
       if (tp->t_rxtshift > 5){
         printf(" dst_path %s src_path %s", this->dst_path.unparse().c_str(), \
           this->src_path.unparse().c_str());
-      }
+      }*/
       printf("\n");
-      */
+      
 
 		  if (tp->t_rxtshift == 5){ // meaning this is the sixth retransmission
         /* If we backed off this far, our srtt estimate is probably bogus.
