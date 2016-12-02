@@ -94,17 +94,17 @@
 #define	TCPTV_PERSMIN	(  3*PR_SLOWHZ)		/* retransmit persistance */
 #define	TCPTV_PERSMAX	( 50*PR_SLOWHZ)		/* maximum persist interval */
 
-#define	TCPTV_KEEP_INIT	( 500*PR_SLOWHZ)		/* initial connect keep alive */
-#define	TCPTV_KEEP_IDLE	(1200*60*PR_SLOWHZ)	/* dflt time before probing */
-#define	TCPTV_KEEPINTVL	( 750*PR_SLOWHZ)		/* default probe interval */
+#define	TCPTV_KEEP_INIT	( 75*PR_SLOWHZ)		/* initial connect keep alive */
+#define	TCPTV_KEEP_IDLE	(120*60*PR_SLOWHZ)	/* dflt time before probing */
+#define	TCPTV_KEEPINTVL	( 75*PR_SLOWHZ)		/* default probe interval */
 #define	TCPTV_KEEPCNT	8			/* max probes before drop */
 
 #define	TCPTV_MIN	(  1) /*1*PR_SLOWHZ*/		/* minimum allowable value */
-#define	TCPTV_REXMTMAX	( 64*PR_SLOWHZ)		/* max allowable REXMT value */
+#define	TCPTV_REXMTMAX	( 10*PR_SLOWHZ)		/* max allowable REXMT value */
 
 #define	TCP_LINGERTIME	120			/* linger at most 2 minutes */
 
-#define	TCP_MAXRXTSHIFT	24			/* maximum retransmits rui: was 12 */
+#define	TCP_MAXRXTSHIFT	30			/* maximum retransmits */
 
 #ifdef	TCPTIMERS
 char *tcptimers[] =

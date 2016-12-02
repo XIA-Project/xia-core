@@ -135,7 +135,9 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_win = ntohl(tcph->th_win);
 	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
 
+  /* debugging no longer necessary
   printf("%lu RX sock %u seq %u to %u len(%u) ack=%u rcv_nxt=%u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), this->id, ti.ti_seq, ti.ti_seq+ti.ti_len, ti.ti_len, ti.ti_ack, tp->rcv_nxt, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
+  */
   
 	/*205 packet should be sane, skip tests */
 	off = ti.ti_off << 2;
@@ -1292,8 +1294,7 @@ send:
 
 		optlen += migratelen;
         
-        click_chatter("Tx migrate msg for sock id %u len %d", this->id, \
-            optlen-2);
+    click_chatter("Tx migrate msg for sock id %u len %d", this->id, optlen-2);
 	}
 
 	// Include the MIGRATEACK option if the migrateacking flag is set
@@ -1328,8 +1329,7 @@ send:
 		migrateacking = false;
 		optlen += migrateacklen;
         
-        click_chatter("Tx migrateack for sock id %u len %d", this->id, \
-            optlen-2);
+    click_chatter("Tx migrateack for sock id %u len %d", this->id, optlen-2);
 	}
 	hdrlen += optlen;
 
@@ -1448,10 +1448,12 @@ send:
     //static unsigned nacks = 0;
     //printf("%lu TX ACK #%u: up to %u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, ++nacks, ntohl(ti.th_ack)); // rui
   
+  /* debugging no longer necessary
   if (flags & XTH_SYN){
     static unsigned ntx = 0;
     printf("%lu TX SYN #%u sock %u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), ++ntx, this->id, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
     }
+  */
   
   
 	XIAHeaderEncap xiah;
@@ -1581,10 +1583,9 @@ XStream::slowtimo() {
     }
 }
 
-int	tcp_backoff[TCP_MAXRXTSHIFT + 1] = {1, 1, 2, 4, 8, 16, 32, 64, 128, 128, \
-                                        256, 256, 512, 512, 1024, 1024, \
-                                        1024, 2048, 2048, 2048, 2048, 4096, \
-                                        4096, 4096, 4096};
+static int tcp_backoff[TCP_MAXRXTSHIFT] = {1, 1, 2, 4, 8, 16, 32, 64, 128, \
+  256, 512, 1024, 1024, 1024, 1024, 2048, 2048, 2048, 2048, 2048, 2048, 2048, \
+  4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096};
 
 void
 XStream::tcp_timers (int timer) {
@@ -1636,10 +1637,8 @@ XStream::tcp_timers (int timer) {
 		  break;
 		case TCPT_REXMT:
 
-		  if (++tp->t_rxtshift > TCP_MAXRXTSHIFT){
-        tp->t_rxtshift = TCP_MAXRXTSHIFT;
-        click_chatter("xstream: tcpdrop due to maxrxtshift exceeded sock id \
-%d", this->id);
+		  if (tp->t_rxtshift >= TCP_MAXRXTSHIFT){ // retransmissions exhausted
+        tp->t_rxtshift = TCP_MAXRXTSHIFT-1;
         tcp_drop(ETIMEDOUT);
         break;
 		  }
@@ -1648,6 +1647,7 @@ XStream::tcp_timers (int timer) {
 		  TCPT_RANGESET(tp->t_rxtcur, rexmt, tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
       
+      /* ddebugging now unnecessary
       printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d \
 rttvar %d tcp_state %u", \
         ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
@@ -1655,19 +1655,14 @@ rttvar %d tcp_state %u", \
         tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar, \
         tp->t_state);
 
-
-      if (tp->t_rxtshift > 7){
-      
-        printf(" dst_path %s src_path %s \n", this->dst_path.unparse().c_str(),
+      if (tp->t_rxtshift > 5){
+        printf(" dst_path %s src_path %s", this->dst_path.unparse().c_str(), \
           this->src_path.unparse().c_str());
-        
-      } else{
-        printf("\n");
       }
+      printf("\n");
+      */
 
-
-
-		  if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4){
+		  if (tp->t_rxtshift == 5){ // meaning this is the sixth retransmission
         /* If we backed off this far, our srtt estimate is probably bogus.
          * Clobber it so we'll take the next rtt measurement as our srtt;
          * move the current srtt into rttvar to keep the current retransmit 
@@ -1680,6 +1675,8 @@ rttvar %d tcp_state %u", \
         tp->t_srtt = 0;
       }
     
+      tp->t_rxtshift++; // increment rxtshift for next time
+
       tp->snd_nxt = tp->snd_una;
       tp->t_rtt = 0;
 
@@ -1701,6 +1698,7 @@ rttvar %d tcp_state %u", \
     
       tcp_output();
 		  break;
+
     case TCPT_IDLE:
       usrclosed();
       break;
@@ -1727,7 +1725,7 @@ XStream::tcp_setpersist() {
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
 		t * tcp_backoff[tp->t_rxtshift],
 		TCPTV_PERSMIN, TCPTV_PERSMAX);
-	if (tp->t_rxtshift < TCP_MAXRXTSHIFT){
+	if (tp->t_rxtshift < TCP_MAXRXTSHIFT-1){
         tp->t_rxtshift++;
     }
 }
