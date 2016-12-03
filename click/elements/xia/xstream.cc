@@ -2317,11 +2317,11 @@ XStream::tcp_newtcpcb()
 	tp->t_maxseg = get_transport()->globals()->tcp_mssdflt;
 	tp->t_flags  = TF_REQ_SCALE | TF_REQ_TSTMP;
 	tp->t_srtt   = TCPTV_SRTTBASE;
-	tp->t_rttvar = get_transport()->globals()->tcp_rttdflt * PR_SLOWHZ << 2;
+	tp->t_rttvar = get_transport()->globals()->tcp_rttdflt << 2;
 	tp->t_rttmin = TCPTV_MIN;
 	TCPT_RANGESET(tp->t_rxtcur,
-		((TCPTV_SRTTBASE >> 2) + ( TCPTV_SRTTDFLT << 2)) >> 1,
-		TCPTV_MIN, TCPTV_REXMTMAX);
+    ((TCPTV_SRTTBASE >> 2) + (TCPTV_SRTTDFLT << 2)) >> 1, TCPTV_MIN,
+    TCPTV_REXMTMAX);
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 
 	//printf("%lu sndCwnd starting out as %u tcp_newtcpcb\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_cwnd); // rui

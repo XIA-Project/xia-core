@@ -88,7 +88,7 @@
  */
 #define	TCPTV_MSL       (30*PR_SLOWHZ) /* max seg lifetime (hah!) */
 #define	TCPTV_SRTTBASE  0 /* base roundtrip time; if 0, no idea yet */
-#define	TCPTV_SRTTDFLT  (PR_SLOWHZ/5) /* assumed RTT if no info */
+#define	TCPTV_SRTTDFLT  (PR_SLOWHZ/20) /* assumed RTT if no info */
 
 #define	TCPTV_PERSMIN   (3*PR_SLOWHZ) /* retransmit persistance */
 #define	TCPTV_PERSMAX   (50*PR_SLOWHZ) /* maximum persist interval */
