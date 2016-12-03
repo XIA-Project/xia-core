@@ -158,15 +158,15 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	/* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
 
-	_tcp_globals.tcp_keepidle 		= 120 * PR_SLOWHZ; // 120s regardless of slowHz
-	_tcp_globals.tcp_keepintvl 		= 120 * PR_SLOWHZ; // 120s regardless of slowHz
-	_tcp_globals.tcp_maxidle   		= 120 * PR_SLOWHZ; // 120s regardless of slowHz
-	_tcp_globals.tcp_now 			= 0;
-	_tcp_globals.so_recv_buffer_size = 0x100000;
-	_tcp_globals.tcp_mssdflt		= 1234;
-	_tcp_globals.tcp_rttdflt		= TCPTV_SRTTDFLT / PR_SLOWHZ;
-	_tcp_globals.so_flags	   	 	= 0;
-	_tcp_globals.so_idletime		= 0;
+	_tcp_globals.tcp_keepidle         = TCPTV_KEEP_IDLE;
+	_tcp_globals.tcp_keepintvl        = TCPTV_KEEPINTVL;
+	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
+	_tcp_globals.tcp_now              = 0;
+	_tcp_globals.so_recv_buffer_size  = 0x100000;
+	_tcp_globals.tcp_mssdflt          = 1234;
+	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT / PR_SLOWHZ;
+	_tcp_globals.so_flags             = 0;
+	_tcp_globals.so_idletime          = 0;
 
 	/* TODO: window_scale and use_timestamp were being used uninitialized
 	   setting them to 0 and false respectively for now but need to revisit

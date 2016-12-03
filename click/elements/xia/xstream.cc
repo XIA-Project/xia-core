@@ -1630,15 +1630,17 @@ XStream::tcp_timers (int timer) {
           printf("tcp_drop #4\n");
           tcp_drop(ETIMEDOUT);
           break;
-      }
+        }
 
-			get_transport()->_tcpstat.tcps_keepprobe++;
-			tcp_respond(tp->rcv_nxt+1, tp->snd_una, 0);
-			tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepintvl;
-		  } else{
-			tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepidle;
-          }
-		  break;
+        get_transport()->_tcpstat.tcps_keepprobe++;
+        tcp_respond(tp->rcv_nxt+1, tp->snd_una, 0);
+        tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepintvl;
+		  
+      } else{
+        tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepidle;
+      }
+		  
+      break;
 		case TCPT_REXMT:
 
 		  if (tp->t_rxtshift >= TCP_MAXRXTSHIFT){ // retransmissions exhausted
