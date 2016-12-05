@@ -95,7 +95,7 @@ string generateCDNOptionsUrl(){
     return result;
 }
 
-void publish_content(ServerVideoInfo* videoInfo){
+int publish_content(ServerVideoInfo* videoInfo){
     char videoPathName[MAX_PATH_SIZE];
     memset(videoPathName, '\0', sizeof(videoPathName));
 
@@ -106,26 +106,31 @@ void publish_content(ServerVideoInfo* videoInfo){
     videoInfo->manifestUrls.clear();
     videoInfo->dagUrls.clear();
 
-    process_dash_content(videoPathName);
+    if(process_dash_content(videoPathName)) {
+        return -1;
+    }
     create_xia_dash_manifest(videoInfo);
     publish_manifest(videoInfo->manifestName.c_str());
     create_xia_dash_manifest_urls(videoInfo);
+    return 0;
 }
 
-void process_dash_content(const char *name){
+int process_dash_content(const char *name){
     int n;
     struct dirent **namelist;
     DIR *dir;
 
     // the DASH video must be in a directory
     if (!(dir = opendir(name))){
-        return;
+        warn("Unable to open video directory: %s\n", name);
+        return -1;
     }
 
     n = scandir(name, &namelist, 0, versionsort);
 
     if (n < 0){
-        return;     
+        warn("Unable to read video directory: %s\n", name);
+        return -1;
     } else {
         for(int i =0 ; i < n; i++){
             char path[MAX_PATH_SIZE];
@@ -140,6 +145,7 @@ void process_dash_content(const char *name){
         free(namelist);
     }
     closedir(dir);
+    return 0;
 }
 
 void process_dash_files(const char* dir){
@@ -277,6 +283,7 @@ int publish_manifest(const char* name){
 
 int main(int argc, char *argv[]){
     char input[MAX_INPUT_SIZE];
+    char videoName[MAX_INPUT_SIZE];
     char manifestType[MAX_INPUT_SIZE];
     int count;
 
@@ -301,28 +308,55 @@ int main(int argc, char *argv[]){
 
     // finding user input1
     say("[Enter [videoName manifestType] to publish a given video]\n");
-    say("[Enter q or quit to turn off content publisher]\n>>");
-    do {
-        if ((count = scanf("%s %s", input, manifestType)) < 0){
+    say("[Enter q or quit to turn off content publisher]\n");
+    while(true) {
+        printf(">> ");
+        fflush(stdout);
+
+        bzero(input, sizeof(input));
+        bzero(videoName, sizeof(videoName));
+        bzero(manifestType, sizeof(manifestType));
+
+        ssize_t incount;
+        incount = read(STDIN_FILENO, input, sizeof(input));
+
+        // Skip processing on error or user just entering newline
+        if (incount < 2) {
+            continue;
+        }
+
+        // Did the user ask to quit?
+        if (strncmp(input, QUIT, 4) == 0
+                || strncmp(input, Q, 1) == 0) {
+            break;
+        }
+
+        if ((count = sscanf(input, "%s %s\n", videoName, manifestType)) < 0){
             warn("Error reading in user input. Exit\n");
             break;
         }
 
-        if(count == 2 && strcmp(input, QUIT) != 0 && strcmp(input, Q) != 0){
-            // publish content based on input
-            videoInfo.videoName = input;
-            if (strcmp(manifestType, MANIFEST_TO_HOST) != 0 && strcmp(manifestType, MANIFEST_TO_CDN) != 0 
-                        && strcmp(manifestType, MANIFEST_TO_MULTI_CDN) != 0){
-                videoInfo.manifestType = MANIFEST_TO_HOST;
-                publish_content(&videoInfo);
-            } else {
-                videoInfo.manifestType = manifestType;
-                publish_content(&videoInfo);
-            }
+        if (count != 2) {
+            warn("Usage: videoName manifestType\n");
+            continue;
         }
 
-        say(">>");
-    } while(strcmp(input, QUIT) != 0 && strcmp(input, Q) != 0);
+        if(count == 2 && strcmp(videoName, QUIT) != 0
+                && strcmp(videoName, Q) != 0){
+            // publish content based on input
+            videoInfo.videoName = videoName;
+            if (strcmp(manifestType, MANIFEST_TO_HOST) != 0
+                    && strcmp(manifestType, MANIFEST_TO_CDN) != 0
+                    && strcmp(manifestType, MANIFEST_TO_MULTI_CDN) != 0){
+                warn("Invalid manifestType. Defaulting to: host\n");
+                videoInfo.manifestType = MANIFEST_TO_HOST;
+            } else {
+                videoInfo.manifestType = manifestType;
+            }
+            publish_content(&videoInfo);
+        }
+
+    }
     say("[Exit content publisher, clean up resources]\n");
 
     return 0;

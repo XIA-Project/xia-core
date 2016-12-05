@@ -126,12 +126,12 @@ string generateCDNOptionsUrl();
  ** publish a given content with video name
  *		publish CIDs and generate manifest
  */
-void publish_content(const char* name);
+int publish_content(const char* name);
 
 /*
  ** publish the dash videos
  */
-void process_dash_content(const char* name);
+int process_dash_content(const char* name);
 
 /*
  ** process the files in the given bitrate directory
@@ -164,4 +164,4 @@ int create_xia_dash_manifest_urls(ServerVideoInfo *videoInfo);
  */
 int publish_manifest(const char* name);
 
-#endif 
+#endif
