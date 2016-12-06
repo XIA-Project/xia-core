@@ -56,7 +56,7 @@ app.directive('chart', function() {
                     },
                     yaxis: {
                         min: 0,
-                        max: 40
+                        max: 130
                     },
                     xaxis: {
                         show: false
