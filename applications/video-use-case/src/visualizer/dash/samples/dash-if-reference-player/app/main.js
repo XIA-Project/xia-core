@@ -56,7 +56,8 @@ app.directive('chart', function() {
                     },
                     yaxis: {
                         min: 0,
-                        max: 130
+                        max: 130,
+                        ticks: 5
                     },
                     xaxis: {
                         show: false
