@@ -24,6 +24,7 @@
 #include "utils.hpp"
 #include <cstring>
 #include <map>
+#include <stack>
 #include <algorithm>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -846,22 +847,74 @@ Graph::index_from_dag_string_index(int32_t dag_string_index, std::size_t source_
 std::size_t
 Graph::intent_XID_index(uint32_t xid_type) const
 {
+	std::size_t intentIndex = INVALID_GRAPH_INDEX;
+
 	std::size_t curIndex;
 	std::size_t source = source_index();
 	std::size_t intent = final_intent_index();
+	std::stack<std::size_t> dfstack;
+
+	// Start walking depth first from source to sink
+	dfstack.push(source);
+
+	while (!dfstack.empty()) {
+
+		// the last seen node
+		curIndex = dfstack.top();
+		dfstack.pop();
+
+		// save it's outgoing edges, in reverse, with first on top
+		std::vector<std::size_t> edges = out_edges_[curIndex];
+		std::vector<std::size_t>::reverse_iterator rit;
+		for(rit = edges.rbegin(); rit != edges.rend(); rit++) {
+			dfstack.push(*rit);
+		}
+
+		// Save last node matching xid_type as intent XID
+		if (nodes_[curIndex].type() == xid_type) {
+			intentIndex = curIndex;
+		}
+
+		// If intent XID is known on reaching intent node, we have a result
+		if (curIndex == intent && intentIndex != INVALID_GRAPH_INDEX) {
+
+			// Return the result to caller
+			// TODO: If called too much, this function may be expensive
+			/*
+			printf("Graph::intent_XID_index: found index:%zu\n", intentIndex);
+			printf("for: %s\n", this->dag_string().c_str());
+			dump_stack_trace();
+			*/
+			break;
+		}
+
+	}
+
+	return intentIndex;
+
+	/* This is a lighter weight implementation that just walks first hops
+	 * TODO: Consider using this if this function is too expensive
 	// Build first_path by walking first hops from source to intent node
 	for(curIndex=source; curIndex!=intent; curIndex=out_edges_[curIndex][0]) {
+
+		// Find last node matching xid_type while walking to intent node
 		if (nodes_[curIndex].type() == xid_type) {
-			return curIndex;
+			intentIndex = curIndex;
 		}
 	}
 
 	// Check if the intent node is the one we are looking for
 	if (nodes_[curIndex].type() == xid_type) {
-		printf("Graph::intent_XID_index: returning index:%zu\n", curIndex);
-		return curIndex;
+		intentIndex = curIndex;
 	}
-	return INVALID_GRAPH_INDEX;
+
+	// TODO: Remove this debug print
+	if (intentIndex != INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_XID_index: found index:%zu\n", curIndex);
+	}
+
+	return intentIndex;
+	*/
 }
 
 std::size_t
@@ -1838,7 +1891,7 @@ Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
 	// Add current node to 'paths'
 	paths.push_back(nodes_[node]);
 
-	// Follow all outgoing edges; sink with have none
+	// Follow all outgoing edges; sink will have none
 	std::vector<std::size_t> out_edges = get_out_edges(node);
 	std::vector<std::size_t>::const_iterator it;
 	for(it = out_edges.begin(); it != out_edges.end(); it++) {
