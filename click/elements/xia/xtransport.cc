@@ -343,18 +343,26 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 			return -1;
 		}
 
+		// Replace intent HID in router's DAG to form new_dag
+		XIAPath new_dag = rvdag;
+		if(!new_dag.replace_intent_hid(f->_hid)) {
+			click_chatter("XTRANSPORT:RVDAG ERROR replacing intent HID in %s",
+					new_dag.unparse().c_str());
+			return -1;
+		}
+
 		for(int i=0; i<f->_num_ports; i++) {
 			// If iface=-1, assign rv_dag to all interfaces
 			if(iface == -1 || iface == i) {
-				if(!f->_interfaces.update_rv_dag(i, rvdag.unparse())) {
+				if(!f->_interfaces.update_rv_dag(i, new_dag.unparse())) {
 					click_chatter("ERROR: Updating dag: %s to iface: %d",
-							rvdag.unparse().c_str(), i);
+							new_dag.unparse().c_str(), i);
 					return -1;
 				}
 			}
 		}
 
-		click_chatter("XTRANSPORT: RV DAG is now %s", rvdag.unparse().c_str());
+		click_chatter("XTRANSPORT: RV DAG now %s", new_dag.unparse().c_str());
 		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
 
 		break;
