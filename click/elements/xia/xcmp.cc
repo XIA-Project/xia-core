@@ -243,6 +243,10 @@ XCMP::processUnreachable(Packet *p_in)
 			case CLICK_XIA_XID_TYPE_HID:
 				code = XCMP_UNREACH_HOST;
 				break;
+			case CLICK_XIA_XID_TYPE_FID:
+				// FIXME: what should this do?
+				INFO("Unreachable for a FID!");
+				break;
 			default:
 				code = XCMP_UNREACH_INTENT;
 		}

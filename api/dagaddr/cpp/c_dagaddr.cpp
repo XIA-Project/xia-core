@@ -13,7 +13,8 @@ static struct {
 	{ XID_TYPE_AD, "AD:" },
 	{ XID_TYPE_HID, "HID:" },
 	{ XID_TYPE_SID, "SID:" },
-	{ XID_TYPE_CID, "CID:" }
+	{ XID_TYPE_CID, "CID:" },
+	{ XID_TYPE_FID, "DID:" }
 };
 
 const char *get_xid_str(int id)
@@ -77,6 +78,10 @@ static node_t str_to_node(char *xidstr)
 	} else if(STREQ(pos, "SID")) {
 		node.s_xid.s_type = XID_TYPE_SID;
 		printf("SID\n");
+		pos += 3;
+	} else if(STREQ(pos, "FID")) {
+		node.s_xid.s_type = XID_TYPE_FID;
+		printf("FID\n");
 		pos += 3;
 	} else if(STREQ(pos, "IP")) {
 		node.s_xid.s_type = XID_TYPE_IP;

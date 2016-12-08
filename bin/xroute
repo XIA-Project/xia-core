@@ -33,7 +33,7 @@ PORT=7777
 MAJOR=1
 MINOR=3
 
-KNOWN_XIDS = [ "AD", "HID", "SID", "CID", "IP" ]
+KNOWN_XIDS = [ "AD", "HID", "FID", "SID", "CID", "IP" ]
 #
 # class for managing command line configuration options
 #

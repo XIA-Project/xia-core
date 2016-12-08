@@ -27,6 +27,7 @@ public:
 	static const unsigned int XID_TYPE_HID = 0x11;
 	static const unsigned int XID_TYPE_CID = 0x12;
 	static const unsigned int XID_TYPE_SID = 0x13;
+	static const unsigned int XID_TYPE_FID = 0x30;
 	static const unsigned int XID_TYPE_IP = 0x14;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
@@ -35,6 +36,7 @@ public:
 	static const std::string XID_TYPE_HID_STRING;
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
+	static const std::string XID_TYPE_FID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
 
 public:
@@ -67,7 +69,7 @@ public:
 	static XidMap xids;
 	static XidMap load_xids();
 
-	
+
 
 protected:
 	void acquire() const;

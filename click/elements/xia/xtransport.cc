@@ -9,6 +9,7 @@
 #include <click/vector.hh>
 #include "xtransport.hh"
 #include <click/xiastreamheader.hh>
+#include <click/xiafidheader.hh>
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"

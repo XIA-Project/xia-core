@@ -42,6 +42,7 @@ enum XID_TYPE {
 	XID_TYPE_CID = 0x12,
 	XID_TYPE_SID = 0x13,
 	XID_TYPE_IP = 0x14,
+	XID_TYPE_FID = 0x30,
 	XID_TYPE_DUMMY_SOURCE = 0xff,
 };
 
@@ -75,4 +76,3 @@ typedef struct {
 } sockaddr_x;
 
 #endif // XIA_H
-
