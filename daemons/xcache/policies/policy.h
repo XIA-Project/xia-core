@@ -12,17 +12,20 @@
 
 class xcache_eviction_policy  {
 public:
-	virtual int store(xcache_meta *) {
+	virtual bool store(xcache_meta*) {
 		return 0;
 	};
-	virtual int get(xcache_meta *) {
+	//virtual int get(xcache_meta*) {
+	//	return 0;
+	//};
+	virtual bool remove(xcache_meta*) {
 		return 0;
 	};
-	virtual int remove(xcache_meta *) {
-		return 0;
-	};
-	virtual xcache_meta *evict() {
+	virtual bool evict(xcache_meta*) {
 		return NULL;
+	};
+	virtual bool touch(xcache_meta*, bool = false) {
+		return true;
 	};
 };
 
@@ -30,7 +33,7 @@ public:
  * All the policies are implemented c++ objects. The corresponding header files
  * must be included here.
  */
-#include "fifo.h"
+//#include "fifo.h"
 #include "lru.h"
 
 #endif /* __POLICY_H__ */

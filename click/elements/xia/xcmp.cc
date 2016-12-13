@@ -209,7 +209,7 @@ XCMP::processUnreachable(Packet *p_in)
 	}
 
 	// don't send undeliverables back to broadcast packets
-	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
+	if (dst_path.xid(dst_path.find_intent_hid()) == bcast_xid) {
 		return;
 	}
 
@@ -221,12 +221,17 @@ XCMP::processUnreachable(Packet *p_in)
 	const struct click_xia_xid_node *n = &h->node[0];
 	int bad_node = -1;
 
+	// get the current valid XID
 	if (last == -1) {
+		// last is the default value, so we we haven't progressed
+		// yet and want the node pointed to by the final xid in the dag
 		n += (dnodes - 1);
 	} else {
 		n += last;
 	}
 
+	// find the node that triggered the undeliverable
+	// it will be the first unvisited edge
 	for (int i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
 		if (!n->edge[i].visited) {
 			bad_node = n->edge[i].idx;

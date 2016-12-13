@@ -28,14 +28,14 @@ void usage(){
 }
 
 void cleanup(int sig) {
-    UNUSED(sig);    
+    UNUSED(sig);
 
     // try to close the listening socket
     if (close(list_s) < 0) {
         fprintf(stderr, "Error calling close()\n");
         exit(EXIT_FAILURE);
     }
-        
+
     // exit with success
     exit(EXIT_SUCCESS);
 }
@@ -69,11 +69,11 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
         }
 
         Graph parsed(dagUrl);
-        parsed.fill_sockaddr(&chunkAddresses[i]);        
+        parsed.fill_sockaddr(&chunkAddresses[i]);
     }
 }
 
-void job(int browser_sock, fd_set *set, int i) {    
+void job(int browser_sock, fd_set *set, int i) {
     int rc;
 
     rc = xia_proxy_handle_request(browser_sock);
@@ -215,14 +215,14 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
         if(strstr(ctx->remote_host, XIA_CDN_SERVICE) != NULL){
             // jump over the /
             dagUrls = cdn_name_to_dag_urls(ctx->remote_host, ctx->remote_path+1);
-        } 
-        // if the current url says this is multi-cdn use case, 
+        }
+        // if the current url says this is multi-cdn use case,
         // pick a CDN name and get the server DAG in the CDN.
         else if (strstr(ctx->remote_host, XIA_VID_SERVICE) != NULL){
             string pname = ctx->remote_path + 1;
             size_t start = pname.find("CID:");
             size_t end = pname.find("?");
-            
+
             size_t len = end - start;
             if(len <= 4){
                 return -1;
@@ -320,7 +320,7 @@ int xia_proxy_handle_request(int browser_sock) {
                 return -1;
             }
         } else if (strstr(ctx.remote_host, XIA_VID_SERVICE) != NULL) {
-            // if this is option probe, 
+            // if this is option probe,
             if (strstr(method, "OPTIONS") != NULL){
                 if(handle_cross_origin_probe(&ctx) < 0){
                     warn("failed to handle cross origin probe back to browser. Exit\n");
@@ -347,7 +347,7 @@ int xia_proxy_handle_request(int browser_sock) {
                 }
             }
         }
-        
+
         return 0;
     } else {
         warn("unsupported request method %s for %s\n", method, host_port);
@@ -358,21 +358,20 @@ int xia_proxy_handle_request(int browser_sock) {
 int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, int numChunks, bool cdn, ...){
     int len = -1, totalBytes = 0;
     double elapsedTime;
-    char data[CHUNKSIZE];
+    char *data = NULL;
     struct timeval t1, t2;
 
     for (int i = 0; i < numChunks; i++) {
-        bzero(data, sizeof(data));
 
         gettimeofday(&t1, NULL);
-        if((len = XfetchChunk(&xcache, data, CHUNKSIZE, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]))) < 0) {
+        if((len = XfetchChunk(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]))) < 0) {
             die(-1, "XcacheGetChunk Failed\n");
         }
         gettimeofday(&t2, NULL);
-        
+
         elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
         elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-        
+
         if(cdn){
             va_list ap;
             va_start(ap, cdn);
@@ -381,7 +380,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
             double curr_throughput = len/elapsedTime;
             double prev_avg = cdns[cname].avg_throughput;
 
-            // we need to repick a CDN if the current observed throughput 
+            // we need to repick a CDN if the current observed throughput
             // is significantly lower than the running average.
             if(curr_throughput/prev_avg < CDN_RESELECT_THRESH){
                 originCDNCache.erase(origin);
@@ -407,7 +406,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
         say("elapsed time for xfetch: %f\n", elapsedTime);
 
         totalBytes += len;
-        
+
         gettimeofday(&t1, NULL);
         // send to browser socket here. Once we reach here, we know it would be success
         if (forward_http_response_body_to_client(ctx, data, len) < 0){
@@ -418,11 +417,15 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
         elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
         say("elapsed time for forwarding: %f\n", elapsedTime);
     }
+
+	if (data) {
+		free(data);
+	}
     return totalBytes;
 }
 
 int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
-    // forward status line (should be OK if chunk is retrieved correctly) 
+    // forward status line (should be OK if chunk is retrieved correctly)
     if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_status_ok, strlen(http_chunk_header_status_ok)) == -1) {
         warn("unable to forward the http status ok\n");
         return -1;
@@ -523,7 +526,7 @@ int main(int argc, char const *argv[])
 
     // write on closed pipe (socket)
     (void) signal (SIGPIPE, SIG_IGN);
-    
+
     if (argc != 2){
         printf("Must specify a port number and whether to use connection close\n");
         return -1;
@@ -547,18 +550,18 @@ int main(int argc, char const *argv[])
     servaddr.sin_family      = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port        = htons(port);
-    
+
     // bind to the socket address
     if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
         fprintf(stderr, "Error calling bind()\n");
         exit(EXIT_FAILURE);
     }
-    
+
     // Listen on socket list_s
     if( (listen(list_s, 10)) == -1) {
         fprintf(stderr, "Error Listening\n");
         exit(EXIT_FAILURE);
-    } 
+    }
 
     printf("Listen on the socket\n");
 
@@ -576,12 +579,12 @@ int main(int argc, char const *argv[])
 
         for (i = 0 ; i < MAX_CLIENTS ; i++) {
             int sd = client_sockets[i];
-            
+
             //if valid socket descriptor then add to read list
             if(sd > 0){
                 FD_SET(sd, &readfds);
             }
-            
+
             //highest file descriptor number, need it for the select function
             if(sd > max_sd){
                 max_sd = sd;
@@ -599,12 +602,12 @@ int main(int argc, char const *argv[])
                 perror("accept");
                 exit(EXIT_FAILURE);
             }
-         
+
             //inform user of socket number - used in send and receive commands
             printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-                          
+
             //add new socket to array of sockets
-            for (i = 0; i < MAX_CLIENTS; i++) 
+            for (i = 0; i < MAX_CLIENTS; i++)
             {
                 //if position is empty
                 if(client_sockets[i] == 0)
@@ -614,7 +617,7 @@ int main(int argc, char const *argv[])
                 }
             }
         }
-    
+
         for (i = 0; i < MAX_CLIENTS; i++) {
             int sd = client_sockets[i];
 
@@ -720,7 +723,7 @@ vector<string> cdn_name_to_dag_urls(char* sname, char* cidString){
 
         Graph g2 = cid2addr(cid_str, AD, HID);
         result.push_back(g2.http_url_string());
-        
+
         return result;
     }
 }
@@ -748,8 +751,8 @@ string multicdn_select_cdn_strategy(string origin, const vector<string> & option
             }
         }
     }
-    
-    // if we need to repick a CDN, select the one with the largest 
+
+    // if we need to repick a CDN, select the one with the largest
     // throughput
     if(originCDNCache.find(origin) == originCDNCache.end()){
         originCDNCache[origin] = c_max_s;
@@ -760,11 +763,11 @@ string multicdn_select_cdn_strategy(string origin, const vector<string> & option
 
 string multicdn_name_to_CDN_name(char* origin, char* options){
     vector<string> voptions = split_string_on_delimiter(options, "&");
-        
+
     for(unsigned i = 0; i < voptions.size(); i++){
         voptions[i] = voptions[i].substr(voptions[i].find("=") + 1);
     }
-        
+
     return multicdn_select_cdn_strategy(origin, voptions);
 }
 

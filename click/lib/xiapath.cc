@@ -693,10 +693,10 @@ XIAPath::find_intent_hid()
 		intent_hid_node = current_node;
 	}
 
-	if(intent_hid_node == INVALID_NODE_HANDLE) {
-		click_chatter("XIAPath: ERROR Intent HID not found");
-		return false;
-	}
+	// if(intent_hid_node == INVALID_NODE_HANDLE) {
+	// 	click_chatter("XIAPath: ERROR Intent HID not found");
+	// 	return false;
+	// }
 	return intent_hid_node;
 }
 

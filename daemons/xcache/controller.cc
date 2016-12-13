@@ -144,8 +144,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
 
-		syslog(LOG_DEBUG, "Remaining(2) = %lu\n", remaining);
-
 		recvd = Xrecv(sock, buf, to_recv, 0);
 		if (recvd < 0) {
 			syslog(LOG_ERR, "Receiver Closed the connection; %s", strerror(errno));
@@ -174,7 +172,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
-	if (!(flags & XCF_SKIPCACHE)) {
+	if ((flags & XCF_CACHE)) {
 		if (__store(context, meta, (const std::string *)&data) == RET_FAILED) {
 			delete meta;
 			Xclose(sock);
@@ -212,10 +210,9 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	IGNORE_PARAM(flags);
 	IGNORE_PARAM(addrlen);
 	IGNORE_PARAM(cmd);
-
-	meta = acquire_meta(cid);
 	syslog(LOG_INFO, "Fetching content %s from local\n", expected_cid.id_string().c_str());
 
+	meta = acquire_meta(cid);
 	if(!meta) {
 		syslog(LOG_WARNING, "meta not found");
 		/* We could not find the content locally */
@@ -228,7 +225,11 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	}
 
 	syslog(LOG_INFO, "Getting data by calling meta->get()\n");
+
+	// touch the object to move it back to the front of the queue
+	meta->fetch(true);
 	data = meta->get();
+	meta->fetch(false);
 
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -567,7 +568,6 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 
 int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	int rc;
 	std::string cid = cmd->cid();
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -582,7 +582,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 
 		switch (meta->state()) {
 			case AVAILABLE:
-				rc = xr.delRoute(c);
+				xr.delRoute(c);
 				// let the garbage collector do the actual data removal
 				meta->set_state(EVICTING);
 
@@ -592,12 +592,13 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 				break;
 
 			case FETCHING:
-				rc = xr.delRoute(c);
+				xr.delRoute(c);
 				// mark the chunk to be evicted once it's out of fetching state
 				resp->set_status(xcache_cmd::XCACHE_CID_MARKED_FOR_DELETE);
 				break;
 
-			case OVERHEARING:
+			case CACHING:
+
 				resp->set_status(xcache_cmd::XCACHE_CID_IN_USE);
 				break;
 
@@ -627,8 +628,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		/*
 		 * Meta already exists
 		 */
-		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 		release_meta(meta);
+		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 	} else {
 		/*
 		 * New object - Allocate a meta
@@ -636,7 +637,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		meta = new xcache_meta(cid);
 		meta->set_ttl(ttl);
 		meta->set_created();
-
+		meta->set_length(cmd->data().length());
+printf("store:length: %lu", meta->get_length());
 		context = lookup_context(cmd->context_id());
 		if(!context) {
 			return RET_FAILED;
@@ -704,7 +706,6 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
-		syslog(LOG_DEBUG, "Header Send Remaining %lu\n", remaining);
 	}
 
 	remaining = resp.data().length();

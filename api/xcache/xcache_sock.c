@@ -9,7 +9,7 @@
 int get_xcache_sock_name(char *sockname, int len)
 {
 	char dag[XIA_MAX_DAG_STR_SIZE], fourid[XIDLEN];
-	int sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 
 	if(sock < 0) {
 		printf("%s: Error while allocating socket\n", __func__);
@@ -18,8 +18,10 @@ int get_xcache_sock_name(char *sockname, int len)
 
 	if(XreadLocalHostAddr(sock, dag, sizeof(dag), fourid, XIDLEN) < 0) {
 		printf("%s: Error while reading localhost addr\n", __func__);
+		Xclose(sock);
 		return -1;
 	}
+	Xclose(sock);
 
 	Graph g(dag);
 	char buf[64];

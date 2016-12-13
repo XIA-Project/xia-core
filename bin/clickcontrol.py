@@ -199,8 +199,9 @@ class ClickControl:
         # TODO: Remove this hacky import.
         # Only python modules that have XIA swig in path can call this method
         import c_xsocket
-        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
         retval = c_xsocket.XupdateNameServerDAG(sockfd, ns_dag)
+        c_xsocket.Xclose(sockfd)
         if retval != 0:
             print "Failed updating Nameserver DAG in Click"
             return False

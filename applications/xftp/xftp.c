@@ -41,8 +41,8 @@
 // global configuration options
 int verbose = 0;
 char name[256];
+int global_flags = 0;
 double totalElapseTime = 0.0;
-
 XcacheHandle h;
 
 /*
@@ -70,13 +70,16 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hn:v")) != -1) {
+	while ((c = getopt(argc, argv, "chn:v")) != -1) {
 		switch (c) {
 			case 'v':
 				verbose = 1;
 				break;
 			case 'n':
 				strcpy(name, optarg);
+				break;
+			case 'c':
+				global_flags = XCF_CACHE;
 				break;
 			case '?':
 			case 'h':
@@ -164,10 +167,9 @@ int getResponse(int sock, char *reply, int sz)
 int retrieveChunk(FILE *fd, char *url)
 {
 	char *saveptr, *token;
-
+	void *buf;
 	double elapsedTime;
     struct timeval t1, t2;
-	char *buf = (char*)malloc(MAX_CHUNKSIZE);
 
 	token = strtok_r(url, " ", &saveptr);
 	while (token) {
@@ -178,7 +180,7 @@ int retrieveChunk(FILE *fd, char *url)
 		url_to_dag(&addr, token, strlen(token));
 
         gettimeofday(&t1, NULL);
-		if ((ret = XfetchChunk(&h, buf, MAX_CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
+		if ((ret = XfetchChunk(&h, &buf, XCF_BLOCK | global_flags, &addr, sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
 		}
 		gettimeofday(&t2, NULL);
@@ -198,11 +200,11 @@ int retrieveChunk(FILE *fd, char *url)
         totalElapseTime += elapsedTime; 		// in ms
 
 		say("Got Chunk\n");
-		fwrite(buf, 1, ret, fd);
+		fwrite((char *)buf, 1, ret, fd);
 		token = strtok_r(NULL, " ", &saveptr);
+		free(buf);
 	}
 
-	free(buf);
 	return 0;
 }
 
@@ -257,13 +259,18 @@ int getFile(int sock, const char *fin, const char *fout)
 	return status;
 }
 
+// FIXME: does this ever get called???
 void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
 {
-	char buf[512];
+	int rc;
+	void *buf;
 
 	printf("Received Chunk Arrived Event\n");
 
-	printf("XreadChunk returned %d\n", XreadChunk(h, addr, addrlen, buf, sizeof(buf), 0));
+	rc = XfetchChunk(h, &buf, XCF_BLOCK | global_flags, addr, addrlen);
+
+	printf("XfetchChunk returned %d\n", rc);
+	free(buf);
 }
 
 int initializeClient(const char *name)
