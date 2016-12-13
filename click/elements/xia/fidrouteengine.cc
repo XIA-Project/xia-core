@@ -569,12 +569,10 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
     	XID source_hid = source_path.xid(source_path.destination_node());
 
     	if(_local_hid == source_hid) {
-			printf("destined for broadcast\n");
     	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)
     	    	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
     	    	return DESTINED_FOR_BROADCAST;
     	} else {
-			printf("incoming broadcast\n");
     		// Case 2. Incoming broadcast packet: send it to port 4 (which eventually send the packet to upper layer)
     		// Also, mark the incoming (ethernet) interface number that connects to this neighbor
     		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(source_hid);
@@ -587,7 +585,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 			  }
     		else
 			  {
-				  printf("adding a neighbor\n");
     			// Make a new entry for this newly discovered neighbor
        			XIARouteData *xrd1 = new XIARouteData();
 				xrd1->port = in_ether_port;
@@ -601,7 +598,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		return DESTINED_FOR_LOCALHOST;
 
     } else {
-		printf("its a packet\n");
     	// Unicast packet
 		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
 		if (it != _rts.end())
@@ -615,7 +611,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		}
 		else
 		{
-			printf("use default route\n");
 			// no match -- use default route
 			// check if outgoing packet
 			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
