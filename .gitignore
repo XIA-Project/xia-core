@@ -32,6 +32,7 @@ xia.mk
 *.dSYM
 .fuse*
 *.gch
+*.log
 
 # directories
 key
