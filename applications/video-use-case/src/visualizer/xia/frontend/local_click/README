@@ -1,0 +1,10 @@
+This directory contains a flash-based visualizer for local click topologies.
+To use it:
+
+1) Make sure your click config file is set up properly:
+    - A single interconnection can't be split over multiple lines
+    - Each interconnection must contain an the following: 'XIAPrint("<element1name> -> <element2name>")'
+
+2) Start click, piping its output to a file: "sudo userLevel/click conf_file 2> trace_file"
+
+3) Open "Visualizer.html" in a browser.

@@ -116,6 +116,8 @@ extern "C" {
 //Function list
 extern int Xsocket(int family, int transport_type, int protocol);
 extern int Xaccept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+
+extern unsigned XgetPrevAcceptHopCount();
 extern int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrlen, struct sockaddr *addr, socklen_t *addrlen);
 extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -139,7 +141,9 @@ extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen)
 
 extern int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen);
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+extern int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
+extern int XregisterAnycastName(const char *name, sockaddr_x *DAG);
 extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID);

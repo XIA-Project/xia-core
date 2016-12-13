@@ -27,6 +27,12 @@
 #include <iostream>
 #include <stdio.h>
 
+static unsigned hop_count = -1;
+
+unsigned XgetPrevAcceptHopCount(){
+	return hop_count;
+}
+
 static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addrlen, struct sockaddr *addr, socklen_t *addrlen)
 {
 	// Xaccept accepts the connection, creates new socket, and returns it.
@@ -63,7 +69,6 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 		}
 		return -1;
 	}
-
 
 	if ((new_sockfd = MakeApiSocket(SOCK_STREAM)) < 0) {
 		LOGF("Error creating new API socket: %s:", strerror(errno));
@@ -128,6 +133,7 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 
 	setConnState(new_sockfd, CONNECTED);
 
+	hop_count = msg->hop_count();
 	return new_sockfd;
 }
 

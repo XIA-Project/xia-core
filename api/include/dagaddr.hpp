@@ -109,6 +109,7 @@ public:
 	void add_edge(std::size_t from_id, std::size_t to_id);
 
 	void print_graph() const;
+	std::string http_url_string() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
@@ -142,6 +143,7 @@ protected:
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
 private:
+	void construct_from_http_url_string(std::string dag_string);
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);

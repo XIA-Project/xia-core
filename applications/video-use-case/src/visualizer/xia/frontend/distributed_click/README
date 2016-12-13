@@ -1,0 +1,40 @@
+                   CLICK NETWORK VISUALIZER
+
+This flashed-based tool displays traffic flowing through a network of click XIA
+elements. There are three components that work together:
+
+	1) 	xia-core/daemons/visualizer/stasserver
+
+		One instance of this executable must be run for the entire network. It
+		aggregates information from each host running click; the visualizer
+		periodically queries the statsserver for this information.
+
+		Passing the "-Z" flag to xia-core/tools/xianet will start the statsserver
+		for you.
+
+	2)	xia-core/daemons/visualizer/xstats
+
+		Each instance of click (typically one per physical host or VM) needs an
+		accompanying instance of the xstats daemon. xstats periodically extracts
+		routing and traffic flow information from click and pushes it to the
+		statsserver. The IP address or hostname of the machine running the
+		statsserver must be supplied to xstats.
+
+		Passing the "-z <server ip>" flag to xia-core/tools/xianet will start
+		the xstats daemon.
+
+	3)	xia-core/visualizations/distributed_click/Visualizer.html
+
+		This is the visualizer itself. Open Visualizer.html in a browswer that
+		supports flash. Make sure that Visualizer.swf is in the same directory
+		as Visualizer.html.
+
+		Supply the address and port of the statsserver and click "Start."
+		For example, the address might be:
+
+		http://localhost:8888
+
+		Flash might proudly declare that it blocked unsafe behavior; to fix this,
+		read the following link:
+		
+		http://helpx.adobe.com/flash-player/kb/communicate-internet-flash-content.html#main_Why_is_my_local_content_being_blocked_

@@ -10,7 +10,9 @@ class FifoPolicy:public xcache_eviction_policy {
 
 public:
 	FifoPolicy() {
-		
+	}
+
+	~FifoPolicy() {
 	}
 
 	int store(xcache_meta *meta) {

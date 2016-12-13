@@ -15,6 +15,7 @@
 #include <errno.h>
 #include "xcache.h"
 
+
 #define DEFAULT_THREADS 2
 #define MAX_XID_SIZE 100
 #define GC_INTERVAL 5
@@ -36,6 +37,7 @@ struct xcache_req {
 	char *cid;
 	void *data;
 	size_t datalen;
+	unsigned hop_count;
 };
 
 class xcache_controller {
@@ -98,7 +100,7 @@ public:
 	 * and then sends appropriate content chunks to the receiver
 	 */
 	int create_sender(void);
-	void send_content_remote(int sock, sockaddr_x *mypath);
+	void send_content_remote(xcache_req *req, sockaddr_x *mypath);
 
 	bool verify_content(xcache_meta *meta, const std::string *);
 
@@ -190,6 +192,7 @@ public:
 	//inline int unlock_meta_map(void);
 
 	int register_meta(std::string &);
+
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);

@@ -70,6 +70,7 @@ extern int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 extern void XbufFree(XcacheBuf *xbuf);
 
 extern int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t addrlen);  //DONE
+extern int XgetPrevFetchHopCount();
 
 //extern int XbufGetChunk(XcacheHandle *h, XcacheBuf *buf, sockaddr_x *addr, socklen_t addrlen, int *flags);
 //

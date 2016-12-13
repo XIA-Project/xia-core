@@ -748,8 +748,18 @@ int main(int argc, char *argv[])
 			while(iter != timeStamp.end())
 			{
 				if (now - iter->second >= EXPIRE_TIME){
-					xr.delRoute(iter->first);
-					syslog(LOG_DEBUG, "purging host route for : %s", iter->first.c_str());
+					//TODO: Re-enable route purges after xrouted
+					// starts handling host registrations with routing that
+					// supports multiple routers in an AD. - Nitin
+					//
+					// Currently, xnetjd/netjoin_session HS3 handler
+					// registers host in routing table directly. In
+					// addition to sending a host register msg to xrouted.
+					// Since router is also registing, that is redundant.
+					//
+					//xr.delRoute(iter->first);
+					//syslog(LOG_DEBUG, "purging host route for : %s", iter->first.c_str());
+					syslog(LOG_DEBUG, "skipped purging host route for : %s", iter->first.c_str());
 					timeStamp.erase(iter++);
 				} else {
 					++iter;

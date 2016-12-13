@@ -462,7 +462,11 @@ Graph::Graph(const Graph& r)
 */
 Graph::Graph(std::string dag_string)
 {
-	if (dag_string.find("DAG") != std::string::npos)
+	if (dag_string.find("http://") != std::string::npos)
+	{
+		construct_from_http_url_string(dag_string);
+	}
+	else if (dag_string.find("DAG") != std::string::npos)
 	{
 		construct_from_dag_string(dag_string);
 	}
@@ -808,7 +812,8 @@ Graph::intent_HID_str() const
 		Node n = get_node(curIndex);
 		if(n.type_string().compare(Node::XID_TYPE_HID_STRING) == 0) {
 			hid = n.to_string();
-//			printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+			//printf("Graph::intent_HID_str Found hid: %s\n", hid.c_str());
+			break;
 		}
 	}
 	return hid;
@@ -881,6 +886,14 @@ Graph::dag_string() const
 	return dag_string;
 }
 
+std::string 
+Graph::http_url_string() const{
+	std::string dag_string = this->dag_string();
+	dag_string.erase(std::remove(dag_string.begin(), dag_string.end(), '\n'), dag_string.end());
+	std::replace(dag_string.begin(), dag_string.end(), ' ', '.');
+	std::replace(dag_string.begin(), dag_string.end(), ':', '$');
+	return "http://" + dag_string;
+}
 
 /**
 * @brief Get the index of the souce node
@@ -1197,6 +1210,14 @@ Graph::get_out_edges(int i) const
 	return out_edges;
 }
 
+void
+Graph::construct_from_http_url_string(std::string url_string){
+	std::string dag_string = url_string.substr(7, std::string::npos);
+	std::replace(dag_string.begin(), dag_string.end(), '.', ' ');
+	std::replace(dag_string.begin(), dag_string.end(), '$', ':');
+	this->construct_from_dag_string(dag_string);
+}
+
 
 void
 Graph::construct_from_dag_string(std::string dag_string)
@@ -1424,7 +1445,6 @@ void
 Graph::from_sockaddr(const sockaddr_x *s)
 {
 	// FIXME: check to be sure it's really a sockaddr_x!
-
 	int num_nodes = s->sx_addr.s_count;
 	// First add nodes to the graph and remember their new indices
 	std::vector<uint8_t> graph_indices;

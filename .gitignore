@@ -32,6 +32,7 @@ xia.mk
 *.dSYM
 .fuse*
 *.gch
+*.log
 
 # directories
 key
@@ -40,8 +41,15 @@ key
 api/session
 applications/example/session
 daemons/session
-
+applications/example/videos/
 daemons/xroute/xrouted
+daemons/xcidrouted/bin/*
+daemons/xcidrouted/log
+!daemons/xcidrouted/bin/cleanup.sh
+!daemons/xcidrouted/bin/getmap.sh
+!daemons/xcidrouted/bin/getworkload.sh
+!daemons/xcidrouted/bin/startrouted.sh
+daemons/xcidrouted/stats/
 arada/waveserver/waveserver
 
 # output from scripts
