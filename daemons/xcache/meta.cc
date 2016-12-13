@@ -150,7 +150,7 @@ int meta_map::walk(void)
 				break;
 
 			case AVAILABLE:
-			printf("walk:available\n");
+			//printf("walk:available\n");
 				// see if it's time to live has expired
 				if (m->ttl() == 0) {
 					++i;
