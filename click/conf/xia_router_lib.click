@@ -311,7 +311,7 @@ elementclass XIARoutingCore {
 
 	xtransport[1] -> Discard; // Port 1 is unused for now.
 
-	Script(write n/proc/rt_HID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
+	Script(write n/proc/rt_FID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 	Script(write n/proc/rt_HID.add - $FALLBACK);
 	Script(write n/proc/rt_AD.add - $FALLBACK);	 // no default route for AD; consider other path
 	Script(write n/proc/rt_SID.add - $FALLBACK);	 // no default route for SID; consider other path
