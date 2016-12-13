@@ -23,7 +23,7 @@ import socket
 numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
 
 # Principal types
-principals = ['AD', 'HID', 'SID', 'CID', 'IP']
+principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
 
 # Pattern to read AD from a network DAG
 adInDagPattern = re.compile('RE\s+(AD:\w+)')
