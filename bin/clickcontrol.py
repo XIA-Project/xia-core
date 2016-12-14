@@ -129,7 +129,6 @@ class ClickControl:
         # Routing tables for each principal type
         #for principal in principals:
         #    elements.append('xrc/n/proc/rt_%s' % principal)
-        elements.append('xrc/n/proc/rt_FID')
 
         # Iterate over the number of interfaces for this host type
         for i in range(numIfaces[hosttype]):
@@ -146,7 +145,8 @@ class ClickControl:
         iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
+        # FIXME: HACK - remove the FID entry once routing is correct
+        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_FID']
         return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host

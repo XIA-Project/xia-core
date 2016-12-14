@@ -16,6 +16,32 @@
 #endif
 CLICK_DECLS
 
+/*
+** TODO:
+** Phase 1
+**	- get FIDs working like the old broadcast HID2
+**	- BHID == FID:fffff....fffff
+**
+**	Phase 2
+**	- remove broadcast semantics
+**		-- delete broadcast FID
+**		-- rework lookup route to not care about broadcast
+**	- allow nodes to register a FID into the route table
+**	- allow nodes to delete a FID
+**	- check to see if we've seen the packet already
+**		- discard if we have
+**	- look at the FID (in our routing table)
+**	- if it's ours
+**		- send it up the stack
+**	- else if it has an interface in the table
+**		- unicast it????
+**	- else
+**		- send it out all the interfaces except the ingress interfaces
+**
+** Phase 3
+**	- ignore external interfaces when reflooding
+*/
+
 FIDRouteEngine::FIDRouteEngine(): _drops(0)
 {
 }
@@ -28,15 +54,12 @@ FIDRouteEngine::~FIDRouteEngine()
 int
 FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    //click_chatter("FIDRouteEngine: configuring %s\n", this->name().c_str());
-
 	_principal_type_enabled = 1;
 	_num_ports = 0;
 
     _rtdata.port = -1;
     _rtdata.flags = 0;
     _rtdata.nexthop = NULL;
-
 
     if (cp_va_kparse(conf, this, errh,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
@@ -69,13 +92,10 @@ FIDRouteEngine::add_handlers()
 	add_write_handler("add4", set_handler4, 0);
 	add_write_handler("set4", set_handler4, (void*)1);
 	add_write_handler("remove", remove_handler, 0);
-	add_write_handler("load", load_routes_handler, 0);
-	add_write_handler("generate", generate_routes_handler, 0);
 	add_data_handlers("drops", Handler::OP_READ, &_drops);
 	add_read_handler("list", list_routes_handler, 0);
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 	add_write_handler("hid", write_handler, (void *)ROUTE_TABLE_HID);
-	add_write_handler("dag", write_handler, (void *)ROUTE_TABLE_DAG);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 }
 
@@ -99,18 +119,6 @@ FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorH
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
-		case ROUTE_TABLE_DAG:
-		{
-			XIAPath dag;
-			if (cp_va_kparse(str, t, errh,
-							 "ROUTE_TABLE_DAG", cpkP + cpkM, cpXIAPath, &dag,
-							 cpEnd) < 0)
-				return -1;
-			t->_local_addr = dag;
-			click_chatter("FIDRouteEngine: DAG is now %s", t->_local_addr.unparse().c_str());
-			return 0;
-
-		}
 		case ROUTE_TABLE_HID:
 		{
 			XID hid;
@@ -156,14 +164,10 @@ FIDRouteEngine::list_routes_handler(Element *e, void * /*thunk */)
 int
 FIDRouteEngine::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-	// handle older style route entries
-
 	String str_copy = conf;
 	String xid_str = cp_shift_spacevec(str_copy);
 
-	if (xid_str.length() == 0)
-	{
-		// ignore empty entry
+	if (xid_str.length() == 0) {
 		return 0;
 	}
 
@@ -248,9 +252,7 @@ FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorH
 {
 	FIDRouteEngine* table = static_cast<FIDRouteEngine*>(e);
 
-	if (xid_str.length() == 0)
-	{
-		// ignore empty entry
+	if (xid_str.length() == 0) {
 		return 0;
 	}
 
@@ -281,170 +283,6 @@ FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorH
 	return 0;
 }
 
-int
-FIDRouteEngine::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
-{
-#if CLICK_USERLEVEL
-	std::ifstream in_f(conf.c_str());
-	if (!in_f.is_open())
-	{
-		errh->error("could not open file: %s", conf.c_str());
-		return -1;
-	}
-
-	int c = 0;
-	while (!in_f.eof())
-	{
-		char buf[1024];
-		in_f.getline(buf, sizeof(buf));
-
-		if (strlen(buf) == 0)
-			continue;
-
-		if (set_handler(buf, e, 0, errh) != 0)
-			return -1;
-
-		c++;
-	}
-	click_chatter("loaded %d entries", c);
-
-	return 0;
-#elif CLICK_LINUXMODLE
-	int c = 0;
-	char buf[1024];
-
-	mm_segment_t old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	struct file * filp = file_open(conf.c_str(), O_RDONLY, 0);
-	if (filp==NULL)
-	{
-		errh->error("could not open file: %s", conf.c_str());
-		return -1;
-	}
-	loff_t file_size = vfs_llseek(filp, (loff_t)0, SEEK_END);
-	loff_t curpos = 0;
-	while (curpos < file_size)	{
-	file_read(filp, curpos, buf, 1020);
-	char * eol = strchr(buf, '\n');
-	if (eol==NULL) {
-			click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
-		break;
-	}
-	curpos+=(eol+1-buf);
-		eol[1] = '\0';
-		if (strlen(buf) == 0)
-			continue;
-
-		if (set_handler(buf, e, 0, errh) != 0) {
-			click_chatter("Error at %s %d\n", __FUNCTION__, __LINE__);
-			return -1;
-	}
-		c++;
-	}
-	set_fs(old_fs);
-
-	click_chatter("XIA routing table loaded %d entries", c);
-	return 0;
-#endif
-}
-
-int
-FIDRouteEngine::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
-{
-#if CLICK_USERLEVEL
-	FIDRouteEngine* table = dynamic_cast<FIDRouteEngine*>(e);
-#else
-	FIDRouteEngine* table = reinterpret_cast<FIDRouteEngine*>(e);
-#endif
-	assert(table);
-
-	String conf_copy = conf;
-
-	String xid_type_str = cp_shift_spacevec(conf_copy);
-	uint32_t xid_type;
-	if (!cp_xid_type(xid_type_str, &xid_type))
-		return errh->error("invalid XID type: ", xid_type_str.c_str());
-
-	String count_str = cp_shift_spacevec(conf_copy);
-	int count;
-	if (!cp_integer(count_str, &count))
-		return errh->error("invalid entry count: ", count_str.c_str());
-
-	String port_str = cp_shift_spacevec(conf_copy);
-	int port;
-	if (!cp_integer(port_str, &port))
-		return errh->error("invalid port: ", port_str.c_str());
-
-#if CLICK_USERLEVEL
-	unsigned short xsubi[3];
-	xsubi[0] = 1;
-	xsubi[1] = 2;
-	xsubi[2] = 3;
-//	unsigned short xsubi_next[3];
-#else
-	struct rnd_state state;
-	prandom32_seed(&state, 1239);
-#endif
-
-	struct click_xia_xid xid_d;
-	xid_d.type = xid_type;
-
-	if (port<0) click_chatter("Random %d ports", -port);
-
-	for (int i = 0; i < count; i++)
-	{
-		uint8_t* xid = xid_d.id;
-		const uint8_t* xid_end = xid + CLICK_XIA_XID_ID_LEN;
-#define PURE_RANDOM
-#ifdef PURE_RANDOM
-		uint32_t seed = i;
-		memcpy(&xsubi[1], &seed, 2);
-		memcpy(&xsubi[2], &(reinterpret_cast<char *>(&seed)[2]), 2);
-		xsubi[0]= xsubi[2]+ xsubi[1];
-#endif
-
-		while (xid != xid_end)
-		{
-#if CLICK_USERLEVEL
-#ifdef PURE_RANDOM
-			*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
-#else
-			*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(nrand48(xsubi));
-#endif
-#else
-			*reinterpret_cast<uint32_t*>(xid) = static_cast<uint32_t>(prandom32(&state));
-			if (i%5000==0)
-				click_chatter("random value %x", *reinterpret_cast<uint32_t*>(xid));
-#endif
-			xid += sizeof(uint32_t);
-		}
-
-		/* random generation from 0 to |port|-1 */
-		XIARouteData *xrd = new XIARouteData();
-		xrd->flags = 0;
-		xrd->nexthop = NULL;
-
-		if (port<0) {
-#if CLICK_LINUXMODULE
-			u32 random = random32();
-#else
-			int random = rand();
-#endif
-			random = random % (-port);
-			xrd->port = random;
-			if (i%5000 == 0)
-				click_chatter("Random port for XID %s #%d: %d ",XID(xid_d).unparse_pretty(e).c_str(), i, random);
-		} else
-			xrd->port = port;
-
-		table->_rts[XID(xid_d)] = xrd;
-	}
-
-	click_chatter("generated %d entries", count);
-	return 0;
-}
-
-
 void
 FIDRouteEngine::push(int in_ether_port, Packet *p)
 {
@@ -457,24 +295,8 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		return;
 	}
 
-    if(in_ether_port == REDIRECT) {
-        // if this is an XCMP redirect packet
-        process_xcmp_redirect(p);
-        p->kill();
-        return;
-    } else {
-    	port = lookup_route(in_ether_port, p);
-    }
+    port = lookup_route(in_ether_port, p);
 
-	//NITIN disable XCMP Redirect packets
-	/*
-    if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
-	  // "local" and "discard" shouldn't send a redirect
-	  Packet *q = p->clone();
-	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
-	  output(4).push(q);
-    }
-	*/
     if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);
@@ -482,12 +304,8 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	else if (port == DESTINED_FOR_LOCALHOST) {
 	  output(1).push(p);
 	}
-	else if (port == DESTINED_FOR_DHCP) {
-	  SET_XIA_PAINT_ANNO(p,port);
-	  output(3).push(p);
-	}
 	else if (port == DESTINED_FOR_BROADCAST) {
-	  for(int i = 0; i <= _num_ports; i++) {
+	  for (int i = 0; i <= _num_ports; i++) {
 		Packet *q = p->clone();
 		SET_XIA_PAINT_ANNO(q,i);
 		//q->set_anno_u8(PAINT_ANNO_OFFSET,i);
@@ -496,128 +314,63 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	  p->kill();
 	}
 	else {
-	  //SET_XIA_PAINT_ANNO(p,UNREACHABLE);
+		//SET_XIA_PAINT_ANNO(p,UNREACHABLE);
+		//p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
 
-	  //p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
-
-        // no match -- discard packet
-	  // Output 9 is for dropping packets.
-	  // let the routing engine handle the dropping.
-	  //_drops++;
-	  //if (_drops == 1)
-      //      click_chatter("Dropping a packet with no match (last message)\n");
-      //  p->kill();
+		// no match -- discard packet
+		// Output 9 is for dropping packets.
+		// let the routing engine handle the dropping.
+		_drops++;
+		if (_drops == 1)
+			click_chatter("Dropping a packet with no match (last message)\n");
+		p->kill();
 	  output(2).push(p);
     }
 }
 
-int
-FIDRouteEngine::process_xcmp_redirect(Packet *p)
-{
-   XIAHeader hdr(p->xia_header());
-   const uint8_t *pay = hdr.payload();
-   XID *dest, *newroute;
-   dest = new XID((const struct click_xia_xid &)(pay[4]));
-   newroute = new XID((const struct click_xia_xid &)(pay[4+sizeof(struct click_xia_xid)]));
-
-   // route update (dst, out, newroute, )
-   HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(*dest);
-   if (it != _rts.end()) {
-   	(*it).second->nexthop = newroute;
-   } else {
-       // Make a new entry for this XID
-       XIARouteData *xrd1 = new XIARouteData();
-
-       int port = _rtdata.port;
-       if(strstr(_local_addr.unparse().c_str(), dest->unparse().c_str())) {
-           port = DESTINED_FOR_LOCALHOST;
-       }
-
-       xrd1->port = port;
-       xrd1->nexthop = newroute;
-       _rts[*dest] = xrd1;
-   }
-
-   return -1;
-}
 
 int
 FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 {
-   const struct click_xia* hdr = p->xia_header();
-   int last = hdr->last;
-   if (last < 0)
-	last += hdr->dnode;
-   const struct click_xia_xid_edge* edge = hdr->node[last].edge;
-   const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
-   const int& idx = current_edge.idx;
-   if (idx == CLICK_XIA_XID_EDGE_UNUSED)
-   {
-	// unused edge -- use default route
-  	return _rtdata.port;
-    }
+	const struct click_xia* hdr = p->xia_header();
+
+	// FIXME: what edge checking still needs to happen?
+	int last = hdr->last;
+
+	if (last < 0) {
+		// the last pointer was still in the initial position
+		//  so the intent node holds the first edge
+		last += hdr->dnode;
+	}
+
+	const struct click_xia_xid_edge* edge = hdr->node[last].edge;
+	const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
+	const int& idx = current_edge.idx;
+
+	if (idx == CLICK_XIA_XID_EDGE_UNUSED) {
+		// unused edge -- use default route
+		return _rtdata.port;
+	}
 
     const struct click_xia_xid_node& node = hdr->node[idx];
 
     XIAHeader xiah(p->xia_header());
 
-    if (_bcast_xid == node.xid) {
-    	// Broadcast packet
+	XIAPath source_path = xiah.src_path();
+	source_path.remove_node(source_path.destination_node());
+	XID source_hid = source_path.xid(source_path.destination_node());
 
-    	XIAPath source_path = xiah.src_path();
-    	source_path.remove_node(source_path.destination_node());
-    	XID source_hid = source_path.xid(source_path.destination_node());
+	// FIXME: can we tell the source interface is from localhost rather than
+	//  checking the source hid?
+	if(_local_hid == source_hid) {
+		// Mark packet for broadcast
+		//  which will duplicate the packet and send each to every interface
+		p->set_nexthop_neighbor_xid_anno(_bcast_xid);
+		return DESTINED_FOR_BROADCAST;
 
-    	if(_local_hid == source_hid) {
-    	    	// Case 1. Outgoing broadcast packet: send it to port 7 (which will duplicate the packet and send each to every interface)
-    	    	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
-    	    	return DESTINED_FOR_BROADCAST;
-    	} else {
-    		// Case 2. Incoming broadcast packet: send it to port 4 (which eventually send the packet to upper layer)
-    		// Also, mark the incoming (ethernet) interface number that connects to this neighbor
-    		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(source_hid);
-    		if (it != _rts.end())
-			  {
-				if ((*it).second->port != in_ether_port) {
-				  // update the entry
-				  (*it).second->port = in_ether_port;
-				}
-			  }
-    		else
-			  {
-    			// Make a new entry for this newly discovered neighbor
-       			XIARouteData *xrd1 = new XIARouteData();
-				xrd1->port = in_ether_port;
-				xrd1->nexthop = new XID(source_hid);
-				_rts[source_hid] = xrd1;
-			  }
-    		return DESTINED_FOR_LOCALHOST;
-    	}
-		// TODO: not sure what this should be??
-		assert(0);
+	} else {
+		// Incoming broadcast packet: send the packet to upper layer
 		return DESTINED_FOR_LOCALHOST;
-
-    } else {
-    	// Unicast packet
-		HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
-		if (it != _rts.end())
-		{
-			XIARouteData *xrd = (*it).second;
-			// check if outgoing packet
-			if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
-				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
-			}
-			return xrd->port;
-		}
-		else
-		{
-			// no match -- use default route
-			// check if outgoing packet
-			if(_rtdata.port != DESTINED_FOR_LOCALHOST && _rtdata.port != FALLBACK && _rtdata.nexthop != NULL) {
-				p->set_nexthop_neighbor_xid_anno(*(_rtdata.nexthop));
-			}
-			return _rtdata.port;
-		}
 	}
 }
 

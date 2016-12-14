@@ -311,18 +311,17 @@ elementclass XIARoutingCore {
 
 	xtransport[1] -> Discard; // Port 1 is unused for now.
 
-	Script(write n/proc/rt_FID.add BHID $DESTINED_FOR_BROADCAST);  // outgoing broadcast packet
 	Script(write n/proc/rt_HID.add - $FALLBACK);
 	Script(write n/proc/rt_AD.add - $FALLBACK);	 // no default route for AD; consider other path
 	Script(write n/proc/rt_SID.add - $FALLBACK);	 // no default route for SID; consider other path
 	Script(write n/proc/rt_CID.add - $FALLBACK);	 // no default route for CID; consider other path
 	Script(write n/proc/rt_IP.add - $FALLBACK);		// no default route for IP; consider other path
+	Script(write n/proc/rt_FID.add - $DESTINED_FOR_BROADCAST);	// by default all FIDs are broadcast unless local
 
 	// TO ADD A NEW USER DEFINED XID (step 4)
 	// create a default fallback route for the new XID
 	//
 	// Script(write n/proc/rt_FOO.add - $FALLBACK);		// no default route for FOO; consider other path
-	Script(write n/proc/rt_FID.add - $DESTINED_FOR_BROADCAST);	// broadcast out to the network
 
 	// quick fix
 	n[3] -> Discard();
