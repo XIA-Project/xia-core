@@ -1504,7 +1504,7 @@ send:
 }
 
 void
-XStream::tcp_respond(tcp_seq_t seq, tcp_seq_t ack, int flags)
+XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 {
 	xtcp th;
 
