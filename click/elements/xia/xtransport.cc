@@ -2000,15 +2000,15 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
-		// Set default AD to point to new RHID
+		// Set default 4ID to point to new RHID
 		cmd = ip_table_str + ".set4";
 		cmdargs = default_4ID + ",0," + new_rhid.unparse() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 	}
 	// Add new RHID route pointing to new RHID
-	cmd = hid_table_str + ".add";
-	cmdargs = new_rhid.unparse() + " " + new_rhid.unparse();
+	cmd = hid_table_str + ".set4";
+	cmdargs = new_rhid.unparse() + "," + String(interface) + "," + new_rhid.unparse() + "," + String(0xffff);
 	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	// Replace intent HID in router's DAG to form new_dag
