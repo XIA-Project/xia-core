@@ -63,8 +63,8 @@ class XIAXIDRouteTable : public Element { public:
 	int get_enabled();
 
 protected:
-    int lookup_route(int in_ether_port, Packet *);
-    int process_xcmp_redirect(Packet *);
+    int lookup_route(Packet *);
+    //int process_xcmp_redirect(Packet *);
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
@@ -83,9 +83,6 @@ private:
 
 	int _principal_type_enabled;
     int _num_ports;
-    XIAPath _local_addr;
-    XID _local_hid;
-    XID _bcast_xid;
 };
 
 CLICK_ENDDECLS

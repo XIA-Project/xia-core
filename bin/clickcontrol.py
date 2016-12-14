@@ -125,9 +125,11 @@ class ClickControl:
 
     # Get a list of elements' write handlers
     def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
+		# FIXME: delete these lines?
         # Routing tables for each principal type
-        for principal in principals:
-            elements.append('xrc/n/proc/rt_%s' % principal)
+        #for principal in principals:
+        #    elements.append('xrc/n/proc/rt_%s' % principal)
+        elements.append('xrc/n/proc/rt_FID')
 
         # Iterate over the number of interfaces for this host type
         for i in range(numIfaces[hosttype]):
