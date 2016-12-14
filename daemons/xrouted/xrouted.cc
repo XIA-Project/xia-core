@@ -222,10 +222,10 @@ int processHello(const char* hello_msg, int interface) {
 		// increase the neighbor count
 		route_state.num_neighbors++;
 
-		// FIXME: HACK until we get new routeing engine
+		// FIXME: HACK until we get new routing daemon implemented
+		// we haven't seen this AD before, so just go ahead and add a route for it's HID
+		// the AD route will be set later when tables are processed
 		xr.setRoute(neighborHID, interface, neighborHID, 0xffff);
-	//	xr.setRoute(neighborAD, interface, neighborHID, 0xffff);
-
 	}
 
 	// 2. update my entry in the networkTable
