@@ -15,7 +15,7 @@
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
 
-#include "taskident.hh" 
+#include "taskident.hh"
 
 /*
 ** FIXME:
@@ -263,7 +263,7 @@ int XTRANSPORT::initialize(ErrorHandler *)
 	_reaper = new Timer(this);
 	_reaper->initialize(this);
 	_reaper->schedule_after_msec(700);
-    
+
 	return 0;
 }
 
@@ -447,7 +447,7 @@ void XTRANSPORT::add_handlers()
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);
-    
+
 }
 
 
@@ -855,9 +855,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
 				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
-                
-                new_sk->initialize(ErrorHandler::default_handler());
-                
+
+				new_sk->initialize(ErrorHandler::default_handler());
+
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
@@ -1132,7 +1132,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	switch (sock_type) {
 	case SOCK_STREAM: {
 		sk = new XStream(this, _sport, id);
-        sk->initialize(ErrorHandler::default_handler());
+		sk->initialize(ErrorHandler::default_handler());
 		break;
 	}
 	case SOCK_RAW:
@@ -2612,19 +2612,19 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
  * Executes socket task, which is used by XStream to output packets.
  */
 bool XTRANSPORT::run_task(Task* task){
-  
-  bool retval = false;
-  
-  TaskIdent* taskIdent = static_cast<TaskIdent*>(task); // living on the edge!
-  const uint32_t taskId = taskIdent->get_id();
 
-  sock *sk = idToSock.get(taskId);
-  
-  if (sk){ // did we find a mapping?
-    retval = sk->run_task(task);
-  }
-  
-  return retval;
+	bool retval = false;
+
+	TaskIdent* taskIdent = static_cast<TaskIdent*>(task); // living on the edge!
+	const uint32_t taskId = taskIdent->get_id();
+
+	sock *sk = idToSock.get(taskId);
+
+	if (sk){ // did we find a mapping?
+		retval = sk->run_task(task);
+	}
+
+	return retval;
 }
 
 

@@ -284,9 +284,9 @@ public:
 	}
 
 	uint32_t NewID();
-    
-    bool run_task(Task*);
-    
+
+	bool run_task(Task*);
+
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -297,9 +297,9 @@ class sock : public Element {
 	friend class XTRANSPORT;
 	public:
 		const char *class_name() const      { return "sock"; }
-    
+
     virtual bool run_task(Task*) { return false; };
-    
+
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;

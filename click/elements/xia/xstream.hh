@@ -186,15 +186,15 @@ public:
 	XStream() : _outputTask(NULL, 0) {}; 
 	~XStream() {};
 
-	const char *class_name() const      { return "XStream"; }
-    
-    bool run_task(Task*);
+	const char *class_name() const  { return "XStream"; }
+
+	bool run_task(Task*);
 
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
 	void check_for_and_handle_pending_recv();
 	/* TCP related core functions */
 	void 	tcp_input(WritablePacket *p);
-	void    tcp_output();
+	void	tcp_output();
 	int		usrsend(WritablePacket *p);
 	void	usrmigrate();
 	void	usrclosed() ;
@@ -218,7 +218,7 @@ public:
 	// XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
 	sock *listening_sock;
-        
+
 private:
 	void set_state(const HandlerState s);
 
@@ -250,8 +250,8 @@ private:
 	// holding location for when xmit buffer is full and we are blocking
 	WritablePacket *_staged;
 	unsigned _staged_seq;
-    
-    TaskIdent _outputTask;
+
+	TaskIdent _outputTask;
 };
 
 /* THE method where we register, and handle any TCP State Updates */
@@ -273,7 +273,7 @@ XStream::tcp_set_state(short state) {
 		set_state(CLOSE);
 		get_transport() -> ChangeState(this, CLOSED);
 		//printf("\t\t\t\tchanged to be reaped\n");
-		reap =  true;
+		reap = true;
 		break;
 	case TCPS_LISTEN:
 		get_transport() -> ChangeState(this, LISTEN);
