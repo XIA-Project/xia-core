@@ -26,6 +26,7 @@ class NetjoinReceiver(threading.Thread):
         self.announcer = announcer    # None, unless running as access point
         self.client_sessions = {}
         self.server_sessions = {}
+        self.existing_sessions = {}
         self.cleanup_sessions = []
 
         logging.debug("Receiver initialized")
@@ -65,6 +66,24 @@ class NetjoinReceiver(threading.Thread):
     def handle_handshake_one(self, message_tuple):
         logging.info("Got HandshakeOne message")
 
+        # Do not create more than one session for a client
+        # unless the previous session was complete (rejoining client)
+        netjoin_msg = message_tuple[0]
+        iface = message_tuple[1]
+        client_key = netjoin_msg.handshake_one.encrypted.client_ephemeral_pubkey
+        identifier = (client_key, iface)
+        if identifier in self.existing_sessions:
+            # TODO: It might be possible to drop all HS1 from existing sessions
+            logging.info("A session with this client already exists")
+            session_state = self.existing_sessions[identifier].state
+            if session_state == NetjoinSession.HS_3_WAIT:
+                self.existing_sessions[identifier].push(message_tuple)
+                return
+
+            if session_state != NetjoinSession.HS_DONE:
+                logging.info("Session not in DONE state, skip this HS1")
+                return
+
         # TODO: Avoid copying announcer's auth because that copies private key
         # Copy the auth session from announcer to bootstrap a new session
         authsession = copy.copy(self.announcer.auth)
@@ -75,6 +94,10 @@ class NetjoinReceiver(threading.Thread):
 
         # TODO: Retrieve session ID from handshake one
         self.server_sessions[session.get_ID()] = session
+
+        # This overwrites any session that was in DONE state
+        # TODO: entries in existing_sessions need to be cleared after join
+        self.existing_sessions[identifier] = session
 
         # Pass handshake one to the corresponding session handler
         session.push(message_tuple)

@@ -25,12 +25,10 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
         return false;
     }
 
-    Timestamp now = Timestamp::now();
-    if(!_pack_String(migrate_payload, now.unparse())) {
+    if(!_pack_String(migrate_payload, migrate_ts)) {
         click_chatter("Failed packing timestamp into migrate message");
         return false;
     }
-	migrate_ts = now.unparse();
 
     return true;
 }

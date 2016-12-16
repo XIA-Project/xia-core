@@ -18,6 +18,7 @@
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
+#include <click/task.hh> /* Task */
 
 #include "clicknet/tcp_timer.h"
 #include "clicknet/tcp_var.h"
@@ -282,6 +283,9 @@ public:
 	}
 
 	uint32_t NewID();
+
+	bool run_task(Task*);
+
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -291,7 +295,10 @@ public:
 class sock : public Element {
 	friend class XTRANSPORT;
 	public:
-		const char *class_name() const      { return "GENERIC_TRANSPORT"; }
+		const char *class_name() const      { return "sock"; }
+
+    virtual bool run_task(Task*) { return false; };
+
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;

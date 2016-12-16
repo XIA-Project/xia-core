@@ -46,6 +46,7 @@ RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
+L2_TYPE="ethernet"      # "dsrc" is the only other supported
 
 # On Arada boxes, don't use -s because /etc/hosts has no entry for hostname
 MACHINE=`uname -m`
@@ -185,6 +186,7 @@ setup()
 			W)
 				REMOTEDSRC=1
 				CONFFLAGS="$CONFFLAGS -W $OPTARG"
+				L2_TYPE="dsrc"
 				;;
 			z)
 				RUN_VISUALIZER_CLIENT=1
@@ -330,7 +332,7 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xnetjd --accesspoint --hostname $host &
+			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
@@ -361,7 +363,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnetjd --client --hostname $host &
+			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;

@@ -7,12 +7,14 @@ import struct
 import logging
 import threading
 import Queue
+import dagaddr
 import c_xsocket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
+from netjoin_dsrc_handler import NetjoinDSRCHandler
 from netjoin_ethernet_handler import NetjoinEthernetHandler
 from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
@@ -22,6 +24,12 @@ from netjoin_handshake_four import NetjoinHandshakeFour
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
     next_session_ID = 1
+    (START,
+                BEACON_RCVD, HS_1_RCVD,
+                HS_2_WAIT, HS_2_RCVD,
+                HS_3_WAIT, HS_3_RCVD,
+                HS_4_WAIT, HS_4_RCVD,
+                HS_DONE) = range(10)
 
     # auth is set on gateway side, new one created on client for handshake 1
     # beacon_id is set only on client side
@@ -30,12 +38,6 @@ class NetjoinSession(threading.Thread):
             receiver=None,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
-        (self.START,
-                self.BEACON_RCVD, self.HS_1_RCVD,
-                self.HS_2_WAIT, self.HS_2_RCVD,
-                self.HS_3_WAIT, self.HS_3_RCVD,
-                self.HS_4_WAIT, self.HS_4_RCVD,
-                self.HS_DONE) = range(10)
 
         self.xianetjoin = ("127.0.0.1", 9882)
         self.beacon = NetjoinBeacon()
@@ -130,6 +132,8 @@ class NetjoinSession(threading.Thread):
 
         if l2_type == LayerTwoIdentifier.ETHERNET:
             l2_handler = NetjoinEthernetHandler()
+        elif l2_type == LayerTwoIdentifier.DSRC:
+            l2_handler = NetjoinDSRCHandler()
         else:
             logging.error("Invalid l2_type: {}".format(l2_type))
 
@@ -201,6 +205,9 @@ class NetjoinSession(threading.Thread):
 
         # Send handshake two
         self.send_netjoin_message(netjoin_h2, interface, theirmac)
+
+        # We don't need to retransmit handshake 2
+        self.disable_retransmission()
 
         # Now we will wait for handshake 3
         self.state = self.HS_3_WAIT
@@ -332,6 +339,13 @@ class NetjoinSession(threading.Thread):
                 logging.error("Failed setting route for {}".format(client_hid))
             else:
                 logging.info("Route set up for {}".format(client_hid))
+            # Inform local xrouted about this HID registration
+            router_register_msg = "2^{}^".format(client_hid)
+            rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
+            router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
+            c_xsocket.Xsendto(rsockfd, router_register_msg, 0, router_dag_str)
+            c_xsocket.Xclose(rsockfd)
+
         # Tell client that gateway side configuration is now complete
         logging.info("Sending handshake four")
         client_session = netjoin_h3.get_client_session_id()
@@ -463,6 +477,8 @@ class NetjoinSession(threading.Thread):
             if self.state == self.HS_3_WAIT:
                 if message_type == "handshake_three":
                     self.handle_handshake_three(message_tuple)
+                elif message_type == "handshake_one":
+                    self.handle_handshake_one(message_tuple)
                 else:
                     logging.error("Invalid message: {}".format(message_type))
                     logging.error("Expected handshake three.")

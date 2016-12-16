@@ -16,6 +16,8 @@
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
 
+#include "taskident.hh"
+
 /*
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
@@ -156,20 +158,20 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	/* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
 
-	_tcp_globals.tcp_keepidle 		= 120;
-	_tcp_globals.tcp_keepintvl 		= 120;
-	_tcp_globals.tcp_maxidle   		= 120;
-	_tcp_globals.tcp_now 			= 0;
-	_tcp_globals.so_recv_buffer_size = 0x10000;
-	_tcp_globals.tcp_mssdflt		= 1024;
-	_tcp_globals.tcp_rttdflt		= TCPTV_SRTTDFLT / PR_SLOWHZ;
-	_tcp_globals.so_flags	   	 	= 0;
-	_tcp_globals.so_idletime		= 0;
+	_tcp_globals.tcp_keepidle         = TCPTV_KEEP_IDLE;
+	_tcp_globals.tcp_keepintvl        = TCPTV_KEEPINTVL;
+	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
+	_tcp_globals.tcp_now              = 0;
+	_tcp_globals.so_recv_buffer_size  = 0x100000;
+	_tcp_globals.tcp_mssdflt          = 1234;
+	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT;
+	_tcp_globals.so_flags             = 0;
+	_tcp_globals.so_idletime          = 0;
 
 	/* TODO: window_scale and use_timestamp were being used uninitialized
 	   setting them to 0 and false respectively for now but need to revisit
 	   especially for the window scale */
-	_tcp_globals.window_scale		= 0;
+	_tcp_globals.window_scale		= 4;
 	_tcp_globals.use_timestamp		= false;
 
 	_verbosity 						= VERB_ERRORS;
@@ -903,6 +905,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
 				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
+
+				new_sk->initialize(ErrorHandler::default_handler());
+
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
@@ -1198,6 +1203,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	switch (sock_type) {
 	case SOCK_STREAM: {
 		sk = new XStream(this, _sport, id);
+		sk->initialize(ErrorHandler::default_handler());
 		break;
 	}
 	case SOCK_RAW:
@@ -1565,12 +1571,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		// Map the source XID to source port
 		XIDtoSock.set(source_xid, tcp_conn);
 
-		// Make us routable
-		addRoute(source_xid);
-		tcp_conn->usropen();
-		ChangeState(tcp_conn, SYN_SENT);
-		ChangeState(sk, SYN_SENT);
-
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 		// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 		// will wait until it gets another message from xtransport notifying it that
@@ -1578,6 +1578,12 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 		tcp_conn->so_error = EINPROGRESS;
 		ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
+
+		// Make us routable
+		addRoute(source_xid);
+		ChangeState(tcp_conn, SYN_SENT);
+		ChangeState(sk, SYN_SENT);
+		tcp_conn->usropen();
 	}
 }
 
@@ -1950,9 +1956,9 @@ bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
         return false;
     }
     // Skip inactive ports
-    if (sk->state == INACTIVE
-			|| sk->state == LISTEN
-			|| sk->state == TIME_WAIT) {
+    if (!(sk->state == SYN_RCVD
+				|| sk->state == SYN_SENT
+				|| sk->state == CONNECTED)) {
         INFO("skipping migration for inactive/listening port");
         INFO("src_path:%s:", sk->src_path.unparse().c_str());
         return false;
@@ -2060,19 +2066,19 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 		// Set default AD to point to new RHID
 		cmd = ad_table_str + ".set4";
-		cmdargs = default_AD + ",0," + new_rhid.c_str() + "," + String(0xffff);
+		cmdargs = default_AD + "," + String(interface) + "," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default HID to point to new RHID
 		cmd = hid_table_str + ".set4";
-		cmdargs = default_HID + ",0," + new_rhid.c_str() + "," + String(0xffff);
+		cmdargs = default_HID + "," + String(interface) + "," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 		// Set default AD to point to new RHID
 		cmd = ip_table_str + ".set4";
-		cmdargs = default_4ID + ",0," + new_rhid.c_str() + "," + String(0xffff);
+		cmdargs = default_4ID + "," + String(interface) + "," + new_rhid.c_str() + "," + String(0xffff);
 		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 	}
@@ -2705,9 +2711,31 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	}
 }
 
+
+/**
+ * Executes socket task, which is used by XStream to output packets.
+ */
+bool XTRANSPORT::run_task(Task* task){
+
+	bool retval = false;
+
+	TaskIdent* taskIdent = static_cast<TaskIdent*>(task); // living on the edge!
+	const uint32_t taskId = taskIdent->get_id();
+
+	sock *sk = idToSock.get(taskId);
+
+	if (sk){ // did we find a mapping?
+		retval = sk->run_task(task);
+	}
+
+	return retval;
+}
+
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XTRANSPORT)
+EXPORT_ELEMENT(sock)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_MT_SAFE(XTRANSPORT)
 ELEMENT_LIBS(-lcrypto -lssl -lprotobuf -L/home/nitingup/work/git/mobility-xia-core/api/lib -ldagaddr)

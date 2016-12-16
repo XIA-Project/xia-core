@@ -248,7 +248,7 @@ struct XIASelfTest {
         }
 
         // RE test
-		/*
+        /*
         {
             const char* s[] = {
                 "AD:0000000000000000000000000000000000000000",
@@ -264,7 +264,7 @@ struct XIASelfTest {
                 assert(p.unparse_re() == s[i]);
             }
         }
-		*/
+        */
 
         // DAG test
         {
@@ -283,10 +283,11 @@ struct XIASelfTest {
         }
 
         // path manipulation test
-		/*
+        /*
         {
             XIAPath p;
             XIAPath::handle_t src_node = p.add_node(XID());
+            p.set_source_node(src_node);
             XIAPath::handle_t dst_node = p.add_node(XID("AD:0000000000000000000000000000000000000000"));
             p.set_destination_node(dst_node);
             p.add_edge(src_node, dst_node);
@@ -324,7 +325,7 @@ struct XIASelfTest {
             assert(p.is_valid());
             click_chatter("%s\n", p.unparse_re().c_str());
         }
-		*/
+        */
 
         click_chatter("test passed.\n");
     }
