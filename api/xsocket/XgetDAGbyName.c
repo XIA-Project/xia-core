@@ -75,20 +75,20 @@ int _send_and_wait(int sock, const char *buf, size_t len,
 		// Wait for a response packet
 		rc = Xselect(sock + 1, &fds, NULL, NULL, &tv);
 		if (rc < 0) {
-			LOGF("Error waiting for response to sent packet");
+			LOG("Error waiting for response to sent packet");
 			return -1;
 		}
 		if (rc == 0) {
-			LOGF("Timed out waiting for response.");
+			LOG("Timed out waiting for response.");
 			if (retries > 1) {
-				LOGF("Will retry by sending packet again");
+				LOG("Will retry by sending packet again");
 			}
 			continue;
 		}
 
 		// This should never happen!
 		if (!FD_ISSET (sock, &fds)) {
-			LOGF("No response, when a response was expected");
+			LOG("No response, when a response was expected");
 			return -1;
 		}
 
@@ -237,7 +237,7 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 
 	//Send a name query to the name server
 	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
-		LOGF("Error sending name query (%d)", rc);
+		LOG("Error sending name query");
 		return -1;
 	}
 
@@ -368,7 +368,7 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	//Send a name query to the name server
 	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
-		LOGF("Error sending name query (%d)", rc);
+		LOG("Error sending name query");
 		return -1;
 	}
 
@@ -462,7 +462,7 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	//Send a name query to the name server
 	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
-		LOGF("Error sending anycast name query (%d)", rc);
+		LOG("Error sending anycast name query");
 		return -1;
 	}
 
@@ -607,8 +607,7 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 
 	//Send the name registration packet to the name server
 	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
-		LOGF("Error sending name registration (%d)", rc);
-		LOGF("ERROR: No registration response", (int)timeout.tv_sec);
+		LOG("Error sending name registration");
 		return -1;
 	}
 
@@ -715,8 +714,7 @@ int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 
 	//Send the name registration packet to the name server
 	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
-		LOGF("Error sending anycast name registration (%d)", rc);
-		LOGF("ERROR: No registration response");
+		LOG("Error sending anycast name registration");
 		return -1;
 	}
 
