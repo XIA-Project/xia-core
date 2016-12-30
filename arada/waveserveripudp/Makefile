@@ -30,7 +30,7 @@ all: $(ALL)
 %.o: %.cc
 	$(CPP) $(CPPFLAGS) $(INCS) -c $< -o $@
 
-waveserveripudp: waveserveripudp.o configfile.o
+waveserveripudp: waveserveripudp.o configfile.o pdrlog.o
 	$(CPP) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
 
 clean:

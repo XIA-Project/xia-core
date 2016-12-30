@@ -34,7 +34,7 @@ int _wavePort = 45624;
 int _pSize = 256; // packet size
 int _burstLen = 1; // number of consecutive packets
 int _sleepTime = 0; // in microsecs
-std::string _dstIpStr = "192.168.3.1";
+std::string _dstIpStr = "192.168.3.101";
 
 
 /**

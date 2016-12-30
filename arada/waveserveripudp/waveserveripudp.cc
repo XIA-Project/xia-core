@@ -1,3 +1,4 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
  * TCP server that provides a simple tx/rx interface to remote nodes.
  * Packets are sent using UDP/IP over WAVE.
@@ -16,6 +17,8 @@
 #include <iomanip> // std::hex, etc
 #include <map> // std::map
 #include <vector> // std::vector
+#include <chrono> // std::chrono::system_clock
+#include <thread> // std::this_thread
 
 // legacy c standard headers
 #include <cmath> // pow()
@@ -31,11 +34,11 @@
 #include <pthread.h> // pthread_*()
 #include <arpa/inet.h> // htons(), ntohs(), etc
 #include <sys/socket.h> // socket(), setsockopt(), bind(), ...
-//#include <sys/types.h> // accept(), freeaddrinfo()
 #include <errno.h> // errno
 
 // my headers
 #include "configfile.h"
+#include "pdrlog.h"
 
 // Global definitions
 #define MTU 66000 // let's support 64K jumbo packets, just in case...
@@ -43,18 +46,35 @@
 #define CLICK_CON_CODE 254 // click connect code, so we know someone's listening
 #define CLICK_DISC_CODE 255 // click disconnect code, so we know it's gone
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+// make life with chrono easier
+using secs = std::chrono::seconds;
+using sysclock = std::chrono::system_clock;
+
+
 /* Global variables, aren't they fun */
-pthread_t _rcvrTid=0;
+pthread_t _rcvrTid=0, _loggerTid=0;
 int _clickSockFd=0, _waveSockFd=0;
 struct sockaddr_in _clickCliAddr;
 bool _isClickCliConn = false;
+PdrLog _pdrLog;
+bool _writePdrLog = false;
+
+#ifdef DEBUG
+unsigned long long nTx=0, nRx=0; // for debug only
+#endif
 
 struct RcvThdArgs {
 	uint64_t myWaveMacInt;
 };
 
-// debug
-unsigned long long nTx=0, nRx=0;
+struct LgrThdArgs{
+  PdrLog& pdrLog;
+  unsigned long timeres;
+  const std::string& logFname;
+  const std::string& myWaveMacStr;
+};
 
 
 /**
@@ -175,6 +195,12 @@ void die(){
     std::cerr << "die(), pthread_cancel(_rcvrTid): " << strerror(errno) << \
         std::endl;
   }
+  
+  // cancel the logger thread (not joined because infinite loop)
+  if (_loggerTid != 0 and pthread_cancel(_loggerTid)){
+    std::cerr << "die(), pthread_cancel(_loggerTid): " << strerror(errno) << \
+        std::endl;
+  }
 
   // close the click comm socket
   if (_clickSockFd != 0){
@@ -228,7 +254,7 @@ void* receiver_thread(void *arg){
 
     if ((rxlen = recvfrom(_waveSockFd, waveRcvBuf, MTU, /*flags*/ 0,
         (struct sockaddr *) &sndrAddr, &sndrAddrLen)) > 0){ // error!
-
+  
       assert(rxlen <= MTU-6);
       assert(rxlen > 14); // must be more than the ethernet header itself!
 
@@ -260,6 +286,23 @@ void* receiver_thread(void *arg){
 
         // copy data contents
         memcpy(&rcvBuf[6], waveRcvBuf, rxlen);        
+
+        if (_writePdrLog){ // if enabled, let us write this RX to the pdr log
+          
+          // we don't want to log packets sent to broadcast address
+          bool isBroadcast = true;
+          for (int i=0; i < 6; i++){
+            if (waveRcvBuf[i] != 0xff){
+              isBroadcast = false;
+            }
+          }
+          
+          if (not isBroadcast){
+            uint64_t srcMacUint64 = 0;
+            std::memcpy(&srcMacUint64, waveRcvBuf+6, 6);
+            _pdrLog.logRx(srcMacUint64);
+          }
+        }
 
 #ifdef DEBUG
         // get sender and destination macs
@@ -392,9 +435,24 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
   }
 
   // send UDP packet
-
+  
+  if (_writePdrLog){ // if enabled, let us write this TX to the pdr log
+    
+    bool isBroadcast = true;
+    for (int i=0; i < 6; i++){
+      if (sndBuf[i] != 0xff){
+        isBroadcast = false;
+      }
+    }
+    
+    if (not isBroadcast){
+      uint64_t dstMacUint64 = 0;
+      std::memcpy(&dstMacUint64, sndBuf, 6);
+      _pdrLog.logTx(dstMacUint64);
+    }
+  }
+  
 #ifdef DEBUG
-if (conLen > 350){
   std::cout << "Wave TX " << std::dec << nTx++ << " " << conLen << "b from ";
 
   for (int i=0; i < 6; i++){
@@ -417,7 +475,6 @@ if (conLen > 350){
   }
   
   std::cout << " (" << dstIpStr << ")" << std::endl;
-}
 #endif
 
   // the packet is now fully assembled and ready to be sent
@@ -428,6 +485,70 @@ if (conLen > 350){
   }
 
   return 0;
+}
+
+/**
+ * This thread periodically writes and resets the PDR log. In between it just
+ * sleeps.
+ */
+void *logger_thread(void *arg){
+
+  // read the arguments
+  LgrThdArgs *threadArgs = (LgrThdArgs *) arg;
+  
+  const std::string& logFname = threadArgs->logFname;
+  
+  // let us open up the log file
+  std::ofstream ofs;
+  ofs.open (logFname, std::ios::out | std::ios::app);
+  
+  if (!ofs.is_open()){ // failure?
+    std::cerr << "logger_thread() couldn't open pdr log file " << logFname << \
+        ". No PDR log will be created." << std::endl;
+    return NULL; // nothing for us here now
+	}
+
+  // if we're starting on a brand new file, let us write a little header for it
+  ofs.seekp(0, std::ios::end); // put cursor at eof
+  if (ofs.tellp() == 0){
+    const std::string& myWaveMacStr = threadArgs->myWaveMacStr;
+    ofs << "# PDR log for MAC " << myWaveMacStr << std::endl << "# Format:" \
+        << std::endl << "# tstamp mac ntx nrx" << std::endl;
+  }
+
+  PdrLog& pdrLog = threadArgs->pdrLog; // the log we shall be writing to
+
+  // configure log periodicity
+  unsigned long timeres = threadArgs->timeres;
+  const sysclock::duration refSleepInt = \
+      std::chrono::duration_cast<sysclock::duration> (secs(timeres));
+
+  sysclock::duration sleepFor = refSleepInt; // how long to sleep
+
+  while(true){
+  
+    std::this_thread::sleep_for(sleepFor); // wait for the right time
+    
+    sysclock::time_point stime = sysclock::now(); // start time
+
+    // reduce granularity to obtain log tstamp
+    const secs logTstampSecs = \
+        std::chrono::duration_cast<secs> (stime.time_since_epoch());
+    const unsigned long logTstamp = logTstampSecs.count() / timeres * 10;
+
+    pdrLog.print(ofs, logTstamp, true /* reset */); // do the actual print
+    ofs.flush(); // write it all out
+
+    sysclock::time_point etime = sysclock::now(); // end time
+    
+    // how long should we sleep for?
+    const sysclock::duration elapTime = etime-stime;
+    sleepFor = refSleepInt - elapTime;
+  }
+  
+  ofs.close();
+
+  return 0; // unreachable code!
 }
 
 
@@ -484,17 +605,17 @@ int main(int argc, char *argv[]){
   }
   
   // wave mac
-  std::string pMyWaveMac = "";
+  std::string pMyWaveMacStr = "";
   try {
-    pMyWaveMac = conf.Value("wave", "mac");
+    pMyWaveMacStr = conf.Value("wave", "mac");
   } catch (const std::string str){
     std::cerr << "Config error: section=wave, value=mac (" << str \
           << ") not found. Exiting." << std::endl;
     die();
   }
   uint64_t myWaveMacInt;
-  if (getMacIntFromStr(pMyWaveMac, myWaveMacInt) < 0){
-    std::cerr << "Invalid wave mac " << pMyWaveMac << ". Exiting." << std::endl;
+  if (getMacIntFromStr(pMyWaveMacStr, myWaveMacInt) < 0){
+    std::cerr << "Invalid wave mac " << pMyWaveMacStr << ". Exiting." << std::endl;
     die();
   }
 
@@ -531,6 +652,56 @@ int main(int argc, char *argv[]){
 #ifdef DEBUG
   std::cout << "Loaded " << macIpMap.size() << " MAC->IP pairs" << std::endl;
 #endif
+
+  // pdr logger
+  _writePdrLog = false;
+  try {
+    _writePdrLog = (bool) std::atoi(conf.Value("pdrlog", "writelog").c_str());
+  } catch (const std::string str){
+    std::cerr << "Config error: section=pdrlog, value=writelog (" << str \
+          << "). PDR log disabled." << std::endl;
+  }
+  
+  // additional processing to be done only if PDR logging is turned on
+  if (_writePdrLog){
+
+    // read time resolution
+    unsigned long timeres = 1; // default seconds
+    try {
+      timeres = \
+          (unsigned long) std::atol(conf.Value("pdrlog", "timeres").c_str());
+
+    } catch (const std::string str){
+      std::cerr << "Config error: section=pdrlog, value=timeres (" << str \
+          << "), using default " << timeres << "." << std::endl;
+    }
+    
+    // read log file name
+    std::string logFname = "pdrlog.txt";
+    try {
+      logFname = conf.Value("pdrlog", "fname");
+
+    } catch (const std::string str){
+      std::cerr << "Config error: section=pdrlog, value=fname (" << str \
+          << "), using default " << logFname << "." << std::endl;
+    }
+    
+    // initialize the arg struct
+    // can only do it now because we can't have uninitialized references
+    LgrThdArgs lgrThdArgs = {
+      _pdrLog,  // pdrLog
+      timeres,  // timeres
+      logFname,  // logFname
+      pMyWaveMacStr,  // myWaveMacStr
+    };
+
+    // finally create the thread
+    if (pthread_create(&_loggerTid, NULL, logger_thread, &lgrThdArgs)){
+      std::cerr << "main(), pthread_create(&_loggerTid): " << \
+        strerror(errno) << std::endl;
+      die();
+    }
+  }
 
   // 3. CREATE WAVE (UDP) SOCKET
   // create the socket
