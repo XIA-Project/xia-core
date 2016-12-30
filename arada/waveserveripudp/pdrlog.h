@@ -12,6 +12,7 @@
 #include <iostream> // std::cout, ...
 
 #include <cstdint> // uint*_t
+#include <ctime> // std::time_t
 #include <semaphore.h> // sem_t
 
 
@@ -36,7 +37,7 @@ public:
 
 	void logTx(const uint64_t dstMac);
   void logRx(const uint64_t srcMac);
-	void print(std::ostream &ofs, const unsigned long tstamp, bool reset);
+	void print(std::ostream &ofs, const std::time_t tstamp, bool reset);
 
 private:
 

@@ -27,7 +27,7 @@
 #include <cstdint> // uint*_t
 #include <cstring> // strerror(), memcpy(), memset()
 #include <cassert> // assert()
-#include <ctime> // time()
+#include <ctime> // std::time_t
 
 // unix headers
 #include <unistd.h> // getpid()
@@ -71,7 +71,7 @@ struct RcvThdArgs {
 
 struct LgrThdArgs{
   PdrLog& pdrLog;
-  unsigned long timeres;
+  std::time_t timeres;
   const std::string& logFname;
   const std::string& myWaveMacStr;
 };
@@ -519,31 +519,25 @@ void *logger_thread(void *arg){
   PdrLog& pdrLog = threadArgs->pdrLog; // the log we shall be writing to
 
   // configure log periodicity
-  unsigned long timeres = threadArgs->timeres;
-  const sysclock::duration refSleepInt = \
-      std::chrono::duration_cast<sysclock::duration> (secs(timeres));
-
-  sysclock::duration sleepFor = refSleepInt; // how long to sleep
+  const unsigned long timeres = threadArgs->timeres;
+  sysclock::time_point nextTimepoint = sysclock::from_time_t(0);
 
   while(true){
   
-    std::this_thread::sleep_for(sleepFor); // wait for the right time
+    std::this_thread::sleep_until(nextTimepoint); // wait for the right time
     
-    sysclock::time_point stime = sysclock::now(); // start time
+    // take note of current time with desired granularity
+    sysclock::time_point nowTimepoint = sysclock::now();
+    const secs nowTstampSecs = \
+        std::chrono::duration_cast<secs> (nowTimepoint.time_since_epoch());
+    const std::time_t nowTstamp = nowTstampSecs.count() / timeres * timeres;
 
-    // reduce granularity to obtain log tstamp
-    const secs logTstampSecs = \
-        std::chrono::duration_cast<secs> (stime.time_since_epoch());
-    const unsigned long logTstamp = logTstampSecs.count() / timeres * 10;
-
-    pdrLog.print(ofs, logTstamp, true /* reset */); // do the actual print
+    pdrLog.print(ofs, nowTstamp, true /* reset */); // do the actual print
     ofs.flush(); // write it all out
-
-    sysclock::time_point etime = sysclock::now(); // end time
     
     // how long should we sleep for?
-    const sysclock::duration elapTime = etime-stime;
-    sleepFor = refSleepInt - elapTime;
+    const std::time_t nextTstamp = nowTstamp + timeres;
+    nextTimepoint = sysclock::from_time_t(nextTstamp);
   }
   
   ofs.close();
@@ -666,10 +660,10 @@ int main(int argc, char *argv[]){
   if (_writePdrLog){
 
     // read time resolution
-    unsigned long timeres = 1; // default seconds
+    std::time_t timeres = 1; // default seconds
     try {
       timeres = \
-          (unsigned long) std::atol(conf.Value("pdrlog", "timeres").c_str());
+          (std::time_t) std::atol(conf.Value("pdrlog", "timeres").c_str());
 
     } catch (const std::string str){
       std::cerr << "Config error: section=pdrlog, value=timeres (" << str \

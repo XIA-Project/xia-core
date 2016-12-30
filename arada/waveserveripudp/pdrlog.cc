@@ -72,7 +72,7 @@ void PdrLog::logRx(const uint64_t srcMac){
  * Print the pdr log using the following format: tstamp mac ntx nrx
  * Optionally reset the log at the end.
  */
-void PdrLog::print(std::ostream &ofs, const unsigned long tstamp, bool reset){
+void PdrLog::print(std::ostream &ofs, const std::time_t tstamp, bool reset){
 
   this->lock();
 
