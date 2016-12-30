@@ -18,22 +18,22 @@
 
 PdrLog::PdrLog() : m_log(), m_logsem() {
 
-	// initialize semaphore protecting concurrent access to log
-	if (sem_init(&m_logsem, 0, 1) == -1) {
+  // initialize semaphore protecting concurrent access to log
+  if (sem_init(&m_logsem, 0, 1) == -1) {
     std::stringstream ss;
-		ss << "In PdrLog::~PdrLog() sem_init(): " << strerror(errno) << std::endl;
+    ss << "In PdrLog::~PdrLog() sem_init(): " << strerror(errno) << std::endl;
     throw std::runtime_error(ss.str());
-	}
+  }
 }
 
 PdrLog::~PdrLog(){
-	
+
   // destroy the semaphore
-	if (sem_destroy(&m_logsem) != 0){
+  if (sem_destroy(&m_logsem) != 0){
     std::stringstream ss;
-		ss << "In PdrLog::~PdrLog() sem_close(): " << strerror(errno) << std::endl;
+    ss << "In PdrLog::~PdrLog() sem_close(): " << strerror(errno) << std::endl;
     throw std::runtime_error(ss.str());
-	}
+  }
 }
 
 /**
@@ -48,7 +48,7 @@ void PdrLog::logTx(const uint64_t dstMac){
   } else{
     m_log[dstMac].ntx++;
   }
-  
+
   this->release();
 }
 
@@ -76,7 +76,7 @@ void PdrLog::print(std::ostream &ofs, const std::time_t tstamp, bool reset){
 
   this->lock();
 
-	for (PdrLogMap::const_iterator logitr = m_log.begin(); \
+  for (PdrLogMap::const_iterator logitr = m_log.begin(); \
       logitr != m_log.end(); ++logitr){
     
     ofs << std::dec << tstamp << " ";
@@ -94,7 +94,7 @@ void PdrLog::print(std::ostream &ofs, const std::time_t tstamp, bool reset){
     
     const PdrLogEntry& logEntry = logitr->second;
     ofs << " " << std::dec << logEntry.ntx << " " << logEntry.nrx << std::endl;
-	}
+  }
   
   if (reset){ // reset the log if that's the case
     m_log.clear();
@@ -108,12 +108,12 @@ void PdrLog::print(std::ostream &ofs, const std::time_t tstamp, bool reset){
  * Acquire log lock. Beware of deadlocks!
  */
 void PdrLog::lock(){
-	
-	if (sem_wait(&m_logsem)){
+  
+  if (sem_wait(&m_logsem)){
     std::stringstream ss;
-		ss << "In PdrLog::lock() sem_wait(): " << strerror(errno) << std::endl;
+    ss << "In PdrLog::lock() sem_wait(): " << strerror(errno) << std::endl;
     throw std::runtime_error(ss.str());
-	}
+  }
 }
 
 /**
@@ -121,9 +121,9 @@ void PdrLog::lock(){
  */
 void PdrLog::release(){
 
-	if (sem_post(&m_logsem)){
+  if (sem_post(&m_logsem)){
     std::stringstream ss;
     ss << "In PdrLog::release() sem_post(): " << strerror(errno) << std::endl;
-		throw std::runtime_error(ss.str());
-	}
+    throw std::runtime_error(ss.str());
+  }
 }

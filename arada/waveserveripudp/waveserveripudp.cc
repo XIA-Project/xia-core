@@ -66,7 +66,7 @@ unsigned long long nTx=0, nRx=0; // for debug only
 #endif
 
 struct RcvThdArgs {
-	uint64_t myWaveMacInt;
+  uint64_t myWaveMacInt;
 };
 
 struct LgrThdArgs{
@@ -506,7 +506,7 @@ void *logger_thread(void *arg){
     std::cerr << "logger_thread() couldn't open pdr log file " << logFname << \
         ". No PDR log will be created." << std::endl;
     return NULL; // nothing for us here now
-	}
+  }
 
   // if we're starting on a brand new file, let us write a little header for it
   ofs.seekp(0, std::ios::end); // put cursor at eof

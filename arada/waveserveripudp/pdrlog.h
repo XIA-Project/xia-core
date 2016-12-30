@@ -17,8 +17,8 @@
 
 
 struct PdrLogEntry{
-    unsigned long ntx = 0;
-    unsigned long nrx = 0;
+  unsigned long ntx = 0;
+  unsigned long nrx = 0;
 }; // PdrLogEntry
 
 
@@ -32,22 +32,21 @@ class PdrLog {
 
 public:
 
-	PdrLog();
-	~PdrLog();
+  PdrLog();
+  ~PdrLog();
 
-	void logTx(const uint64_t dstMac);
+  void logTx(const uint64_t dstMac);
   void logRx(const uint64_t srcMac);
-	void print(std::ostream &ofs, const std::time_t tstamp, bool reset);
+  void print(std::ostream &ofs, const std::time_t tstamp, bool reset);
 
 private:
 
   void lock();
   void release();
 
-	PdrLogMap m_log; /* the log per se*/
-	sem_t m_logsem;
-		
+  PdrLogMap m_log; /* the log per se*/
+  sem_t m_logsem;
+
 }; // PdrLog
-	
 
 #endif // PDRLOG_H

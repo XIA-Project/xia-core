@@ -20,10 +20,10 @@ public:
     ConfigFile(std::string const& configFile);
     
     std::vector<std::string> GetSections();
-	
+
     std::string const& Value(std::string const& section, 
                              std::string const& entry) const;
-	
+
     std::string const& Value(std::string const& section, 
                              std::string const& entry, 
                              std::string const& value);
