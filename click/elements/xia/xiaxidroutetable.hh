@@ -82,7 +82,6 @@ private:
     uint32_t _drops;
 
 	int _principal_type_enabled;
-    int _num_ports;
 };
 
 CLICK_ENDDECLS

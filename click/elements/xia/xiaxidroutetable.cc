@@ -25,22 +25,15 @@ XIAXIDRouteTable::~XIAXIDRouteTable()
 }
 
 int
-XIAXIDRouteTable::configure(Vector<String> &conf, ErrorHandler *errh)
+XIAXIDRouteTable::configure(Vector<String> & /*conf*/, ErrorHandler * /*errh*/)
 {
     //click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
-	_num_ports = 0;
 
     _rtdata.port = -1;
     _rtdata.flags = 0;
     _rtdata.nexthop = NULL;
-
-
-    if (cp_va_kparse(conf, this, errh,
-		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
-		cpEnd) < 0)
-	return -1;
 
 	return 0;
 }
@@ -455,27 +448,8 @@ XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 	else if (port == DESTINED_FOR_LOCALHOST) {
 	  output(1).push(p);
 	}
-	else if (port == DESTINED_FOR_BROADCAST) {
-	  for(int i = 0; i <= _num_ports; i++) {
-		Packet *q = p->clone();
-		SET_XIA_PAINT_ANNO(q,i);
-		//q->set_anno_u8(PAINT_ANNO_OFFSET,i);
-		output(0).push(q);
-	  }
-	  p->kill();
-	}
 	else {
-	  //SET_XIA_PAINT_ANNO(p,UNREACHABLE);
-
-	  //p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
-
-        // no match -- discard packet
-	  // Output 9 is for dropping packets.
-	  // let the routing engine handle the dropping.
-	  //_drops++;
-	  //if (_drops == 1)
-      //      click_chatter("Dropping a packet with no match (last message)\n");
-      //  p->kill();
+      // no route, feed back into the route engine
 	  output(2).push(p);
     }
 }

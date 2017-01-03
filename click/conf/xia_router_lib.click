@@ -115,7 +115,7 @@ elementclass XIAPacketRoute {
 	// rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO :: XIAXIDRouteTable($num_ports);
 	// c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, [2]output;
 
-	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable($num_ports);
+	rt_AD, rt_HID, rt_SID, rt_CID, rt_IP :: XIAXIDRouteTable();
 	rt_FID :: FIDRouteEngine($num_ports);
 	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, [2]output;
 
