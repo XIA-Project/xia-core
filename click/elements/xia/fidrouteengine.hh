@@ -37,11 +37,8 @@ so use the XIACheckDest element before using this element.
 #define UNREACHABLE -6
 #define FALLBACK -7
 
-// typedef struct {
-// 	int	port;
-// 	unsigned flags;
-// 	XID *nexthop;
-// } XIARouteData;
+// special flood destination (localhost and re-flood)
+#define DESTINED_FOR_FLOOD_ALL -8
 
 class FIDRouteEngine : public Element { public:
 

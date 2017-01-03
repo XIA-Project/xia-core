@@ -286,7 +286,7 @@ FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorH
 void
 FIDRouteEngine::push(int in_ether_port, Packet *p)
 {
-    int port;
+	int port;
 
 	in_ether_port = XIA_PAINT_ANNO(p);
 
@@ -295,37 +295,46 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		return;
 	}
 
-    port = lookup_route(in_ether_port, p);
+	port = lookup_route(in_ether_port, p);
 
-    if (port >= 0) {
-	  SET_XIA_PAINT_ANNO(p,port);
-	  output(0).push(p);
-	}
-	else if (port == DESTINED_FOR_LOCALHOST) {
-	  output(1).push(p);
-	}
-	else if (port == DESTINED_FOR_BROADCAST) {
-	  for (int i = 0; i <= _num_ports; i++) {
-		Packet *q = p->clone();
-		SET_XIA_PAINT_ANNO(q,i);
-		//q->set_anno_u8(PAINT_ANNO_OFFSET,i);
-		output(0).push(q);
-	  }
-	  p->kill();
-	}
-	else {
-		//SET_XIA_PAINT_ANNO(p,UNREACHABLE);
-		//p->set_anno_u8(PAINT_ANNO_OFFSET,UNREACHABLE);
+	if (port >= 0) {
+		SET_XIA_PAINT_ANNO(p,port);
+		output(0).push(p);
 
-		// no match -- discard packet
-		// Output 9 is for dropping packets.
-		// let the routing engine handle the dropping.
-		_drops++;
-		if (_drops == 1)
-			click_chatter("Dropping a packet with no match (last message)\n");
+	} else if (port == DESTINED_FOR_LOCALHOST) {
+		output(1).push(p);
+
+	} else if (port == DESTINED_FOR_FLOOD_ALL) {
+
+		// reflood the packet
+		// for (int i = 0; i <= _num_ports; i++) {
+		// 	if (i != in_ether_port) {
+		// 		printf("reflooding\n");
+		// 		Packet *q = p->clone();
+		// 		SET_XIA_PAINT_ANNO(q, i);
+		// 		output(0).push(q);
+		// 	}
+		// }`
+
+		// and handle it locally
+		output(1).push(p);
+
+	} else if (port == DESTINED_FOR_BROADCAST) {
+		// send it out on all interfaces except the one it came in on
+		// FIXME: eventually restrict external interfaces as well
+		for (int i = 0; i <= _num_ports; i++) {
+			if (i != in_ether_port) {
+				Packet *q = p->clone();
+				SET_XIA_PAINT_ANNO(q, i);
+				output(0).push(q);
+			}
+		}
 		p->kill();
-	  output(2).push(p);
-    }
+
+	} else {
+		// no route, consider fallbacks
+		output(2).push(p);
+	}
 }
 
 
@@ -353,25 +362,55 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	}
 
     const struct click_xia_xid_node& node = hdr->node[idx];
+	XID f(node.xid);
 
-    XIAHeader xiah(p->xia_header());
-
-	XIAPath source_path = xiah.src_path();
-	source_path.remove_node(source_path.destination_node());
-	XID source_hid = source_path.xid(source_path.destination_node());
-
-	// FIXME: can we tell the source interface is from localhost rather than
-	//  checking the source hid?
-	if(_local_hid == source_hid) {
-		// Mark packet for broadcast
-		//  which will duplicate the packet and send each to every interface
+	// we're initiating a flood
+	if (in_ether_port == DESTINED_FOR_LOCALHOST) {
+		// Mark packet for flooding
+		//  which will duplicate the packet and send to every interface
 		p->set_nexthop_neighbor_xid_anno(_bcast_xid);
 		return DESTINED_FOR_BROADCAST;
+	}
+
+	// have we seen this packet already?
+	// FIXME: add check to see if we have seen this packet before
+	if (0) {
+		// we've seen it
+		return DESTINED_FOR_DISCARD;
+	}
+
+	// it's a new packet that may or may not be destined for me
+
+	// FIXME: if we keep the global value, should we handle it like
+	// this or use the routing table like below?
+	if (f == _bcast_xid) {
+		// it's the global FID
+		// FIXME: is this a temporary case?
+
+		// we want to handle this locally and also reflood it
+		return DESTINED_FOR_FLOOD_ALL;
+	}
+
+	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
+	if (it != _rts.end()) {
+		XIARouteData *xrd = (*it).second;
+
+		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
+			// set next hop annotation if the packet is going back out
+			// this is unlikely to ever happen unless we have added specific routes for an FID
+			// on a different host
+			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
+		}
+
+		return xrd->port;
 
 	} else {
-		// Incoming broadcast packet: send the packet to upper layer
-		return DESTINED_FOR_LOCALHOST;
+		// not a global broadcast and not for us, just reflood it
+		p->set_nexthop_neighbor_xid_anno(_bcast_xid);
+		return DESTINED_FOR_BROADCAST;
 	}
+
+	assert(0);
 }
 
 CLICK_ENDDECLS
