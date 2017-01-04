@@ -173,8 +173,6 @@ public:
 	ErrorHandler    *_errhandler;
 
 public:
-	XIAXIDRouteTable *_routeTable;
-
 	// list of ids wanting xcmp notifications
 	list<uint32_t> xcmp_listeners;
 
@@ -247,6 +245,7 @@ public:
 	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -272,14 +271,12 @@ public:
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	// modify routing table
-	void addRoute(const XID &sid) {
-		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-		HandlerCall::call_write(_routeTable, "add", cmd);
+	void manageRoute(const XID &xid, bool create);
+	void addRoute(const XID &xid) {
+		manageRoute(xid, true);
 	}
-
-	void delRoute(const XID &sid) {
-		String cmd = sid.unparse();
-		HandlerCall::call_write(_routeTable, "remove", cmd);
+	void delRoute(const XID &xid) {
+		manageRoute(xid, false);
 	}
 
 	uint32_t NewID();

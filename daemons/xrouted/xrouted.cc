@@ -164,6 +164,10 @@ void processHostRegister(const char* host_register_msg, int interface) {
   		start = found+1;  // forward the search point
   	}
 
+
+	// FIXME: only do this if we haven't seen the HID before
+	// should HIDs go into neighbor table?
+
 	printf("xrouted: Routing table entry: interface=%d, host=%s\n", interface, hostHID.c_str());
 	// update the host entry in (click-side) HID table
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
@@ -527,6 +531,9 @@ void updateClickRoutingTable() {
 void initRouteState()
 {
 	char dag[MAX_DAG_SIZE];
+	char fid[MAX_XID_SIZE];
+
+	XcreateFID(fid, MAX_XID_SIZE);
 
 	// make the dest DAG (broadcast to other routers)
 	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);

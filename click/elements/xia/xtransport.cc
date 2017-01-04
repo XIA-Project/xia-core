@@ -147,7 +147,6 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	XIAPath local_addr;
 	String hostname;
 	XID local_4id;
-	Element* routing_table_elem;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
     char xidString[50];
@@ -183,7 +182,6 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (cp_va_kparse(conf, this, errh,
 						 "HOSTNAME", cpkP + cpkM, cpString, &hostname,
 						 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
-						 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 						 "NUM_PORTS", cpkP+cpkM, cpInteger, &_num_ports,
 						 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 						 "IDLETIME", 0, cpUnsigned, &(_tcp_globals.so_idletime),
@@ -219,12 +217,6 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_null_4id.parse("IP:0.0.0.0");
 
 	_is_dual_stack_router = is_dual_stack_router;
-
-#if USERLEVEL
-	_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
-#else
-	_routeTable = reinterpret_cast<XIAXIDRouteTable*>(routing_table_elem);
-#endif
 
 	return 0;
 }
@@ -297,7 +289,23 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	}
 }
 
+void XTRANSPORT::manageRoute(const XID &xid, bool create)
+{
+	String xidstr = xid.unparse();
 
+	// get the type string of the XID
+	int i = xidstr.find_left(':');
+	assert (i != -1);
+	String typestr = xidstr.substring(0, i).upper();
+
+	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+
+	if (create) {
+		HandlerCall::call_write(table + ".add", xidstr + " " + String(DESTINED_FOR_LOCALHOST), this);
+	} else {
+		HandlerCall::call_write(table + ".remove", xidstr, this);
+	}
+}
 
 /*************************************************************
 ** HANDLER FUNCTIONS
@@ -1083,6 +1091,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XNOTIFY:
 		Xnotify(_sport, id, &xia_socket_msg);
+		break;
+	case xia::XMANAGEFID:
+		XmanageFID(_sport, id, &xia_socket_msg);
 		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
@@ -2600,6 +2611,26 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 		xsm_cpy->CopyFrom(*xia_socket_msg);
 		sk->pending_recv_msg = xsm_cpy;
 	}
+}
+
+void XTRANSPORT::XmanageFID(unsigned short _sport, uint32_t /*id*/, xia::XSocketMsg *xia_socket_msg)
+{
+	int rc = 0, ec = 0;
+
+	xia::X_ManageFID_Msg *x_fid_msg = xia_socket_msg->mutable_x_manage_fid();
+
+	bool create = x_fid_msg->create();
+	String fid(x_fid_msg->fid().c_str());
+
+	DBG("%s: %s", create ? "create" : "remove", fid.c_str());
+
+	if (create) {
+		addRoute(fid);
+	} else {
+		delRoute(fid);
+	}
+
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
 }
 
 CLICK_ENDDECLS

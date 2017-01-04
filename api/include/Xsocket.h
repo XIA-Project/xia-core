@@ -152,6 +152,9 @@ extern int XsetXcacheSID(int sockfd, char *, unsigned);
 extern int Xgetifaddrs(struct ifaddrs **ifap);
 extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
+extern int XcreateFID(char *fid, int len);
+extern int XremoveFID(const char *fid);
+
 /* internal only functions */
 extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
 extern int XupdateRV(int sockfd, int interface, const char *rv_control_dag);
