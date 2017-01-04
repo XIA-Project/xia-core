@@ -280,6 +280,9 @@ public:
 	}
 
 	uint32_t NewID();
+
+	uint32_t NextFIDSeqNo(sock *sk, XIAPath &dst);
+
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -359,6 +362,11 @@ class sock : public Element {
 	unsigned short nxt_xport;
 
 	int refcount;				// # of processes that have this socket open
+
+	/* =========================
+	 * Flooding state
+	 * ========================= */
+	 HashTable<XID, uint32_t > flood_sequence_numbers;
 
 	/* =========================
 	 * "TCP" state

@@ -503,6 +503,38 @@ char *XTRANSPORT::random_xid(const char *type, char *buf)
 }
 
 
+// FIXME: should we allow for multiple FIDs in the DAG?
+uint32_t XTRANSPORT::NextFIDSeqNo(sock *sk, XIAPath &dst)
+{
+	Vector<XID> fids;
+	uint32_t fid_seq = 0;
+	dst.find_nodes_of_type(CLICK_XIA_XID_TYPE_FID, fids);
+
+	if (!fids.empty()) {
+		Vector<XID>::iterator it = fids.begin();
+		while (it != fids.end()) {
+			INFO("Found FID in DAG: %s\n", it->unparse().c_str());
+			HashTable<XID, uint32_t>::iterator it1 = sk->flood_sequence_numbers.find(*it);
+			if (it1 != sk->flood_sequence_numbers.end()) {
+				fid_seq = it1->second;
+				printf("found seq # %u\n", fid_seq);
+			} else if (fid_seq == 0) {
+				fid_seq = rand();
+				printf("setting seq # to %u\n", fid_seq);
+			}
+			uint32_t next = fid_seq + 1;
+			if (next == 0) {
+				next = 100;
+			}
+			sk->flood_sequence_numbers[*it] = next;
+			it++;
+		}
+	}
+
+	return fid_seq;
+}
+
+
 
 const char *XTRANSPORT::SocketTypeStr(int stype)
 {
@@ -2491,6 +2523,8 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 	}
 
+	uint32_t fid_seq = NextFIDSeqNo(sk, dst_path);
+
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 
@@ -2510,17 +2544,30 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		p = xiah.encap(just_payload_part, false);
 
 	} else {
-		xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
-		xiah.set_plen(pktPayloadSize);
-
-		//Add XIA Transport headers
 		DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+		FIDHeaderEncap *fhdr = NULL;
+
 		p = dhdr->encap(just_payload_part);
 
-		xiah.set_plen(pktPayloadSize + dhdr->hlen()); // XIA payload = transport header + transport-layer data
+		if (fid_seq == 0) {
+			xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
+			xiah.set_plen(pktPayloadSize + dhdr->hlen()); // XIA payload = transport header + transport-layer data
+
+		} else {
+			// we need to insert a FID header before the Datagram header
+			fhdr = new FIDHeaderEncap(CLICK_XIA_NXT_XDGRAM, fid_seq);
+
+			p = fhdr->encap(p);
+			xiah.set_nxt(CLICK_XIA_NXT_FID);
+			xiah.set_plen(pktPayloadSize + + fhdr->hlen() + dhdr->hlen());
+		}
+
 
 		p = xiah.encap(p, false);
 		delete dhdr;
+		if (fhdr) {
+			delete fhdr;
+		}
 	}
 
 	output(NETWORK_PORT).push(p);
