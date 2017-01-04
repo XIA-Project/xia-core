@@ -726,6 +726,17 @@ XIAPath::find_intent_sid()
 	return intent_sid_node;
 }
 
+// FIXME: do we ever need more than one FID?
+void
+XIAPath::find_nodes_of_type(uint32_t type, Vector<XID> &v)
+{
+	for (int i = 0; i < _nodes.size(); i++) {
+		if (_nodes[i].xid.type() == ntohl(type)) {
+			v.push_back(_nodes[i].xid);
+		}
+	}
+}
+
 Vector<XIAPath::handle_t>
 XIAPath::next_nodes(handle_t node) const
 {
