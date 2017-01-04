@@ -21,7 +21,6 @@
 #include <thread> // std::this_thread
 
 // legacy c standard headers
-#include <cmath> // pow()
 #include <csignal> // signal()
 #include <cstdlib> // strtoul()
 #include <cstdint> // uint*_t
@@ -107,6 +106,7 @@ int stringSplit(const std::string &str, char c,
   return nstrings;
 }
 
+
 /**
  * Extract a MAC address
  * Returns 0 on success, -1 on failure.
@@ -121,15 +121,17 @@ int getMacIntFromStr(const std::string &macStr, uint64_t &macInt){
     return -1;
   }
 
-  macInt = 0;
-  int exp = 0;
-  for (std::vector<std::string>::reverse_iterator itr = macSplinters.rbegin();
-      itr != macSplinters.rend(); ++itr) {
-
-    const uint8_t macByte = strtoul(itr->c_str(), NULL, 16);
-    macInt += (uint64_t) macByte * pow(16, exp);
-    exp += 2;
+  uint8_t macIntArray[6];
+  int i = 0;
+  for (std::vector<std::string>::const_iterator itr = macSplinters.begin();
+      itr != macSplinters.end(); ++itr) {
+    
+    macIntArray[i++] = strtoul(itr->c_str(), NULL, 16); // extract
   }
+  
+  // copy it over
+  macInt = 0;
+  std::memcpy(&macInt, &macIntArray, 6);
 
   return 0;
 }
@@ -172,7 +174,7 @@ int loadMacIpMap(const std::string &macIpMapFname,
     uint64_t macInt;
     
     if (getMacIntFromStr(macStr, macInt)){
-          std::cerr << "Skipping invalid mac: " << macStr << std::endl;
+      std::cerr << "Skipping invalid mac: " << macStr << std::endl;
       continue; // on to the next line
     }
 
@@ -264,12 +266,7 @@ void* receiver_thread(void *arg){
         // check to see that we ourselves aren't the originator of the message
         // can happen with broadcast packets
         uint64_t srcMacInt = 0;
-        int exp = 0;
-        for (int i=5; i >= 0; i--){
-          const uint8_t macByte = waveRcvBuf[i+6]; // src mac is 2nd in line
-          srcMacInt += (uint64_t) macByte * pow(16, exp);
-          exp += 2;
-        }
+        std::memcpy(&srcMacInt, &waveRcvBuf[6], 6);
 
         if (srcMacInt == myWaveMacInt){ // ignore and move on!
           continue;
@@ -278,14 +275,14 @@ void* receiver_thread(void *arg){
         // copy length
         uint16_t totalPktLen = rxlen + 6;
         const uint16_t totalPktLenNet = htons(totalPktLen);
-        memcpy(&rcvBuf[0], &totalPktLenNet, 2);
+        std::memcpy(&rcvBuf[0], &totalPktLenNet, 2);
         
         // note that there are 4 useless bytes in here, they server to add some
         // padding so the application header is the same length (6 bytes) on
         // both directions
 
         // copy data contents
-        memcpy(&rcvBuf[6], waveRcvBuf, rxlen);        
+        std::memcpy(&rcvBuf[6], waveRcvBuf, rxlen);
 
         if (_writePdrLog){ // if enabled, let us write this RX to the pdr log
           
@@ -298,9 +295,7 @@ void* receiver_thread(void *arg){
           }
           
           if (not isBroadcast){
-            uint64_t srcMacUint64 = 0;
-            std::memcpy(&srcMacUint64, waveRcvBuf+6, 6);
-            _pdrLog.logRx(srcMacUint64);
+            _pdrLog.logRx(srcMacInt);
           }
         }
 
@@ -335,8 +330,9 @@ void* receiver_thread(void *arg){
         char *senderIpStr;
         if ((senderIpStr = inet_ntoa(sndrAddr.sin_addr)) != NULL){
 
-          std::cout << "Wave RX " << std::dec << nRx++ << " " << rxlen << "b from " << \
-              srcMac << " (" << senderIpStr << ") to " << dstMac << std::endl;
+          std::cout << "Wave RX " << std::dec << nRx++ << " " << rxlen << \
+              "b from " << srcMac << " (" << senderIpStr << ") to " << dstMac \
+              << std::endl;
 
         } else{ // unable to figure out sender's IP
 
@@ -368,7 +364,6 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
                      std::map<uint64_t,std::string> &macIpMap,
                      const uint16_t wavePort){
 
-
   assert(pktLen >= 20); // 6 for our header plus 14 for the ethernet header
 
   // deserialize
@@ -376,7 +371,7 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
 
   // packet length
   uint16_t plen;
-  memcpy(&plen, &pktBuf[idx], 2);
+  std::memcpy(&plen, &pktBuf[idx], 2);
   idx += 2;
   plen = ntohs(plen);
   assert(plen == pktLen); // otherwise something's very wrong!
@@ -390,18 +385,13 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
 
   uint8_t sndBuf[MTU];
   assert (conLen <= MTU);
-  memcpy(sndBuf, &pktBuf[idx], conLen);
+  std::memcpy(sndBuf, &pktBuf[idx], conLen);
   idx += conLen;
   assert(idx == pktLen);
 
   // figure out what IP the destination mac corresponds to
   uint64_t dstMacInt = 0;
-  int exp = 0;
-  for (int i=5; i >= 0; i--){
-    const uint8_t macByte = sndBuf[i]; // destination mac is at the beginning
-    dstMacInt += (uint64_t) macByte * pow(16, exp);
-    exp += 2;
-  }
+  std::memcpy(&dstMacInt, &sndBuf, 6);
 
   if (macIpMap.find(dstMacInt) == macIpMap.end()){
 
@@ -446,9 +436,9 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
     }
     
     if (not isBroadcast){
-      uint64_t dstMacUint64 = 0;
-      std::memcpy(&dstMacUint64, sndBuf, 6);
-      _pdrLog.logTx(dstMacUint64);
+      uint64_t dstMacInt = 0;
+      std::memcpy(&dstMacInt, sndBuf, 6);
+      _pdrLog.logTx(dstMacInt);
     }
   }
   
@@ -597,7 +587,7 @@ int main(int argc, char *argv[]){
     std::cerr << "Config error: section=server, value=macipmapfname (" << str \
         << "), using default value " << pMacIpMapFname << "." << std::endl;
   }
-  
+
   // wave mac
   std::string pMyWaveMacStr = "";
   try {
@@ -742,7 +732,7 @@ int main(int argc, char *argv[]){
     std::cerr << "main(), bind(wave): " << strerror(errno) << std::endl;
     die();
   }
-  
+
   // 4. LAUNCH RECEIVER THREAD
   RcvThdArgs rcvThdArgs;
   rcvThdArgs.myWaveMacInt = myWaveMacInt;
@@ -771,13 +761,12 @@ int main(int argc, char *argv[]){
     std::cerr << "main(), socket(click): " << strerror(errno) << std::endl;
     die();
   }
-
   // set reuseaddr option
   // isReuseaddr was previously defined to be true
   if (setsockopt(_clickSockFd, SOL_SOCKET, SO_REUSEADDR, &isReuseaddr, \
       sizeof(isReuseaddr)) == -1){
-    std::cerr << "main(), setsockopt(click, reuseaddr): " << strerror(errno) << \
-        std::endl;
+    std::cerr << "main(), setsockopt(click, reuseaddr): " << strerror(errno) \
+        << std::endl;
     die();
   }
 
