@@ -25,16 +25,37 @@ public:
 	// read from packet p->network_header() should point to XIA header
 	FIDHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_FID);
+		const struct xfid *temp_hdr(reinterpret_cast<const struct xfid*>(xh.next_header()));
 
 		if (xh.nxt() == CLICK_XIA_NXT_FID) {
-			_hdr = reinterpret_cast<const struct xfid*>(xh.next_header());
+			_hdr = reinterpret_cast<const struct xfid *>(xh.next_header());
+
 		} else {
-			_hdr = NULL;
+			click_chatter("Looking for Header of type %d\n", CLICK_XIA_NXT_FID);
+			click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			click_chatter("temp_hdr = %p\n", temp_hdr);
+
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_FID && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+
+				// walk the header chain
+				temp_hdr += (temp_hdr->th_off << 2);
+				click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			}
+
+			if (temp_hdr->th_nxt == CLICK_XIA_NXT_FID) {
+				_hdr = (temp_hdr + (temp_hdr->th_off << 2));
+			} else {
+				// something horrible happened and we're gonna crash
+				click_chatter("Header %d not found!", CLICK_XIA_NXT_FID);
+				_hdr = NULL;
+			}
 		}
+
+		assert (valid());
 	};
 
     inline const struct xfid* header() const { return _hdr; };
+	inline bool valid()            { return _hdr != NULL && _hdr->th_nxt != CLICK_XIA_NXT_DATA; };
 	inline uint8_t nxt() const     { return _hdr->th_nxt; };
 	inline uint8_t hlen() const    { return _hdr->th_off << 2; };
 	inline uint32_t seqnum() const { return _hdr->th_sequence; };
@@ -47,22 +68,12 @@ private:
 class FIDHeaderEncap
 {
 public:
-    FIDHeaderEncap(uint32_t seq = 0) {
+    FIDHeaderEncap(uint32_t next, uint32_t seq = 0) {
 		_hdr = (struct xfid*)calloc(1, sizeof(struct xfid));
-		_hdr->th_nxt = CLICK_XIA_NXT_DATA;
+		_hdr->th_nxt = next;
 		_hdr->th_off = sizeof(struct xfid) >> 2;
 		_hdr->th_sequence = seq;
 	}
-
-    static FIDHeaderEncap* MakeFidHeader(xfid *dgh) {
-		assert(dgh != NULL);
-
-    	FIDHeaderEncap* h = new FIDHeaderEncap();
-
-		memcpy(h->_hdr, dgh, sizeof(struct xfid));
-		h->_hdr->th_off = sizeof(struct xfid) >> 2;
-     	return h;
-    }
 
 	~FIDHeaderEncap() {
 		if (_hdr) {
@@ -70,7 +81,7 @@ public:
 		}
 	}
 
-	// encapsulate the given packet with a Datagram header
+	// encapsulate the given packet with a FID header
 	WritablePacket* encap(Packet* p_in) const
 	{
 	    size_t len = hlen();

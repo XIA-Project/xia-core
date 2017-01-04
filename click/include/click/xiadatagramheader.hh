@@ -25,16 +25,37 @@ public:
 	// read from packet p->network_header() should point to XIA header
 	DatagramHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_XDGRAM);
+		const struct xdgram *temp_hdr(reinterpret_cast<const struct xdgram*>(xh.next_header()));
 
 		if (xh.nxt() == CLICK_XIA_NXT_XDGRAM) {
-			_hdr = reinterpret_cast<const struct xdgram*>(xh.next_header());
+			_hdr = reinterpret_cast<const struct xdgram *>(xh.next_header());
+
 		} else {
-			_hdr = NULL;
+			click_chatter("Looking for Header of type %d\n", CLICK_XIA_NXT_XDGRAM);
+			click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			click_chatter("temp_hdr = %p\n", temp_hdr);
+
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XDGRAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+
+				// walk the header chain
+				temp_hdr += (temp_hdr->th_off << 2);
+				click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			}
+
+			if (temp_hdr->th_nxt == CLICK_XIA_NXT_XDGRAM) {
+				_hdr = (temp_hdr + (temp_hdr->th_off << 2));
+			} else {
+				// something horrible happened and we're gonna crash
+				click_chatter("Header %d not found!", CLICK_XIA_NXT_XDGRAM);
+				_hdr = NULL;
+			}
 		}
+
+		assert (valid());
 	};
 
     inline const struct xdgram* header() const { return _hdr; };
+	inline bool valid()                   { return _hdr != NULL; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
 	inline uint8_t hlen() const           { return _hdr->th_off << 2; };
 	inline const uint8_t* payload() const { return reinterpret_cast<const uint8_t*>(_hdr) + hlen(); };

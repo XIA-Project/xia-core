@@ -18,18 +18,39 @@ public:
 	// read from packet p->network_header() should point to XIA header
 	StreamHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_XSTREAM);
+		const struct xtcp *temp_hdr(reinterpret_cast<const struct xtcp*>(xh.next_header()));
 
 		if (xh.nxt() == CLICK_XIA_NXT_XSTREAM) {
-			_hdr = reinterpret_cast<const struct xtcp*>(xh.next_header());
+			_hdr = reinterpret_cast<const struct xtcp *>(xh.next_header());
+
 		} else {
-			_hdr = NULL;
+			click_chatter("Looking for Header of type %d\n", CLICK_XIA_NXT_XSTREAM);
+			click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			click_chatter("temp_hdr = %p\n", temp_hdr);
+
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XSTREAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+
+				// walk the header chain
+				temp_hdr += (temp_hdr->th_off << 2);
+				click_chatter("Next = %d\n", temp_hdr->th_nxt);
+			}
+
+			if (temp_hdr->th_nxt == CLICK_XIA_NXT_XSTREAM) {
+				_hdr = (temp_hdr + (temp_hdr->th_off << 2));
+			} else {
+				// something horrible happened and we're gonna crash
+				click_chatter("Header %d not found!", CLICK_XIA_NXT_XSTREAM);
+				_hdr = NULL;
+			}
 		}
+
+		assert (valid());
 	};
 
     inline const struct xtcp* header() const { return _hdr; };
+	inline bool valid()                   { return _hdr != NULL; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
-	inline uint16_t hlen() const           { return _hdr->th_off << 2; };
+	inline uint16_t hlen() const          { return _hdr->th_off << 2; };
 	inline uint32_t seq_num() const       { return ntohl(_hdr->th_seq); };
 	inline uint32_t ack_num() const       { return ntohl(_hdr->th_ack); };
 	inline uint32_t recv_window() const   { return ntohl(_hdr->th_win); };
