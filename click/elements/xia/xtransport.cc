@@ -818,7 +818,6 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
-		p_in->kill();
 		return;
 	}
 
