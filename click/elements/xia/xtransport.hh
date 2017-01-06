@@ -366,7 +366,7 @@ class sock : public Element {
 	/* =========================
 	 * Flooding state
 	 * ========================= */
-	 HashTable<XID, uint32_t > flood_sequence_numbers;
+	 HashTable<XIDpair, uint32_t> flood_sequence_numbers;
 
 	/* =========================
 	 * "TCP" state

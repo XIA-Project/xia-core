@@ -22,6 +22,9 @@
 ** - see various FIXMEs in the code
 */
 
+#define FID_BAD_SEQ_NO   1
+#define FID_SEQ_NO_START 100
+
 CLICK_DECLS
 
 sock::sock(
@@ -361,14 +364,14 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	}
 	case HID:
 	{
-		XID hid;
+		XID xid;
 		if (cp_va_kparse(conf, f, errh,
-					"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+					"HID", cpkP + cpkM, cpXID, &xid, cpEnd) < 0)
 			return -1;
-		f->_hid = hid;
-		click_chatter("XTRANSPORT: HID assigned: %s", hid.unparse().c_str());
+		f->_hid = xid;
+		click_chatter("XTRANSPORT: HID assigned: %s", xid.unparse().c_str());
 		// Apply the same HID to all interfaces with DAG *->HID
-		String hid_dag = "RE " + hid.unparse();
+		String hid_dag = "RE " + xid.unparse();
 		click_chatter("XTRANSPORT: Assigning address for all interfaces: %s", hid_dag.c_str());
 		for(int i=0; i<f->_num_ports; i++) {
 			if(!f->_interfaces.add(i, hid_dag)) {
@@ -378,6 +381,10 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		}
 		// Also use the HID dag as our local address until we have a network dag
 		f->_local_addr.parse(hid_dag);
+
+		// register a FID with the same hash as the HID
+		xid.xid().type = htonl(CLICK_XIA_XID_TYPE_FID);
+		f->addRoute(xid);
 		break;
 	}
 	default:
@@ -503,32 +510,39 @@ char *XTRANSPORT::random_xid(const char *type, char *buf)
 }
 
 
-// FIXME: should we allow for multiple FIDs in the DAG?
 uint32_t XTRANSPORT::NextFIDSeqNo(sock *sk, XIAPath &dst)
 {
 	Vector<XID> fids;
 	uint32_t fid_seq = 0;
 	dst.find_nodes_of_type(CLICK_XIA_XID_TYPE_FID, fids);
 
-	if (!fids.empty()) {
-		Vector<XID>::iterator it = fids.begin();
-		while (it != fids.end()) {
-			INFO("Found FID in DAG: %s\n", it->unparse().c_str());
-			HashTable<XID, uint32_t>::iterator it1 = sk->flood_sequence_numbers.find(*it);
-			if (it1 != sk->flood_sequence_numbers.end()) {
-				fid_seq = it1->second;
-				printf("found seq # %u\n", fid_seq);
-			} else if (fid_seq == 0) {
-				fid_seq = rand();
-				printf("setting seq # to %u\n", fid_seq);
+	int count = fids.size();
+	if (count > 1) {
+		// we don't currently support multiple FIDs in DAGs
+		INFO("Invalid DAG: multiple FIDs not allowed");
+		fid_seq = FID_BAD_SEQ_NO;
+
+	} else if (count == 1) {
+		XID fid = fids[0];
+		XID sid = dst.xid(dst.find_intent_sid());
+
+		XIDpair pair(fid, sid);
+
+		HashTable<XIDpair, uint32_t>::iterator it = sk->flood_sequence_numbers.find(pair);
+		if (it != sk->flood_sequence_numbers.end()) {
+			fid_seq = it->second;
+		} else {
+			while (fid_seq < FID_SEQ_NO_START) {
+				fid_seq = click_random(0, 0xffffffff);
 			}
-			uint32_t next = fid_seq + 1;
-			if (next == 0) {
-				next = 100;
-			}
-			sk->flood_sequence_numbers[*it] = next;
-			it++;
 		}
+
+		uint32_t next = fid_seq + 1;
+		if (next == 0) {
+			// handle wrapping
+			next = FID_SEQ_NO_START;
+		}
+		sk->flood_sequence_numbers[pair] = next;
 	}
 
 	return fid_seq;
@@ -2523,7 +2537,14 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 	}
 
+	// if there is a FID in the DAG, get the next sequence #
 	uint32_t fid_seq = NextFIDSeqNo(sk, dst_path);
+	if (fid_seq == FID_BAD_SEQ_NO) {
+		// the DAG contains multiple FIDs, return an error
+		x_sendto_msg->clear_payload();
+		ReturnResult(_sport, xia_socket_msg, -1, ELOOP);
+		return;
+	}
 
 	//Add XIA headers
 	XIAHeaderEncap xiah;
@@ -2667,9 +2688,9 @@ void XTRANSPORT::XmanageFID(unsigned short _sport, uint32_t /*id*/, xia::XSocket
 	xia::X_ManageFID_Msg *x_fid_msg = xia_socket_msg->mutable_x_manage_fid();
 
 	bool create = x_fid_msg->create();
-	String fid(x_fid_msg->fid().c_str());
+	XID fid(x_fid_msg->fid().c_str());
 
-	DBG("%s: %s", create ? "create" : "remove", fid.c_str());
+	DBG("%s: %s", create ? "create" : "remove", x_fid_msg->fid().c_str());
 
 	if (create) {
 		addRoute(fid);
