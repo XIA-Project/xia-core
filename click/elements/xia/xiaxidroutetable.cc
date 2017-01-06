@@ -563,7 +563,14 @@ XIAXIDRouteTable::lookup_route(int in_ether_port, Packet *p)
     if (_bcast_xid == node.xid) {
     	// Broadcast packet
 
-    	std::string intent_hid_str = xiah.src_path().intent_hid_str();
+    	std::string intent_hid_str;
+    	try {
+    		intent_hid_str = xiah.src_path().intent_hid_str();
+    	} catch (std::range_error &e) {
+    		click_chatter("XIAXIDRouteTable::lookup_route bad src path");
+    		click_chatter("XIAXIDRouteTable::lookup_route %s", e.what());
+    		return _rtdata.port;
+    	}
     	XID source_hid(intent_hid_str.c_str());
 
     	if(_local_hid == source_hid) {
