@@ -726,7 +726,6 @@ XIAPath::find_intent_sid()
 	return intent_sid_node;
 }
 
-// FIXME: do we ever need more than one FID?
 void
 XIAPath::find_nodes_of_type(uint32_t type, Vector<XID> &v)
 {
