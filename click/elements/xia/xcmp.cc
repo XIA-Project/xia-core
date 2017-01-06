@@ -195,7 +195,13 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	XIAPath dst_path = hdr.dst_path();
+	XIAPath dst_path;
+	try {
+		dst_path = hdr.dst_path();
+	} catch (std::range_error &e) {
+		WARN("XCMP::processUnreachable ERROR Invalid dst path in pkt.\n");
+		return;
+	}
 	String broadcast_xid(BHID);
 	XID bcast_xid;
 	bcast_xid.parse(broadcast_xid);
