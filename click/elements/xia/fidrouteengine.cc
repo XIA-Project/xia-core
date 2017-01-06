@@ -18,16 +18,9 @@ CLICK_DECLS
 
 /*
 ** TODO:
-** Phase 1
-**	- get FIDs working like the old broadcast HID2
-**	- BHID == FID:fffff....fffff
-**
-**	Phase 2
 **	- remove broadcast semantics
 **		-- delete broadcast FID
 **		-- rework lookup route to not care about broadcast
-**	- allow nodes to register a FID into the route table
-**	- allow nodes to delete a FID
 **	- check to see if we've seen the packet already
 **		- discard if we have
 **	- look at the FID (in our routing table)
@@ -38,8 +31,9 @@ CLICK_DECLS
 **	- else
 **		- send it out all the interfaces except the ingress interfaces
 **
-** Phase 3
+** Phase 2
 **	- ignore external interfaces when reflooding
+*** - tcp??
 */
 
 FIDRouteEngine::FIDRouteEngine(): _drops(0)
@@ -66,7 +60,7 @@ FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 		cpEnd) < 0)
 	return -1;
 
-    String broadcast_xid(BHID);  // broadcast HID
+    String broadcast_xid(BFID);  // broadcast FID
     _bcast_xid.parse(broadcast_xid);
 
 	return 0;

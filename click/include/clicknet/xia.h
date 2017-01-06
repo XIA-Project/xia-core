@@ -142,5 +142,5 @@ struct click_xia_xcmp {
 #define	  XCMP_TIMXCEED_TRANSIT		0	/*   ttl==0 in transit	     */
 #define	  XCMP_TIMXCEED_REASSEMBLY	1	/*   ttl==0 in reassembly    */
 
-#define BHID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+#define BFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 #endif

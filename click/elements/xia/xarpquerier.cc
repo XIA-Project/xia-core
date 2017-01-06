@@ -4,7 +4,7 @@
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2005 Regents of the University of California
- * Copyright (c) 2008-2009 Meraki, Inc. 
+ * Copyright (c) 2008-2009 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -16,8 +16,8 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
- 
-// Modified from original ARP code 
+
+// Modified from original ARP code
 
 #include <click/config.h>
 #include "xarpquerier.hh"
@@ -94,13 +94,13 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
 	*/
-	
+
     if (cp_va_kparse(conf, this, errh,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
-	
-    /*	
+
+    /*
     if (Args(conf, this, errh)
 	.read_mp("XID", _my_xid)
 	.read_mp("ETH", _my_en)
@@ -109,10 +109,10 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     */
 
     if (!have_broadcast) {
-    	String _bcast_xid(BHID);  // Broadcast HID
+        String _bcast_xid(BFID);  // Broadcast FID
         _my_bcast_xid.parse(_bcast_xid);
     }
-    
+
     _broadcast_poll = broadcast_poll;
     if ((uint32_t) poll_timeout.sec() >= (uint32_t) 0xFFFFFFFFU / CLICK_HZ)
 	_poll_timeout_j = 0;
@@ -146,22 +146,22 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     EtherAddress my_en;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
-	
+
     if (cp_va_kparse(conf, this, errh,
 	             "ETH", cpkP + cpkM, cpEtherAddress, &_my_en,
 	             cpEnd) < 0)
 	return -1;
-	
-    /*	
+
+    /*
     if (Args(conf, this, errh)
 	.read_mp("XID", _my_xid)
 	.read_mp("ETH", _my_en)
 	.complete() < 0)
 	return -1;
     */
-	
+
     if (!have_broadcast) {
-    	String _bcast_xid(BHID);  // Broadcast HID
+        String _bcast_xid(BFID);  // Broadcast FID
         _my_bcast_xid.parse(_bcast_xid);
     }
 
@@ -169,7 +169,7 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	_xarpt->clear();
 
     _my_en = my_en;
-    String _bcast_xid(BHID);  // Broadcast HID
+    String _bcast_xid(BFID);  // Broadcast FID
     _my_bcast_xid.parse(_bcast_xid);
     if (_my_xarpt && have_capacity)
 	_xarpt->set_capacity(capacity);
@@ -250,9 +250,9 @@ XARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     memcpy(ea->xarp_sha, _my_en.data(), 6);
     memcpy(ea->xarp_spa, _my_xid.data(), 24);
     memset(ea->xarp_tha, 0, 6);
-        
+
     XID want_xid = p->nexthop_neighbor_xid_anno();
-    
+
     memcpy(ea->xarp_tpa, want_xid.data(), 24);
 
     q->set_timestamp_anno(p->timestamp_anno());
@@ -290,7 +290,7 @@ XARPQuerier::handle_xip(Packet *p, bool response)
 	return;
     } else
 	q->ether_header()->ether_type = htons(ETHERTYPE_XIP);
-    
+
     XID nexthop_neighbor_xid = q->nexthop_neighbor_xid_anno();
 
     EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
@@ -348,14 +348,14 @@ XARPQuerier::handle_response(Packet *p)
 
     click_ether *ethh = (click_ether *) p->data();
     click_ether_xarp *xarph = (click_ether_xarp *) (ethh + 1);
-    
+
     struct click_xia_xid xid_tmp;
-    memcpy( &(xid_tmp.type), xarph->xarp_spa, 4); 
+    memcpy( &(xid_tmp.type), xarph->xarp_spa, 4);
     for (size_t d = 0; d < sizeof(xid_tmp.id); d++) {
     	xid_tmp.id[d] = xarph->xarp_spa[4 + d];
     }
     XID xida = xid_tmp;
-    
+
     EtherAddress ena = EtherAddress(xarph->xarp_sha);
     if (ntohs(ethh->ether_type) == ETHERTYPE_XARP
 	&& ntohs(xarph->ea_hdr.ar_hrd) == XARPHRD_ETHER
@@ -388,12 +388,12 @@ XARPQuerier::push(int port, Packet *p)
 
 
 /*
- * If xarp query timer expires, it sends 'xarp query timeout message' to XCMP module (via output port 1) 
+ * If xarp query timer expires, it sends 'xarp query timeout message' to XCMP module (via output port 1)
  */
 void
 XARPQuerier::xarp_query_timeout(Packet *p)
 {
-    // Paint the packet with the XARP_timeout color	
+    // Paint the packet with the XARP_timeout color
     int anno = XIA_PAINT_ANNO_OFFSET;
     int color = UNREACHABLE;
     p->set_anno_u8(anno, color);

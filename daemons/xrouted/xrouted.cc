@@ -536,7 +536,7 @@ void initRouteState()
 	XcreateFID(fid, MAX_XID_SIZE);
 
 	// make the dest DAG (broadcast to other routers)
-	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
+	Graph g = Node() * Node(BFID) * Node(SID_XROUTE);
 	g.fill_sockaddr(&route_state.ddag);
 
 	syslog(LOG_INFO, "xroute Broadcast DAG: %s", g.dag_string().c_str());

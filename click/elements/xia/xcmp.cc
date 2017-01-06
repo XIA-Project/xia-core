@@ -196,7 +196,7 @@ XCMP::processUnreachable(Packet *p_in)
 	}
 
 	XIAPath dst_path = hdr.dst_path();
-	String broadcast_xid(BHID);
+	String broadcast_xid(BFID);
 	XID bcast_xid;
 	bcast_xid.parse(broadcast_xid);
 
