@@ -1698,6 +1698,12 @@ Graph::fill_sockaddr(sockaddr_x *s) const
 void
 Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 {
+	// A graph cannot have more than CLICK_XIA_ADDR_MAX_NODES
+	if (num_nodes > CLICK_XIA_ADDR_MAX_NODES) {
+		printf("Graph::from_wire_format ERROR: num_nodes: %d\n", num_nodes);
+		throw std::range_error("too many nodes in wire format");
+	}
+
 	// First add nodes to the graph and remember their new indices
 	std::vector<uint8_t> graph_indices;
 	for (int i = 0; i < num_nodes; i++)
@@ -1722,9 +1728,20 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 			from_node = graph_indices[i];
 		}
 
+		if (from_node > CLICK_XIA_ADDR_MAX_NODES) {
+			printf("Graph::from_wire_format ERROR from_node: %d\n",from_node);
+			throw std::range_error("invalid from_node in wire format");
+		}
+
 		for (int j = 0; j < EDGES_MAX; j++)
 		{
 			int to_node = node->edge[j].idx;
+
+			if(to_node > CLICK_XIA_ADDR_MAX_NODES &&
+					to_node != CLICK_XIA_XID_EDGE_UNUSED) {
+				printf("Graph::from_wire_format ERROR to_node:%d\n",to_node);
+				throw std::range_error("invalid to_node in wire format");
+			}
 
 			if (to_node != EDGE_UNUSED) {
 				add_edge(from_node, to_node);
