@@ -58,7 +58,7 @@ public:
 	inline bool valid()            { return _hdr != NULL && _hdr->th_nxt != CLICK_XIA_NXT_DATA; };
 	inline uint8_t nxt() const     { return _hdr->th_nxt; };
 	inline uint8_t hlen() const    { return _hdr->th_off << 2; };
-	inline uint32_t seqnum() const { return _hdr->th_sequence; };
+	inline uint32_t seqnum() const { return ntohl(_hdr->th_sequence); };
 
 private:
 	const struct xfid *_hdr;
@@ -72,7 +72,7 @@ public:
 		_hdr = (struct xfid*)calloc(1, sizeof(struct xfid));
 		_hdr->th_nxt = next;
 		_hdr->th_off = sizeof(struct xfid) >> 2;
-		_hdr->th_sequence = seq;
+		_hdr->th_sequence = htonl(seq);
 	}
 
 	~FIDHeaderEncap() {
@@ -93,7 +93,7 @@ public:
 	    return p;
 	}
 
-	inline void seqnum(uint32_t s) { _hdr->th_sequence = s; };
+	inline void seqnum(uint32_t s) { _hdr->th_sequence = htonl(s); };
 	inline size_t hlen() const { return _hdr->th_off << 2; };
 
 protected:
