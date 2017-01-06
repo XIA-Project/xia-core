@@ -36,6 +36,7 @@ CLICK_DECLS
 *** - tcp??
 */
 
+
 FIDRouteEngine::FIDRouteEngine(): _drops(0)
 {
 }
@@ -51,17 +52,17 @@ FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 	_principal_type_enabled = 1;
 	_num_ports = 0;
 
-    _rtdata.port = -1;
-    _rtdata.flags = 0;
-    _rtdata.nexthop = NULL;
+	_rtdata.port = -1;
+	_rtdata.flags = 0;
+	_rtdata.nexthop = NULL;
 
-    if (cp_va_kparse(conf, this, errh,
+	if (cp_va_kparse(conf, this, errh,
 		"NUM_PORT", cpkP+cpkM, cpInteger, &_num_ports,
 		cpEnd) < 0)
 	return -1;
 
-    String broadcast_xid(BFID);  // broadcast FID
-    _bcast_xid.parse(broadcast_xid);
+	String broadcast_xid(BFID);  // broadcast FID
+	_bcast_xid.parse(broadcast_xid);
 
 	return 0;
 }
@@ -97,20 +98,20 @@ String
 FIDRouteEngine::read_handler(Element *e, void *thunk)
 {
 	FIDRouteEngine *t = (FIDRouteEngine *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return String(t->get_enabled());
 
 		default:
 			return "<error>";
-    }
+	}
 }
 
 int
 FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
 	FIDRouteEngine *t = (FIDRouteEngine *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
 		case ROUTE_TABLE_HID:
@@ -125,7 +126,7 @@ FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorH
 		}
 		default:
 			return -1;
-    }
+	}
 }
 
 String
@@ -203,7 +204,7 @@ FIDRouteEngine::set_handler4(const String &conf, Element *e, void *thunk, ErrorH
 	}
 
 	if (args.size() >= 3 && args[2].length() > 0) {
-	    String nxthop = args[2];
+		String nxthop = args[2];
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -289,6 +290,21 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		return;
 	}
 
+/* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
+	const struct click_xia* hdr = p->xia_header();
+	int last = hdr->last;
+	if (last < 0) {
+		last += hdr->dnode;
+	}
+	const struct click_xia_xid_edge* edge = hdr->node[last].edge;
+	const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
+	const int& idx = current_edge.idx;
+	const struct click_xia_xid_node& fnode = hdr->node[idx];
+	XID fid(fnode.xid);
+	XIDtuple xt(fid, fid, fid);
+	check(xt, p);
+*/
+
 	port = lookup_route(in_ether_port, p);
 
 	if (port >= 0) {
@@ -299,6 +315,7 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		output(1).push(p);
 
 	} else if (port == DESTINED_FOR_FLOOD_ALL) {
+
 
 		// reflood the packet
 		// for (int i = 0; i <= _num_ports; i++) {
@@ -331,6 +348,50 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	}
 }
 
+bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
+{
+	HashTable<XIDtuple, uint32_t>::iterator it;
+
+	FIDHeader fhdr(p);
+	uint32_t seq = fhdr.seqnum();
+
+	//xt.dump();
+	//click_chatter("seq# = %u", seq);
+
+	it = _seq_nos.find(xt);
+
+	if (it != _seq_nos.end()) {
+		uint32_t old = it->second;
+
+		//click_chatter("FID seq# found: old = %u new = %u\n", old, seq);
+
+		if (seq == old) {
+			// duplicate
+			click_chatter("dup sequence #");
+			return false;
+
+		} else if (seq < old) {
+			// the new sequence # is smaller than the last one seen
+
+			// check to see if we wrapped.
+			uint64_t forward = (seq - old) % 0xffffffff;
+			uint64_t reverse = (old - seq) % 0xffffffff;
+
+			if (forward > reverse) {
+				// ok to assume we wrapped if the reverse distance is larger
+				//  than the forward distance?
+				click_chatter("stale seq #");
+				return false;
+			}
+			click_chatter("we wrapped");
+		}
+	}
+
+	// update the table
+	_seq_nos[xt] = seq;
+	return true;
+}
+
 
 int
 FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
@@ -355,21 +416,24 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		return _rtdata.port;
 	}
 
-    const struct click_xia_xid_node& node = hdr->node[idx];
-	XID f(node.xid);
+	const struct click_xia_xid_node& fnode = hdr->node[idx];
+	XID fid(fnode.xid);
+	XID src;
+	XID dst;
 
 	// we're initiating a flood
 	if (in_ether_port == DESTINED_FOR_LOCALHOST) {
 		// Mark packet for flooding
 		//  which will duplicate the packet and send to every interface
-		p->set_nexthop_neighbor_xid_anno(_bcast_xid);
+		p->set_nexthop_neighbor_xid_anno(fid);
 		return DESTINED_FOR_BROADCAST;
 	}
 
 	// have we seen this packet already?
-	// FIXME: add check to see if we have seen this packet before
-	if (0) {
-		// we've seen it
+	XIDtuple xt(fid, src, dst);
+
+	if (!check(xt, p)) {
+		// we've seen it or it's expired
 		return DESTINED_FOR_DISCARD;
 	}
 
@@ -377,7 +441,7 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
-	if (f == _bcast_xid) {
+	if (fid == _bcast_xid) {
 		// it's the global FID
 		// FIXME: is this a temporary case?
 
@@ -385,7 +449,7 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		return DESTINED_FOR_FLOOD_ALL;
 	}
 
-	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
+	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);
 	if (it != _rts.end()) {
 		XIARouteData *xrd = (*it).second;
 

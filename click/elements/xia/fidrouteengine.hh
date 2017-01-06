@@ -5,6 +5,7 @@
 #include <clicknet/xia.h>
 #include <click/xid.hh>
 #include <click/xiapath.hh>
+#include <click/xidtuple.hh>
 #include "xcmp.hh"
 CLICK_DECLS
 
@@ -40,6 +41,7 @@ so use the XIACheckDest element before using this element.
 // special flood destination (localhost and re-flood)
 #define DESTINED_FOR_FLOOD_ALL -8
 
+
 class FIDRouteEngine : public Element { public:
 
     FIDRouteEngine();
@@ -67,8 +69,12 @@ protected:
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
     static String list_routes_handler(Element *e, void *thunk);
 
+	bool check(XIDtuple &xt, Packet *p);
+
+
 private:
 	HashTable<XID, XIARouteData*> _rts;
+	HashTable<XIDtuple, uint32_t> _seq_nos;
 	XIARouteData _rtdata;
     uint32_t _drops;
 
