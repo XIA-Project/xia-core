@@ -801,15 +801,26 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
 	bool set_full_dag = false;
 
+	// INFO("Inside ProcessStreamPacket");
+	XIAHeader xiah(p_in->xia_header());
+	XIAPath dst_path;
+	XIAPath src_path;
+
+	try {
+		dst_path = xiah.dst_path();
+		src_path = xiah.src_path();
+	} catch (std::range_error &e) {
+		click_chatter("XTRANSPORT::ProcessStreamPacket %s", e.what());
+		click_chatter("XTRANSPORT::ProcessStreamPacket: Bad packet dropped");
+		p_in->kill();
+		return;
+	}
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
+		p_in->kill();
 		return;
 	}
-	// INFO("Inside ProcessStreamPacket");
-	XIAHeader xiah(p_in->xia_header());
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
 
 	// NOTE: CID dags arrive here with the last ptr = the SID node,
 	//  so we can't use the last pointer as it's not pointing to the
