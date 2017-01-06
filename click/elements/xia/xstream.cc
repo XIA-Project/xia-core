@@ -274,7 +274,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->_tcpstat.tcps_rcvbyte += ti.ti_len;
 
 				/* Drop TCP/IP hdrs and TCP opts, add data to recv queue. */
-				WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+				WritablePacket *copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 				p -> kill();
 
 				/* _q_recv.push() corresponds to the tcp_reass function whose purpose is
@@ -309,7 +309,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = NULL;
 	if (ti.ti_len){
-		copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+		copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 	}
 
 	int win = so_recv_buffer_space();
@@ -1469,7 +1469,7 @@ send:
 	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&ti, opt, optlen);
 	int payload_length = 0;
 	if (p==NULL){
-		p = WritablePacket::make((uint32_t)0, '\0', 0, 0);
+		p = WritablePacket::make((uint32_t)2048, '\0', 0, 0);
 	} else{
 		payload_length = p -> length();
 	}
@@ -1534,7 +1534,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&th);
 	// sending a control packet
-	WritablePacket *p =  WritablePacket::make((uint32_t)0, '\0', 0, 0);
+	WritablePacket *p =  WritablePacket::make((uint32_t)2048, '\0', 0, 0);
 	WritablePacket *tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
