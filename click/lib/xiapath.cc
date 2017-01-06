@@ -703,7 +703,7 @@ XIAPath::find_intent_hid()
 XIAPath::handle_t
 XIAPath::find_intent_sid()
 {
-	click_chatter("XIAPath::find_intent_sid called");
+	//click_chatter("XIAPath::find_intent_sid called");
 	handle_t current_node = source_node();
 	handle_t dst = destination_node();
 	handle_t intent_sid_node = INVALID_NODE_HANDLE;
