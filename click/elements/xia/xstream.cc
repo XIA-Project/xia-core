@@ -742,7 +742,6 @@ XStream::tcp_input(WritablePacket *p)
 					goto drop;
 
 				} else if (tp->t_dupacks > TCP_REXMT_THRESH){
-					assert(false); // unreachable code
 					tp->snd_cwnd += tp->t_maxseg;
 					//debug_output(VERB_TCP, "[%s] now: [%u] cwnd: %u, dups", SPKRNAME, get_transport()->tcp_now(), tp->snd_cwnd );
 					tcp_output();
