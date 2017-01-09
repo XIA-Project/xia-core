@@ -22,8 +22,14 @@
 ** - see various FIXMEs in the code
 */
 
-#define FID_BAD_SEQ_NO   1
-#define FID_SEQ_NO_START 100
+/*
+** sequence numbers are in the range of 2 - uint32 max
+** 0 & 1 are special case values
+ */
+#define FID_NOT_FOUND 0
+#define FID_BAD_SEQ   1
+#define FID_SEQ_START 2
+#define uint32_max    0xffffffff
 
 CLICK_DECLS
 
@@ -513,14 +519,14 @@ char *XTRANSPORT::random_xid(const char *type, char *buf)
 uint32_t XTRANSPORT::NextFIDSeqNo(sock *sk, XIAPath &dst)
 {
 	Vector<XID> fids;
-	uint32_t fid_seq = 0;
+	uint32_t fid_seq = FID_NOT_FOUND;
 	dst.find_nodes_of_type(CLICK_XIA_XID_TYPE_FID, fids);
 
 	int count = fids.size();
 	if (count > 1) {
 		// we don't currently support multiple FIDs in DAGs
 		INFO("Invalid DAG: multiple FIDs not allowed");
-		fid_seq = FID_BAD_SEQ_NO;
+		fid_seq = FID_BAD_SEQ;
 
 	} else if (count == 1) {
 		XID fid = fids[0];
@@ -532,17 +538,19 @@ uint32_t XTRANSPORT::NextFIDSeqNo(sock *sk, XIAPath &dst)
 		if (it != sk->flood_sequence_numbers.end()) {
 			fid_seq = it->second;
 		} else {
-			while (fid_seq < FID_SEQ_NO_START) {
-				fid_seq = click_random(0, 0xffffffff);
+			while (fid_seq < FID_SEQ_START) {
+				fid_seq = click_random(0, uint32_max);
 			}
 		}
 
 		uint32_t next = fid_seq + 1;
 		if (next == 0) {
 			// handle wrapping
-			next = FID_SEQ_NO_START;
+			next = FID_SEQ_START;
 		}
 		sk->flood_sequence_numbers[pair] = next;
+	} else {
+		fid_seq = FID_NOT_FOUND;
 	}
 
 	return fid_seq;
@@ -2539,7 +2547,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 	// if there is a FID in the DAG, get the next sequence #
 	uint32_t fid_seq = NextFIDSeqNo(sk, dst_path);
-	if (fid_seq == FID_BAD_SEQ_NO) {
+	if (fid_seq == FID_BAD_SEQ) {
 		// the DAG contains multiple FIDs, return an error
 		x_sendto_msg->clear_payload();
 		ReturnResult(_sport, xia_socket_msg, -1, ELOOP);
@@ -2570,7 +2578,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 		p = dhdr->encap(just_payload_part);
 
-		if (fid_seq == 0) {
+		if (fid_seq == FID_NOT_FOUND) {
 			xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
 			xiah.set_plen(pktPayloadSize + dhdr->hlen()); // XIA payload = transport header + transport-layer data
 

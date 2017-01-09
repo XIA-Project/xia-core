@@ -36,6 +36,9 @@ CLICK_DECLS
 *** - tcp??
 */
 
+const uint32_t seq_max = 0xffffffff;
+
+
 
 FIDRouteEngine::FIDRouteEngine(): _drops(0)
 {
@@ -290,7 +293,7 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		return;
 	}
 
-/* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
+///* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
 	const struct click_xia* hdr = p->xia_header();
 	int last = hdr->last;
 	if (last < 0) {
@@ -303,7 +306,7 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	XID fid(fnode.xid);
 	XIDtuple xt(fid, fid, fid);
 	check(xt, p);
-*/
+//*/
 
 	port = lookup_route(in_ether_port, p);
 
@@ -350,10 +353,14 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 
 bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 {
+	// NOTE: use int64_t integer types for math to detect sequence # wrapping
+	//  otherwise the number space isn't large enough for the calculations. This
+	//  is a simplification of the logic in RFC 1982 but should give the same results
+
 	HashTable<XIDtuple, uint32_t>::iterator it;
 
 	FIDHeader fhdr(p);
-	uint32_t seq = fhdr.seqnum();
+	int64_t seq = fhdr.seqnum();
 
 	//xt.dump();
 	//click_chatter("seq# = %u", seq);
@@ -361,29 +368,27 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	it = _seq_nos.find(xt);
 
 	if (it != _seq_nos.end()) {
-		uint32_t old = it->second;
+		int64_t old = it->second;
+
+		uint32_t forward = ((uint32_t)(seq - old));
+		uint32_t reverse = ((uint32_t)(old - seq));
 
 		//click_chatter("FID seq# found: old = %u new = %u\n", old, seq);
 
 		if (seq == old) {
 			// duplicate
-			click_chatter("dup sequence #");
+			click_chatter("FID Engine: dup sequence #");
 			return false;
 
-		} else if (seq < old) {
+		} else if (forward > reverse) {
 			// the new sequence # is smaller than the last one seen
 
-			// check to see if we wrapped.
-			uint64_t forward = (seq - old) % 0xffffffff;
-			uint64_t reverse = (old - seq) % 0xffffffff;
+			click_chatter("FID Engine: stale seq #");
+			return false;
 
-			if (forward > reverse) {
-				// ok to assume we wrapped if the reverse distance is larger
-				//  than the forward distance?
-				click_chatter("stale seq #");
-				return false;
-			}
-			click_chatter("we wrapped");
+		} else {
+			// this is a new packet
+			//click_chatter("FID Engine: new packet");
 		}
 	}
 
