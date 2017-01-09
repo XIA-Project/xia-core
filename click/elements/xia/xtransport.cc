@@ -776,6 +776,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		return;
 
 	} else if (next == CLICK_XIA_NXT_FID) {
+		INFO("Found a FID Header");
 		FIDHeader fh(p_in);
 		next = fh.nxt();
 	}
