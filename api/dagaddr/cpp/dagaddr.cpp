@@ -1152,7 +1152,6 @@ Graph::final_intent_index() const
 		}
 	}
 
-	printf("Warning: Graph::final_intent_index: no sink node found\n");
 	return -1;
 }
 
