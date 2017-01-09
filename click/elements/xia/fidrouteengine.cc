@@ -19,26 +19,13 @@ CLICK_DECLS
 /*
 ** TODO:
 **	- remove broadcast semantics
-**		-- delete broadcast FID
-**		-- rework lookup route to not care about broadcast
-**	- check to see if we've seen the packet already
-**		- discard if we have
-**	- look at the FID (in our routing table)
-**	- if it's ours
-**		- send it up the stack
-**	- else if it has an interface in the table
-**		- unicast it????
-**	- else
-**		- send it out all the interfaces except the ingress interfaces
+**		-- delete broadcast FID?
+**		-- rework lookup route to not care about broadcast?
 **
 ** Phase 2
 **	- ignore external interfaces when reflooding
 *** - tcp??
 */
-
-const uint32_t seq_max = 0xffffffff;
-
-
 
 FIDRouteEngine::FIDRouteEngine(): _drops(0)
 {
@@ -293,7 +280,7 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		return;
 	}
 
-///* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
+/* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
 	const struct click_xia* hdr = p->xia_header();
 	int last = hdr->last;
 	if (last < 0) {
@@ -302,24 +289,30 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	const struct click_xia_xid_edge* edge = hdr->node[last].edge;
 	const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
 	const int& idx = current_edge.idx;
+
 	const struct click_xia_xid_node& fnode = hdr->node[idx];
+	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
+	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
 	XID fid(fnode.xid);
-	XIDtuple xt(fid, fid, fid);
+	XID src(snode.xid);
+	XID dst(dnode.xid);
+
+	XIDtuple xt(src, fid, dst);
 	check(xt, p);
-//*/
+*/
 
 	port = lookup_route(in_ether_port, p);
 
 	if (port >= 0) {
+		// we have a known route to the dest so we don't need to flood the packet
 		SET_XIA_PAINT_ANNO(p,port);
 		output(0).push(p);
 
 	} else if (port == DESTINED_FOR_LOCALHOST) {
+		// we'll handle it locally
 		output(1).push(p);
 
 	} else if (port == DESTINED_FOR_FLOOD_ALL) {
-
-
 		// reflood the packet
 		// for (int i = 0; i <= _num_ports; i++) {
 		// 	if (i != in_ether_port) {
@@ -328,7 +321,7 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		// 		SET_XIA_PAINT_ANNO(q, i);
 		// 		output(0).push(q);
 		// 	}
-		// }`
+		// }
 
 		// and handle it locally
 		output(1).push(p);
@@ -358,7 +351,6 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	//  is a simplification of the logic in RFC 1982 but should give the same results
 
 	HashTable<XIDtuple, uint32_t>::iterator it;
-
 	FIDHeader fhdr(p);
 	int64_t seq = fhdr.seqnum();
 
@@ -381,8 +373,7 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 			return false;
 
 		} else if (forward > reverse) {
-			// the new sequence # is smaller than the last one seen
-
+			// the new sequence # is older than the last one seen
 			click_chatter("FID Engine: stale seq #");
 			return false;
 
@@ -392,7 +383,7 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 		}
 	}
 
-	// update the table
+	// update the table with the new sequence #
 	_seq_nos[xt] = seq;
 	return true;
 }
@@ -403,7 +394,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 {
 	const struct click_xia* hdr = p->xia_header();
 
-	// FIXME: what edge checking still needs to happen?
 	int last = hdr->last;
 
 	if (last < 0) {
@@ -416,17 +406,17 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
 	const int& idx = current_edge.idx;
 
+	// FIXME: should this trigger a reflood?
 	if (idx == CLICK_XIA_XID_EDGE_UNUSED) {
 		// unused edge -- use default route
 		return _rtdata.port;
 	}
 
+	// get the FID
 	const struct click_xia_xid_node& fnode = hdr->node[idx];
 	XID fid(fnode.xid);
-	XID src;
-	XID dst;
 
-	// we're initiating a flood
+	// we're initiating a new flood
 	if (in_ether_port == DESTINED_FOR_LOCALHOST) {
 		// Mark packet for flooding
 		//  which will duplicate the packet and send to every interface
@@ -434,15 +424,21 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		return DESTINED_FOR_BROADCAST;
 	}
 
-	// have we seen this packet already?
+	// get the source and destination intent xids
+	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
+	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
+	XID src(snode.xid);
+	XID dst(dnode.xid);
+
+	// create the index into the sequence number table
 	XIDtuple xt(fid, src, dst);
 
 	if (!check(xt, p)) {
-		// we've seen it or it's expired
+		// we've seen this packet or it has expired
 		return DESTINED_FOR_DISCARD;
 	}
 
-	// it's a new packet that may or may not be destined for me
+	// else, it's a new packet that may or may not be destined for me
 
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
@@ -456,9 +452,12 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);
 	if (it != _rts.end()) {
+		// either the packet is for us, or another host we have a route for
+
 		XIARouteData *xrd = (*it).second;
 
 		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
+			// it's for someone else
 			// set next hop annotation if the packet is going back out
 			// this is unlikely to ever happen unless we have added specific routes for an FID
 			// on a different host
@@ -468,12 +467,11 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		return xrd->port;
 
 	} else {
-		// not a global broadcast and not for us, just reflood it
-		p->set_nexthop_neighbor_xid_anno(_bcast_xid);
-		return DESTINED_FOR_BROADCAST;
+		// fall through, not a global broadcast and not for us, just reflood it
 	}
 
-	assert(0);
+	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
+	return DESTINED_FOR_BROADCAST;
 }
 
 CLICK_ENDDECLS
