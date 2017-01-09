@@ -21,6 +21,7 @@ CLICK_DECLS
 **	- remove broadcast semantics
 **		-- delete broadcast FID?
 **		-- rework lookup route to not care about broadcast?
+**	- should table entries be timestamped so we can delete them if too old?
 **
 ** Phase 2
 **	- ignore external interfaces when reflooding

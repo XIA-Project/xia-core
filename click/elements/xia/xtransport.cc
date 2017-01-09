@@ -768,24 +768,26 @@ void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
+	int next = xiah.nxt();
 
-	switch(xiah.nxt()) {
-		case CLICK_XIA_NXT_XCMP:
-			// pass the packet to all sockets that registered for XMCP packets
-			ProcessXcmpPacket(p_in);
-			return;
+	if (next == CLICK_XIA_NXT_XCMP) {
+		// pass the packet to all sockets that registered for XMCP packets
+		ProcessXcmpPacket(p_in);
+		return;
 
-		case CLICK_XIA_NXT_XSTREAM:
-			ProcessStreamPacket(p_in);
-			return;
+	} else if (next == CLICK_XIA_NXT_FID) {
+		FIDHeader fh(p_in);
+		next = fh.nxt();
+	}
 
-		case CLICK_XIA_NXT_XDGRAM:
-			ProcessDatagramPacket(p_in);
-			return;
+	if (next == CLICK_XIA_NXT_XSTREAM) {
+		ProcessStreamPacket(p_in);
 
-		default:
+	} else if (next == CLICK_XIA_NXT_XDGRAM){
+		ProcessDatagramPacket(p_in);
+
+	} else {
 			WARN("ProcessNetworkPacket: Unknown TransportType:%d\n", xiah.nxt());
-			break;
 	}
 }
 
