@@ -31,10 +31,6 @@ public:
 			_hdr = reinterpret_cast<const struct xdgram *>(xh.next_header());
 
 		} else {
-			click_chatter("Looking for Header of type %d\n", CLICK_XIA_NXT_XDGRAM);
-			click_chatter("Next = %d\n", temp_hdr->th_nxt);
-			click_chatter("temp_hdr = %p\n", temp_hdr);
-
 			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XDGRAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
 
 				// walk the header chain
