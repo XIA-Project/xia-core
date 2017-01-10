@@ -2,6 +2,7 @@
 #ifndef CLICK_FIDHEADER_HH
 #define CLICK_FIDHEADER_HH
 
+#include <time.h>
 #include <clicknet/xia.h>
 #include <click/packet.hh>
 #include <click/xiaheader.hh>
@@ -13,14 +14,15 @@ struct xfid {
 	uint8_t  th_off;
 	uint16_t th_padding;	// pad it out to 4 bytes
 	uint32_t th_sequence;
+	uint32_t th_tstamp;
 };
 #pragma pack(pop)
 
 class FIDHeader
 {
 public:
-	FIDHeader(const FIDHeader& r)  { _hdr = r._hdr; };
-	FIDHeader(const struct xfid* hdr) { _hdr = hdr; };
+	//FIDHeader(const FIDHeader& r)  { _hdr = r._hdr; };
+	//FIDHeader(const struct xfid* hdr) { _hdr = hdr; };
 
 	// read from packet p->network_header() should point to XIA header
 	FIDHeader(const Packet* p) {
@@ -54,6 +56,7 @@ public:
 	inline bool valid()            { return _hdr != NULL && _hdr->th_nxt != CLICK_XIA_NXT_DATA; };
 	inline uint8_t nxt() const     { return _hdr->th_nxt; };
 	inline uint8_t hlen() const    { return _hdr->th_off << 2; };
+	inline uint32_t tstamp() const { return ntohl(_hdr->th_tstamp); };
 	inline uint32_t seqnum() const { return ntohl(_hdr->th_sequence); };
 
 private:
@@ -69,6 +72,7 @@ public:
 		_hdr->th_nxt = next;
 		_hdr->th_off = sizeof(struct xfid) >> 2;
 		_hdr->th_sequence = htonl(seq);
+		_hdr->th_tstamp = htonl(time(NULL) & 0xffffffff);
 	}
 
 	~FIDHeaderEncap() {
@@ -90,7 +94,8 @@ public:
 	}
 
 	inline void seqnum(uint32_t s) { _hdr->th_sequence = htonl(s); };
-	inline size_t hlen() const { return _hdr->th_off << 2; };
+	inline size_t hlen() const     { return _hdr->th_off << 2; };
+	inline uint32_t tstamp() const { return ntohl(_hdr->th_tstamp); };
 
 protected:
 	struct xfid *_hdr;

@@ -3,6 +3,7 @@
  */
 
 #include <click/config.h>
+#include <click/timer.hh>
 #include "fidrouteengine.hh"
 #include <click/glue.hh>
 #include <click/error.hh>
@@ -10,6 +11,7 @@
 #include <click/packet_anno.hh>
 #include <click/xiaheader.hh>
 #include "click/xiafidheader.hh"
+#include "xlog.hh"
 #if CLICK_USERLEVEL
 #include <fstream>
 #include <stdlib.h>
@@ -25,10 +27,18 @@ CLICK_DECLS
 **
 ** Phase 2
 **	- ignore external interfaces when reflooding
-*** - tcp??
+**  - tcp??
+**
+** FIXME:
+**	- when should we expire old sequence records?
+**	- how often should we check for old entries?
 */
 
-FIDRouteEngine::FIDRouteEngine(): _drops(0)
+#define REFRESH_INTERVAL 60
+#define MAX_AGE          60
+#define RESET_AGE        10
+
+FIDRouteEngine::FIDRouteEngine(): _drops(0), _timer(this)
 {
 }
 
@@ -37,8 +47,7 @@ FIDRouteEngine::~FIDRouteEngine()
 	_rts.clear();
 }
 
-int
-FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
+int FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	_principal_type_enabled = 1;
 	_num_ports = 0;
@@ -58,6 +67,35 @@ FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
+int FIDRouteEngine::initialize(ErrorHandler *)
+{
+	_timer.initialize(this);
+	_timer.schedule_after_sec(REFRESH_INTERVAL);
+
+
+	return 0;
+}
+
+
+void FIDRouteEngine::run_timer(Timer *t)
+{
+	HashTable<XIDtuple, seq_info>::iterator it;
+	time_t now = time(NULL);
+
+	for (it = _seq_nos.begin(); it != _seq_nos.end(); ) {
+		seq_info si = it->second;
+
+		if (now - si.tstamp > MAX_AGE) {
+			it = _seq_nos.erase(it);
+		} else {
+			++it;
+		}
+	}
+
+	t-> reschedule_after_sec(REFRESH_INTERVAL);
+}
+
+
 int
 FIDRouteEngine::set_enabled(int e)
 {
@@ -70,8 +108,7 @@ int FIDRouteEngine::get_enabled()
 	return _principal_type_enabled;
 }
 
-void
-FIDRouteEngine::add_handlers()
+void FIDRouteEngine::add_handlers()
 {
 	add_write_handler("add", set_handler, 0);
 	add_write_handler("set", set_handler, (void*)1);
@@ -85,8 +122,7 @@ FIDRouteEngine::add_handlers()
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 }
 
-String
-FIDRouteEngine::read_handler(Element *e, void *thunk)
+String FIDRouteEngine::read_handler(Element *e, void *thunk)
 {
 	FIDRouteEngine *t = (FIDRouteEngine *) e;
 	switch ((intptr_t)thunk) {
@@ -98,8 +134,7 @@ FIDRouteEngine::read_handler(Element *e, void *thunk)
 	}
 }
 
-int
-FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
+int FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh)
 {
 	FIDRouteEngine *t = (FIDRouteEngine *) e;
 	switch ((intptr_t)thunk) {
@@ -112,7 +147,7 @@ FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorH
 						"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
 				return -1;
 			t->_local_hid = hid;
-			click_chatter("FIDRouteEngine: HID assigned: %s", t->_local_hid.unparse().c_str());
+			INFO("HID assigned: %s", t->_local_hid.unparse().c_str());
 			return 0;
 		}
 		default:
@@ -120,8 +155,7 @@ FIDRouteEngine::write_handler(const String &str, Element *e, void *thunk, ErrorH
 	}
 }
 
-String
-FIDRouteEngine::list_routes_handler(Element *e, void * /*thunk */)
+String FIDRouteEngine::list_routes_handler(Element *e, void * /*thunk */)
 {
 	FIDRouteEngine* table = static_cast<FIDRouteEngine*>(e);
 	XIARouteData *xrd = &table->_rtdata;
@@ -147,8 +181,7 @@ FIDRouteEngine::list_routes_handler(Element *e, void * /*thunk */)
 	return tbl;
 }
 
-int
-FIDRouteEngine::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+int FIDRouteEngine::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
 	String str_copy = conf;
 	String xid_str = cp_shift_spacevec(str_copy);
@@ -166,8 +199,7 @@ FIDRouteEngine::set_handler(const String &conf, Element *e, void *thunk, ErrorHa
 	return set_handler4(str, e, thunk, errh);
 }
 
-int
-FIDRouteEngine::set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+int FIDRouteEngine::set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
 	FIDRouteEngine* table = static_cast<FIDRouteEngine*>(e);
 
@@ -233,8 +265,7 @@ FIDRouteEngine::set_handler4(const String &conf, Element *e, void *thunk, ErrorH
 	return 0;
 }
 
-int
-FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
+int FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
 {
 	FIDRouteEngine* table = static_cast<FIDRouteEngine*>(e);
 
@@ -269,8 +300,8 @@ FIDRouteEngine::remove_handler(const String &xid_str, Element *e, void *, ErrorH
 	return 0;
 }
 
-void
-FIDRouteEngine::push(int in_ether_port, Packet *p)
+
+void FIDRouteEngine::push(int in_ether_port, Packet *p)
 {
 	int port;
 
@@ -280,27 +311,6 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		output(2).push(p);
 		return;
 	}
-
-/* DEBUG CODE TO EXERCISE THE CHECK SEQ # LOGIC
-	const struct click_xia* hdr = p->xia_header();
-	int last = hdr->last;
-	if (last < 0) {
-		last += hdr->dnode;
-	}
-	const struct click_xia_xid_edge* edge = hdr->node[last].edge;
-	const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
-	const int& idx = current_edge.idx;
-
-	const struct click_xia_xid_node& fnode = hdr->node[idx];
-	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
-	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
-	XID fid(fnode.xid);
-	XID src(snode.xid);
-	XID dst(dnode.xid);
-
-	XIDtuple xt(src, fid, dst);
-	check(xt, p);
-*/
 
 	port = lookup_route(in_ether_port, p);
 
@@ -351,47 +361,62 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	//  otherwise the number space isn't large enough for the calculations. This
 	//  is a simplification of the logic in RFC 1982 but should give the same results
 
-	HashTable<XIDtuple, uint32_t>::iterator it;
+	HashTable<XIDtuple, seq_info>::iterator it;
 	FIDHeader fhdr(p);
 	int64_t seq = fhdr.seqnum();
+	seq_info si;
+	INFO("tstamp:%lu", fhdr.tstamp());
+	time_t now = (time_t)fhdr.tstamp();
 
 	//xt.dump();
-	//click_chatter("seq# = %u", seq);
+	//INFO("seq# = %u", seq);
 
 	it = _seq_nos.find(xt);
 
 	if (it != _seq_nos.end()) {
-		int64_t old = it->second;
+		si = it->second;
 
-		uint32_t forward = ((uint32_t)(seq - old));
-		uint32_t reverse = ((uint32_t)(old - seq));
+		uint32_t forward = ((uint32_t)(seq - si.seq));
+		uint32_t reverse = ((uint32_t)(si.seq - seq));
 
-		//click_chatter("FID seq# found: old = %u new = %u\n", old, seq);
+		//INFO("FID seq# found: old = %u new = %u\n", old, seq);
 
-		if (seq == old) {
+		if (seq == si.seq) {
 			// duplicate
-			click_chatter("FID Engine: dup sequence #");
+			INFO("FID Engine: dup sequence #");
 			return false;
 
 		} else if (forward > reverse) {
 			// the new sequence # is older than the last one seen
-			click_chatter("FID Engine: stale seq #");
-			return false;
+			INFO("FID Engine: stale seq #");
+
+			// FIXME: temporary code to work around rebooting peers which
+			// might have a smaller initial sequence number causing false
+			// rejections
+INFO("now%lu tstamp:%lu", now, si.tstamp);
+			if (now <= si.tstamp) {
+				return false;
+			} else {
+				INFO("but the time delta is big enough to start over");
+			}
+
+			//return false;
 
 		} else {
 			// this is a new packet
-			//click_chatter("FID Engine: new packet");
+			//INFO("FID Engine: new packet");
 		}
 	}
 
 	// update the table with the new sequence #
-	_seq_nos[xt] = seq;
+	si.seq = seq;
+	si.tstamp = now;
+	_seq_nos[xt] = si;
 	return true;
 }
 
 
-int
-FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
+int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 {
 	const struct click_xia* hdr = p->xia_header();
 

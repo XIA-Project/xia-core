@@ -41,6 +41,11 @@ so use the XIACheckDest element before using this element.
 // special flood destination (localhost and re-flood)
 #define DESTINED_FOR_FLOOD_ALL -8
 
+struct seq_info {
+	uint32_t seq;
+	time_t tstamp;
+};
+
 
 class FIDRouteEngine : public Element { public:
 
@@ -52,6 +57,7 @@ class FIDRouteEngine : public Element { public:
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
+	int initialize(ErrorHandler *);
     void add_handlers();
 
     void push(int in_ether_port, Packet *);
@@ -69,14 +75,17 @@ protected:
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
     static String list_routes_handler(Element *e, void *thunk);
 
+	void run_timer(Timer *timer);
+
 	bool check(XIDtuple &xt, Packet *p);
 
 
 private:
 	HashTable<XID, XIARouteData*> _rts;
-	HashTable<XIDtuple, uint32_t> _seq_nos;
+	HashTable<XIDtuple, seq_info> _seq_nos;
 	XIARouteData _rtdata;
-    uint32_t _drops;
+	uint32_t _drops;
+	Timer _timer;
 
 	int _principal_type_enabled;
     int _num_ports;
