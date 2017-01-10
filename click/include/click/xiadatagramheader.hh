@@ -19,31 +19,42 @@ struct xdgram {
 class DatagramHeader
 {
 public:
-	DatagramHeader(const DatagramHeader& r)  { _hdr = r._hdr; };
-	DatagramHeader(const struct xdgram* hdr) { _hdr = hdr; };
+	//DatagramHeader(const DatagramHeader& r)  { _hdr = r._hdr; };
+	//DatagramHeader(const struct xdgram* hdr) { _hdr = hdr; };
 
 	// read from packet p->network_header() should point to XIA header
 	DatagramHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
 		const struct xdgram *temp_hdr(reinterpret_cast<const struct xdgram*>(xh.next_header()));
 
+		_plen = xh.plen();	// get the XIA Header's total payload size
+
 		if (xh.nxt() == CLICK_XIA_NXT_XDGRAM) {
 			_hdr = reinterpret_cast<const struct xdgram *>(xh.next_header());
+			_plen -= hlen();	// remove our header's size from the payload sizee
 
 		} else {
-			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XDGRAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+			uint32_t len = temp_hdr->th_off << 2;
+			_plen -= len;
 
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XDGRAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
 				// walk the header chain
-				temp_hdr += (temp_hdr->th_off << 2);
+				temp_hdr = (xdgram*)((char *)temp_hdr + len);				// get next header
+				len = temp_hdr->th_off << 2;	// get size of next header
+				_plen -= len;					// adjust payload size
 				click_chatter("Next = %d\n", temp_hdr->th_nxt);
 			}
 
 			if (temp_hdr->th_nxt == CLICK_XIA_NXT_XDGRAM) {
-				_hdr = (temp_hdr + (temp_hdr->th_off << 2));
+				_hdr = (xdgram*)((char *)temp_hdr + len);
+				len = _hdr->th_off << 2;
+				_plen -= len;
+				click_chatter("len = %d nxt = %d XIA plen = %d DG pLen = %d", len, _hdr->th_nxt, xh.plen(), plen());
 			} else {
 				// something horrible happened and we're gonna crash
 				click_chatter("Header %d not found!", CLICK_XIA_NXT_XDGRAM);
 				_hdr = NULL;
+				_plen = 0;
 			}
 		}
 
@@ -55,9 +66,11 @@ public:
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
 	inline uint8_t hlen() const           { return _hdr->th_off << 2; };
 	inline const uint8_t* payload() const { return reinterpret_cast<const uint8_t*>(_hdr) + hlen(); };
+	inline uint32_t plen()                { return _plen; };
 
 private:
 	const struct xdgram *_hdr;
+	uint32_t _plen;
 };
 
 
@@ -69,15 +82,6 @@ public:
 		_hdr->th_nxt = CLICK_XIA_NXT_DATA;
 		_hdr->th_off = sizeof(struct xdgram) >> 2;
 	}
-
-    static DatagramHeaderEncap* MakeTCPHeader(xdgram *dgh) {
-		assert(dgh != NULL);
-
-    	DatagramHeaderEncap* h = new DatagramHeaderEncap();
-		// if th_off is non 0 copy the options too
-		memcpy(h->_hdr, dgh, dgh->th_off << 2);
-     	return h;
-    }
 
     static DatagramHeaderEncap* MakeDgramHeader(xdgram *dgh) {
 		assert(dgh != NULL);
