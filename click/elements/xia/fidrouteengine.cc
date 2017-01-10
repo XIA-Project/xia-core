@@ -85,7 +85,7 @@ void FIDRouteEngine::run_timer(Timer *t)
 	for (it = _seq_nos.begin(); it != _seq_nos.end(); ) {
 		seq_info si = it->second;
 
-		if (now - si.tstamp > MAX_AGE) {
+		if (now - si.changed > MAX_AGE) {
 			it = _seq_nos.erase(it);
 		} else {
 			++it;
@@ -365,8 +365,7 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	FIDHeader fhdr(p);
 	int64_t seq = fhdr.seqnum();
 	seq_info si;
-	INFO("tstamp:%lu", fhdr.tstamp());
-	time_t now = (time_t)fhdr.tstamp();
+	uint32_t new_ts = fhdr.tstamp();
 
 	//xt.dump();
 	//INFO("seq# = %u", seq);
@@ -388,19 +387,17 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 
 		} else if (forward > reverse) {
 			// the new sequence # is older than the last one seen
-			INFO("FID Engine: stale seq #");
 
-			// FIXME: temporary code to work around rebooting peers which
-			// might have a smaller initial sequence number causing false
-			// rejections
-INFO("now%lu tstamp:%lu", now, si.tstamp);
-			if (now <= si.tstamp) {
-				return false;
+			if (new_ts > si.tstamp) {
+				// the timestamp is newer than was with the previous
+				// fid header, so we'll assume the peer restarted and
+				// ended up with a smaller initial sequence number
+				INFO("Seq number is stale, but timestamp is newer.\nResetting last seqeuce number value");
 			} else {
-				INFO("but the time delta is big enough to start over");
+				// the timestamp is also old
+				INFO("FID Engine: stale seq #");
+				return false;
 			}
-
-			//return false;
 
 		} else {
 			// this is a new packet
@@ -410,7 +407,8 @@ INFO("now%lu tstamp:%lu", now, si.tstamp);
 
 	// update the table with the new sequence #
 	si.seq = seq;
-	si.tstamp = now;
+	si.tstamp = new_ts;
+	si.changed = time(NULL);
 	_seq_nos[xt] = si;
 	return true;
 }

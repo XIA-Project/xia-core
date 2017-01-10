@@ -43,7 +43,8 @@ so use the XIACheckDest element before using this element.
 
 struct seq_info {
 	uint32_t seq;
-	time_t tstamp;
+	uint32_t tstamp;
+	time_t changed;
 };
 
 
