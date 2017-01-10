@@ -299,6 +299,7 @@ class sock : public Element {
 
     virtual bool run_task(Task*) { return false; };
 
+    using Element::push;
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
