@@ -305,18 +305,15 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 	port = lookup_route(in_ether_port, p);
 
 	if (port >= 0) {
-		click_chatter("lookup 1");
 		// we have a known route to the dest so we don't need to flood the packet
 		SET_XIA_PAINT_ANNO(p,port);
 		output(0).push(p);
 
 	} else if (port == DESTINED_FOR_LOCALHOST) {
-		click_chatter("lookup 2");
 		// we'll handle it locally
 		output(1).push(p);
 
 	} else if (port == DESTINED_FOR_FLOOD_ALL) {
-		click_chatter("lookup 3");
 		// reflood the packet
 		// for (int i = 0; i <= _num_ports; i++) {
 		// 	if (i != in_ether_port) {
@@ -343,7 +340,6 @@ FIDRouteEngine::push(int in_ether_port, Packet *p)
 		p->kill();
 
 	} else {
-		click_chatter("lookup 5");
 		// no route, consider fallbacks
 		output(2).push(p);
 	}
@@ -359,8 +355,8 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	FIDHeader fhdr(p);
 	int64_t seq = fhdr.seqnum();
 
-	xt.dump();
-	click_chatter("seq# = %u", seq);
+	//xt.dump();
+	//click_chatter("seq# = %u", seq);
 
 	it = _seq_nos.find(xt);
 
@@ -370,7 +366,7 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 		uint32_t forward = ((uint32_t)(seq - old));
 		uint32_t reverse = ((uint32_t)(old - seq));
 
-		click_chatter("FID seq# found: old = %u new = %u\n", old, seq);
+		//click_chatter("FID seq# found: old = %u new = %u\n", old, seq);
 
 		if (seq == old) {
 			// duplicate
@@ -448,7 +444,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
 	if (fid == _bcast_xid) {
-		click_chatter("lookup 11");
 		// it's the global FID
 		// FIXME: is this a temporary case?
 
@@ -457,10 +452,8 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	}
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);
-	click_chatter("lookup 12");
 	if (it != _rts.end()) {
 		// either the packet is for us, or another host we have a route for
-		click_chatter("lookup 13");
 
 		XIARouteData *xrd = (*it).second;
 
@@ -477,7 +470,6 @@ FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	} else {
 		// fall through, not a global broadcast and not for us, just reflood it
 	}
-	click_chatter("lookup 14");
 
 	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
 	return DESTINED_FOR_BROADCAST;
