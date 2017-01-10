@@ -878,7 +878,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			}
 
 			// First, check if this request is already in the pending queue
-			HashTable<XIDpair , struct sock*>::iterator it;
+			HashTable<XIDpair , class sock*>::iterator it;
 			it = XIDpairToConnectPending.find(xid_pair);
 
 			if (it == XIDpairToConnectPending.end()) {
