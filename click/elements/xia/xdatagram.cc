@@ -117,9 +117,6 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 		x_recvfrom_msg->set_sender_dag(src_path.c_str());
 		x_recvfrom_msg->set_bytes_returned(data_size);
 
-
-INFO("bytes=%s\n", payload.c_str());
-
 		if (!peek) {
 			// NOTE: bytes beyond what the app asked for will be discarded,
 			// they are not saved for the next recv like streaming socket data

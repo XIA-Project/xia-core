@@ -784,7 +784,6 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 		ProcessStreamPacket(p_in);
 
 	} else if (next == CLICK_XIA_NXT_XDGRAM){
-INFO("Found a SID Header");
 		ProcessDatagramPacket(p_in);
 
 	} else {
@@ -2669,12 +2668,10 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
 		return;
 	}
-INFO("getting");
 
 	dynamic_cast<XDatagram *>(sk)->read_from_recv_buf(xia_socket_msg);
 
 	if (xia_socket_msg->x_recvfrom().bytes_returned() > 0) {
-INFO("byte count = %d\n", xia_socket_msg->x_recvfrom().bytes_returned());
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
 
 	} else if (!xia_socket_msg->blocking()) {
@@ -2683,7 +2680,6 @@ INFO("byte count = %d\n", xia_socket_msg->x_recvfrom().bytes_returned());
 		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
 
 	} else {
-INFO("waiting");
 		// rather than returning a response, wait until we get data
 		sk->recv_pending = true; // when we get data next, send straight to app
 

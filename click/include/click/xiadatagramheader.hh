@@ -42,14 +42,12 @@ public:
 				temp_hdr = (xdgram*)((char *)temp_hdr + len);				// get next header
 				len = temp_hdr->th_off << 2;	// get size of next header
 				_plen -= len;					// adjust payload size
-				click_chatter("Next = %d\n", temp_hdr->th_nxt);
 			}
 
 			if (temp_hdr->th_nxt == CLICK_XIA_NXT_XDGRAM) {
 				_hdr = (xdgram*)((char *)temp_hdr + len);
 				len = _hdr->th_off << 2;
 				_plen -= len;
-				click_chatter("len = %d nxt = %d XIA plen = %d DG pLen = %d", len, _hdr->th_nxt, xh.plen(), plen());
 			} else {
 				// something horrible happened and we're gonna crash
 				click_chatter("Header %d not found!", CLICK_XIA_NXT_XDGRAM);
