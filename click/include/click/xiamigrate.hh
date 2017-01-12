@@ -3,17 +3,7 @@
 
 #include <click/xiasecurity.hh>
 #include <click/xiapath.hh>
-
-// These should really be in clicknet/xia.h or similar
-// and also shared with the API.
-// Currently, api/include/xia.h has identical definitions
-#define EDGES_MAX   4
-#define XID_SIZE    20
-#define NODES_MAX   20
-#define MAX_XID_TYPE_STR 8
-#define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
-#define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
-
+#include <clicknet/xia.h>
 
 // Migrate messages definitions
 #define MAX_TIMESTAMP_STR_SIZE 64

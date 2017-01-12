@@ -22,6 +22,11 @@
 
 #define CLICK_XIA_ADDR_MAX_NODES	20
 
+#define CLICK_XIA_MAX_XID_TYPE_STR	8
+
+#define XIA_XID_STR_SIZE ((CLICK_XIA_XID_ID_LEN*2)+CLICK_XIA_MAX_XID_TYPE_STR)
+#define XIA_MAX_DAG_STR_SIZE (XIA_XID_STR_SIZE)*(CLICK_XIA_ADDR_MAX_NODES)
+
 struct click_xia_xid {
     uint32_t type;
     uint8_t id[CLICK_XIA_XID_ID_LEN];

@@ -36,11 +36,10 @@
 
 #define EDGES_MAX	4
 #define EDGE_UNUSED 127u
-#define XID_SIZE	20
-#define NODES_MAX	20
-#define MAX_XID_TYPE_STR 8
-#define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
-#define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
+
+// Moved to clicknet/xia.h. Here for backwards compatibility
+#define XID_SIZE	CLICK_XIA_XID_ID_LEN
+#define NODES_MAX	CLICK_XIA_ADDR_MAX_NODES
 
 #define XID_TYPE_UNKNOWN CLICK_XIA_XID_TYPE_UNDEF
 #define XID_TYPE_AD CLICK_XIA_XID_TYPE_AD

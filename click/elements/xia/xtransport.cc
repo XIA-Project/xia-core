@@ -2041,7 +2041,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 	// Retrieve AD from old DAG for this interface
 	std::string old_ad = old_dag.intent_ad_str();
-	if (old_ad.length() > XID_SIZE) {    // XID_SIZE is 20 bytes
+	if (old_ad.length() > CLICK_XIA_XID_ID_LEN) {    // 20 bytes
 
 		// Delete route for the old AD
 		cmd = ad_table_str + ".remove";
