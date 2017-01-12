@@ -304,7 +304,7 @@ XARPQuerier::handle_xip(Packet *p, bool response)
 	if (r > 0)
 	    send_query_for(q, true);
 	// ... and send packet below.
-    } else if (nexthop_neighbor_xid == _my_bcast_xid) {
+	} else if (nexthop_neighbor_xid.type() == ntohl(CLICK_XIA_XID_TYPE_FID)) {
 	memset(dst_eth, 0xff, 6);
     } else {
 	// Zero or unknown address: do not send the packet.
