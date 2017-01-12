@@ -61,14 +61,13 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     uint32_t capacity, entry_capacity;
     Timestamp timeout, poll_timeout(60);
-    bool have_capacity, have_entry_capacity, have_timeout, have_broadcast,
+    bool have_capacity, have_entry_capacity, have_timeout,
 	broadcast_poll = false;
     _xarpt = 0;
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
 	.read("ENTRY_CAPACITY", entry_capacity).read_status(have_entry_capacity)
 	.read("TIMEOUT", timeout).read_status(have_timeout)
-	.read("BROADCAST", _my_bcast_xid).read_status(have_broadcast)
 	.read("TABLE", ElementCastArg("XARPTable"), _xarpt)
 	.read("POLL_TIMEOUT", poll_timeout)
 	.read("BROADCAST_POLL", broadcast_poll)
@@ -89,7 +88,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	_my_xarpt = true;
     }
 
-    IPAddress my_mask;
 	/* TODO: NITIN ASK DAN why this exists? Makes kparse unhappy below
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
@@ -108,11 +106,6 @@ XARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
     */
 
-    if (!have_broadcast) {
-        String _bcast_xid(BFID);  // Broadcast FID
-        _my_bcast_xid.parse(_bcast_xid);
-    }
-
     _broadcast_poll = broadcast_poll;
     if ((uint32_t) poll_timeout.sec() >= (uint32_t) 0xFFFFFFFFU / CLICK_HZ)
 	_poll_timeout_j = 0;
@@ -127,22 +120,19 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 {
     uint32_t capacity, entry_capacity;
     Timestamp timeout, poll_timeout(Timestamp::make_jiffies((click_jiffies_t) _poll_timeout_j));
-    bool have_capacity, have_entry_capacity, have_timeout, have_broadcast,
+    bool have_capacity, have_entry_capacity, have_timeout,
 	broadcast_poll(_broadcast_poll);
-    IPAddress my_bcast_ip;
 
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
 	.read("ENTRY_CAPACITY", entry_capacity).read_status(have_entry_capacity)
 	.read("TIMEOUT", timeout).read_status(have_timeout)
-	.read("BROADCAST", _my_bcast_xid).read_status(have_broadcast)
 	.read_with("TABLE", AnyArg())
 	.read("POLL_TIMEOUT", poll_timeout)
 	.read("BROADCAST_POLL", broadcast_poll)
 	.consume() < 0)
 	return -1;
 
-    IPAddress my_ip, my_mask;
     EtherAddress my_en;
     if (conf.size() == 1)
 	conf.push_back(conf[0]);
@@ -160,17 +150,10 @@ XARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
     */
 
-    if (!have_broadcast) {
-        String _bcast_xid(BFID);  // Broadcast FID
-        _my_bcast_xid.parse(_bcast_xid);
-    }
-
     if ((my_en != _my_en) && _my_xarpt)
 	_xarpt->clear();
 
     _my_en = my_en;
-    String _bcast_xid(BFID);  // Broadcast FID
-    _my_bcast_xid.parse(_bcast_xid);
     if (_my_xarpt && have_capacity)
 	_xarpt->set_capacity(capacity);
     if (_my_xarpt && have_entry_capacity)
@@ -209,8 +192,7 @@ void
 XARPQuerier::take_state(Element *e, ErrorHandler *errh)
 {
     XARPQuerier *xarpq = (XARPQuerier *) e->cast("XARPQuerier");
-    if (!xarpq || _my_xid != xarpq->_my_xid || _my_en != xarpq->_my_en
-	|| _my_bcast_xid != xarpq->_my_bcast_xid)
+    if (!xarpq || _my_xid != xarpq->_my_xid || _my_en != xarpq->_my_en)
 	return;
 
     if (_my_xarpt && xarpq->_my_xarpt)

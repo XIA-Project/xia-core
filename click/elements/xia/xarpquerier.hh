@@ -81,10 +81,8 @@ don't poll.  Defaults to one minute.
 
 =item BROADCAST
 
-XIP address.  Local broadcast XIP address.  Packets sent to this address will be
-forwarded to Ethernet address FF-FF-FF-FF-FF-FF.  Defaults to the local
-broadcast address that can be extracted from the XIP address's corresponding
-prefix, if any.
+Packets sent via a FID XID will be flooded one or more interfaces and will be
+forwarded to Ethernet address FF-FF-FF-FF-FF-FF.
 
 =item BROADCAST_POLL
 
@@ -116,10 +114,6 @@ XARPQuerier will send at most 10 queries a second for any XIP address.
 =h ipaddr rw
 
 Returns or sets the XARPQuerier's source XIP address.
-
-=h broadcast r
-
-Returns the XARPQuerier's XIP broadcast address.
 
 =h table r
 
@@ -195,9 +189,7 @@ class XARPQuerier : public Element { public:
     XARPTable *_xarpt;
     EtherAddress _my_en;
     IPAddress _my_ip;
-    IPAddress _my_bcast_ip;
     XID       _my_xid;
-    XID       _my_bcast_xid;
     uint32_t _poll_timeout_j;
     int _broadcast_poll;
 
