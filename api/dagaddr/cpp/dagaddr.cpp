@@ -647,7 +647,7 @@ Graph::remove_intent_sid_node()
 	// Ensure that the sink node is an SID
 	std::size_t intent_index = final_intent_index();
 	if (nodes_[intent_index].type() != XID_TYPE_SID) {
-		printf("Graph::remove_intent_sid() Intent node was not SID\n");
+		printf("Graph::remove_intent_sid_node() Intent node was not SID\n");
 		return false;
 	}
 	return remove_intent_node();
