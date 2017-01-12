@@ -28,6 +28,7 @@ SCRIPT=""
 
 NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
+RESOLVCONF=$XIADIR/etc/resolv.conf
 
 ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
 
@@ -639,6 +640,11 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
+		if [ "$NODETYPE" == "router" ] && [ ! -f $RESOLVCONF ]; then
+			echo "ERROR: $RESOLVCONF not found"
+			echo "Copy resolv.conf from the nameserver host and start again"
+			exit -1
+		fi
 		[ $NO_CLICK != 1 ] && start_click
 		process_nodes "start"
 		visualizer "start"
