@@ -29,23 +29,32 @@ public:
 		XIAHeader xh = XIAHeader(p);
 		const struct xfid *temp_hdr(reinterpret_cast<const struct xfid*>(xh.next_header()));
 
+		_plen = xh.plen();	// get the XIA Header's total payload size
+
 		if (xh.nxt() == CLICK_XIA_NXT_FID) {
 			_hdr = reinterpret_cast<const struct xfid *>(xh.next_header());
+			_plen -= hlen();	// remove our header's size from the payload sizee
 
 		} else {
-			while (temp_hdr->th_nxt != CLICK_XIA_NXT_FID && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+			uint32_t len = temp_hdr->th_off << 2;
+			_plen -= len;
 
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_FID && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
 				// walk the header chain
-				temp_hdr += (temp_hdr->th_off << 2);
-				click_chatter("Next = %d\n", temp_hdr->th_nxt);
+				temp_hdr = (xfid*)((char *)temp_hdr + len);				// get next header
+				len = temp_hdr->th_off << 2;	// get size of next header
+				_plen -= len;					// adjust payload size
 			}
 
 			if (temp_hdr->th_nxt == CLICK_XIA_NXT_FID) {
-				_hdr = (temp_hdr + (temp_hdr->th_off << 2));
+				_hdr = (xfid*)((char *)temp_hdr + len);
+				len = _hdr->th_off << 2;
+				_plen -= len;
 			} else {
 				// something horrible happened and we're gonna crash
-				click_chatter("Header %d not found!", CLICK_XIA_NXT_FID);
+				click_chatter("Header %d not found!", CLICK_XIA_NXT_XDGRAM);
 				_hdr = NULL;
+				_plen = 0;
 			}
 		}
 
@@ -58,9 +67,11 @@ public:
 	inline uint8_t hlen() const    { return _hdr->th_off << 2; };
 	inline uint32_t tstamp() const { return ntohl(_hdr->th_tstamp); };
 	inline uint32_t seqnum() const { return ntohl(_hdr->th_sequence); };
+	inline uint32_t plen()         { return _plen; };
 
 private:
 	const struct xfid *_hdr;
+	uint32_t _plen;
 };
 
 
