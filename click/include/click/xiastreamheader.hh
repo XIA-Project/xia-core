@@ -60,15 +60,16 @@ public:
     }
 
     static StreamHeaderEncap* MakeTCPHeader(xtcp *tcph, u_char *opt, unsigned optlen) {
-		assert(tcph != NULL);
+      assert(tcph != NULL);
+      assert(optlen <= XTCP_OPTIONS_MAX);
 
-    	StreamHeaderEncap* h = new StreamHeaderEncap();
+      StreamHeaderEncap* h = new StreamHeaderEncap();
 
-		memcpy(h->_hdr, tcph, sizeof(struct xtcp));
-		u_char *o = reinterpret_cast<u_char*>(h->_hdr) + sizeof(struct xtcp);
-		memcpy(o, opt, optlen);
-		h->_hdr->th_off = (sizeof(struct xtcp) + optlen) >> 2;
-     	return h;
+      memcpy(h->_hdr, tcph, sizeof(struct xtcp));
+      u_char *o = reinterpret_cast<u_char*>(h->_hdr) + sizeof(struct xtcp);
+      memcpy(o, opt, optlen);
+      h->_hdr->th_off = (sizeof(struct xtcp) + optlen) >> 2;
+      return h;
     }
 
 	~StreamHeaderEncap() {
@@ -80,12 +81,12 @@ public:
 	// encapsulate the given packet with an Stream header
 	WritablePacket* encap(Packet* p_in) const
 	{
-	    size_t len = hlen();
+	    const size_t len = hlen();
 	    WritablePacket* p = p_in->push(len);
 	    if (!p)
 	        return NULL;
 
-	    memcpy(p->data(), _hdr, hlen());  // copy the header
+	    memcpy(p->data(), _hdr, len);  // copy the header
 	    return p;
 	}
 

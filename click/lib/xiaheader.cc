@@ -157,14 +157,14 @@ XIAHeaderEncap::update()
     click_xia* new_hdr = reinterpret_cast<struct click_xia*>(new uint8_t[size]);
 
     // preserve the current header content except path information
+    assert(size >= sizeof(struct click_xia));
     memcpy(new_hdr, _hdr, sizeof(struct click_xia));
     new_hdr->dnode = dnode;
     new_hdr->snode = snode;
 
-    if (_dst_path.unparse_node(new_hdr->node, dnode) != dnode)
-        assert(false);
-    if (_src_path.unparse_node(new_hdr->node + dnode, snode) != snode)
-        assert(false);
+    // sanity checks
+    assert(_dst_path.unparse_node(new_hdr->node, dnode) == dnode);
+    assert(_src_path.unparse_node(new_hdr->node + dnode, snode) == snode);
 
     delete [] reinterpret_cast<uint8_t*>(_hdr);
     _hdr = new_hdr;
