@@ -162,9 +162,10 @@ XIAHeaderEncap::update()
     new_hdr->dnode = dnode;
     new_hdr->snode = snode;
 
-    // sanity checks
-    assert(_dst_path.unparse_node(new_hdr->node, dnode) == dnode);
-    assert(_src_path.unparse_node(new_hdr->node + dnode, snode) == snode);
+    if (_dst_path.unparse_node(new_hdr->node, dnode) != dnode)
+        assert(false);
+    if (_src_path.unparse_node(new_hdr->node + dnode, snode) != snode)
+        assert(false);
 
     delete [] reinterpret_cast<uint8_t*>(_hdr);
     _hdr = new_hdr;
