@@ -117,7 +117,7 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_off = tcph->th_off;
 	ti.ti_flags = ntohs(tcph->th_flags);
 	ti.ti_win = ntohl(tcph->th_win);
-	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
+	ti.ti_len = (uint16_t)(thdr.plen());
 
 	//printf("\t\t\ttcpinput flag is %d\n", ti.ti_flags);
 	//printf("\t\t\ttcpinput seq is %d\n", (ti.ti_seq));
@@ -1398,6 +1398,7 @@ send:
 	} else {
 		payload_length = p -> length();
 	}
+	// FIXME: need to adust this code to deal with multiple subheaders rather than just 1
 	//printf("emitting %d bytes\n", payload_length);
 	tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data

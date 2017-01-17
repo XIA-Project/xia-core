@@ -79,6 +79,7 @@ public:
 		_hdr = (struct xdgram*)calloc(1, sizeof(struct xdgram));
 		_hdr->th_nxt = CLICK_XIA_NXT_DATA;
 		_hdr->th_off = sizeof(struct xdgram) >> 2;
+		_plen = 0;
 	}
 
     static DatagramHeaderEncap* MakeDgramHeader(xdgram *dgh) {
@@ -98,9 +99,12 @@ public:
 	}
 
 	// encapsulate the given packet with a Datagram header
-	WritablePacket* encap(Packet* p_in) const
+	WritablePacket* encap(Packet* p_in)
 	{
 	    size_t len = hlen();
+
+		_plen = p_in->length();
+
 	    WritablePacket* p = p_in->push(len);
 	    if (!p)
 	        return NULL;
@@ -110,9 +114,11 @@ public:
 	}
 
 	size_t hlen() const { return _hdr->th_off << 2; };
+	size_t plen()       { return _plen; };
 
 protected:
 	struct xdgram *_hdr;
+	size_t _plen;
 };
 
 
