@@ -129,6 +129,15 @@ XIAPath::is_valid() const
 	return false;
 }
 
+void
+XIAPath::find_nodes_of_type(uint32_t type, Vector<XID> &v)
+{
+	std::vector<const Node *>fid_nodes = g.get_nodes_of_type(type);
+	for (size_t i=0; i < fid_nodes.size(); i++) {
+		v.push_back(XID(fid_nodes[i]->to_string().c_str()));
+	}
+}
+
 XIAPath::handle_t
 XIAPath::destination_node() const
 {
