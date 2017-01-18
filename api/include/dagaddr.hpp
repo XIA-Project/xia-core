@@ -12,7 +12,12 @@
 #include <vector>
 #include <string>
 #include <map>
+
+#ifdef CLICK_USERLEVEL
+#include <clicknet/xia.h>
+#else
 #include "xia.h"
+#endif
 
 class Graph;
 
@@ -20,14 +25,6 @@ class Node
 {
 public:
 	static const std::size_t ID_LEN = 20;
-
-	static const unsigned int XID_TYPE_UNKNOWN = 0;
-	static const unsigned int XID_TYPE_DUMMY_SOURCE = 0xff;
-	static const unsigned int XID_TYPE_AD = 0x10;  // TODO: why does swig complain when these are uint32_t?
-	static const unsigned int XID_TYPE_HID = 0x11;
-	static const unsigned int XID_TYPE_CID = 0x12;
-	static const unsigned int XID_TYPE_SID = 0x13;
-	static const unsigned int XID_TYPE_IP = 0x14;
 
 	static const std::string XID_TYPE_UNKNOWN_STRING;
 	static const std::string XID_TYPE_DUMMY_SOURCE_STRING;
@@ -63,17 +60,16 @@ public:
 
 	bool equal_to(const Node& r) const;
 
+private:
 	typedef std::map<int, std::string> XidMap;
 	static XidMap xids;
 	static XidMap load_xids();
 
 	
 
-protected:
 	void acquire() const;
 	void release() const;
 
-private:
 	struct container
 	{
 		uint32_t type;
@@ -103,16 +99,17 @@ public:
 	Graph operator+(const Graph& r) const;
 	Graph operator*(const Node& r) const;
 	Graph operator+(const Node& r) const;
+	bool operator==(const Graph& r) const;
+	void append_node_str(std::string node_str);
 
-	// TODO: should these be part of public interface?
-	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
-	void add_edge(std::size_t from_id, std::size_t to_id);
-
+	static const std::size_t MAX_XIDS_IN_ALL_PATHS = 30;
+	static const std::size_t INVALID_GRAPH_INDEX = 255;
 	void print_graph() const;
 	std::string http_url_string() const;
 	std::string dag_string() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
+	std::string intent_SID_str() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
 	Graph next_hop(const Node& n);
@@ -121,20 +118,42 @@ public:
 	uint8_t num_nodes() const;
 	Node get_node(int i) const;
 	std::vector<std::size_t> get_out_edges(int i) const;
+	size_t fill_wire_buffer(node_t *buf) const;
 	void fill_sockaddr(sockaddr_x *s) const;
+	void from_wire_format(uint8_t num_nodes, const node_t *buf);
 	void from_sockaddr(const sockaddr_x *s);
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
-	void replace_node_at(int i, const Node& new_node);
+	bool replace_intent_HID(std::string new_hid_str);
+	size_t unparse_node_size() const;
+	bool flatten();
+	bool first_hop_is_sid() const;
+	bool remove_intent_sid_node();
+	bool remove_intent_node();
 	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
-protected:
+	// TODO: We need to stop exposing internal Graph indices with these
+	// Need to refactor code that uses these functions
+	std::string xid_str_from_index(std::size_t node) const;
+	std::size_t final_intent_index() const;
+
+	int compare_except_intent_AD(Graph other) const;
+private:
+	std::size_t intent_XID_index(uint32_t xid_type) const;
+	std::size_t intent_AD_index() const;
+	std::size_t intent_HID_index() const;
+	std::size_t intent_SID_index() const;
+
+	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
+	void add_edge(std::size_t from_id, std::size_t to_id);
+
+	void replace_node_at(int i, const Node& new_node);
+
 
 	bool is_source(std::size_t id) const;
 	bool is_sink(std::size_t id) const;
 
 	std::size_t source_index() const;
-	std::size_t final_intent_index() const;
 
 	void merge_graph(const Graph& r, std::vector<std::size_t>& node_mapping, bool allow_duplicate_nodes = false);
 
@@ -142,28 +161,31 @@ protected:
 	std::size_t index_in_dag_string(std::size_t index, std::size_t source_index, std::size_t sink_index) const;
 	std::size_t index_from_dag_string_index(int32_t dag_string_index, std::size_t source_index, std::size_t sink_index) const;
 
-private:
 	void construct_from_http_url_string(std::string dag_string);
 	void construct_from_dag_string(std::string dag_string);
 	int check_dag_string(std::string dag_string);
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
 
+	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
+	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
+
+	void dump_stack_trace() const;
 	std::vector<Node> nodes_;
 	std::vector<std::vector<std::size_t> > out_edges_;
 	std::vector<std::vector<std::size_t> > in_edges_;
 };
 
 /**
-* @brief Make a graph by appending a node
-*
-* Make a graph by appending a node to this node. The resulting graph will have
-* one edge from this node to the supplied node.
-*
-* @param r The node to append
-*
-* @return The resulting graph
-*/
+ * @brief Make a graph by appending a node
+ *
+ * Make a graph by appending a node to this node. The resulting graph will have
+ * one edge from this node to the supplied node.
+ *
+ * @param r The node to append
+ *
+ * @return The resulting graph
+ */
 inline Graph Node::operator*(const Node& r) const
 {
 	return Graph(*this) * Graph(r);

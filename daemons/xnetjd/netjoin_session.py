@@ -245,12 +245,36 @@ class NetjoinSession(threading.Thread):
             logging.error("Failed updating DAG in XIA stack")
         logging.info("Local DAG updated")
 
-        # Set the nameserver dag into Click
-        ns_dag = str(netjoin_h2.nameserver_dag())
+        # Click configuration
         with ClickControl() as click:
-            if click.setNSDAG(ns_dag) == False:
+
+            # Set the nameserver dag into Click
+            ns_dag = netjoin_h2.nameserver_dag()
+            if click.setNSDAG(str(ns_dag)) == False:
                 logging.error("Failed updating Nameserver DAG in XIA Stack")
-        logging.info("Nameserver DAG updated")
+            logging.info("Nameserver DAG updated")
+
+            # Set the Rendezvous DAG into Click
+            router_rv_dag = netjoin_h2.router_rv_dag()
+            if router_rv_dag:
+                # TODO: Switch out router HID with client HID
+                if click.assignRVDAG(self.hostname, "XIAEndHost",
+                        str(router_rv_dag), interface) == False:
+                    logging.error("Failed updating RV DAG in XIA Stack")
+                    return
+                logging.info("Router DAG sent to Click and processed")
+
+            # TODO: Set the Rendezvous Control DAG into Click
+            control_rv_dag = netjoin_h2.control_rv_dag()
+            if control_rv_dag:
+                if click.assignRVControlDAG(self.hostname, "XIAEndHost",
+                        str(control_rv_dag), interface)==False:
+                    logging.error("Failed updating Control RV DAG in XIA Stack")
+                    return
+                logging.info("Control RV DAG sent to Click and processed")
+
+        # Inform RV service of new network joined
+        # TODO: This should really happen on receiving handshake four
 
         # Retrieve handshake two info to be included in handshake three
         gateway_session_id = netjoin_h2.get_gateway_session_id()

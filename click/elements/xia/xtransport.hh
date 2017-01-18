@@ -139,7 +139,6 @@ public:
 private:
 	Timer _timer;
 
-	uint32_t _cid_type, _sid_type;
 	XIAPath _local_addr;
 	String _hostname;
 	XID _hid;
@@ -300,6 +299,7 @@ class sock : public Element {
 
     virtual bool run_task(Task*) { return false; };
 
+    using Element::push;
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;

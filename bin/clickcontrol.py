@@ -180,9 +180,17 @@ class ClickControl:
             return False
         return True
 
-    # Assign a Rendezvous DAG to a given router
-    def assignRVDAG(self, hostname, hosttype, dag):
-        if not self.writeCommand('%s/xrc/xtransport.rvDAG %s' % (hostname, dag)):
+    # Assign a Rendezvous DAG to an interface. All interfaces by default.
+    def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
+    # Assign a Rendezvous Control-plane DAG to an interface. default=all.
+    def assignRVControlDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvcDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
             return False
         return True
 
@@ -205,6 +213,10 @@ class ClickControl:
             print "Failed updating Nameserver DAG in Click"
             return False
         return True
+
+    # TODO: Add setRVControlDAG function here.
+    def setRVControlDAG(self, interface, control_plane_dag):
+        print "setRVControlDAG called, but ignored"
 
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost

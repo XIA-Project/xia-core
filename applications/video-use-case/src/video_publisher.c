@@ -69,8 +69,8 @@ sockaddr_x localAddr2DAG(string AD, string HID){
     sockaddr_x addr;
 
     Node n_src;
-    Node n_ad(Node::XID_TYPE_AD, strchr(AD.c_str(), ':') + 1);
-    Node n_hid(Node::XID_TYPE_HID, strchr(HID.c_str(), ':') + 1);
+    Node n_ad(XID_TYPE_AD, strchr(AD.c_str(), ':') + 1);
+    Node n_hid(XID_TYPE_HID, strchr(HID.c_str(), ':') + 1);
 
     Graph gAddr = n_src * n_ad * n_hid;
     gAddr.fill_sockaddr(&addr);

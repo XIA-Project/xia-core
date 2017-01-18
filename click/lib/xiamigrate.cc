@@ -34,14 +34,11 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
 }
 
 bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
-        XID xid)
+        std::string xid_str)
 {
 
     unsigned char *payload = (unsigned char *)payloadbuf.get_buffer();
     uint16_t payloadlen = payloadbuf.size();
-
-    // Find the src XID whose credentials will be used for signing
-    String xid_str = xid.unparse();
 
     // Sign the migrate message
     uint8_t signature[MAX_SIGNATURE_SIZE];
@@ -89,9 +86,9 @@ bool build_migrate_message(XIASecurityBuffer &migrate_msg,
     }
 
     // Sign and include pubkey into migrate message
-    XID src_xid = src_path.xid(src_path.destination_node());
+	std::string src_xid_str = src_path.intent_sid_str();
 
-    if(!_sign_and_pack(migrate_msg, migrate_payload, src_xid)) {
+    if(!_sign_and_pack(migrate_msg, migrate_payload, src_xid_str)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }
@@ -123,7 +120,7 @@ bool _unpack_migrate_payload(XIASecurityBuffer &migrate_payload,
     return true;
 }
 
-bool _unpack_and_verify(XIASecurityBuffer &buf, XID xid,
+bool _unpack_and_verify(XIASecurityBuffer &buf, std::string xid_str,
         char *payload, uint16_t *payloadlen)
 {
     uint16_t siglen = MAX_SIGNATURE_SIZE;
@@ -149,7 +146,7 @@ bool _unpack_and_verify(XIASecurityBuffer &buf, XID xid,
     }
 
     // Public key must match the XID
-    if(!xs_pubkeyMatchesXID(pubkey, xid.unparse().c_str())) {
+    if(!xs_pubkeyMatchesXID(pubkey, xid_str.c_str())) {
         click_chatter("ERROR: Mismatched migrate XID and pubkey");
         return false;
     }
@@ -230,7 +227,7 @@ bool valid_migrate_message(XIASecurityBuffer &migrate_msg,
 
     uint16_t payloadlen = 1024;
     char payload[payloadlen];
-    XID sender_xid = their_addr.xid(their_addr.destination_node());
+	std::string sender_xid = their_addr.intent_sid_str();
 
     // Unpack and verify signature, then return payload
     if(! _unpack_and_verify(migrate_msg, sender_xid, payload, &payloadlen)) {
@@ -280,9 +277,10 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
         return false;
     }
 
-    XID my_xid = our_addr.xid(our_addr.find_intent_sid());
+	std::string my_xid_str = our_addr.intent_sid_str();
+
     // Sign and include public key
-    if(!_sign_and_pack(migrateack_msg, migrateack_payload, my_xid)) {
+    if(!_sign_and_pack(migrateack_msg, migrateack_payload, my_xid_str)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }
@@ -355,7 +353,7 @@ bool valid_migrateack_message(XIASecurityBuffer &migrateack_msg,
 {
     uint16_t payloadlen = 1024;
     char payload[payloadlen];
-    XID their_xid = their_addr.xid(their_addr.find_intent_sid());
+	std::string their_xid = their_addr.intent_sid_str();
 
     // Unpack and verify signature, then return payload
     if(! _unpack_and_verify(migrateack_msg, their_xid, payload, &payloadlen)) {
