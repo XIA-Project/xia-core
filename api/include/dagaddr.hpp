@@ -130,6 +130,7 @@ public:
 	bool first_hop_is_sid() const;
 	bool remove_intent_sid_node();
 	bool remove_intent_node();
+	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
 	// TODO: We need to stop exposing internal Graph indices with these
 	// Need to refactor code that uses these functions
@@ -147,7 +148,6 @@ private:
 	void add_edge(std::size_t from_id, std::size_t to_id);
 
 	void replace_node_at(int i, const Node& new_node);
-	std::vector<const Node*> get_nodes_of_type(unsigned int type) const;
 
 
 	bool is_source(std::size_t id) const;

@@ -90,6 +90,9 @@ class XIAPath { public:
     // set the source node
     void set_source_node(handle_t node);
 
+	// Find all FID type nodes
+	void find_nodes_of_type(uint32_t type, Vector<XID> &v);
+
 	// if first edge of DAG points to intent, delete edge
 	// forcing us to take the fallback path
 	bool flatten();
