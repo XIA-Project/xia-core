@@ -2235,6 +2235,8 @@ void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMs
 }
 
 
+// Add interface DAG to list of dags being returned for getifaddrs
+// Include Rendezvous DAG for the interface as a separate entry, if exists
 void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 {
 	char iface_name[16];
@@ -2245,6 +2247,16 @@ void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 	ifaddr->set_flags(0);
 	ifaddr->set_src_addr_str(_interfaces.getDAG(interface).c_str());
 	ifaddr->set_dst_addr_str(_interfaces.getDAG(interface).c_str());
+	// TODO Add RV DAG to a new _msg->add_ifaddrs() if one is available
+	// If there is no Rendezvous DAG to add, we are done
+	if (!_interfaces.hasRVDAG(interface)) {
+		return;
+	}
+	xia::X_GetIfAddrs_Msg::IfAddr *rvifaddr = _msg->add_ifaddrs();
+	rvifaddr->set_iface_name(iface_name);
+	rvifaddr->set_flags(0);
+	rvifaddr->set_src_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_dst_addr_str(_interfaces.getRVDAG(interface).c_str());
 }
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
