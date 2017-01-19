@@ -186,6 +186,7 @@ message X_GetIfAddrs_Msg {
     optional uint32 flags = 2;
     optional string src_addr_str = 3;
     optional string dst_addr_str = 4;
+    optional bool is_rv_dag = 5;
   }
 
   repeated IfAddr ifaddrs = 1;

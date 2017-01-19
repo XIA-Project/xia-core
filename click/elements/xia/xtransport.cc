@@ -2257,6 +2257,7 @@ void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 	rvifaddr->set_flags(0);
 	rvifaddr->set_src_addr_str(_interfaces.getRVDAG(interface).c_str());
 	rvifaddr->set_dst_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_is_rv_dag(true);
 }
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,

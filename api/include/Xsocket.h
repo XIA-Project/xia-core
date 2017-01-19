@@ -81,6 +81,9 @@ extern "C" {
 
 #define DEFAULT_CHUNK_SIZE	2000
 
+// XIA specific ifaddr flags
+// must exceed last entry in enum net_device_flags in /usr/include/linux/if.h
+#define XIFA_RVDAG 1<<25	// past /usr/include/linux/if.h net_device_flags
 
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string

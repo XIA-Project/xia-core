@@ -58,6 +58,9 @@ int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifadd
 
 	// Store flags
 	_ifaddr->ifa_flags = ifaddr.flags();
+	if(ifaddr.is_rv_dag()) {
+		_ifaddr->ifa_flags |= XIFA_RVDAG;
+	}
 
 	// Store interface DAG
 	_ifaddr->ifa_addr = (struct sockaddr *) calloc(sizeof(sockaddr_x), 1);
