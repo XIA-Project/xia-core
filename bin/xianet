@@ -640,7 +640,7 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
-		if [ "$NODETYPE" == "router" ] && [ ! -f $RESOLVCONF ]; then
+		if [ "$NODETYPE" == "router" ] && [ "$NAMESERVER" == "0" ] && [ ! -f $RESOLVCONF ]; then
 			echo "ERROR: $RESOLVCONF not found"
 			echo "Copy resolv.conf from the nameserver host and start again"
 			exit -1
