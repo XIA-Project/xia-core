@@ -345,7 +345,7 @@ XARPQuerier::handle_response(Packet *p)
 	&& ntohs(xarph->ea_hdr.ar_op) == XARPOP_REPLY
 	&& !ena.is_group()) {
 	Packet *cached_packet;
-	_xarpt->insert(xida, ena, &cached_packet);
+	_xarpt->insert(xida, false, ena, &cached_packet);
 
 	// Send out packets in the order in which they arrived
 	while (cached_packet) {
