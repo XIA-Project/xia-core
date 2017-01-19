@@ -2579,8 +2579,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 // FIXME: make this section cleaner
 		p = dhdr->encap(just_payload_part);
-		INFO("payload size = %d", pktPayloadSize);
-		INFO("datagram sizes: hlen:%d plen:%d", dhdr->hlen(), dhdr->plen());
 
 		if (fid_seq == FID_NOT_FOUND) {
 			xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
