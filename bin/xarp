@@ -245,7 +245,6 @@ class XArpApp:
 			self.errorExit("HID not specified")
 
 		cmd = "%s/xlc%s/xarpq.delete %s" % (self.config.hostname(), self.config.card(iface), hid.upper())
-		print cmd
 		self.writeData(cmd)
 		print "deleted arp entry for %s" % (hid)
 
@@ -261,8 +260,6 @@ class XArpApp:
 		mac = args[2]
 		static = args[3]	# if true, table entry won't expire
 
-		print iface, hid, mac, static
-
 		if self.config.card(iface) == None:
 			self.errorExit("%s is not a valid XIA interface" % iface)
 		if (hid == None or hid == ""):
@@ -271,7 +268,6 @@ class XArpApp:
 			self.errorExit("mac not specified")
 
 		cmd = "%s/xlc%s/xarpq.insert %s %s %s" % (self.config.hostname(), self.config.card(iface), hid.upper(), mac, static)
-
 		self.writeData(cmd)
 		print "added arp entry for %s: HID %s ETH %s" % (iface, hid, mac)
 
