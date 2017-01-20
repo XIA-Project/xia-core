@@ -17,7 +17,6 @@
 import os
 import argparse
 import clicksock
-import telnetlib
 
 APP_VERSION="1.0"
 
@@ -45,7 +44,7 @@ def main():
 	parser.add_argument("-f", "--flush", action="store_true", help='purge all STREAM sockets in TIME_WAIT state')
 	parser.add_argument("-p", "--purge", action='store_true', help='purge *ALL* STREAM sockets')
 	parser.add_argument("-t", "--type", nargs="*", help='only output information for the specified Socket type(s) STREAM|DGRAM|CHUNK')
-	parser.add_argument("-s", "--sort", nargs=1, help='sort output on (p)ort, (t)ype, (s)tate, or (x)id', default='p')
+	parser.add_argument("-s", "--sort", help='sort output on (p)ort, (t)ype, (s)tate, or (x)id', default='p')
 	args = parser.parse_args()
 
 	# make list of socket types to display
@@ -75,7 +74,7 @@ def flush():
 	print "Purging sockets in TIME_WAIT state"
 	click.writeData(NS_FLUSH % hostname)
 
-#
+	#
 # format the route table header and loop through the requested XID tables
 #
 def printSocketTable():
@@ -95,7 +94,7 @@ def printSocketTable():
 			socket[0] = int(socket[0])
 			sockets.append(socket)
 
-	index = "ptsx".find(args.sort[0])
+	index = "ptsx".find(args.sort)
 	if index == -1:
 		index = 0
 	sockets.sort(key=lambda tup: tup[index])
