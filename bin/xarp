@@ -13,10 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-import os
+
 import re
 import sys
+import socket
 import argparse
 import clicksock
 
@@ -42,7 +42,7 @@ def main():
 	global hostname
 	global click
 
-	hostname = os.uname()[1]
+	hostname = socket.gethostname().split('.')[0]
 	cards = {}
 
 	parser = argparse.ArgumentParser(description = 'XIA ARP %s' % APP_VERSION,

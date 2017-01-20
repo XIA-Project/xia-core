@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import socket
 import argparse
 import clicksock
 
@@ -37,7 +37,7 @@ def main():
 	global types
 	global args
 
-	hostname = os.uname()[1]
+	hostname = socket.gethostname().split('.')[0]
 	types = []
 
 	parser = argparse.ArgumentParser(description = 'XIA netstat %s' % APP_VERSION)
