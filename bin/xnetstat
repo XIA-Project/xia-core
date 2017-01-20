@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-#ts=4
 #
 # Copyright 2015 Carnegie Mellon University
 #
@@ -14,302 +13,123 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
 import os
-import sys
-import getopt
-import datetime
+import argparse
+import clicksock
 import telnetlib
-import socket
 
 APP_VERSION="1.0"
-TITLE="XIA netstat version %s"
 
-# default Click host and port (can be changed on cmd line)
-HOST="localhost"
-PORT=7777
+SOCKET_TYPES = [ "STREAM", "DGRAM", "RAW" ]
 
-# Minimum Click version required
-MAJOR=1
-MINOR=3
+# command strings to send to click
+XTRANSPORT = "%s/xrc/xtransport"
+NS_PURGE = XTRANSPORT + ".purge"
+NS_FLUSH = XTRANSPORT + ".flush"
+NS_LIST  = XTRANSPORT + ".netstat"
 
-SOCKET_TYPES = [ "STREAM", "DGRAM", "RAW", "CHUNK" ]
+# socket table format string
+NS_FORMAT = "%-5s  %-3s %-6s  %-10s  %s"
 
-#
-# class for managing command line configuration options
-#
-class Options:
-	""" xnetstat configuration options"""
-	def __init__(self):
-		self._host = HOST
-		self._port = PORT
-		self._types = []
-		self._sort = 0
-		self._purge = False
-		self._flush = False
+def main():
+	global click
+	global hostname
+	global types
+	global args
 
-	#
-	# parse the command line so we can do stuff
-	#
-	def getOptions(self):
-		try:
-			# FIXME: make the option names more meaningful
-			shortopt = "ht:s:"
-			opts, args = getopt.getopt(sys.argv[1:], shortopt,
-				["help", "host=", "port=", "type=", "sort=", "purge", "flush"])
-		except getopt.GetoptError, err:
-			# print	 help information and exit:
-			print str(err) # will print something like "option -a not recognized"
-			self.help()
-			sys.exit(2)
-
-		for o, a in opts:
-			if o in ("-h", "--help"):
-				self.help()
-			elif o in ("--host"):
-				self._host = a
-			elif o in ("--port"):
-				self._port = a
-			elif o in ("--flush"):
-				self._flush = True
-			elif o in ("--purge"):
-				self._purge = True
-			elif o in ("-t", "--type"):
-				self._types.append(a.upper())
-			elif o in ("-s", "--sort"):
-				s = "ptsx".find(a[0])
-				if s >= 0:
-					self._sort = s
-			else:
-			 	assert False, "unhandled option"
-
-	#
-	# display helpful information
-	#
-	def help(self):
-		print """
-usage: xnetstat [-hd:t:s:] [commands]
-where:
-  -host=<host>     : specify the click host address
-
-  --port=<port>    : specify the click control port
-
-  -t<type>
-  --type=<stype>   : only output information for the specified Socket type
-                     can be specified multile times on the command line
-
-  -s<field>
-  --sort=<field>   : sort output on (p)ort, (t)ype, (s)tate, or (x)id
-                     default = port
-
-  --flush          : purge all STREAM sockets in TIME_WAIT state
-
-  --purge          : purge *ALL* STREAM sockets
-"""
-		sys.exit()
-
-	def host(self):
-		return self._host
-
-	def port(self):
-		return self._port
-
-	def types(self):
-		return self._types
-
-	def sort(self):
-		return self._sort
-
-	def flush(self):
-		return self._flush
-
-	def purge(self):
-		return self._purge
-
-#
-# The main body of the xnetstat app
-#
-class XnetstatApp:
-	connected = False
-	csock = None
-	device = socket.gethostname().split(".")[0]
+	hostname = os.uname()[1]
 	types = []
 
-	#
-	# the main logic of the xnetstat app
-	#
-	def run(self):
-		# get the command line options
-		self.options = Options()
-		self.options.getOptions()
+	parser = argparse.ArgumentParser(description = 'XIA netstat %s' % APP_VERSION)
+	parser.add_argument("-f", "--flush", action="store_true", help='purge all STREAM sockets in TIME_WAIT state')
+	parser.add_argument("-p", "--purge", action='store_true', help='purge *ALL* STREAM sockets')
+	parser.add_argument("-t", "--type", nargs="*", help='only output information for the specified Socket type(s) STREAM|DGRAM|CHUNK')
+	parser.add_argument("-s", "--sort", nargs=1, help='sort output on (p)ort, (t)ype, (s)tate, or (x)id', default='p')
+	args = parser.parse_args()
 
-		# connect to click and parse the click configuration into our config object
-		self.connectToClick()
+	# make list of socket types to display
+	makeTypeList()
 
-		# if specified by the user, only get info for the specified Socket types (STREAM, DGRAM,...)
-		if (len(self.options.types())):
-			self.types = self.options.types()
+	with clicksock.clicksock() as click:
+
+		if (args.purge):
+			purge()
+		elif (args.flush):
+			flush()
 		else:
-			self.types = SOCKET_TYPES
-
-
-		if (self.options.purge()):
-			self.purge()
-
-		elif (self.options.flush()):
-			self.flush()
-		else:
-			print(self.getSocketTable())
-
-		self.shutdown()
-
-	#
-	# print an error message and exit the app with an error
-	#
-	def errorExit(self, msg):
-		print msg
-		self.shutdown()
-		sys.exit(-1)
-
-	#
-	# get the click statuscode and message
-	# some operations get 2 lines of status message with the code on each
-	# and the second line is more useful, so the caller can specify if we should
-	# die on error, or keep going and loop back for the 2nd line
-	#
-	def checkStatus(self, die):
-		rc = self.csock.read_until("\n")
-		rc = rc.strip()
-
-		# some result code lines are in the form of 'nnn msg' and some are nnn-msg'
-		# so ignore the odd character by slicing round it
-		code = int(rc[:3])
-		msg = rc[4:-1]
-		if (die and code != 200):
-			self.errorExit("error %d: %s" % (code, msg))
-		return code
-
-	#
-	# read the length of data sent by click so we can consume the right
-	# amout of text
-	#
-	def readLength(self):
-		text = self.csock.read_until("\n")
-		text.strip()
-		(data, length) = text.split()
-		if data != "DATA":
-			self.errorExit(tn, "error retreiving data length")
-		return int(length)
-
-	#
-	# connect to the click control socket
-	#
-	def connectToClick(self):
-		try:
-			self.csock = telnetlib.Telnet(self.options.host(), self.options.port())
-			self.connected = True
-
-			data = self.csock.read_until("\n")
-		except:
-			self.errorExit("Unable to connect to Click")
-
-		# make sure it's really click we're talking to
-		data = data.strip()
-		[name, ver] = data.split("/")
-		[major, minor] = ver.split(".")
-		if name != "Click::ControlSocket":
-			self.errorExit("Socket is not a click ControlSocket")
-		if int(major) < MAJOR or (int(major) == MAJOR and int(minor) < MINOR):
-			self.errorExit("Click version %d.%d or higher is required" % (MAJOR, MINOR))
-
-	#
-	# send a read command to click and return the resulting text
-	#
-	def readData(self, cmd):
-		self.csock.write("READ %s\n" % (cmd))
-		self.checkStatus(True)
-
-		length = self.readLength()
-		buf=""
-		while len(buf) < length:
-			buf += self.csock.read_some()
-		return buf
-
-	#
-	# send a write command to click and verify it worked OK
-	#
-	def writeData(self, cmd):
-		self.csock.write("WRITE %s\n" % (cmd))
-		code = self.checkStatus(False)
-
-		# the click write handler returns 2 lines of status on an error, and the
-		#second line contains a more useful message, so call it again
-		if code != 200:
-			self.checkStatus(True)
-
-	#
-	#
-	#
-	def purge(self):
-		print "Purging ALL Stream sockets"
-		self.writeData("%s/xrc/xtransport.purge" % self.device)
-
-	def flush(self):
-		print "Purging sockets in TIME_WAIT state"
-		self.writeData("%s/xrc/xtransport.flush" % self.device)
-
-	#
-	# print the specified socket table to stdout
-	#
-	def printSocketTable(self):
-		tfmt = "%s/xrc/xtransport.netstat"
-		data = self.readData(tfmt % self.device)
-
-		text =""
-		sockets = []
-		lines = data.split("\n")
-		for line in lines:
-			socket = line.split(",")
-			if len(socket) != 5:
-				continue
-
-			if socket[1] in self.types:
-				socket[0] = int(socket[0])
-				sockets.append(socket)
-
-		sockets.sort(key=lambda tup: tup[self.options.sort()])
-
-		for socket in sockets:
-			text += "%-5s  %-3s %-6s  %-10s  %s\n" % (socket[0], socket[4], socket[1], socket[2], socket[3])
-		return text
-
-
-	#
-	# format the route table header and loop through the requested XID tables
-	#
-	def getSocketTable(self):
-		text  = "%-5s  %-3s %-6s  %-10s  %s\n" % ("PORT", "REF", "TYPE", "STATE",  "XID")
-		text +=  "=" * 75
-		text += "\n"
-		text += self.printSocketTable()
-		return text
-
-	#
-	# close the connection to click
-	#
-	def shutdown(self):
-		if (self.connected):
-			self.csock.write("quit\n")
+			printSocketTable()
 
 
 #
-# let's do this thing
+# Purge all STREAM sockets regardless of state
 #
-def main():
-	print TITLE % (APP_VERSION)
+def purge():
+	print "Purging ALL Stream sockets"
+	click.writeData(NS_PURGE % hostname)
 
-	xnetstat = XnetstatApp()
-	xnetstat.run()
+#
+# Purge all STREAM sockets in TIME_WAIT
+#
+def flush():
+	print "Purging sockets in TIME_WAIT state"
+	click.writeData(NS_FLUSH % hostname)
+
+#
+# format the route table header and loop through the requested XID tables
+#
+def printSocketTable():
+	print NS_FORMAT % ("PORT", "REF", "TYPE", "STATE",  "XID")
+	print  "=" * 75
+
+	data = click.readData(NS_LIST % hostname)
+
+	sockets = []
+	lines = data.split("\n")
+	for line in lines:
+		socket = line.split(",")
+		if len(socket) != 5:
+			continue
+
+		if socket[1] in map(str.upper, types):
+			socket[0] = int(socket[0])
+			sockets.append(socket)
+
+	index = "ptsx".find(args.sort[0])
+	if index == -1:
+		index = 0
+	sockets.sort(key=lambda tup: tup[index])
+
+	for socket in sockets:
+		print NS_FORMAT % (socket[0], socket[4], socket[1], socket[2], socket[3])
+
+
+#
+# print an error message and exit the app with an error
+#
+def errorExit(msg):
+	print msg
+	sys.exit(-1)
+
+
+#
+# make list of socket types to display
+#
+def makeTypeList():
+	global types
+
+	# if specified by the user, only get info for the specified Socket types (STREAM, DGRAM,...)
+	if (args.type != None):
+		if len(args.type) == 0:
+			errorExit("error: No types specified")
+		types = args.type
+
+		for type in types:
+			if type.upper() not in SOCKET_TYPES:
+				errorExit("Invalid socket type specified (%s)" % type)
+	else:
+		types = SOCKET_TYPES
+
 
 if __name__ == "__main__":
     main()
