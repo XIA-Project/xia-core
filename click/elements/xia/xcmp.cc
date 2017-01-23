@@ -214,11 +214,7 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	// don't send undeliverables back to broadcast packets
-	if (dst_path.intent_hid_str().compare(BFID)) {
 
-		return;
-	}
 
 	// the xia_path code seems to discard the visited values, so we need to go
 	// into the dags directly
@@ -235,6 +231,13 @@ XCMP::processUnreachable(Packet *p_in)
 		n += (dnodes - 1);
 	} else {
 		n += last;
+	}
+
+	// return if the current node in the path is a FID
+	//  - we don't send undeliverables in response to flooded packets
+	// FIXME: is this the correct behavior if it's not the broadcast fid?
+	if (ntohl(n->xid.type) == CLICK_XIA_XID_TYPE_FID) {
+		return;
 	}
 
 	// find the node that triggered the undeliverable
