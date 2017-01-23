@@ -73,3 +73,13 @@ applications/video-use-case/src/xia_manifest_urls_dash2.txt
 arada/pdrtestip/pdrtestipclient
 arada/pdrtestip/pdrtestipserver
 arada/waveserveripudp/waveserveripudp
+
+# ignore git temp files
+*_BACKUP_*
+*_LOCAL_*
+*_BASE_*
+*_REMOTE_*
+*.orig
+# but don't ignore the .orig files that are in the click/driver tree. But why are they there???
+!click/drivers/*.orig
+
