@@ -222,9 +222,6 @@ void* receiver_thread(void *arg){
   struct sockaddr_in sndrAddr;
   size_t sndrAddrLen = sizeof(sndrAddr);
   size_t clickCliAddrLen = sizeof(_clickCliAddr);
-  
-  unsigned long long nBytesRx = 0;
-  time_t prevTime = time(NULL);
 
   // infinite read loop
   while (true){
@@ -232,27 +229,11 @@ void* receiver_thread(void *arg){
     if ((rxlen = recvfrom(_waveSockFd, waveRcvBuf, MTU, /*flags*/ 0,
         (struct sockaddr *) &sndrAddr, &sndrAddrLen)) > 0){ // error!
 
-      // print out the current rx throughput
-      nBytesRx += rxlen;
-      time_t curTime = time(NULL);
-
-      if (curTime > prevTime){
-
-        double mbits = ((double)nBytesRx)*8/1000000/(curTime-prevTime);
-
-        std::cout << std::setiosflags(std::ios::fixed) << \
-          std::setprecision(3) << "RX @ " << mbits << std::endl;
-          
-        // reset state
-        prevTime = curTime;
-        nBytesRx = 0;
-      }
+      assert(rxlen <= MTU-6);
+      assert(rxlen > 14); // must be more than the ethernet header itself!
 
       // if there is someone listening
       if (_isClickCliConn > 0){
-
-        assert(rxlen <= MTU-2);
-        assert(rxlen > 14); // must be more than the ethernet header itself!
 
         // check to see that we ourselves aren't the originator of the message
         // can happen with broadcast packets
@@ -265,19 +246,22 @@ void* receiver_thread(void *arg){
         }
 
         if (srcMacInt == myWaveMacInt){ // ignore and move on!
-            continue;
+          continue;
         }
 
         // copy length
-        uint16_t totalPktLen = rxlen + 2;
+        uint16_t totalPktLen = rxlen + 6;
         const uint16_t totalPktLenNet = htons(totalPktLen);
         memcpy(&rcvBuf[0], &totalPktLenNet, 2);
+        
+        // note that there are 4 useless bytes in here, they server to add some
+        // padding so the application header is the same length (6 bytes) on
+        // both directions
 
         // copy data contents
-        memcpy(&rcvBuf[2], waveRcvBuf, rxlen);        
+        memcpy(&rcvBuf[6], waveRcvBuf, rxlen);        
 
 #ifdef DEBUG
-if (rxlen > 350){
         // get sender and destination macs
         std::ostringstream strStream;
         // destination mac
@@ -315,8 +299,7 @@ if (rxlen > 350){
 
           std::cout << "Wave RX " << std::dec << rxlen << "b from " << \
               srcMac << " (ip?) to " << dstMac << std::endl;
-        }
-}        
+        }   
 #endif
 
         if (sendto(_clickSockFd, rcvBuf, totalPktLen, 0 /*flags*/, \
@@ -442,24 +425,6 @@ if (conLen > 350){
       (struct sockaddr *) &dstAddr, sizeof(dstAddr)) < 0) {
     std::cerr << "handleClient(), sendto(wave): " << strerror(errno) << \
         std::endl;
-  }
-
-  // register send rate
-  static unsigned long long nBytesTx = 0;
-  static time_t prevTime = time(NULL);
-
-  time_t curTime = time(NULL);
-
-  if (curTime > prevTime){
-
-    double mbits = ((double)nBytesTx)*8/1000000/(curTime-prevTime);
-
-    std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(3) \
-      << "TX @ " << mbits << std::endl;
-
-    // reset state
-    prevTime = curTime;
-    nBytesTx = 0;
   }
 
   return 0;

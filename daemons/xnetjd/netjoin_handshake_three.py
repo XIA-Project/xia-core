@@ -104,13 +104,13 @@ class NetjoinHandshakeThree(object):
         return protobuf_text_format.MessageToString(self.handshake_three)
 
     def print_handshake_three(self):
-        print self.handshake_three_str()
+        logging.info(self.handshake_three_str())
 
     def cyphertext_str(self):
         return protobuf_text_format.MessageToString(self.cyphertext)
 
     def print_cyphertext(self):
-        print self.cyphertext_str()
+        logging.info(self.cyphertext_str())
 
     # wire_handshake_three is actually a serialized jacp_pb2.HandshakeThree
     def from_wire_handshake_three(self, wire_handshake_three):

@@ -100,11 +100,16 @@ message LayerTwoRequest {
         }        
         optional MinimalXIAWifiParams minimal = 2;
     }
+
+    message DSRCL2Request {
+        required bytes client_mac_address = 1;
+    }
     
 
     oneof l2_req {
         EthernetL2Request ethernet = 1;
         WifiL2Request wifi = 2;
+        DSRCL2Request dsrc = 3;
     }
 }
 
@@ -190,6 +195,7 @@ message LayerTwoReply {
         oneof config {
             EthernetL2Config ethernet = 1;
             WifiL2Config wifi = 2;
+            DSRCL2Config dsrc = 3;
         }
     }
 
@@ -212,6 +218,12 @@ message EthernetL2Config { };
 message WifiL2Config { };
 
 // Wi-Fi:1 ends here
+
+// [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*DSRC][DSRC:1]]
+
+message DSRCL2Config { };
+
+// DSRC:1 ends here
 
 // [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Layer%203%20Reply][Layer\ 3\ Reply:1]]
 

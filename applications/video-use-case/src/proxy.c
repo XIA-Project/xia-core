@@ -6,6 +6,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <iostream>
+#include <pthread.h>
 #include "proxy.h"
 
 static int port = 0;                    // port this server runs on
@@ -13,6 +14,9 @@ static int list_s;                      // listening socket of this proxy
 static int reuseaddr = 1;               // need to reuse the address for binding
 static int client_sockets[MAX_CLIENTS]; // all client sockets
 static XcacheHandle xcache;             // xcache instance
+
+unsigned int numthreads = 0;            // Current number of clients
+pthread_mutex_t numthreadslock;
 
 // the lookup cache for CDN nameserver query
 //  CDN name -> server location (AD:HID)
@@ -73,8 +77,9 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
     }
 }
 
-void job(int browser_sock, fd_set *set, int i) {
+void *job(void *sockptr) {
     int rc;
+    int browser_sock = *((int *)sockptr);
 
     rc = xia_proxy_handle_request(browser_sock);
     if (rc == -1) {
@@ -82,8 +87,19 @@ void job(int browser_sock, fd_set *set, int i) {
     }
 
     close_fd(browser_sock);
-    FD_CLR(browser_sock, set);
-    client_sockets[i] = 0;
+
+    if (pthread_mutex_lock(&numthreadslock)) {
+        perror("proxy: ERROR: locking numthreads variable");
+        return NULL;
+    }
+    if (numthreads > 0) {
+        numthreads--;
+    }
+    if (pthread_mutex_unlock(&numthreadslock)) {
+        perror("proxy: ERROR: unlocking numthreads variable");
+        return NULL;
+    }
+	return NULL;
 }
 
 int send_command(ProxyRequestCtx *ctx, const char *cmd) {
@@ -515,10 +531,9 @@ int parse_request_line(char *buf, char *method, char *protocol,
 
 int main(int argc, char const *argv[])
 {
-    fd_set readfds;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
-    int max_sd, new_socket, i;
+    int new_socket, i;
     struct sockaddr_in servaddr; //  socket address structure
 
     // set up signal handler for ctrl-c
@@ -572,58 +587,36 @@ int main(int argc, char const *argv[])
     // initilize xcache
     XcacheHandleInit(&xcache);
 
+    // Initialize a mutex to guard numthreads global
+    if (pthread_mutex_init(&numthreadslock, NULL)) {
+        perror("proxy: ERROR initializing lock for numthreads");
+        return -1;
+    }
+
     while (1) {
-        FD_ZERO(&readfds);
-        FD_SET(list_s, &readfds);
-        max_sd = list_s;
-
-        for (i = 0 ; i < MAX_CLIENTS ; i++) {
-            int sd = client_sockets[i];
-
-            //if valid socket descriptor then add to read list
-            if(sd > 0){
-                FD_SET(sd, &readfds);
-            }
-
-            //highest file descriptor number, need it for the select function
-            if(sd > max_sd){
-                max_sd = sd;
-            }
+        // Accept incoming connection requests from clients
+        new_socket = accept(list_s, (struct sockaddr *)&address,
+                (socklen_t *) &addrlen);
+        if (new_socket < 0) {
+            perror("proxy: ERROR: accept failed");
+            continue;
         }
 
-        if (select(max_sd + 1, &readfds, NULL, NULL, NULL) == -1) {
-            printf("Something is wrong with the select wait call\n");
+        // Check if we can create another thread
+        if (pthread_mutex_lock(&numthreadslock)) {
+            perror("proxy: ERROR: locking numthreads variable");
             return -1;
         }
-
-         //If something happened on the master socket , then its an incoming connection
-        if (FD_ISSET(list_s, &readfds)) {
-            if ((new_socket = accept(list_s, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-
-            //inform user of socket number - used in send and receive commands
-            printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-
-            //add new socket to array of sockets
-            for (i = 0; i < MAX_CLIENTS; i++)
-            {
-                //if position is empty
-                if(client_sockets[i] == 0)
-                {
-                    client_sockets[i] = new_socket;
-                    break;
-                }
+        if (numthreads++ < MAX_CLIENTS) {
+            // Create a new thread
+            pthread_t worker;
+            if (pthread_create(&worker, NULL, job, (void *)&new_socket)) {
+                printf("proxy: ERROR: creating handler. Dropping request\n");
             }
         }
-
-        for (i = 0; i < MAX_CLIENTS; i++) {
-            int sd = client_sockets[i];
-
-            if (FD_ISSET(sd, &readfds)) {
-                job(sd, &readfds, i);
-            }
+        if (pthread_mutex_unlock(&numthreadslock)) {
+            perror("proxy: ERROR: unlocking numthreads variable");
+            return -1;
         }
     }
 
@@ -663,9 +656,9 @@ string capitalize_XID(string dagUrl){
 
 Graph cid2addr(std::string CID, std::string AD, std::string HID) {
     Node n_src;
-    Node n_cid(Node::XID_TYPE_CID, strchr(CID.c_str(), ':') + 1);
-    Node n_ad(Node::XID_TYPE_AD, strchr(AD.c_str(), ':') + 1);
-    Node n_hid(Node::XID_TYPE_HID, strchr(HID.c_str(), ':') + 1);
+    Node n_cid(XID_TYPE_CID, strchr(CID.c_str(), ':') + 1);
+    Node n_ad(XID_TYPE_AD, strchr(AD.c_str(), ':') + 1);
+    Node n_hid(XID_TYPE_HID, strchr(HID.c_str(), ':') + 1);
 
     Graph primaryIntent = n_src * n_cid;
     Graph gFallback = n_src * n_ad * n_hid * n_cid;

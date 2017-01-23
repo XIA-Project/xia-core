@@ -59,7 +59,7 @@ int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler
 	case DAG:
 	{
 		XIAPath dag;
-		if (cp_va_kparse(conf, f, errh, "DAG", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
+		if (cp_va_kparse(conf, f, errh, "ADDR", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
 			return -1;
 		}
 		f->_src_path = dag;
@@ -195,13 +195,19 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	XIAPath dst_path = hdr.dst_path();
+	XIAPath dst_path;
+	try {
+		dst_path = hdr.dst_path();
+	} catch (std::range_error &e) {
+		WARN("XCMP::processUnreachable ERROR Invalid dst path in pkt.\n");
+		return;
+	}
 	String broadcast_xid(BFID);
 	XID bcast_xid;
 	bcast_xid.parse(broadcast_xid);
 
 	if (!dst_path.is_valid()) {
-		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str());
+		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse().c_str());
 		INFO("Sending Unreachable from %s\n   to %s\n   for %s\n",
 			 _src_path.unparse().c_str(),
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
@@ -209,7 +215,8 @@ XCMP::processUnreachable(Packet *p_in)
 	}
 
 	// don't send undeliverables back to broadcast packets
-	if (dst_path.xid(dst_path.find_intent_hid()) == bcast_xid) {
+	if (dst_path.intent_hid_str().compare(BFID)) {
+
 		return;
 	}
 

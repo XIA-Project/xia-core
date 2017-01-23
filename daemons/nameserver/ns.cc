@@ -129,11 +129,11 @@ void migrate(const char *name, const char *dag)
 		for (int i = 0; i < new_dag.num_nodes(); i++) {
 			Node n = new_dag.get_node(i);
 
-			if (n.type() == Node::XID_TYPE_AD) {
+			if (n.type() == XID_TYPE_AD) {
 				ad_index = i;
 				new_ad = new Node(n);
 
-			} else if (n.type() == Node::XID_TYPE_HID) {
+			} else if (n.type() == XID_TYPE_HID) {
 				hid_index = i;
 				new_hid = new Node(n);
 			}
@@ -151,11 +151,11 @@ void migrate(const char *name, const char *dag)
 			for (int i = 0; i < old_dag.num_nodes(); i++) {
 
 				Node n = old_dag.get_node(i);
-				if (n.type() == Node::XID_TYPE_AD) {
+				if (n.type() == XID_TYPE_AD) {
 					ad_index = i;
 					old_ad = new Node(n);
 				}
-				else if (n.type() == Node::XID_TYPE_HID && new_hid->equal_to(n)) {
+				else if (n.type() == XID_TYPE_HID && new_hid->equal_to(n)) {
 					// we found an HID that matches the one in the new dag
 					hid_index = i;
 				}

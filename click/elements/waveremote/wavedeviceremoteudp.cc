@@ -568,8 +568,8 @@ pthread_mutex_lock(pipeMutex), strerror=%s",
             }
 
             // write the received data on the pipe
-            const int dataLen = nrcvd-2;
-            if (write(pipeFd, &rcvBuf[2], dataLen) != dataLen){
+            const int dataLen = nrcvd-6;
+            if (write(pipeFd, &rcvBuf[6], dataLen) != dataLen){
                 errh->error("%s, receiver_thread(): write(pipeFd), \
 strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
             }

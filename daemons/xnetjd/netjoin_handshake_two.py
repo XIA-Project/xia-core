@@ -49,6 +49,13 @@ class NetjoinHandshakeTwo(object):
             xhcp_reply = l3_reply.grant.XIP.single.pxhcp
             xhcp_reply.router_dag = self.conf.get_router_dag()
             xhcp_reply.nameserver_dag = self.conf.get_ns_dag()
+            # Set RV DAGs in protobuf only if they exist
+            router_rv_dag = self.conf.get_rv_dag()
+            control_rv_dag = self.conf.get_rv_control_dag()
+            if router_rv_dag:
+                xhcp_reply.router_rv_dag = router_rv_dag
+            if control_rv_dag:
+                xhcp_reply.control_rv_dag = control_rv_dag
             cc_reply.accept.SetInParent()
         self.cyphertext.gateway_credentials.SetInParent()
         self.cyphertext.client_session_id = client_session
@@ -66,13 +73,24 @@ class NetjoinHandshakeTwo(object):
     def get_gateway_session_id(self):
         return self.cyphertext.gateway_session_id
 
+    def xhcp_info(self):
+        return self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
+
     def router_dag(self):
-        xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
-        return xhcp_info.router_dag
+        return self.xhcp_info().router_dag
 
     def nameserver_dag(self):
-        xhcp_info = self.cyphertext.gateway_l3_reply.grant.XIP.single.pxhcp
-        return xhcp_info.nameserver_dag
+        return self.xhcp_info().nameserver_dag
+
+    def router_rv_dag(self):
+        if self.xhcp_info().HasField('router_rv_dag'):
+            return self.xhcp_info().router_rv_dag
+        return None
+
+    def control_rv_dag(self):
+        if self.xhcp_info().HasField('control_rv_dag'):
+            return self.xhcp_info().control_rv_dag
+        return None
 
     def layer_two_granted(self):
         l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneof("l2_reply")
@@ -115,13 +133,13 @@ class NetjoinHandshakeTwo(object):
         return protobuf_text_format.MessageToString(self.handshake_two)
 
     def print_handshake_two(self):
-        print self.handshake_two_str()
+        logging.info(self.handshake_two_str())
 
     def cyphertext_str(self):
         return protobuf_text_format.MessageToString(self.cyphertext)
 
     def print_cyphertext(self):
-        print self.cyphertext_str()
+        logging.info(self.cyphertext_str())
 
     # wire_handshake_two is actually a serialized jacp_pb2.HandshakeTwo
     def from_wire_handshake_two(self, wire_handshake_two):

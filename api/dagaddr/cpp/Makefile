@@ -7,7 +7,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 LIBS=$(XLIB)/libdagaddr.so
 STATICLIB=$(XLIB)/libdagaddr.a
 
-all: $(LIB) dagaddr_test
+all: $(LIBS) dagaddr_test
 
 static: $(STATICLIB) dagaddr_test
 

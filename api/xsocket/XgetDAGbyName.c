@@ -28,6 +28,78 @@
 #include "dagaddr.hpp"
 
 #define ETC_HOSTS "/etc/hosts.xia"
+#define MAX_SEND_RETRIES 5
+
+/*!
+** @brief Send data to a host and wait for a response to be ready
+**
+** @param sock socket to send data on
+** @param buf buffer containing data to be sent
+** @param len length of the data to be sent
+** @param destaddr destination DAG to send data to
+** @param timeout in seconds
+** @param msgtype type of nameserver message
+**
+** @returns 0 if data is available on socket to read before timeout
+** @returns -1 on failure. NOTE: Closes sock.
+*/
+
+int _send_and_wait(int sock, const char *buf, size_t len,
+		const sockaddr *destaddr, unsigned int timeout) {
+
+	int rc;
+	int retval = -1;
+	fd_set fds;
+	struct timeval tv;
+	int retries = MAX_SEND_RETRIES;
+
+	for (;retries > 0; retries--) {
+
+		// Send packet to the destination
+		Graph gns((const sockaddr_x *)destaddr);
+		rc = Xsendto(sock, buf, len, 0, destaddr, sizeof(sockaddr_x));
+		if (rc < 0 ) {
+			int err = errno;
+			Graph g((sockaddr_x *)destaddr);
+			LOGF("Error sending message to %s (%d)", g.dag_string().c_str(), rc);
+			Xclose(sock);
+			errno = err;
+			return -1;
+		}
+
+		FD_ZERO(&fds);
+		FD_SET(sock, &fds);
+		tv.tv_sec = timeout;
+		tv.tv_usec = 0;
+
+		// Wait for a response packet
+		rc = Xselect(sock + 1, &fds, NULL, NULL, &tv);
+		if (rc < 0) {
+			LOG("Error waiting for response to sent packet");
+			return -1;
+		}
+		if (rc == 0) {
+			LOG("Timed out waiting for response.");
+			if (retries > 1) {
+				LOG("Will retry by sending packet again");
+			}
+			continue;
+		}
+
+		// This should never happen!
+		if (!FD_ISSET (sock, &fds)) {
+			LOG("No response, when a response was expected");
+			return -1;
+		}
+
+		// A response is ready to be read
+		retval = 0;
+		break;
+	}
+
+	// 0 on success, -1 on exhausting all retries.
+	return retval;
+}
 
 /*!
 ** @brief Lookup a DAG in the hosts.xia file
@@ -164,11 +236,8 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 	free(addrstr);
 
 	//Send a name query to the name server
-	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
-		int err = errno;
-		LOGF("Error sending name query (%d)", rc);
-		Xclose(sock);
-		errno = err;
+	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
+		LOG("Error sending name query");
 		return -1;
 	}
 
@@ -298,11 +367,8 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
 
 	//Send a name query to the name server
-	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
-		int err = errno;
-		LOGF("Error sending name query (%d)", rc);
-		Xclose(sock);
-		errno = err;
+	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
+		LOG("Error sending name query");
 		return -1;
 	}
 
@@ -395,11 +461,8 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	int len = make_ns_packet(&query_pkt, pkt, sizeof(pkt));
 
 	//Send a name query to the name server
-	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr*)&ns_dag, sizeof(sockaddr_x))) < 0) {
-		int err = errno;
-		LOGF("Error sending name query (%d)", rc);
-		Xclose(sock);
-		errno = err;
+	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
+		LOG("Error sending anycast name query");
 		return -1;
 	}
 
@@ -407,7 +470,7 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
 		int err = errno;
-		LOGF("Error retrieving name query (%d)", rc);
+		LOGF("Error retrieving anycast name query (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;
@@ -543,22 +606,8 @@ int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
 
 	//Send the name registration packet to the name server
-	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
-		int err = errno;
-		LOGF("Error sending name registration (%d)", rc);
-		Xclose(sock);
-		errno = err;
-		return -1;
-	}
-
-	fd_set read_fds;
-	FD_ZERO(&read_fds);
-	FD_SET(sock, &read_fds);
-	struct timeval timeout;
-	timeout.tv_sec = 5;
-	timeout.tv_usec = 0;
-	if(Xselect(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
-		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
+	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
+		LOG("Error sending name registration");
 		return -1;
 	}
 
@@ -664,22 +713,8 @@ int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 	int len = make_ns_packet(&register_pkt, pkt, sizeof(pkt));
 
 	//Send the name registration packet to the name server
-	if ((rc = Xsendto(sock, pkt, len, 0, (const struct sockaddr *)&ns_dag, sizeof(sockaddr_x))) < 0) {
-		int err = errno;
-		LOGF("Error sending name registration (%d)", rc);
-		Xclose(sock);
-		errno = err;
-		return -1;
-	}
-
-	fd_set read_fds;
-	FD_ZERO(&read_fds);
-	FD_SET(sock, &read_fds);
-	struct timeval timeout;
-	timeout.tv_sec = 5;
-	timeout.tv_usec = 0;
-	if(Xselect(sock+1, &read_fds, NULL, NULL, &timeout) == 0) {
-		LOGF("ERROR: Application should try again. No registration response in %d seconds", (int)timeout.tv_sec);
+	if(_send_and_wait(sock, pkt, len, (const struct sockaddr *)&ns_dag, 1)) {
+		LOG("Error sending anycast name registration");
 		return -1;
 	}
 
@@ -687,7 +722,7 @@ int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 	memset(pkt, 0, sizeof(pkt));
 	if ((rc = Xrecvfrom(sock, pkt, NS_MAX_PACKET_SIZE, 0, NULL, NULL)) < 0) {
 		int err = errno;
-		LOGF("Error sending name registration (%d)", rc);
+		LOGF("Error sending anycast name registration (%d)", rc);
 		Xclose(sock);
 		errno = err;
 		return -1;

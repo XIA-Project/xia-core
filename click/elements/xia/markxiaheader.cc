@@ -7,6 +7,7 @@
 #include <click/confparse.hh>
 #include <clicknet/xia.h>
 #include <click/xiaheader.hh>
+#include "xlog.hh"
 CLICK_DECLS
 
 MarkXIAHeader::MarkXIAHeader()
@@ -31,6 +32,13 @@ MarkXIAHeader::simple_action(Packet *p)
 {
     const click_xia *xiah = reinterpret_cast<const click_xia *>(p->data() + _offset);
 
+	if ((xiah->dnode > CLICK_XIA_ADDR_MAX_NODES)
+		|| (xiah->snode > CLICK_XIA_ADDR_MAX_NODES)) {
+		WARN("MarkXIAHeader dropping packet with bad header");
+		// drop the packet
+		p->kill();
+		return NULL;
+	}
     p->set_xia_header(xiah, XIAHeader::hdr_size(xiah->dnode + xiah->snode));
 
     return p;

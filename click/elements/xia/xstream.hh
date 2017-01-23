@@ -19,6 +19,9 @@
 #include "xtransport.hh"
 #include <clicknet/tcp_fsm.h>
 #include <cstdint> // uint32_t
+#include <click/task.hh>
+
+#include "taskident.hh"
 
 #if CLICK_USERLEVEL
 #include <list>
@@ -122,7 +125,7 @@ public:
 	tcp_seq_t tailseq() { return _q_tail ? _q_tail->seq : 0; }
 	tcp_seq_t last()  { return _q_last ? _q_last->seq : 0; }
 	tcp_seq_t last_nxt()  { return _q_last ? _q_last->seq_nxt : 0; }
-	tcp_seq_t bytes_ok() { return _q_last ? _q_last->seq - _q_first->seq : 0; }
+	tcp_seq_t bytes_ok() { return (_q_last && _q_first) ? _q_last->seq - _q_first->seq : 0; }
 	bool is_empty() { return _q_first ? false : true; }
 	//FIXME: Returns true even if there is a hole at the front! Decide whether
 	//to rethink what we mean by "ordered"
@@ -180,13 +183,18 @@ class XStream  : public sock {
 
 public:
 	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
-	XStream(){};
+	XStream() : _outputTask(NULL, 0) {}; 
 	~XStream() {};
+
+	const char *class_name() const  { return "XStream"; }
+
+	bool run_task(Task*);
+
 	int read_from_recv_buf(XSocketMsg *xia_socket_msg);
 	void check_for_and_handle_pending_recv();
 	/* TCP related core functions */
 	void 	tcp_input(WritablePacket *p);
-	void 	tcp_output();
+	void	tcp_output();
 	int		usrsend(WritablePacket *p);
 	void	usrmigrate();
 	void	usrclosed() ;
@@ -210,12 +218,13 @@ public:
 	// XTRANSPORT *get_transport() { return transport; }
 	tcpcb 		*tp;
 	sock *listening_sock;
+
 private:
 	void set_state(const HandlerState s);
 
 	void 		_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 	int * ts_present, uint32_t *ts_val, uint32_t *ts_ecr);
-	void 		tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags);
+	void 		tcp_respond(tcp_seq_t seq, tcp_seq_t ack, int flags);
 	void		tcp_setpersist();
 	void		tcp_drop(int err);
 	void		tcp_xmit_timer(short rtt);
@@ -241,6 +250,8 @@ private:
 	// holding location for when xmit buffer is full and we are blocking
 	WritablePacket *_staged;
 	unsigned _staged_seq;
+
+	TaskIdent _outputTask;
 };
 
 /* THE method where we register, and handle any TCP State Updates */
