@@ -420,10 +420,10 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 
 	int last = hdr->last;
 
-	if (last < 0) {
+	if (last == LAST_NODE_DEFAULT) {
 		// the last pointer was still in the initial position
 		//  so the intent node holds the first edge
-		last += hdr->dnode;
+		last = hdr->dnode - 1;
 	}
 
 	const struct click_xia_xid_edge* edge = hdr->node[last].edge;

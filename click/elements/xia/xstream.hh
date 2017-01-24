@@ -50,8 +50,6 @@ using namespace xia;
 
 #define ACK_DELAY			300
 #define TEARDOWN_DELAY		240000
-#define HLIM_DEFAULT		250
-#define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
@@ -183,7 +181,7 @@ class XStream  : public sock {
 
 public:
 	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
-	XStream() : _outputTask(NULL, 0) {}; 
+	XStream() : _outputTask(NULL, 0) {};
 	~XStream() {};
 
 	const char *class_name() const  { return "XStream"; }

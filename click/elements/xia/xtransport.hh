@@ -49,8 +49,6 @@ using namespace xia;
 #define ACK_DELAY			300
 #define MIGRATEACK_DELAY	3000
 #define TEARDOWN_DELAY		240000
-#define HLIM_DEFAULT		250
-#define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
@@ -310,10 +308,6 @@ class sock : public Element {
     void set_src_path(XIAPath p) {src_path = p;}
     XIAPath get_dst_path() {return dst_path;}
     void set_dst_path(XIAPath p) {dst_path = p;}
-    int get_nxt() {return nxt;}
-    void set_nxt(int n) {nxt = n;}
-    int get_last() {return last;}
-    void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
     uint8_t get_hop_count() {return hop_count;}
@@ -427,9 +421,6 @@ protected:
     XTRANSPORT *transport;
     HandlerState hstate;
     XIDpair key;
-
-    int nxt;
-    int last;
 
 	uint32_t id;
 

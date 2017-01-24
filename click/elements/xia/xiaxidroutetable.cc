@@ -489,8 +489,8 @@ XIAXIDRouteTable::lookup_route(Packet *p)
 {
    const struct click_xia* hdr = p->xia_header();
    int last = hdr->last;
-   if (last < 0)
-	last += hdr->dnode;
+   if (last == LAST_NODE_DEFAULT)
+	last = hdr->dnode - 1;
    const struct click_xia_xid_edge* edge = hdr->node[last].edge;
    const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p)];
    const int& idx = current_edge.idx;

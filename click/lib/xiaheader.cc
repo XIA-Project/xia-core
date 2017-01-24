@@ -38,8 +38,8 @@ XIAHeaderEncap::XIAHeaderEncap()
     _hdr = reinterpret_cast<struct click_xia*>(new uint8_t[size]);
     memset(_hdr, 0, size);
     _hdr->ver = 1;
-    _hdr->last = static_cast<int8_t>(-1);
-    _hdr->hlim = static_cast<uint8_t>(250);
+    _hdr->last = LAST_NODE_DEFAULT;
+    _hdr->hlim = HLIM_DEFAULT;
     _hdr->nxt = CLICK_XIA_NXT_DATA;
     assert(hdr_size() == size);
 }

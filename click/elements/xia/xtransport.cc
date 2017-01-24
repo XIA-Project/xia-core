@@ -54,10 +54,6 @@ sock::sock(
 	timer_on = false;
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
-	if (type == SOCK_STREAM)
-		nxt_xport = CLICK_XIA_NXT_XSTREAM;
-	else
-		nxt_xport = CLICK_XIA_NXT_XDGRAM;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -88,10 +84,6 @@ sock::sock(
 	transport = trans;
 	sock_type = type;
 	hlim = HLIM_DEFAULT;
-	if (type == SOCK_STREAM)
-		nxt = CLICK_XIA_NXT_XSTREAM;
-	else
-		nxt = CLICK_XIA_NXT_XDGRAM;
 	refcount = 1;
 	xcacheSock = false;
 	id = sockid;
@@ -850,6 +842,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
+	// FIXME: validate that last is within range of # of nodes
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 
 	sock *sk = XID2Sock(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
@@ -1102,6 +1095,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
+	// FIXME: validate that last is within range of # of nodes
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
@@ -1631,8 +1625,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		// FIXME: is it possible for us not to have a source dag
 		//   and if so, we should return an error
 		assert(tcp_conn->src_path.is_valid());
-		tcp_conn->set_nxt(LAST_NODE_DEFAULT);
-		tcp_conn->set_last(LAST_NODE_DEFAULT);
 
 		XID source_xid = tcp_conn->src_path.xid(tcp_conn->src_path.destination_node());
 		XID destination_xid = tcp_conn->dst_path.xid(tcp_conn->dst_path.destination_node());
@@ -2688,7 +2680,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 
-	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);

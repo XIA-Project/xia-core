@@ -70,22 +70,22 @@ XIAIPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
 
 Packet *
 XIAIPEncap::simple_action(Packet *p_in)
-{    
+{
     const struct click_xia* hdr = p_in->xia_header();
     int last = hdr->last;
-    if (last < 0)
-    	last += hdr->dnode;
+	if (last == LAST_NODE_DEFAULT)
+		last = hdr->dnode - 1;
     const struct click_xia_xid_edge* edge = hdr->node[last].edge;
     const struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p_in)];
     const int& idx = current_edge.idx;
     const struct click_xia_xid_node& node = hdr->node[idx];
-  
+
     if (htonl(node.xid.type) != CLICK_XIA_XID_TYPE_IP)
         return 0;
-    
+
     long storedip = *(long *)(node.xid.id + 16);
-    _daddr.s_addr = storedip; 
-  
+    _daddr.s_addr = storedip;
+
     WritablePacket *p = p_in->push(sizeof(click_udp) + sizeof(click_ip));
     click_ip *ip = reinterpret_cast<click_ip *>(p->data());
     click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
@@ -109,7 +109,7 @@ XIAIPEncap::simple_action(Packet *p_in)
     ip->ip_tos = 0;
     ip->ip_off = 0;
     ip->ip_ttl = 250;
-  
+
     ip->ip_sum = 0;
 #if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
     if (_aligned)
@@ -123,7 +123,7 @@ XIAIPEncap::simple_action(Packet *p_in)
 #endif
 
     p->set_ip_header(ip, sizeof(click_ip));
-  
+
     // set up UDP header
     udp->uh_sport = _sport;
     udp->uh_dport = _dport;
@@ -135,7 +135,7 @@ XIAIPEncap::simple_action(Packet *p_in)
         unsigned csum = click_in_cksum((unsigned char *)udp, len);
         udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
     }
-  
+
     return p;
 }
 

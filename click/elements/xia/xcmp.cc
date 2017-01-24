@@ -214,8 +214,6 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-
-
 	// the xia_path code seems to discard the visited values, so we need to go
 	// into the dags directly
 	const struct click_xia *h = hdr.hdr();
@@ -225,7 +223,7 @@ XCMP::processUnreachable(Packet *p_in)
 	int bad_node = -1;
 
 	// get the current valid XID
-	if (last == -1) {
+	if (last == LAST_NODE_DEFAULT) {
 		// last is the default value, so we we haven't progressed
 		// yet and want the node pointed to by the final xid in the dag
 		n += (dnodes - 1);

@@ -27,7 +27,6 @@
 // CMU principal types
 #define CLICK_XIA_XID_TYPE_FID      (0x30)
 
-
 #define CLICK_XIA_XID_TYPE_DUMMY    (0xff)
 
 #define CLICK_XIA_XID_ID_LEN        20
@@ -176,5 +175,11 @@ struct click_xia_xcmp {
 #define	  XCMP_TIMXCEED_TRANSIT		0	/*   ttl==0 in transit	     */
 #define	  XCMP_TIMXCEED_REASSEMBLY	1	/*   ttl==0 in reassembly    */
 
+
 #define BFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+
+// changed from 0xff to 0xfe for BU compatability
+#define LAST_NODE_DEFAULT	0x7e
+
+#define HLIM_DEFAULT		250
 #endif
