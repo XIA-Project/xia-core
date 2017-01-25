@@ -15,6 +15,7 @@
 #include "click/dagaddr.hpp"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
+#include <click/xiarendezvous.hh>
 
 #include "taskident.hh"
 
@@ -2005,6 +2006,65 @@ bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
     INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
     sk->src_path = new_dag;
     return true;
+}
+
+void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(id);
+	// Retrieve interface from user provided argument
+	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
+	sock *sk = idToSock.get(_sport);
+	int iface = x_updaterv_msg->interface();
+
+	// Retrieve rendezvous control dag for the interface
+	XIAInterface interface = _interfaces.getInterface(iface);
+	if (!interface.has_rv_control_dag()) {
+		return;
+	}
+
+	// Send a control message to the rendezvous service to tell new address
+	XIAPath rvControlDAG;
+	rvControlDAG.parse(interface.rv_control_dag());
+
+	XIAPath iface_dag;
+	iface_dag.parse(interface.dag());
+	// HID of this interface
+	String hid = iface_dag.intent_hid_str().c_str();
+	// Current local DAG for this interface
+	String dag = iface_dag.unparse_dag();
+	// Current timestamp as nonce against replay attacks
+	String timestamp = Timestamp::now().unparse();
+	XIASecurityBuffer rv_control_msg(900);
+	if (build_rv_control_message(rv_control_msg, hid, dag, timestamp)
+			== false) {
+		WARN("ERROR: Unable to build notification for rendezvous service");
+		return;
+	}
+
+	// Send the notification to rendezvous service
+	XIAHeaderEncap xiah;
+	xiah.set_hlim(sk->hlim);
+	xiah.set_dst_path(rvControlDAG);
+	xiah.set_src_path(sk->src_path);
+	xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
+	xiah.set_plen(rv_control_msg.size());
+
+	WritablePacket *just_payload_part = WritablePacket::make(256,
+			(const void *)rv_control_msg.get_buffer(),
+			rv_control_msg.size(), 1);
+
+	// Add XIA Transport headers
+
+	WritablePacket *p = NULL;
+	DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+	p = dhdr->encap(just_payload_part);
+
+	xiah.set_plen(rv_control_msg.size() + dhdr->hlen()); // XIA payload = transport header + transport-layer data
+
+	p = xiah.encap(p, false);
+	delete dhdr;
+
+	output(NETWORK_PORT).push(p);
 }
 
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
