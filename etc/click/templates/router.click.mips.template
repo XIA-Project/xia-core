@@ -15,6 +15,6 @@ waveDevice -> Print(MAXLENGTH 512, LABEL received) -> [0]${HNAME}[0] -> Print(MA
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######
 
-	ControlSocket(tcp, 7777);
+ControlSocket(tcp, 7777);
 
 AlignmentInfo($HNAME/xrc/c 4 0, $HNAME/xlc0/c 4 0, $HNAME/xlc0/statsFilter 4 0, $HNAME/xlc0/xrespFilter 4 0,  $HNAME/xlc1/c 4 0, $HNAME/xlc1/statsFilter 4 0,  $HNAME/xlc1/xrespFilter 4 0, $HNAME/xlc2/c 4 0, $HNAME/xlc2/statsFilter 4 0, $HNAME/xlc2/xrespFilter 4 0, $HNAME/xlc3/c 4 0, $HNAME/xlc3/statsFilter 4 0, $HNAME/xlc3/xrespFilter 4 0);

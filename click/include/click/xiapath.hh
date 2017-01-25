@@ -73,9 +73,6 @@ class XIAPath { public:
 	// First child node for the given node
 	handle_t first_hop_from_node(handle_t node) const;
 
-	// find all XIDs of the given type
-	void find_nodes_of_type(uint32_t type, Vector<XID> &v);
-
 	// Replace intent HID node with a new one
 	bool replace_intent_hid(XID new_hid);
 
@@ -92,6 +89,9 @@ class XIAPath { public:
 
     // set the source node
     void set_source_node(handle_t node);
+
+	// Find all FID type nodes
+	void find_nodes_of_type(uint32_t type, Vector<XID> &v);
 
 	// if first edge of DAG points to intent, delete edge
 	// forcing us to take the fallback path

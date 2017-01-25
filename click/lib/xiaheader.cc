@@ -157,6 +157,7 @@ XIAHeaderEncap::update()
     click_xia* new_hdr = reinterpret_cast<struct click_xia*>(new uint8_t[size]);
 
     // preserve the current header content except path information
+    assert(size >= sizeof(struct click_xia));
     memcpy(new_hdr, _hdr, sizeof(struct click_xia));
     new_hdr->dnode = dnode;
     new_hdr->snode = snode;

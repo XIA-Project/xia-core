@@ -16,4 +16,4 @@ waveDevice -> [0]${HNAME}[0] -> waveDevice;
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######
 
-	ControlSocket(tcp, 7777);
+ControlSocket(tcp, 7777);

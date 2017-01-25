@@ -133,6 +133,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 			// copy the data from the ping (ie. we need the seq num and ID,
 			// so the sender can figure out what ping our pong refers to)
+			assert(xlen <= MAX_PACKET);
 			memcpy(msg, hdr.payload(), xlen);
 			break;
 
@@ -143,10 +144,13 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 			memset(msg + xlen, 0, NUM_EMPTY_BYTES);	// first 4 bytes after xcmp header are 0
 			xlen += NUM_EMPTY_BYTES;
+
+			assert(hdr.hdr_size() <= (MAX_PACKET-xlen));
 			memcpy(msg + xlen, hdr.hdr(), hdr.hdr_size());
 			xlen += hdr.hdr_size();
 
 			// copy 1st 8 bytes of payload as is done in ICMP
+			assert(NUM_ORIG_BYTES <= (MAX_PACKET-xlen));
 			memcpy(msg + xlen, hdr.payload(), NUM_ORIG_BYTES);
 			xlen += NUM_ORIG_BYTES;
 			break;
@@ -311,10 +315,11 @@ XCMP::processPacket(Packet *p_in) {
 // got an xcmp packet, need to either send up or respond with a different xcmp message
 void
 XCMP::gotXCMPPacket(Packet *p_in) {
-	char pload[1500];
+	char pload[MAX_PACKET];
 	XIAHeader hdr(p_in);
 
 	// have to work around const qualifiers
+	assert(hdr.plen() <= MAX_PACKET);
 	memcpy(pload, hdr.payload(), hdr.plen());
 
 	struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(pload);

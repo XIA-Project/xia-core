@@ -1040,7 +1040,10 @@ Graph::intent_SID_str() const
 		return "";
 	}
 	return nodes_[sid_index].to_string();
+	}
+	return nodes_[sid_index].to_string();
 }
+
 
 
 /**
