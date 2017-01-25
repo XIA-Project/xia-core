@@ -15,7 +15,6 @@
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include "xcache_sock.h"
 #include "cid.h"
 

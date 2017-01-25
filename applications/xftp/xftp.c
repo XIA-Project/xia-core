@@ -30,7 +30,6 @@
 #include <sys/time.h>
 #include "Xsocket.h"
 #include "xcache.h"
-#include "dagaddr.h"
 #include "dagaddr.hpp"
 
 #define VERSION "v2.0"
@@ -177,7 +176,9 @@ int retrieveChunk(FILE *fd, char *url)
 		sockaddr_x addr;
 
 		say("Fetching URL %s\n", token);
-		url_to_dag(&addr, token, strlen(token));
+
+		Graph g(token);
+		g.fill_sockaddr(&addr);
 
         gettimeofday(&t1, NULL);
 		if ((ret = XfetchChunk(&h, &buf, XCF_BLOCK | global_flags, &addr, sizeof(addr))) < 0) {
@@ -185,7 +186,6 @@ int retrieveChunk(FILE *fd, char *url)
 		}
 		gettimeofday(&t2, NULL);
 
-		Graph g(&addr);
 		printf("------------------------\n");
 		g.print_graph();
 		say("fetch hop count is %d\n", XgetPrevFetchHopCount());

@@ -12,7 +12,6 @@
 #include "xcache.h"
 
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include "Xkeys.h"
 
 #define TITLE "XIA Video Proxy"

@@ -7,7 +7,6 @@
 #include "Xsocket.h"
 #include "xcache.h"
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include <assert.h>
 #include "chunk-demo.h"
 
@@ -109,7 +108,9 @@ int make_and_getchunk(int sock)
 
 	printf("Got URL %s\n", url);
 
-	url_to_dag(&addr, url, strlen(url));
+	Graph g(url);
+	g.fill_sockaddr(&addr);
+
 	if ((ret = XfetchChunk(&h, &buf, 0, &addr, sizeof(addr))) < 0) {
 		die(-1, "XfetchChunk Failed\n");
 	}

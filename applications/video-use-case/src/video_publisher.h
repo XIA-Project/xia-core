@@ -6,7 +6,6 @@
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include "utils.h"
 #include "manifest.h"
 #include "xcache.h"
