@@ -55,8 +55,8 @@ with clicksock.clicksock() as click:
 	if args.level != None:
 		click.writeData("log.level %d" % args.level)
 
-	l = int(click.readData("log.level").strip())
-	v = int(click.readData("log.verbose").strip())
+	l = int(click.readData("log.level"))
+	v = int(click.readData("log.verbose"))
 
 print "console logging: " + status[v]
 print "level: " + levels[l]

@@ -21,9 +21,6 @@ import clicksock
 APP_VERSION="1.0"
 CACHE_ELEMENT="/cf/cidFilter"
 
-#
-# let's do this thing!
-#
 parser = argparse.ArgumentParser(description = 'xcache controller %s' % APP_VERSION)
 parser.add_argument("caching", nargs='?', help='enable caching', choices=['on', 'off'])
 args = parser.parse_args()
@@ -38,4 +35,4 @@ with clicksock.clicksock() as click:
 	elif args.caching == 'off':
 		click.writeData(enable + " false")
 
-	print "caching is " + click.readData(status).strip()
+	print "caching is " + click.readData(status)

@@ -38,6 +38,7 @@ class clicksock:
 
 			data = self.csock.read_until("\n")
 		except:
+			self.connected = False
 			self.errorExit("Unable to connect to Click")
 
 		# make sure it's really click we're talking to
@@ -105,7 +106,7 @@ class clicksock:
 		buf=""
 		while len(buf) < length:
 			buf += self.csock.read_some()
-		return buf
+		return buf.strip()
 
 	#
 	# send a write command to click and verify it worked OK
@@ -123,7 +124,7 @@ class clicksock:
 	# close the connection to click
 	#
 	def shutdown(self):
-		if (self.connected):
+		if self.connected:
 			self.csock.write("quit\n")
 			self.csock.close()
 			self.connected = False

@@ -92,7 +92,7 @@ def errorExit(msg):
 #
 def loadCards():
 	conf = click.readData("config")
-	lines = conf.strip().split('\n')
+	lines = conf.split('\n')
 
 	rx = re.compile("FromDevice\((\w+)\).*\[(\w+)\]")
 
@@ -157,7 +157,7 @@ def printTable():
 #
 def deleteEntry(args):
 	iface = args[0]
-	hid = args[1]
+	hid = args[1].upper()
 
 	card = findCard(iface)
 	validateHID(hid)
@@ -174,7 +174,7 @@ def deleteEntry(args):
 #
 def addEntry(args):
 	iface = args[0]
-	hid = args[1]
+	hid = args[1].upper()
 	mac = args[2]
 	static = args[3]	# if true, table entry won't expire
 
