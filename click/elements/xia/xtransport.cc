@@ -2041,29 +2041,27 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 		return;
 	}
 
-	// Send the notification to rendezvous service
+	// Create a packet with the just the data
+	WritablePacket *just_payload_part = WritablePacket::make(256,
+			(const void *)rv_control_msg.get_buffer(),
+			rv_control_msg.size(), 1);
+
+	// Add a datagram header onto the packet
+	DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+	WritablePacket *p = NULL;
+	p = dhdr->encap(just_payload_part);
+
+	// Add the XIA header onto the packet
 	XIAHeaderEncap xiah;
 	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(rvControlDAG);
 	xiah.set_src_path(sk->src_path);
 	xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
-	xiah.set_plen(rv_control_msg.size());
-
-	WritablePacket *just_payload_part = WritablePacket::make(256,
-			(const void *)rv_control_msg.get_buffer(),
-			rv_control_msg.size(), 1);
-
-	// Add XIA Transport headers
-
-	WritablePacket *p = NULL;
-	DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
-	p = dhdr->encap(just_payload_part);
-
-	xiah.set_plen(rv_control_msg.size() + dhdr->hlen()); // XIA payload = transport header + transport-layer data
-
+	xiah.set_plen(rv_control_msg.size() + dhdr->hlen());
 	p = xiah.encap(p, false);
 	delete dhdr;
 
+	// Send the notification to rendezvous service
 	output(NETWORK_PORT).push(p);
 }
 
