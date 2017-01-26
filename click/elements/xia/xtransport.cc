@@ -2430,6 +2430,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 	//Find DAG info for that stream
 	if (rc == 0 && sk->sock_type == SOCK_RAW) {
 		char payload[65536];
+		assert (pktPayloadSize <= 65536);
 		memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
 
 		// FIXME: we should check to see that the packet isn't too big here

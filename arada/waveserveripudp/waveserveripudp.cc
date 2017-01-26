@@ -1,3 +1,4 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /**
  * TCP server that provides a simple tx/rx interface to remote nodes.
  * Packets are sent using UDP/IP over WAVE.
@@ -16,26 +17,27 @@
 #include <iomanip> // std::hex, etc
 #include <map> // std::map
 #include <vector> // std::vector
+#include <chrono> // std::chrono::system_clock
+#include <thread> // std::this_thread
 
 // legacy c standard headers
-#include <cmath> // pow()
 #include <csignal> // signal()
 #include <cstdlib> // strtoul()
 #include <cstdint> // uint*_t
 #include <cstring> // strerror(), memcpy(), memset()
 #include <cassert> // assert()
-#include <ctime> // time()
+#include <ctime> // std::time_t
 
 // unix headers
 #include <unistd.h> // getpid()
 #include <pthread.h> // pthread_*()
 #include <arpa/inet.h> // htons(), ntohs(), etc
 #include <sys/socket.h> // socket(), setsockopt(), bind(), ...
-//#include <sys/types.h> // accept(), freeaddrinfo()
 #include <errno.h> // errno
 
 // my headers
 #include "configfile.h"
+#include "pdrlog.h"
 
 // Global definitions
 #define MTU 66000 // let's support 64K jumbo packets, just in case...
@@ -43,18 +45,35 @@
 #define CLICK_CON_CODE 254 // click connect code, so we know someone's listening
 #define CLICK_DISC_CODE 255 // click disconnect code, so we know it's gone
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+// make life with chrono easier
+using secs = std::chrono::seconds;
+using sysclock = std::chrono::system_clock;
+
+
 /* Global variables, aren't they fun */
-pthread_t _rcvrTid=0;
+pthread_t _rcvrTid=0, _loggerTid=0;
 int _clickSockFd=0, _waveSockFd=0;
 struct sockaddr_in _clickCliAddr;
 bool _isClickCliConn = false;
+PdrLog _pdrLog;
+bool _writePdrLog = false;
+
+#ifdef DEBUG
+unsigned long long nTx=0, nRx=0; // for debug only
+#endif
 
 struct RcvThdArgs {
-	uint64_t myWaveMacInt;
+  uint64_t myWaveMacInt;
 };
 
-// debug
-unsigned long long nTx=0, nRx=0;
+struct LgrThdArgs{
+  PdrLog& pdrLog;
+  std::time_t timeres;
+  const std::string& logFname;
+  const std::string& myWaveMacStr;
+};
 
 
 /**
@@ -87,6 +106,7 @@ int stringSplit(const std::string &str, char c,
   return nstrings;
 }
 
+
 /**
  * Extract a MAC address
  * Returns 0 on success, -1 on failure.
@@ -101,15 +121,17 @@ int getMacIntFromStr(const std::string &macStr, uint64_t &macInt){
     return -1;
   }
 
-  macInt = 0;
-  int exp = 0;
-  for (std::vector<std::string>::reverse_iterator itr = macSplinters.rbegin();
-      itr != macSplinters.rend(); ++itr) {
-
-    const uint8_t macByte = strtoul(itr->c_str(), NULL, 16);
-    macInt += (uint64_t) macByte * pow(16, exp);
-    exp += 2;
+  uint8_t macIntArray[6];
+  int i = 0;
+  for (std::vector<std::string>::const_iterator itr = macSplinters.begin();
+      itr != macSplinters.end(); ++itr) {
+    
+    macIntArray[i++] = strtoul(itr->c_str(), NULL, 16); // extract
   }
+  
+  // copy it over
+  macInt = 0;
+  std::memcpy(&macInt, &macIntArray, 6);
 
   return 0;
 }
@@ -152,7 +174,7 @@ int loadMacIpMap(const std::string &macIpMapFname,
     uint64_t macInt;
     
     if (getMacIntFromStr(macStr, macInt)){
-          std::cerr << "Skipping invalid mac: " << macStr << std::endl;
+      std::cerr << "Skipping invalid mac: " << macStr << std::endl;
       continue; // on to the next line
     }
 
@@ -173,6 +195,12 @@ void die(){
   // cancel the receiver thread (not joined because infinite loop)
   if (_rcvrTid != 0 and pthread_cancel(_rcvrTid)){
     std::cerr << "die(), pthread_cancel(_rcvrTid): " << strerror(errno) << \
+        std::endl;
+  }
+  
+  // cancel the logger thread (not joined because infinite loop)
+  if (_loggerTid != 0 and pthread_cancel(_loggerTid)){
+    std::cerr << "die(), pthread_cancel(_loggerTid): " << strerror(errno) << \
         std::endl;
   }
 
@@ -228,7 +256,7 @@ void* receiver_thread(void *arg){
 
     if ((rxlen = recvfrom(_waveSockFd, waveRcvBuf, MTU, /*flags*/ 0,
         (struct sockaddr *) &sndrAddr, &sndrAddrLen)) > 0){ // error!
-
+  
       assert(rxlen <= MTU-6);
       assert(rxlen > 14); // must be more than the ethernet header itself!
 
@@ -238,12 +266,7 @@ void* receiver_thread(void *arg){
         // check to see that we ourselves aren't the originator of the message
         // can happen with broadcast packets
         uint64_t srcMacInt = 0;
-        int exp = 0;
-        for (int i=5; i >= 0; i--){
-          const uint8_t macByte = waveRcvBuf[i+6]; // src mac is 2nd in line
-          srcMacInt += (uint64_t) macByte * pow(16, exp);
-          exp += 2;
-        }
+        std::memcpy(&srcMacInt, &waveRcvBuf[6], 6);
 
         if (srcMacInt == myWaveMacInt){ // ignore and move on!
           continue;
@@ -252,14 +275,29 @@ void* receiver_thread(void *arg){
         // copy length
         uint16_t totalPktLen = rxlen + 6;
         const uint16_t totalPktLenNet = htons(totalPktLen);
-        memcpy(&rcvBuf[0], &totalPktLenNet, 2);
+        std::memcpy(&rcvBuf[0], &totalPktLenNet, 2);
         
         // note that there are 4 useless bytes in here, they server to add some
         // padding so the application header is the same length (6 bytes) on
         // both directions
 
         // copy data contents
-        memcpy(&rcvBuf[6], waveRcvBuf, rxlen);        
+        std::memcpy(&rcvBuf[6], waveRcvBuf, rxlen);
+
+        if (_writePdrLog){ // if enabled, let us write this RX to the pdr log
+          
+          // we don't want to log packets sent to broadcast address
+          bool isBroadcast = true;
+          for (int i=0; i < 6; i++){
+            if (waveRcvBuf[i] != 0xff){
+              isBroadcast = false;
+            }
+          }
+          
+          if (not isBroadcast){
+            _pdrLog.logRx(srcMacInt);
+          }
+        }
 
 #ifdef DEBUG
         // get sender and destination macs
@@ -292,8 +330,9 @@ void* receiver_thread(void *arg){
         char *senderIpStr;
         if ((senderIpStr = inet_ntoa(sndrAddr.sin_addr)) != NULL){
 
-          std::cout << "Wave RX " << std::dec << nRx++ << " " << rxlen << "b from " << \
-              srcMac << " (" << senderIpStr << ") to " << dstMac << std::endl;
+          std::cout << "Wave RX " << std::dec << nRx++ << " " << rxlen << \
+              "b from " << srcMac << " (" << senderIpStr << ") to " << dstMac \
+              << std::endl;
 
         } else{ // unable to figure out sender's IP
 
@@ -325,7 +364,6 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
                      std::map<uint64_t,std::string> &macIpMap,
                      const uint16_t wavePort){
 
-
   assert(pktLen >= 20); // 6 for our header plus 14 for the ethernet header
 
   // deserialize
@@ -333,7 +371,7 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
 
   // packet length
   uint16_t plen;
-  memcpy(&plen, &pktBuf[idx], 2);
+  std::memcpy(&plen, &pktBuf[idx], 2);
   idx += 2;
   plen = ntohs(plen);
   assert(plen == pktLen); // otherwise something's very wrong!
@@ -347,18 +385,13 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
 
   uint8_t sndBuf[MTU];
   assert (conLen <= MTU);
-  memcpy(sndBuf, &pktBuf[idx], conLen);
+  std::memcpy(sndBuf, &pktBuf[idx], conLen);
   idx += conLen;
   assert(idx == pktLen);
 
   // figure out what IP the destination mac corresponds to
   uint64_t dstMacInt = 0;
-  int exp = 0;
-  for (int i=5; i >= 0; i--){
-    const uint8_t macByte = sndBuf[i]; // destination mac is at the beginning
-    dstMacInt += (uint64_t) macByte * pow(16, exp);
-    exp += 2;
-  }
+  std::memcpy(&dstMacInt, &sndBuf, 6);
 
   if (macIpMap.find(dstMacInt) == macIpMap.end()){
 
@@ -392,9 +425,24 @@ int parseAndSendWave(uint8_t *pktBuf, const uint16_t pktLen,
   }
 
   // send UDP packet
-
+  
+  if (_writePdrLog){ // if enabled, let us write this TX to the pdr log
+    
+    bool isBroadcast = true;
+    for (int i=0; i < 6; i++){
+      if (sndBuf[i] != 0xff){
+        isBroadcast = false;
+      }
+    }
+    
+    if (not isBroadcast){
+      uint64_t dstMacInt = 0;
+      std::memcpy(&dstMacInt, sndBuf, 6);
+      _pdrLog.logTx(dstMacInt);
+    }
+  }
+  
 #ifdef DEBUG
-if (conLen > 350){
   std::cout << "Wave TX " << std::dec << nTx++ << " " << conLen << "b from ";
 
   for (int i=0; i < 6; i++){
@@ -417,7 +465,6 @@ if (conLen > 350){
   }
   
   std::cout << " (" << dstIpStr << ")" << std::endl;
-}
 #endif
 
   // the packet is now fully assembled and ready to be sent
@@ -428,6 +475,64 @@ if (conLen > 350){
   }
 
   return 0;
+}
+
+/**
+ * This thread periodically writes and resets the PDR log. In between it just
+ * sleeps.
+ */
+void *logger_thread(void *arg){
+
+  // read the arguments
+  LgrThdArgs *threadArgs = (LgrThdArgs *) arg;
+  
+  const std::string& logFname = threadArgs->logFname;
+  
+  // let us open up the log file
+  std::ofstream ofs;
+  ofs.open (logFname, std::ios::out | std::ios::app);
+  
+  if (!ofs.is_open()){ // failure?
+    std::cerr << "logger_thread() couldn't open pdr log file " << logFname << \
+        ". No PDR log will be created." << std::endl;
+    return NULL; // nothing for us here now
+  }
+
+  // if we're starting on a brand new file, let us write a little header for it
+  ofs.seekp(0, std::ios::end); // put cursor at eof
+  if (ofs.tellp() == 0){
+    const std::string& myWaveMacStr = threadArgs->myWaveMacStr;
+    ofs << "# PDR log for MAC " << myWaveMacStr << std::endl << "# Format:" \
+        << std::endl << "# tstamp mac ntx nrx" << std::endl;
+  }
+
+  PdrLog& pdrLog = threadArgs->pdrLog; // the log we shall be writing to
+
+  // configure log periodicity
+  const unsigned long timeres = threadArgs->timeres;
+  sysclock::time_point nextTimepoint = sysclock::from_time_t(0);
+
+  while(true){
+  
+    std::this_thread::sleep_until(nextTimepoint); // wait for the right time
+    
+    // take note of current time with desired granularity
+    sysclock::time_point nowTimepoint = sysclock::now();
+    const secs nowTstampSecs = \
+        std::chrono::duration_cast<secs> (nowTimepoint.time_since_epoch());
+    const std::time_t nowTstamp = nowTstampSecs.count() / timeres * timeres;
+
+    pdrLog.print(ofs, nowTstamp, true /* reset */); // do the actual print
+    ofs.flush(); // write it all out
+    
+    // how long should we sleep for?
+    const std::time_t nextTstamp = nowTstamp + timeres;
+    nextTimepoint = sysclock::from_time_t(nextTstamp);
+  }
+  
+  ofs.close();
+
+  return 0; // unreachable code!
 }
 
 
@@ -482,19 +587,19 @@ int main(int argc, char *argv[]){
     std::cerr << "Config error: section=server, value=macipmapfname (" << str \
         << "), using default value " << pMacIpMapFname << "." << std::endl;
   }
-  
+
   // wave mac
-  std::string pMyWaveMac = "";
+  std::string pMyWaveMacStr = "";
   try {
-    pMyWaveMac = conf.Value("wave", "mac");
+    pMyWaveMacStr = conf.Value("wave", "mac");
   } catch (const std::string str){
     std::cerr << "Config error: section=wave, value=mac (" << str \
           << ") not found. Exiting." << std::endl;
     die();
   }
   uint64_t myWaveMacInt;
-  if (getMacIntFromStr(pMyWaveMac, myWaveMacInt) < 0){
-    std::cerr << "Invalid wave mac " << pMyWaveMac << ". Exiting." << std::endl;
+  if (getMacIntFromStr(pMyWaveMacStr, myWaveMacInt) < 0){
+    std::cerr << "Invalid wave mac " << pMyWaveMacStr << ". Exiting." << std::endl;
     die();
   }
 
@@ -531,6 +636,56 @@ int main(int argc, char *argv[]){
 #ifdef DEBUG
   std::cout << "Loaded " << macIpMap.size() << " MAC->IP pairs" << std::endl;
 #endif
+
+  // pdr logger
+  _writePdrLog = false;
+  try {
+    _writePdrLog = (bool) std::atoi(conf.Value("pdrlog", "writelog").c_str());
+  } catch (const std::string str){
+    std::cerr << "Config error: section=pdrlog, value=writelog (" << str \
+          << "). PDR log disabled." << std::endl;
+  }
+  
+  // additional processing to be done only if PDR logging is turned on
+  if (_writePdrLog){
+
+    // read time resolution
+    std::time_t timeres = 1; // default seconds
+    try {
+      timeres = \
+          (std::time_t) std::atol(conf.Value("pdrlog", "timeres").c_str());
+
+    } catch (const std::string str){
+      std::cerr << "Config error: section=pdrlog, value=timeres (" << str \
+          << "), using default " << timeres << "." << std::endl;
+    }
+    
+    // read log file name
+    std::string logFname = "pdrlog.txt";
+    try {
+      logFname = conf.Value("pdrlog", "fname");
+
+    } catch (const std::string str){
+      std::cerr << "Config error: section=pdrlog, value=fname (" << str \
+          << "), using default " << logFname << "." << std::endl;
+    }
+    
+    // initialize the arg struct
+    // can only do it now because we can't have uninitialized references
+    LgrThdArgs lgrThdArgs = {
+      _pdrLog,  // pdrLog
+      timeres,  // timeres
+      logFname,  // logFname
+      pMyWaveMacStr,  // myWaveMacStr
+    };
+
+    // finally create the thread
+    if (pthread_create(&_loggerTid, NULL, logger_thread, &lgrThdArgs)){
+      std::cerr << "main(), pthread_create(&_loggerTid): " << \
+        strerror(errno) << std::endl;
+      die();
+    }
+  }
 
   // 3. CREATE WAVE (UDP) SOCKET
   // create the socket
@@ -577,7 +732,7 @@ int main(int argc, char *argv[]){
     std::cerr << "main(), bind(wave): " << strerror(errno) << std::endl;
     die();
   }
-  
+
   // 4. LAUNCH RECEIVER THREAD
   RcvThdArgs rcvThdArgs;
   rcvThdArgs.myWaveMacInt = myWaveMacInt;
@@ -606,13 +761,12 @@ int main(int argc, char *argv[]){
     std::cerr << "main(), socket(click): " << strerror(errno) << std::endl;
     die();
   }
-
   // set reuseaddr option
   // isReuseaddr was previously defined to be true
   if (setsockopt(_clickSockFd, SOL_SOCKET, SO_REUSEADDR, &isReuseaddr, \
       sizeof(isReuseaddr)) == -1){
-    std::cerr << "main(), setsockopt(click, reuseaddr): " << strerror(errno) << \
-        std::endl;
+    std::cerr << "main(), setsockopt(click, reuseaddr): " << strerror(errno) \
+        << std::endl;
     die();
   }
 

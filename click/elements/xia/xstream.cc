@@ -254,8 +254,7 @@ XStream::tcp_input(WritablePacket *p)
 
 					return;
 				}
-			} else if (ti.ti_ack == tp->snd_una && 
-				1 /* rui: why did this use to be a zero? */ &&
+			} else if (ti.ti_ack == tp->snd_una &&
 				(_q_recv.is_empty() || _q_recv.is_ordered()) &&
 				(so_recv_buffer_size > _q_recv.bytes_ok() + ti.ti_len)) {
 				/* this is a pure, in-sequence data packet
@@ -274,8 +273,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->_tcpstat.tcps_rcvbyte += ti.ti_len;
 
 				/* Drop TCP/IP hdrs and TCP opts, add data to recv queue. */
-				WritablePacket *copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
-				p -> kill();
+				WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 
 				/* _q_recv.push() corresponds to the tcp_reass function whose purpose is
 				 * to put all data into the TCPQueue for both possible reassembly and
@@ -287,7 +285,7 @@ XStream::tcp_input(WritablePacket *p)
 						copy->kill();
 						copy = NULL;
 					}
-				} else if (! _q_recv.is_empty() && has_pullable_data()){
+				} else if (!_q_recv.is_empty() && has_pullable_data()){
 					// If the reassembly queue has data, a gap should have just been
 					// filled - then we set rcv_next to the last seq num in the queue to
 					// indicate the next packet we expect to get from the sender.
@@ -300,6 +298,10 @@ XStream::tcp_input(WritablePacket *p)
 				tp->t_flags |= TF_DELACK;
 				tcp_output();
 
+				if (p != NULL){
+					p->kill();
+				}
+
 				return;
 			}
 		}
@@ -309,7 +311,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = NULL;
 	if (ti.ti_len){
-		copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+		copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 	}
 
 	int win = so_recv_buffer_space();
@@ -1062,13 +1064,10 @@ void XStream::tcp_output(){
 	long		len, win;
 	xtcp 	ti;
 	WritablePacket *p = NULL;
-	WritablePacket *tcp_payload = NULL;
 
 	ti.th_nxt = CLICK_XIA_NXT_DATA;
 
-	for (int i=0; i < MAX_TCPOPTLEN; i++){
-		opt[i] = 0;
-	}
+	memset(opt, 0, MAX_TCPOPTLEN);   // clear them options
 
 	/*61*/
 	idle = (tp->snd_max == tp->snd_una);
@@ -1194,11 +1193,7 @@ void XStream::tcp_output(){
 
 	// XIA active session migration
 	// TODO: skip migration if not in established state
-	if (migrating){
-		goto send;
-	}
-
-	if (migrateacking){
+	if (migrating or migrateacking){
 		goto send;
 	}
 
@@ -1213,11 +1208,10 @@ send:
 	if (flags & XTH_SYN){
 		tp->snd_nxt = tp->iss;
 		if ((tp->t_flags & TF_NOOPT) == 0){
-			u_short mss;
 			opt[0] = TCPOPT_MAXSEG;
 			opt[1] = TCPOLEN_MAXSEG >> 2; // pack len in multiples of 4 bytes
-			mss = htons((u_short)tcp_mss(0));
-			memcpy( &(opt[2]), &mss, sizeof(mss));
+			const uint16_t mss = htons((uint16_t)tcp_mss(0));
+			memcpy( &(opt[2]), &mss, 2);
 			optlen = 4;
 
 			// Here we set the Window Scale option if it was requested of us to
@@ -1257,7 +1251,6 @@ send:
 	// TODO: Ensure we are not exceeding max packet size with all options
 	if (migrating){
 
-
 		if (tp->t_timer[TCPT_REXMT] == 0 && tp->t_timer[TCPT_PERSIST] == 0){
 			tp->t_rxtshift = 0;
 			tcp_setpersist();
@@ -1294,6 +1287,7 @@ send:
 		memcpy(migrateoptptr+2, migrate_msg.get_buffer(), migrate_msg.size());
 
 		optlen += migratelen;
+		assert(optlen <= MAX_TCPOPTLEN);
 
 		click_chatter("Tx migrate msg for sock id %u len %d", this->id, optlen-2);
 	}
@@ -1323,13 +1317,13 @@ send:
 
 		*(migrateackoptptr + 1) = migrateacklen >> 2;
 
-		memcpy(migrateackoptptr+2, migrate_ack.get_buffer(),
-				migrate_ack.size());
+		memcpy(migrateackoptptr+2, migrate_ack.get_buffer(), migrate_ack.size());
 
 		// We don't retransmit MIGRATEACK messages, so set flag to false
 		migrateacking = false;
 		optlen += migrateacklen;
 
+		assert(optlen <= MAX_TCPOPTLEN);
 		click_chatter("Tx migrateack for sock id %u len %d", this->id, optlen-2);
 	}
 	hdrlen += optlen;
@@ -1379,7 +1373,6 @@ send:
 	} else{
 		ti.th_seq = htonl(tp->snd_max);
 	}
-	
 
 	ti.th_ack = htonl(tp->rcv_nxt);
 	if (optlen){
@@ -1457,25 +1450,26 @@ send:
 	}
 	*/
 
-
-	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
-	xiah.set_last(LAST_NODE_DEFAULT);
-	xiah.set_hlim(hlim);
-	xiah.set_dst_path(dst_path);
-	xiah.set_src_path(src_path);
-
-	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&ti, opt, optlen);
-	int payload_length = 0;
-	if (p==NULL){
-		p = WritablePacket::make((uint32_t)2048, '\0', 0, 0);
-	} else{
-		payload_length = p -> length();
+	// if there is no data to send, create an empty packet
+	if (p == NULL){
+		p = WritablePacket::make((uint32_t) 1512 /*headroom*/, NULL /*data*/, \
+			0 /*length*/, 0 /*tailroom*/);
 	}
-	tcp_payload = send_hdr->encap(p);
-	xiah.set_plen(payload_length + send_hdr->hlen()); // XIA payload = transport header + transport-layer data
-	tcp_payload = xiah.encap(tcp_payload, false);
-	delete send_hdr;
+
+	// add stream header
+	StreamHeaderEncap *streamHdr = \
+		StreamHeaderEncap::MakeTCPHeader(&ti, opt, optlen);
+	p = streamHdr->encap(p);
+	delete streamHdr; // no longer needed
+
+	// add network header
+	XIAHeaderEncap xiaHdr;
+	xiaHdr.set_nxt(CLICK_XIA_NXT_XSTREAM);
+	xiaHdr.set_last(LAST_NODE_DEFAULT);
+	xiaHdr.set_hlim(hlim);
+	xiaHdr.set_dst_path(dst_path);
+	xiaHdr.set_src_path(src_path);
+	p = xiaHdr.encap(p, true /*adjust_plen*/);
 
 	if (win > 0 && SEQ_GT(tp->rcv_nxt + win, tp->rcv_adv)) {
 		tp->rcv_adv = tp->rcv_nxt + win;
@@ -1483,7 +1477,7 @@ send:
 	tp->last_ack_sent = tp->rcv_nxt;
 	tp->t_flags &= ~(TF_ACKNOW | TF_DELACK);
 
-	get_transport()->output(NETWORK_PORT).push(tcp_payload);
+	get_transport()->output(NETWORK_PORT).push(p);
 
 	/* Data has been sent out at this point. If we advertised a positive window
 	 * and if this new window advertisement will result in us recieving a higher
@@ -1533,7 +1527,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&th);
 	// sending a control packet
-	WritablePacket *p =  WritablePacket::make((uint32_t)2048, '\0', 0, 0);
+	WritablePacket *p =  WritablePacket::make((uint32_t)0, '\0', 0, 0);
 	WritablePacket *tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
@@ -2220,8 +2214,8 @@ XStream::print_state(StringAccum &sa)
 * @param tcp_conn
 */
 void XStream::check_for_and_handle_pending_recv() {
-	if (recv_pending){
 
+	if (recv_pending){
 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
 		recv_pending = false;
