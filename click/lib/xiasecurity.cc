@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
+#include <strings.h> // bzero
 
 /*
 // Generate HMAC-SHA1
@@ -257,6 +258,9 @@ bool XIASecurityBuffer::sign_and_pack(XIASecurityBuffer &payloadbuf, const std::
 // Typical usage: while(unpack(buf, &len)) ... do something
 bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
 {
+	// zero out the buffer so user won't be burned if they unpack a string
+	bzero(data, *length);
+
 	// If we go past the nextPack pointer, no more entries to unpack
 	if(nextUnpack >= nextPack) {
 		xs_chatter("XIASecurityBuffer::unpack: ERROR no entries to unpack");
