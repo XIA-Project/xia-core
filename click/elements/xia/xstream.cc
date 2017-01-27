@@ -1065,6 +1065,14 @@ void XStream::tcp_output(){
 	xtcp 	ti;
 	WritablePacket *p = NULL;
 
+	// Build XIA header so it's length is known for pkt size calculation
+	XIAHeaderEncap xiaHdr;
+	xiaHdr.set_nxt(CLICK_XIA_NXT_XSTREAM);
+	xiaHdr.set_last(LAST_NODE_DEFAULT);
+	xiaHdr.set_hlim(hlim);
+	xiaHdr.set_dst_path(dst_path);
+	xiaHdr.set_src_path(src_path);
+
 	ti.th_nxt = CLICK_XIA_NXT_DATA;
 
 	memset(opt, 0, MAX_TCPOPTLEN);   // clear them options
@@ -1328,10 +1336,13 @@ send:
 	}
 	hdrlen += optlen;
 
-	if (len > tp->t_maxseg - optlen){
-		len = tp->t_maxseg - optlen;
+	size_t overhead = xiaHdr.hdr_size() + sizeof(ti) + optlen;
+	if (len > (long)(tp->t_maxseg - overhead)){
+		len = tp->t_maxseg - overhead;
+		assert(len > 0);
 		sendalot = 1;
 	}
+	click_chatter("Xstream::tcp_output payload %d bytes", len);
 
 	/*278*/
 	if (len){
@@ -1463,12 +1474,6 @@ send:
 	delete streamHdr; // no longer needed
 
 	// add network header
-	XIAHeaderEncap xiaHdr;
-	xiaHdr.set_nxt(CLICK_XIA_NXT_XSTREAM);
-	xiaHdr.set_last(LAST_NODE_DEFAULT);
-	xiaHdr.set_hlim(hlim);
-	xiaHdr.set_dst_path(dst_path);
-	xiaHdr.set_src_path(src_path);
 	p = xiaHdr.encap(p, true /*adjust_plen*/);
 
 	if (win > 0 && SEQ_GT(tp->rcv_nxt + win, tp->rcv_adv)) {
