@@ -1342,7 +1342,6 @@ send:
 		assert(len > 0);
 		sendalot = 1;
 	}
-	click_chatter("Xstream::tcp_output payload %d bytes", len);
 
 	/*278*/
 	if (len){
