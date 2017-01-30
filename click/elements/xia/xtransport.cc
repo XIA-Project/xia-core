@@ -1121,6 +1121,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATEDAG:
 		Xupdatedag(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XUPDATERV:
+		Xupdaterv(_sport, id, &xia_socket_msg);
+		break;
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, id, &xia_socket_msg);
 		break;
@@ -2013,7 +2016,7 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	UNUSED(id);
 	// Retrieve interface from user provided argument
 	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
-	sock *sk = idToSock.get(_sport);
+	sock *sk = idToSock.get(id);
 	int iface = x_updaterv_msg->interface();
 
 	// Retrieve rendezvous control dag for the interface
