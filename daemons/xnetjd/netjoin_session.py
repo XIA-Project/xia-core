@@ -275,6 +275,10 @@ class NetjoinSession(threading.Thread):
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
+        retval = c_xsocket.XupdateRV(sockfd, interface);
+        if retval != 0:
+            logging.error("Failed notifying RV service of new location")
+        logging.info("Rendezvous service notified")
 
         # Retrieve handshake two info to be included in handshake three
         gateway_session_id = netjoin_h2.get_gateway_session_id()
