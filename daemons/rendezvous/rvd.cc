@@ -142,8 +142,8 @@ void config(int argc, char** argv)
 
 	if(!control_plane_dag_known) {
 		// Read Data plane DAG from resolv.conf
-		if(XreadRVServerAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
-			syslog(LOG_INFO, "Data plane DAG: %s", control_plane_DAG);
+		if(XreadRVServerControlAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
+			syslog(LOG_INFO, "Control plane DAG: %s", control_plane_DAG);
 		} else {
 			// Build a DAG from scratch
 			if(buildDAGFromRandomSID(control_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
