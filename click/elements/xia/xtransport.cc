@@ -2013,7 +2013,7 @@ bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
 
 void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-	UNUSED(id);
+	UNUSED(_sport);
 	// Retrieve interface from user provided argument
 	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
 	sock *sk = idToSock.get(id);
@@ -2028,6 +2028,8 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	// Send a control message to the rendezvous service to tell new address
 	XIAPath rvControlDAG;
 	rvControlDAG.parse(interface.rv_control_dag());
+	click_chatter("Xupdaterv: RV control plane dag: %s:",
+			rvControlDAG.unparse().c_str());
 
 	XIAPath iface_dag;
 	iface_dag.parse(interface.dag());
@@ -2058,12 +2060,15 @@ void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	XIAHeaderEncap xiah;
 	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(rvControlDAG);
-	xiah.set_src_path(sk->src_path);
+	//xiah.set_src_path(sk->src_path); // src_path is uninitialized
+	xiah.set_src_path(iface_dag);	// so using interface dag for now
 	xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
 	xiah.set_plen(rv_control_msg.size() + dhdr->hlen());
 	p = xiah.encap(p, false);
 	delete dhdr;
 
+	click_chatter("Xupdaterv: sending pkt to:%s\nfrom:%s",
+			rvControlDAG.unparse().c_str(), iface_dag.unparse().c_str());
 	// Send the notification to rendezvous service
 	output(NETWORK_PORT).push(p);
 }
