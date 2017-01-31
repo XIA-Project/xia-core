@@ -20,9 +20,8 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: xwrap [-h host] [-tixwdv] [-o <logfile>] cmd
+usage: xwrap [-tixwdv] [-o <logfile>] cmd [args...]
 where:
-  -h <host> run on the specified host (when using local topology file)
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
@@ -42,12 +41,8 @@ EOH
 
 while getopts "o:h:tivwxd" opt; do
 	case $opt in
-		h)
-			export XSOCKCONF_SECTION=$OPTARG
-			;;
 		o)
 			LOGFILE=$OPTARG
-			# export XWRAP_LOGFILE=$OPTARG
 			;;
 		v)
 			export XWRAP_VERBOSE=1
@@ -60,7 +55,7 @@ while getopts "o:h:tivwxd" opt; do
 			;;
 		i)
 			export XWRAP_INFO=1
-			;;	 
+			;;
 		w)
 			export XWRAP_WARNING=1
 			;;
