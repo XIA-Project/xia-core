@@ -9,13 +9,22 @@
  *
  */
 
-
+// default principal types
 #define CLICK_XIA_XID_TYPE_UNDEF    (0)
 #define CLICK_XIA_XID_TYPE_AD       (0x10)
 #define CLICK_XIA_XID_TYPE_HID      (0x11)
 #define CLICK_XIA_XID_TYPE_CID      (0x12)
 #define CLICK_XIA_XID_TYPE_SID      (0x13)
 #define CLICK_XIA_XID_TYPE_IP       (0x14)
+// BU principal types
+// #define CLICK_XIA_XID_TYPE_I4ID     (0x15)
+// #define CLICK_XIA_XID_TYPE_U4ID     (0x16)
+// #define CLICK_XIA_XID_TYPE_XDP      (0x17)
+// #define CLICK_XIA_XID_TYPE_SRVCID   (0x18)
+// #define CLICK_XIA_XID_TYPE_FLOWID   (0x19)
+// #define CLICK_XIA_XID_TYPE_ZF       (0x20)
+
+// CMU principal types
 #define CLICK_XIA_XID_TYPE_FID      (0x30)
 
 #define CLICK_XIA_XID_TYPE_DUMMY    (0xff)
@@ -105,6 +114,7 @@ typedef struct {
 #define CLICK_XIA_NXT_XCMP		0x01
 #define CLICK_XIA_NXT_XDGRAM	0x02
 #define CLICK_XIA_NXT_XSTREAM	0x03
+#define CLICK_XIA_NXT_FID       0x04
 
 // XIA extension header
 #pragma pack(push)
@@ -165,5 +175,11 @@ struct click_xia_xcmp {
 #define	  XCMP_TIMXCEED_TRANSIT		0	/*   ttl==0 in transit	     */
 #define	  XCMP_TIMXCEED_REASSEMBLY	1	/*   ttl==0 in reassembly    */
 
-#define BHID "HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+
+#define BFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+
+// changed from 0xff to 0xfe for BU compatability
+#define LAST_NODE_DEFAULT	0x7e
+
+#define HLIM_DEFAULT		250
 #endif

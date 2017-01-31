@@ -51,23 +51,6 @@ void listRoutes(std::string xidType)
 }
 
 
-int interfaceNumber(std::string xidType, std::string xid)
-{
-	int rc;
-	vector<XIARouteEntry> routes;
-	if ((rc = xr.getRoutes(xidType, routes)) > 0) {
-		vector<XIARouteEntry>::iterator ir;
-		for (ir = routes.begin(); ir < routes.end(); ir++) {
-			XIARouteEntry r = *ir;
-			if ((r.xid).compare(xid) == 0) {
-				return (int)(r.port);
-			}
-		}
-	}
-	return -1;
-}
-
-
 // send Hello message (1-hop broadcast)
 int sendHello(){
 	// Send my AD and my HID to the directly connected neighbors
@@ -157,7 +140,7 @@ int sendLSA() {
 }
 
 // process a Host Register message
-void processHostRegister(const char* host_register_msg) {
+void processHostRegister(const char* host_register_msg, int interface) {
 	/* Procedure:
 		1. update this host entry in (click-side) HID table:
 			(hostHID, interface#, hostHID, -)
@@ -181,7 +164,10 @@ void processHostRegister(const char* host_register_msg) {
   		start = found+1;  // forward the search point
   	}
 
- 	int interface = interfaceNumber("HID", hostHID);
+
+	// FIXME: only do this if we haven't seen the HID before
+	// should HIDs go into neighbor table?
+
 	printf("xrouted: Routing table entry: interface=%d, host=%s\n", interface, hostHID.c_str());
 	// update the host entry in (click-side) HID table
 	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
@@ -191,7 +177,7 @@ void processHostRegister(const char* host_register_msg) {
 }
 
 // process an incoming Hello message
-int processHello(const char* hello_msg) {
+int processHello(const char* hello_msg, int interface) {
 	/* Procedure:
 		1. fill in the neighbor table
 		2. update my entry in the networkTable
@@ -233,13 +219,17 @@ int processHello(const char* hello_msg) {
 		entry.HID = neighborHID;
 		entry.cost = 1; // for now, same cost
 
-		int interface = interfaceNumber("HID", neighborHID);
 		entry.port = interface;
 
 		route_state.neighborTable[neighborAD] = entry;
 
 		// increase the neighbor count
 		route_state.num_neighbors++;
+
+		// FIXME: HACK until we get new routing daemon implemented
+		// we haven't seen this AD before, so just go ahead and add a route for it's HID
+		// the AD route will be set later when tables are processed
+		xr.setRoute(neighborHID, interface, neighborHID, 0xffff);
 	}
 
 	// 2. update my entry in the networkTable
@@ -541,9 +531,12 @@ void updateClickRoutingTable() {
 void initRouteState()
 {
 	char dag[MAX_DAG_SIZE];
+	char fid[MAX_XID_SIZE];
+
+	XcreateFID(fid, MAX_XID_SIZE);
 
 	// make the dest DAG (broadcast to other routers)
-	Graph g = Node() * Node(BHID) * Node(SID_XROUTE);
+	Graph g = Node() * Node(BFID) * Node(SID_XROUTE);
 	g.fill_sockaddr(&route_state.ddag);
 
 	syslog(LOG_INFO, "xroute Broadcast DAG: %s", g.dag_string().c_str());
@@ -632,9 +625,8 @@ void config(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-	int rc, selectRetVal, n;
+	int rc, selectRetVal;
     size_t found, start;
-    socklen_t dlen;
     char recv_message[1024];
     sockaddr_x theirDAG;
     fd_set socks;
@@ -686,10 +678,42 @@ int main(int argc, char *argv[])
 		if (selectRetVal > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
-			dlen = sizeof(sockaddr_x);
-			n = Xrecvfrom(route_state.sock, recv_message, 1024, 0, (struct sockaddr*)&theirDAG, &dlen);
-			if (n < 0) {
-					perror("recvfrom");
+
+			int iface;
+			struct msghdr mh;
+			struct iovec iov;
+			struct in_pktinfo pi;
+			struct cmsghdr *cmsg;
+			struct in_pktinfo *pinfo;
+			char cbuf[CMSG_SPACE(sizeof pi)];
+
+			iov.iov_base = recv_message;
+			iov.iov_len = sizeof(recv_message);
+
+			mh.msg_name = &theirDAG;
+			mh.msg_namelen = sizeof(theirDAG);
+			mh.msg_iov = &iov;
+			mh.msg_iovlen = 1;
+			mh.msg_control = cbuf;
+			mh.msg_controllen = sizeof(cbuf);
+
+			cmsg = CMSG_FIRSTHDR(&mh);
+			cmsg->cmsg_level = IPPROTO_IP;
+			cmsg->cmsg_type = IP_PKTINFO;
+			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+			mh.msg_controllen = cmsg->cmsg_len;
+
+			if (Xrecvmsg(route_state.sock, &mh, 0) < 0) {
+				perror("recvfrom");
+				continue;
+			}
+
+			for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
+				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+					iface = pinfo->ipi_ifindex;
+				}
 			}
 
 			string msg = recv_message;
@@ -701,7 +725,7 @@ int main(int argc, char *argv[])
 				switch (type) {
 					case HELLO:
 						// process the incoming Hello message
-						processHello(msg.c_str());
+						processHello(msg.c_str(), iface);
 						break;
 					case LSA:
 						// process the incoming LSA message
@@ -709,7 +733,7 @@ int main(int argc, char *argv[])
 						break;
 					case HOST_REGISTER:
 						// process the incoming host-register message
-						processHostRegister(msg.c_str());
+						processHostRegister(msg.c_str(), iface);
 						break;
 					default:
 						perror("unknown routing message");

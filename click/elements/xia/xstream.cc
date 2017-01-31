@@ -132,7 +132,7 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_off = tcph->th_off;
 	ti.ti_flags = ntohs(tcph->th_flags);
 	ti.ti_win = ntohl(tcph->th_win);
-	ti.ti_len = (uint16_t)(xiah.plen() - thdr.hlen());
+	ti.ti_len = (uint16_t)(thdr.plen());
 
 	/* debugging no longer necessary
 	printf("%lu RX sock %u seq %u to %u len(%u) ack=%u rcv_nxt=%u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), this->id, ti.ti_seq, ti.ti_seq+ti.ti_len, ti.ti_len, ti.ti_ack, tp->rcv_nxt, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
@@ -273,7 +273,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->_tcpstat.tcps_rcvbyte += ti.ti_len;
 
 				/* Drop TCP/IP hdrs and TCP opts, add data to recv queue. */
-				WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+				WritablePacket *copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 
 				/* _q_recv.push() corresponds to the tcp_reass function whose purpose is
 				 * to put all data into the TCPQueue for both possible reassembly and
@@ -311,7 +311,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = NULL;
 	if (ti.ti_len){
-		copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+		copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 	}
 
 	int win = so_recv_buffer_space();
@@ -1068,7 +1068,6 @@ void XStream::tcp_output(){
 	// Build XIA header so it's length is known for pkt size calculation
 	XIAHeaderEncap xiaHdr;
 	xiaHdr.set_nxt(CLICK_XIA_NXT_XSTREAM);
-	xiaHdr.set_last(LAST_NODE_DEFAULT);
 	xiaHdr.set_hlim(hlim);
 	xiaHdr.set_dst_path(dst_path);
 	xiaHdr.set_src_path(src_path);
@@ -1194,7 +1193,7 @@ void XStream::tcp_output(){
 		goto send;
 	}
 
-	if (flags & XTH_FIN && 
+	if (flags & XTH_FIN &&
 		((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una)){
 		goto send;
 	}
@@ -1302,7 +1301,7 @@ send:
 
 	// Include the MIGRATEACK option if the migrateacking flag is set
 	if (migrateacking){
-		
+
 		int migrateacklen, padlen;
 
 		u_char *migrateackoptptr = opt + optlen;
@@ -1491,9 +1490,9 @@ send:
 
 	if (sendalot){
 		//goto again;
-		_outputTask.reschedule(); // reschedule to send another packet. 
-						// but don't send immediately because 
-						// there may be some acks we need to 
+		_outputTask.reschedule(); // reschedule to send another packet.
+						// but don't send immediately because
+						// there may be some acks we need to
 						// process first!
 	}
 
@@ -1524,14 +1523,13 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 	xiah.set_nxt(CLICK_XIA_NXT_XSTREAM);
-	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(src_path);
 
 	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&th);
 	// sending a control packet
-	WritablePacket *p =  WritablePacket::make((uint32_t)0, '\0', 0, 0);
+	WritablePacket *p =  WritablePacket::make((uint32_t)2048, '\0', 0, 0);
 	WritablePacket *tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
@@ -1639,7 +1637,7 @@ XStream::tcp_timers (int timer) {
 		  } else{
 			tp->t_timer[TCPT_KEEP] = get_transport()->globals()->tcp_keepidle;
 		  }
-		  
+
 		  break;
 		case TCPT_REXMT:
 
@@ -1672,7 +1670,7 @@ XStream::tcp_timers (int timer) {
 		  if (tp->t_rxtshift == 5){ // meaning this is the sixth retransmission
 			/* If we backed off this far, our srtt estimate is probably bogus.
 			 * Clobber it so we'll take the next rtt measurement as our srtt;
-			 * move the current srtt into rttvar to keep the current retransmit 
+			 * move the current srtt into rttvar to keep the current retransmit
 			 * times until then.
 			 *
 			 * We could also notify the lower layer to try a different route, but
@@ -2155,7 +2153,7 @@ XStream::_tcp_dooptions(const u_char *cp, int cnt, uint8_t th_flags,
 						tp->t_timer[TCPT_REXMT] = 0;
 						tp->t_rxtshift = 0;
 						// set srtt to zero but first pass it on to rttvar so we don't
-						// retransmit too soon 
+						// retransmit too soon
 						tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
 						tp->t_srtt = 0;
 						tcp_timers(TCPT_REXMT); // tcp_output() called inside
@@ -2343,7 +2341,7 @@ XStream::tcp_newtcpcb()
 
 
 XStream::XStream(XTRANSPORT *transport, const unsigned short port, uint32_t id)
-	: sock(transport, port, id, SOCK_STREAM), _q_recv(this), 
+	: sock(transport, port, id, SOCK_STREAM), _q_recv(this),
 		_q_usr_input(this), _outputTask(transport, id) {
 
 	tp = tcp_newtcpcb();

@@ -10,6 +10,7 @@ using namespace std;
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "Xkeys.h"
+#include "xia.h"
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xrendezvous"
@@ -333,7 +334,7 @@ void process_data(int datasock)
 	//sha1_hash_to_hex_string((unsigned char *)adNode.id(), 20, id_hex_string, 41);
 	//syslog(LOG_INFO, "AD from table = %s", id_hex_string);
 	memcpy(xiah->node[0].xid.id, adNode.id(), 20);
-	xiah->last = -1;
+	xiah->last = LAST_NODE_DEFAULT;
 	syslog(LOG_INFO, "Updated AD and last pointer in header");
 	print_packet_header(xiah);
 	syslog(LOG_INFO, "Sending the packet out on the network");

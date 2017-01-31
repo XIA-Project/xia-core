@@ -29,7 +29,6 @@
 #include "xcache.h"
 #include "Xsocket.h"
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include "Xkeys.h"
 
 #define VERSION "v2.0"
@@ -202,10 +201,10 @@ void *recvCmd(void *socketid)
 			int i = atoi(chk);
 			char url[256];
 
-			strcpy(reply, "OK:");
+			Graph g(&addrs[i]);
+			g.fill_sockaddr(&addrs[i]);
 
-			dag_to_url(url, 256, &addrs[i]);
-			if (strlen(reply) + strlen(url) >= BUFSIZE) {
+			if (snprintf(reply, BUFSIZE, "OK: %s", g.http_url_string().c_str()) > BUFSIZE) {
 				// this shouldn't happen
 				strcpy(reply, "FAIL:buffer too small.");
 				say("reply: %s\n", reply);

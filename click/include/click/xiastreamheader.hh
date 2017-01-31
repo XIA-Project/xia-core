@@ -12,33 +12,61 @@
 class StreamHeader
 {
 public:
-	StreamHeader(const StreamHeader& r)  { _hdr = r._hdr; };
-	StreamHeader(const struct xtcp* hdr) { _hdr = hdr; };
+	//StreamHeader(const StreamHeader& r)  { _hdr = r._hdr; };
+	//StreamHeader(const struct xtcp* hdr) { _hdr = hdr; };
 
 	// read from packet p->network_header() should point to XIA header
 	StreamHeader(const Packet* p) {
 		XIAHeader xh = XIAHeader(p);
-		assert(xh.nxt() == CLICK_XIA_NXT_XSTREAM);
+		const struct xtcp *temp_hdr(reinterpret_cast<const struct xtcp*>(xh.next_header()));
+
+		_plen = xh.plen();	// get the XIA Header's total payload size
 
 		if (xh.nxt() == CLICK_XIA_NXT_XSTREAM) {
-			_hdr = reinterpret_cast<const struct xtcp*>(xh.next_header());
+			_hdr = reinterpret_cast<const struct xtcp *>(xh.next_header());
+			_plen -= hlen();	// remove our header's size from the payload sizee
+
 		} else {
-			_hdr = NULL;
+			uint32_t len = temp_hdr->th_off << 2;
+			_plen -= len;
+
+			while (temp_hdr->th_nxt != CLICK_XIA_NXT_XSTREAM && temp_hdr->th_nxt != CLICK_XIA_NXT_DATA) {
+				// walk the header chain
+				temp_hdr = (xtcp*)((char *)temp_hdr + len);				// get next header
+				len = temp_hdr->th_off << 2;	// get size of next header
+				_plen -= len;					// adjust payload size
+			}
+
+			if (temp_hdr->th_nxt == CLICK_XIA_NXT_XSTREAM) {
+				_hdr = (xtcp*)((char *)temp_hdr + len);
+				len = _hdr->th_off << 2;
+				_plen -= len;
+			} else {
+				// something horrible happened and we're gonna crash
+				click_chatter("Header %d not found!", CLICK_XIA_NXT_XSTREAM);
+				_hdr = NULL;
+				_plen = 0;
+			}
 		}
+
+		assert (valid());
 	};
 
     inline const struct xtcp* header() const { return _hdr; };
+	inline bool valid()                   { return _hdr != NULL; };
 	inline uint8_t nxt() const            { return _hdr->th_nxt; };
-	inline uint16_t hlen() const           { return _hdr->th_off << 2; };
+	inline uint16_t hlen() const          { return _hdr->th_off << 2; };
 	inline uint32_t seq_num() const       { return ntohl(_hdr->th_seq); };
 	inline uint32_t ack_num() const       { return ntohl(_hdr->th_ack); };
 	inline uint32_t recv_window() const   { return ntohl(_hdr->th_win); };
 	inline uint16_t flags() const         { return ntohs(_hdr->th_flags); };
 	inline const u_char* tcpopt() const   { return reinterpret_cast<const uint8_t*>(_hdr) + sizeof(struct xtcp); };
 	inline const uint8_t* payload() const { return reinterpret_cast<const uint8_t*>(_hdr) + hlen(); };
+	inline uint32_t plen()                { return _plen; };
 
 private:
 	const struct xtcp *_hdr;
+	uint32_t _plen;
 };
 
 

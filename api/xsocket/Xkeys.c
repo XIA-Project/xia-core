@@ -1,4 +1,5 @@
 // COMPILE: gcc -o genkeypair genkeypair.c -lcrypto -lssl
+#include <string.h>
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
@@ -7,6 +8,7 @@
 #define KEY_BITS 1024
 #define XIA_KEYDIR "key"
 #define MAX_KEYDIR_PATH_LEN 1024
+#define FID_PREFIX "FID:"
 
 // Convert a SHA1 hash to a hex string
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
@@ -76,7 +78,7 @@ static int write_key_files(const char *keydir, char *pubkeyhashstr, RSA *r)
 		goto cleanup_write_key_files;
 	}
 	state = 3;
-	
+
 	if(PEM_write_bio_RSA_PUBKEY(pubfilebio, r) != 1) {
 		goto cleanup_write_key_files;
 	}
@@ -148,7 +150,7 @@ static const char *get_keydir()
 	return keydir;
 }
 
-int destroy_keypair(char *pubkeyhashstr, int hashstrlen)
+int destroy_keypair(const char *pubkeyhashstr, int hashstrlen)
 {
 	char *privfilepath;
 	char *pubfilepath;
@@ -248,14 +250,14 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
     if(BN_set_word(bne, e) != 1) {
         goto cleanup_generate_keypair;
     }
- 
+
 	// Create a new RSA key pair
     r = RSA_new();
     if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
         goto cleanup_generate_keypair;
     }
 	state = 2;
- 
+
     // Derive filename from hash of public key and write keys to filesystem
 	pubkeybuf = BIO_new(BIO_s_mem());
 	if(pubkeybuf == NULL) {
@@ -285,7 +287,7 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	}
 	// Successfully written files
 	retval = 0;
- 
+
 cleanup_generate_keypair:
 	switch(state) {
 		case 4: free(pubkeystr);
@@ -293,7 +295,7 @@ cleanup_generate_keypair:
 		case 2: RSA_free(r);
 		case 1: BN_free(bne);
 	};
- 
+
     return retval;
 }
 
@@ -307,6 +309,72 @@ int XmakeNewSID(char *randomSID, int randomSIDlen)
 	strcpy(randomSID, "SID:");
 	strcat(randomSID, pubkeyhashstr);
 	return 0;
+}
+
+static int manageFID(const char *fid, bool create)
+{
+	int rc = -1;
+	int sock = MakeApiSocket(SOCK_DGRAM);
+	xia::XSocketMsg xsm;
+	xia::X_ManageFID_Msg *xfm;
+
+	if (sock <= 0) {
+		LOG("Unable to create socket");
+		return rc;
+	}
+
+	xfm = xsm.mutable_x_manage_fid();
+	xsm.set_type(xia::XMANAGEFID);
+	xsm.set_sequence(0);
+	xsm.set_id(0);
+	xfm->set_create(create);
+	xfm->set_fid(fid);
+
+	if ((rc = click_send(sock, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+
+	} else if ((rc = click_reply(sock, 0, &xsm)) < 0) {
+		LOGF("Error getting status from Click: %s", strerror(errno));
+	}
+
+	freeSocketState(sock);
+	(_f_close)(sock);
+	return rc;
+}
+
+int XcreateFID(char *fid, int len)
+{
+	int tlen = strlen(FID_PREFIX);
+	assert(len >= (int)(tlen + XIA_SHA_DIGEST_STR_LEN));
+	char *p = fid + tlen;
+
+	memset(fid, 0, len);
+	strcpy(fid, FID_PREFIX);
+	if (generate_keypair(p, XIA_SHA_DIGEST_STR_LEN)) {
+		return -1;
+	}
+
+	// now tell click to bind to it
+	return manageFID(fid, true);
+}
+
+int XremoveFID(const char *fid)
+{
+	int tlen = strlen(FID_PREFIX);
+	const char *p = fid + tlen;
+	int len = strlen(p);
+	assert(len >= XIA_SHA_DIGEST_STR_LEN - 1);
+
+	if (strncasecmp(fid, FID_PREFIX, tlen) != 0) {
+		LOGF("%s is not a valid FID", fid);
+		return -1;
+	}
+
+	if (manageFID(fid, false) < 0) {
+		return -1;
+	}
+
+	return destroy_keypair(p, len);
 }
 
 // Check that key files matching pubkeyhashstr exist in keydir
@@ -362,7 +430,7 @@ int XexistsSID(const char *sid)
 }
 
 /*
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
 	char pubkeyhexdigest[SHA_DIGEST_LENGTH*2+1];
     int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));

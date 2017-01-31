@@ -19,7 +19,7 @@ CLICK_DECLS
  */
 
 /** @class XID
-    @brief XID helper class 
+    @brief XID helper class
 
     The XID type represents an XID address. It
     provides methods for unparsing IP addresses
@@ -83,13 +83,16 @@ XID::unparse() const
         case CLICK_XIA_XID_TYPE_SID:
            c += sprintf(c, "SID");
            break;
+	   case CLICK_XIA_XID_TYPE_FID:
+		  c += sprintf(c, "FID");
+		  break;
         case CLICK_XIA_XID_TYPE_IP:
            c += sprintf(c, "IP");
       	   break;
         default:
            if (XidMap::name(ntohl(_xid.type), name))
              c += sprintf(c, "%s", name.c_str());
-            else 
+            else
              c += sprintf(c, "%x", _xid.type);
     }
     c += sprintf(c, ":");
@@ -127,9 +130,9 @@ XIDArg::parse(const String &str, XID &value, const ArgContext & /* args */)
     XID xid_tmp;
     if (!cp_xid(str, &xid_tmp))
         (xid_tmp.xid()).type = htonl(CLICK_XIA_XID_TYPE_UNDEF);
-        
+
     value = xid_tmp;
-    
+
     return true;
 }
 

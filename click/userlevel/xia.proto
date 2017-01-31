@@ -33,6 +33,8 @@ enum XSocketCallType {
 
   XGETIFADDRS = 38;
   XGETHOSTNAME = 39;
+
+  XMANAGEFID = 40;
 }
 
 message XSocketMsg {
@@ -77,6 +79,8 @@ message XSocketMsg {
 
   optional X_GetIfAddrs_Msg x_getifaddrs = 41;
   optional X_GetHostName_Msg x_gethostname = 42;
+
+  optional X_ManageFID_Msg x_manage_fid = 43;
 }
 
 message X_Socket_Msg {
@@ -236,6 +240,12 @@ message X_Poll_Msg {
 message X_Updaterv_Msg {
   required int32 interface = 1;
 }
+
+message X_ManageFID_Msg {
+	required bool create = 1;
+	required string fid = 2;
+}
+
 
 /**************************************************/
 

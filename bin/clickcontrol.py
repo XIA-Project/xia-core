@@ -23,7 +23,7 @@ import socket
 numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
 
 # Principal types
-principals = ['AD', 'HID', 'SID', 'CID', 'IP']
+principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
 
 # Pattern to read AD from a network DAG
 adInDagPattern = re.compile('RE\s+(AD:\w+)')
@@ -125,9 +125,10 @@ class ClickControl:
 
     # Get a list of elements' write handlers
     def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
+		# FIXME: delete these lines?
         # Routing tables for each principal type
-        for principal in principals:
-            elements.append('xrc/n/proc/rt_%s' % principal)
+        #for principal in principals:
+        #    elements.append('xrc/n/proc/rt_%s' % principal)
 
         # Iterate over the number of interfaces for this host type
         for i in range(numIfaces[hosttype]):
@@ -144,7 +145,8 @@ class ClickControl:
         iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
+        # FIXME: HACK - remove the FID entry once routing is correct
+        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_FID']
         return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
@@ -207,8 +209,9 @@ class ClickControl:
         # TODO: Remove this hacky import.
         # Only python modules that have XIA swig in path can call this method
         import c_xsocket
-        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
         retval = c_xsocket.XupdateNameServerDAG(sockfd, ns_dag)
+        c_xsocket.Xclose(sockfd)
         if retval != 0:
             print "Failed updating Nameserver DAG in Click"
             return False

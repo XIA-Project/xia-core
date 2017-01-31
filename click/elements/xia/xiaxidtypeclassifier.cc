@@ -113,7 +113,7 @@ XIAXIDTypeClassifier::match(Packet *p)
 	// commented out for microbenchmarks
     /*
     if (p==NULL) return -1;
-    if (!hdr) 
+    if (!hdr)
         return -1;
     if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
@@ -126,8 +126,8 @@ XIAXIDTypeClassifier::match(Packet *p)
 
     {
         int last = hdr->last;
-        if (last < 0)
-            last += hdr->dnode;
+        if (last == LAST_NODE_DEFAULT)
+            last = hdr->dnode - 1;
         const struct click_xia_xid_edge* edge = hdr->node[last].edge;
         if (XIA_NEXT_PATH_ANNO(p) < CLICK_XIA_XID_EDGE_NUM)
         {
