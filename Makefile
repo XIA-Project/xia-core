@@ -4,8 +4,7 @@ endif
 
 
 # list of top level directories that need to be built
-#MAKEDIRS=api click daemons applications arada # tools
-MAKEDIRS=api click daemons applications arada # tools
+MAKEDIRS=api click daemons applications arada tools
 
 # make sure we run clean in anything we built in
 CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
@@ -20,9 +19,6 @@ TESTDIRS=$(addsuffix .test, api)
 #always make sure we have configured before building the sub projects
 all: config $(MAKEDIRS)
 
-static:
-	make all STATIC='static'
-
 # generate the click makefile optimized for XIA
 click/Makefile: click/Makefile.in xia.mk
 	cd click; ./configure \
@@ -32,7 +28,7 @@ click/Makefile: click/Makefile.in xia.mk
 				--enable-user-multithread \
 				--enable-warp9     \
 				--enable-userlevel \
-	 			--disable-analysis \
+				--disable-analysis \
 				--disable-tcpudp   \
 				--disable-tools    \
 				--disable-test     \
@@ -53,12 +49,11 @@ $(filter-out click, $(MAKEDIRS)):
 
 #### CONFIG RULES
 # add other configuration targets here as needed
-config: xia.mk click/Makefile
+config: xia.mk
 
 # creates xia.mk
 xia.mk: configure
 	@./configure
-	make -C .
 
 xia.env:
 	echo "export CC=\"${CC}\"" > xia.env
@@ -68,9 +63,13 @@ xia.env:
 	echo "export LD_LIBRARY_PATH=\"${LD_LIBRARY_PATH}\"" >> xia.env
 
 #### CLEAN RULES
-clean: $(CLEANDIRS)
-	-@rm click/Makefile
-	-@rm xia.mk
+clean: trickclean $(CLEANDIRS)
+	@-rm -f click/Makefile
+	@-rm -f xia.mk
+
+# touch xia.mk so that we don't get a ton of warnings that it doesn't exist when cleaning
+trickclean:
+	touch xia.mk
 
 $(CLEANDIRS):
 	-make -C $(basename $@) clean

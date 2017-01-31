@@ -30,10 +30,10 @@ doc:
 	make -C doc html
 
 clean:
-	-rm $(TARGET)
-	-rm $(XLIB)/xsocket.py
-	-rm $(XLIB)/c_xsocket.py
+	-rm -f $(TARGET)
+	-rm -f $(XLIB)/xsocket.py
+	-rm -f $(XLIB)/c_xsocket.py
 	-rm -f $(XLIB)/*.pyc
 	make -C doc clean
 	-rm -f *.so *.o *.pyc
-	-rm c_xsocket_wrap.c
+	-rm -f c_xsocket_wrap.c

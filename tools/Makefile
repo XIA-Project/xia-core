@@ -15,4 +15,4 @@ all: $(TARGETS)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
 clean: 
-	-rm $(TARGETS)
+	@-rm -f $(TARGETS)

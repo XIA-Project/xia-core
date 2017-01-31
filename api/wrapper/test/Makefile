@@ -1,4 +1,4 @@
-include ../../../xia.mk 
+include ../../../xia.mk
 
 .PHONY: all test
 
@@ -15,4 +15,4 @@ test: $(TARGET)
 	LD_PRELOAD="$(LIBS)"; ./$(TARGET)
 
 clean:
-	-rm $(TARGET)
+	@-rm -f $(TARGET)

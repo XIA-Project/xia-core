@@ -13,5 +13,5 @@ $(XROUTED): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 clean:
-	-rm $(XROUTED)
+	@-rm -f $(XROUTED)
 
