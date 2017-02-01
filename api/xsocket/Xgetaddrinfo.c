@@ -53,18 +53,18 @@ const char *xerr_unimplemented = "This feature is not currently supported";
 
  const char *Xgai_strerror(int code)
  {
- 	const char *msg = NULL;
+	const char *msg = NULL;
 
- 	switch (code) {
- 		case XEAI_UNIMPLEMENTED:
- 			msg = xerr_unimplemented;
- 			break;
+	switch (code) {
+		case XEAI_UNIMPLEMENTED:
+			msg = xerr_unimplemented;
+			break;
 
- 		default:
- 			msg = gai_strerror(code);
- 	}
+		default:
+			msg = gai_strerror(code);
+	}
 
- 	return msg;
+	return msg;
  }
 
 #define CONFIG_PATH_BUF_SIZE 1024
@@ -330,7 +330,10 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 				} else {
 					g = gif;
 				}
+			} else {
+				g = gif;
 			}
+
 			g.fill_sockaddr(&sa);
 			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
 				Xfreeifaddrs(ifaddr);
