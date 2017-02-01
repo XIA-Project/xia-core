@@ -555,7 +555,7 @@ clean_conf_and_keys()
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
 	echo "Deleting content files"
-	sudo rm /tmp/content/*
+	sudo rm -f /tmp/content/*
 
 }
 
