@@ -20,8 +20,9 @@ help ()
 
 Start or stop the XIA network services.
 
-usage: xwrap [-tixwdv] [-o <logfile>] cmd [args...]
+usage: xwrap [-n <name>] [-tixwdv] [-o <logfile>] cmd [args...]
 where:
+  -n <name> use host as the local hostname instead of $(hostname)
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
@@ -36,11 +37,14 @@ EOH
 	exit 0
 }
 
+XWRAP_HOST=$(hostname)
 
-[[ "$#" == "0" ]] && help
+while getopts "o:n:tivwxdh" opt; do
 
-while getopts "o:h:tivwxd" opt; do
 	case $opt in
+		n)
+			export XWRAP_HOST=$OPTARG
+			;;
 		o)
 			LOGFILE=$OPTARG
 			;;
@@ -68,6 +72,9 @@ while getopts "o:h:tivwxd" opt; do
 	esac
 done
 shift $((OPTIND-1))
+
+# there's no app to run
+[[ "$#" == "0" ]] && help
 
 export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 XLIB=$XIADIR/api/lib
