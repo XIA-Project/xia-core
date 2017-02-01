@@ -193,11 +193,10 @@ DECLARE(int, execve, const char *filename, char *const argv[], char *const envp[
 DECLARE(int, clone, int (*fn)(void *), void *child_stack,int flags, void *arg, ...);
 
 
+// local "IP" address & name ***************************************
+#define HOSTLEN 64
 
-// local "IP" address **********************************************
-// When running in a local topology this means the client and server
-// hosts end up with the same IP which can be a little confusing as
-// they are running on different XIA hosts
+char hostname[HOSTLEN];
 struct ifaddrs default_ifa;
 static char local_addr[ID_LEN];
 static struct sockaddr local_sa;
@@ -209,9 +208,15 @@ static address_t addresses;
 // ID (IP-port) <=> DAG mapping tables *****************************
 typedef std::map<std::string, std::string> id2dag_t;
 typedef std::map<std::string, std::string> dag2id_t;
+typedef std::map<std::string, std::string> id2host_t;
+typedef std::map<std::string, std::string> host2id_t;
 
 static id2dag_t id2dag;
 static dag2id_t dag2id;
+
+static id2dag_t host2dag;
+static id2host_t id2host;
+static host2id_t host2id;
 
 // HACK to allow services with fixed ports always get the same SID
 // This will only work correctly for DATAGRAM sockets unless the SID
@@ -268,7 +273,7 @@ static unsigned short _NewPort()
 // a) it is used with a DATAGRAM socket
 // b) the SID was created crypographically and the associated
 //  key is resident on the server binding to the SID
-static void _LoadSIDs() 
+static void _LoadSIDs()
 {
 	char conf[2048];
 	char p[64];
@@ -276,6 +281,7 @@ static void _LoadSIDs()
 	unsigned short port;
 
 	if (!XrootDir(conf, sizeof(conf))) {
+
 		conf[0] = 0;
 	}
 	strncat(conf, SID_FILE, sizeof(conf));
@@ -354,7 +360,13 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 	sin->sin_port = port;
 
 	// create an ID for the IPv4 sockaddr
-	sprintf(id, "%s-%d", addr, ntohs(sin->sin_port));
+	if (port != 0) {
+		sprintf(id, "%s-%d", addr, ntohs(sin->sin_port));
+	} else {
+		strcpy(id, addr);
+	}
+
+	printf("new id = %s\n", id);
 
 	// if we have a DAG, create a mapping between the IPv4 sockaddr and the DAG
 	if (sax) {
@@ -376,11 +388,11 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 // Generate a random SID
 static char *_NewSID(char *buf, unsigned len, unsigned short port)
 {
-	MSG("newsid port = %d\n", port);
+	MSG("newsid port = %d\n", ntohs(port));
 	// note: buf must be at least 45 characters long
 	// (longer if the XID type gets longer than 3 characters)
 	if (len < SID_SIZE) {
-		WARNING("buf is only %d chars long, it needs to be %d. Truncating...\n", len, SID_SIZE);
+		WARNING("buf is only %u chars long, it needs to be %d. Truncating...\n", len, SID_SIZE);
 	}
 
 	// lookup port, and if found use the static SID associated with it
@@ -408,10 +420,30 @@ static char *_IDstring(char *s, unsigned len, const struct sockaddr_in* sa)
 	inet_ntop(AF_INET, &sa->sin_addr, ip, INET_ADDRSTRLEN);
 
 	// make an id from the ip address and port
-	snprintf(s, len, "%s-%u", ip, ntohs(sa->sin_port));
+	if (sa->sin_port == 0)
+		snprintf(s, len, "%s", ip);
+	else
+		snprintf(s, len, "%s-%u", ip, ntohs(sa->sin_port));
 	return s;
 }
 
+
+
+// convert a hostname&port into an id string in the form of hostname-port
+static const char *_hoststring(char *s, unsigned len, const char *name, unsigned short port)
+{
+
+MSG("%s:%u\n", name, ntohs(port));
+
+	if (port != 0) {
+		// make an id from the ip address and port
+		snprintf(s, len, "%s-%u", name, ntohs(port));
+	} else {
+		// just use the hostname
+		strncpy(s, name, len);
+	}
+	return s;
+}
 
 
 // map from IP to XIA
@@ -433,6 +465,34 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 
 	} else {
 		MSG("No mapping for %s\n", s);
+		rc = -1;
+	}
+
+	return rc;
+}
+
+
+// map from IP to XIA
+static int _h2x(const char *name, unsigned short port, sockaddr_x *sax)
+{
+	char h[HOSTLEN];
+	int rc = 0;
+
+	MSG("name: %s port: %u\n", name, port);
+	id2dag_t::iterator it = host2dag.find(_hoststring(h, HOSTLEN, name, port));
+	MSG("No mapping for %s\n", h);
+
+	if (it != host2dag.end()) {
+
+		std::string dag = it->second;
+
+		MSG("Found: %s -> %s\n", h, dag.c_str());
+
+		Graph g(dag);
+		g.fill_sockaddr(sax);
+
+	} else {
+		MSG("No mapping for %s\n", h);
 		rc = -1;
 	}
 
@@ -475,7 +535,29 @@ static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 	return rc;
 }
 
+// Try to register our hostname with them esapping server
+// we need a host only entry for the xgetXbyY functions
+// and also for getaddrinfo when called with no service
+static int _RegisterHost()
+{
+	static bool registered = FALSE;
 
+	if (registered) {
+		return 0;
+	}
+
+	// register my hostname in the XIA mapping server
+	struct addrinfo *pai = NULL;
+
+	if (Xgetaddrinfo(NULL, NULL, NULL, &pai) >= 0) {
+		XregisterName(hostname, (sockaddr_x*)pai->ai_addr);
+		Xfreeaddrinfo(pai);
+
+		registered = TRUE;
+	}
+
+	return 0;
+}
 
 // create a dag with sid for this sockaddr and register it with
 // the xia name server. Also create a mapping to go from ip->xia and xia-ip
@@ -483,6 +565,7 @@ static int _Register(const struct sockaddr_in *sa)
 {
 	unsigned rc;
 	char id[ID_LEN];
+	char hname[HOSTLEN];
 	char sid[SID_SIZE];
 	struct addrinfo *ai;
 
@@ -495,6 +578,7 @@ static int _Register(const struct sockaddr_in *sa)
 
 	// register it in the name server with the ip-port id
 	XregisterName(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
+	XregisterName(_hoststring(hname, HOSTLEN, hostname, sa->sin_port), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -504,6 +588,7 @@ static int _Register(const struct sockaddr_in *sa)
 	id2dag[id] = dag;
 	dag2id[dag] = id;
 
+	_RegisterHost();
 	return 1;
 }
 
@@ -584,6 +669,7 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 {
 	int rc = 0;
 	char id[ID_LEN];
+	char ip[ID_LEN];
 	socklen_t len = sizeof(sockaddr_x);
 
 	if (_i2x((struct sockaddr_in*)addr, sax) == 0) {
@@ -595,6 +681,15 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 
 	if (_NegativeLookup(id)) {
 		return EAI_NONAME;
+	}
+
+
+	inet_ntop(AF_INET, &addr->sin_addr, ip, ID_LEN);
+printf("id = %s ip = %s\n", id, ip);
+	id2host_t::iterator it = id2host.find(ip);
+	if (it != id2host.end()) {
+		printf("found a mapping ip-name\n");
+		_hoststring(id, ID_LEN, it->second.c_str(), addr->sin_port);
 	}
 
 	MSG("Looking up mapping for %s in the nameserver\n", id);
@@ -620,22 +715,70 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 
 
 
+static int _LookupHost(const char *hname, unsigned short port, struct sockaddr *sa, sockaddr_x *sax)
+{
+	int rc = 0;
+	char id[HOSTLEN];
+	socklen_t len = sizeof(sockaddr_x);
+
+	if (_h2x(hname, port, sax) == 0) {
+		// found locally
+		return rc;
+	}
+
+	_hoststring(id, HOSTLEN, hname, port);
+
+	if (_NegativeLookup(id)) {
+		return EAI_NONAME;
+	}
+
+	MSG("Looking up mapping for %s in the nameserver\n", id);
+
+	if (XgetDAGbyName(id, sax, &len) < 0) {
+		WARNING("Mapping server lookup failed for %s\n", id);
+
+		failedLookups[id] = time(NULL);
+		rc = EAI_NONAME;
+
+	} else {
+		Graph g(sax);
+		std::string dag = g.dag_string();
+		char iid[HOSTLEN];
+
+		MSG("host:%s\ndag:%s\n", id, dag.c_str());
+		// found it, add it to our local mapping tables
+		host2dag[id] = dag;
+
+		// make an ip address to go along with the 'hostname'
+		_GetIP(sax, (sockaddr_in*)sa, NULL, port);
+
+		// create mapping between the IP and the hoststring
+		id2host[_IDstring(iid, sizeof(iid), (sockaddr_in*)sa)] = id;
+		host2id[id] = iid;
+		printf("created iid %s\n", iid);
+	}
+
+	return rc;
+}
+
+
+
 static int _LookupStr(const char *id, unsigned short port, struct sockaddr *sa, sockaddr_x *sax)
 {
 	int rc = 0;
+
 	struct sockaddr_in sin;
 
 	bzero(&sin, sizeof(sin));
-	if (inet_pton(AF_INET, id, &sin.sin_addr) > 0) {
-		sin.sin_port = port;
-		sin.sin_family = AF_INET;
+	sin.sin_port = port;
+	sin.sin_family = AF_INET;
 
+	if (inet_pton(AF_INET, id, &sin.sin_addr) > 0) {
 		if ((rc = _Lookup(&sin, sax)) == 0) {
 			memcpy(sa, &sin, sizeof(struct sockaddr));
 		}
 	} else {
-		MSG("Hostnames are not supported at this time\n");
-		rc = EAI_FAMILY;
+		rc = _LookupHost(id, port, sa, sax);
 	}
 
 	return rc;
@@ -693,6 +836,8 @@ static int _GetLocalIPs()
 				def_ifa = p;
 				strcpy(local_addr, ip);
 
+				// FIXME: likely ens33 or similar on ubuntu now
+				// should we change the default?
 				if (strcasecmp(p->ifa_name, "ETH0") == 0) {
 					found = true;
 				}
@@ -772,7 +917,7 @@ void bufferDump(int fd, int type, const void *buf, size_t len)
 {
 	if (!_log_dump)
 		return;
-	
+
 	MSG("%d: %s...\n", fd, (type == 0 ? "READING" : "WRITING"));
 
 	char *s = (char *)malloc(len + 10);
@@ -791,6 +936,8 @@ void bufferDump(int fd, int type, const void *buf, size_t len)
 ********************************************************************/
 void __attribute__ ((constructor)) xwrap_init(void)
 {
+	const char *h;
+
 	if (_log_info || _log_warning || _log_wrap || _log_trace) {
 		fprintf(_log, "loading XIA wrappers (created: %s)\n", __DATE__);
 		fprintf(_log, "remapping all socket IO automatically into XIA\n");
@@ -812,6 +959,12 @@ void __attribute__ ((constructor)) xwrap_init(void)
 		_log_warning = 1;
 	if (getenv("XWRAP_WRAP") != NULL)
 		_log_wrap = 1;
+
+	if ((h = getenv("XWRAP_HOST")) != NULL) {
+		strncpy(hostname, h, sizeof(hostname));
+	} else {
+		gethostname(hostname, sizeof(hostname));
+	}
 
 	const char *lf = getenv("XWRAP_LOGFILE");
 	if (lf)
@@ -848,7 +1001,7 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(socket);
 	GET_FCN(socketpair);
 	GET_FCN(write);
-	GET_FCN(writev);	
+	GET_FCN(writev);
 
 	// do the same for the informational functions
 	GET_FCN(gethostbyaddr);
@@ -899,7 +1052,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *addr_len)
 			errno = 0;
 		}
 
-		MSG("RC = %d errno = %d ===============================================\n", rc, errno);
+		MSG("RC = %d errno = %d\n", rc, errno);
 
 		if (FORCE_XIA()) {
 			// create a new fake IP address/port  to map to
@@ -923,6 +1076,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 	int rc;
 	sockaddr_x sax;
 	sockaddr_in sin;
+	unsigned short port = ((struct sockaddr_in*)addr)->sin_port;
 
 	TRACE();
 	if (shouldWrap(fd) ) {
@@ -935,7 +1089,14 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 		} else {
 			MSG(" using default address\n");
 			memcpy(&sin, &local_sa, sizeof(sockaddr_in));
-			sin.sin_port = ((struct sockaddr_in*)addr)->sin_port;
+			sin.sin_port = port;
+		}
+
+		if (port == 0) {
+			// make a random port number
+			// FIXME: need to ensure this is unique
+			port = rand() % 0xffff;
+			sin.sin_port = htons(port);
 		}
 
 		if (FORCE_XIA()) {
@@ -1116,7 +1277,7 @@ void freeaddrinfo (struct addrinfo *ai)
 {
 	TRACE();
 	// there currently isn't any new XIA functionality for this call
-	return __real_freeaddrinfo(ai);
+	__real_freeaddrinfo(ai);
 }
 
 
@@ -1253,8 +1414,6 @@ int getaddrinfo (const char *name, const char *service, const struct addrinfo *h
 			rc = 0;
 
 		} else {
-			sprintf(s, "%s-%d", name, ntohs(port));
-
 			if (_LookupStr(name, port, sa, &sax) < 0) {
 
 				MSG("name lookup failed for %s\n", s);
@@ -1803,14 +1962,14 @@ int shutdown(int fd, int how)
 			rc = -1;
 
 		} else if (getConnState(fd) != CONNECTED) {
-			errno = ENOTCONN; 
+			errno = ENOTCONN;
 			rc = -1;
-		
+
 		} else {
 			// we don't have anything like shutdown in XIA, so lie and say we did something
 			rc = 0;
-		}		
-	
+		}
+
 	} else {
 		NOXIA();
 		rc = __real_shutdown(fd, how);
@@ -2080,8 +2239,8 @@ int getservbyport_r (int port, const char *proto, struct servent *result_buf, ch
 }
 
 int clone(int (*fn)(void *), void *child_stack,
-                 int flags, void *arg, ...
-                 /* pid_t *ptid, struct user_desc *tls, pid_t *ctid */ )
+				 int flags, void *arg, ...
+				 /* pid_t *ptid, struct user_desc *tls, pid_t *ctid */ )
 {
 	TRACE();
 	ALERT();
