@@ -415,11 +415,12 @@ rendezvous()
 	local host=$1
 	local action=$2
 
+	DATASID=`cat $ADDRCONF |grep rendezvous|awk {'print $3'}`
 	cd $XIADIR/bin
 	case $action in
 		"start")
 			echo ./xrendezvous -h $host $LOG_FLAGS
-			./xrendezvous -h $host $LOG_FLAGS &
+			./xrendezvous -h $host -d $DATASID $LOG_FLAGS &
 			;;
 		"stop")
 			kill_service $host "xrendezvous"
@@ -554,7 +555,7 @@ clean_conf_and_keys()
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
 	echo "Deleting content files"
-	sudo rm /tmp/content/*
+	sudo rm -f /tmp/content/*
 
 }
 

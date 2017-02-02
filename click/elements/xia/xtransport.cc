@@ -16,6 +16,7 @@
 #include "click/dagaddr.hpp"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
+#include <click/xiarendezvous.hh>
 
 #include "taskident.hh"
 
@@ -164,7 +165,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
 	_tcp_globals.tcp_now              = 0;
 	_tcp_globals.so_recv_buffer_size  = 0x100000;
-	_tcp_globals.tcp_mssdflt          = 1234;
+	_tcp_globals.tcp_mssdflt          = 1500;
 	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT;
 	_tcp_globals.so_flags             = 0;
 	_tcp_globals.so_idletime          = 0;
@@ -1182,6 +1183,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATEDAG:
 		Xupdatedag(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XUPDATERV:
+		Xupdaterv(_sport, id, &xia_socket_msg);
+		break;
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, id, &xia_socket_msg);
 		break;
@@ -2073,6 +2077,68 @@ bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
     return true;
 }
 
+void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(_sport);
+	// Retrieve interface from user provided argument
+	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
+	sock *sk = idToSock.get(id);
+	int iface = x_updaterv_msg->interface();
+
+	// Retrieve rendezvous control dag for the interface
+	XIAInterface interface = _interfaces.getInterface(iface);
+	if (!interface.has_rv_control_dag()) {
+		return;
+	}
+
+	// Send a control message to the rendezvous service to tell new address
+	XIAPath rvControlDAG;
+	rvControlDAG.parse(interface.rv_control_dag());
+	click_chatter("Xupdaterv: RV control plane dag: %s:",
+			rvControlDAG.unparse().c_str());
+
+	XIAPath iface_dag;
+	iface_dag.parse(interface.dag());
+	// HID of this interface
+	String hid = iface_dag.intent_hid_str().c_str();
+	// Current local DAG for this interface
+	String dag = iface_dag.unparse_dag();
+	// Current timestamp as nonce against replay attacks
+	String timestamp = Timestamp::now().unparse();
+	XIASecurityBuffer rv_control_msg(900);
+	if (build_rv_control_message(rv_control_msg, hid, dag, timestamp)
+			== false) {
+		WARN("ERROR: Unable to build notification for rendezvous service");
+		return;
+	}
+
+	// Create a packet with the just the data
+	WritablePacket *just_payload_part = WritablePacket::make(256,
+			(const void *)rv_control_msg.get_buffer(),
+			rv_control_msg.size(), 1);
+
+	// Add a datagram header onto the packet
+	DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+	WritablePacket *p = NULL;
+	p = dhdr->encap(just_payload_part);
+
+	// Add the XIA header onto the packet
+	XIAHeaderEncap xiah;
+	xiah.set_hlim(sk->hlim);
+	xiah.set_dst_path(rvControlDAG);
+	//xiah.set_src_path(sk->src_path); // src_path is uninitialized
+	xiah.set_src_path(iface_dag);	// so using interface dag for now
+	xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
+	xiah.set_plen(rv_control_msg.size() + dhdr->hlen());
+	p = xiah.encap(p, false);
+	delete dhdr;
+
+	click_chatter("Xupdaterv: sending pkt to:%s\nfrom:%s",
+			rvControlDAG.unparse().c_str(), iface_dag.unparse().c_str());
+	// Send the notification to rendezvous service
+	output(NETWORK_PORT).push(p);
+}
+
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
@@ -2302,6 +2368,8 @@ void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMs
 }
 
 
+// Add interface DAG to list of dags being returned for getifaddrs
+// Include Rendezvous DAG for the interface as a separate entry, if exists
 void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 {
 	char iface_name[16];
@@ -2312,6 +2380,17 @@ void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 	ifaddr->set_flags(0);
 	ifaddr->set_src_addr_str(_interfaces.getDAG(interface).c_str());
 	ifaddr->set_dst_addr_str(_interfaces.getDAG(interface).c_str());
+	// TODO Add RV DAG to a new _msg->add_ifaddrs() if one is available
+	// If there is no Rendezvous DAG to add, we are done
+	if (!_interfaces.hasRVDAG(interface)) {
+		return;
+	}
+	xia::X_GetIfAddrs_Msg::IfAddr *rvifaddr = _msg->add_ifaddrs();
+	rvifaddr->set_iface_name(iface_name);
+	rvifaddr->set_flags(0);
+	rvifaddr->set_src_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_dst_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_is_rv_dag(true);
 }
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,

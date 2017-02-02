@@ -18,6 +18,10 @@ class XIAInterface {
 			return _dag;
 		}
 
+		String rv_dag() {
+			return _rv_dag;
+		}
+
 		String rhid() {
 			return _rhid;
 		}
@@ -65,6 +69,12 @@ class XIAInterfaceTable {
 		}
 		String getDAG(int iface) {
 			return interfaces[iface].dag();
+		}
+		String getRVDAG(int iface) {
+			return interfaces[iface].rv_dag();
+		}
+		bool hasRVDAG(int iface) {
+			return interfaces[iface].has_rv_dag();
 		}
 		XIAInterface getInterface(int iface) {
 			return interfaces[iface];
