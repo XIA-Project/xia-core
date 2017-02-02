@@ -226,12 +226,38 @@ void echo_stream()
 		die(-1, "Unable to create a temporary SID");
 	}
 
+	// Get a list of interfaces and their corresponding addresses
+	struct ifaddrs *ifaddr, *ifa;
+	if(Xgetifaddrs(&ifaddr)) {
+		die(-1, "unable to get interface addresses\n");
+	}
+
+	// See if we can find an address with rendezvous service
+	std::string rvdagstr;
+	for(ifa=ifaddr; ifa!=NULL; ifa = ifa->ifa_next) {
+		if(ifa->ifa_addr == NULL) {
+			continue;
+		}
+		if(ifa->ifa_flags & XIFA_RVDAG) {
+			Graph rvdag((sockaddr_x *)ifa->ifa_addr);
+			rvdagstr = rvdag.dag_string();
+			break;
+		}
+	}
+
 	struct addrinfo hints, *ai;
 	bzero(&hints, sizeof(hints));
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_XIA;
-	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
+	if (rvdagstr.size() > XIA_XID_STR_SIZE) {
+		if(Xgetaddrinfo(rvdagstr.c_str(), sid_string, &hints, &ai)) {
+			die(-1, "getaddrinfo with rvdag failed\n");
+		}
+	} else {
+		if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0) {
+			die(-1, "getaddrinfo failure!\n");
+		}
+	}
 
 	Graph g((sockaddr_x*)ai->ai_addr);
 

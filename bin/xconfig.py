@@ -9,6 +9,7 @@ import getopt
 import socket
 import genkeys
 import subprocess
+import xiapyutils
 from string import Template
 
 # constants
@@ -89,7 +90,7 @@ def createAD():
 def getHostname():
     global hostname
     if (len(hostname) == 0):
-        hostname = socket.gethostname()
+        hostname = xiapyutils.getxiaclickhostname()
     dot = hostname.find(".")
     if (dot >= 0):
         hostname = hostname[:dot]

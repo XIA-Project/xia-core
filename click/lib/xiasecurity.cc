@@ -16,6 +16,8 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string>
+#include <strings.h> // bzero
 
 /*
 // Generate HMAC-SHA1
@@ -206,10 +208,59 @@ bool XIASecurityBuffer::pack(const char *data, uint16_t length)
 	return true;
 }
 
+bool XIASecurityBuffer::pack(const char *data)
+{
+	uint16_t len = strlen(data);
+	// TODO: Add asserts to validate length here
+	return pack(data, len);
+}
+
+bool XIASecurityBuffer::sign_and_pack(XIASecurityBuffer &payloadbuf, const std::string &xid_str)
+{
+
+    unsigned char *payload = (unsigned char *)payloadbuf.get_buffer();
+    uint16_t payloadlen = payloadbuf.size();
+
+    // Sign the rv_control message
+    uint8_t signature[MAX_SIGNATURE_SIZE];
+    uint16_t siglen = MAX_SIGNATURE_SIZE;
+    if(xs_sign(xid_str.c_str(), payload, payloadlen, signature, &siglen)) {
+        xs_chatter("xs_chatter: Signing rv_control message");
+        return false;
+    }
+
+    // Extract the pubkey for inclusion in rv_control message
+    char pubkey[MAX_PUBKEY_SIZE];
+    uint16_t pubkeylen = MAX_PUBKEY_SIZE;
+    if(xs_getPubkey(xid_str.c_str(), pubkey, &pubkeylen)) {
+        xs_chatter("xs_chatter: Pubkey not found:%s", xid_str.c_str());
+        return false;
+    }
+
+    // Fill in the rv_control message
+    if(!pack((const char *) payload, payloadlen)) {
+        xs_chatter("Failed packing rv_control payload into rv_control message");
+        return false;
+    }
+    if(!pack((const char *) signature, siglen)) {
+        xs_chatter("Failed packing signature into rv_control message");
+        return false;
+    }
+    if(!pack((const char *) pubkey, pubkeylen)) {
+        xs_chatter("Failed packing pubkey into rv_control message");
+        return false;
+    }
+
+    return true;
+}
+
 // Unpack items from buffer, one per call
 // Typical usage: while(unpack(buf, &len)) ... do something
 bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
 {
+	// zero out the buffer so user won't be burned if they unpack a string
+	bzero(data, *length);
+
 	// If we go past the nextPack pointer, no more entries to unpack
 	if(nextUnpack >= nextPack) {
 		xs_chatter("XIASecurityBuffer::unpack: ERROR no entries to unpack");

@@ -140,11 +140,12 @@ int sendLSA() {
 }
 
 // process a Host Register message
-void processHostRegister(const char* host_register_msg, int interface) {
+void processHostRegister(const char* host_register_msg) {
 	/* Procedure:
 		1. update this host entry in (click-side) HID table:
 			(hostHID, interface#, hostHID, -)
 	*/
+	int interface = -1;
 	int rc;
 	size_t found, start;
 	string msg, hostHID;
@@ -163,6 +164,20 @@ void processHostRegister(const char* host_register_msg, int interface) {
   		hostHID = msg.substr(start, found-start);
   		start = found+1;  // forward the search point
   	}
+
+	// read interface number - provided by xnetjd
+	found=msg.find("^", start);
+	if (found!=string::npos) {
+		interface = atoi(msg.substr(start, found-start).c_str());
+		assert(interface >= 0 && interface <= 3); // no more than 4 interfaces
+		start = found+1;	// forward the search point
+	}
+
+	// Make sure xnetjd sent us a valid interface to register
+	if (interface == -1) {
+		printf("xrouted: ERROR: processHostRegister: Invalid interface.\n");
+		return;
+	}
 
 
 	// FIXME: only do this if we haven't seen the HID before
@@ -733,7 +748,7 @@ int main(int argc, char *argv[])
 						break;
 					case HOST_REGISTER:
 						// process the incoming host-register message
-						processHostRegister(msg.c_str(), iface);
+						processHostRegister(msg.c_str());
 						break;
 					default:
 						perror("unknown routing message");

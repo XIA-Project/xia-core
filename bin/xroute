@@ -21,6 +21,7 @@ import getopt
 import datetime
 import telnetlib
 import socket
+import xiapyutils
 
 APP_VERSION="1.0"
 TITLE="XIA Route version %s"
@@ -252,7 +253,7 @@ class RouterConfig:
 class XrouteApp:
 	connected = False
 	csock = None
-	device = socket.gethostname().split(".")[0]
+	device = xiapyutils.getxiaclickhostname()
 	types = []
 
 	#

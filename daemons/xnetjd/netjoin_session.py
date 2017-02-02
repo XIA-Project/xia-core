@@ -276,6 +276,10 @@ class NetjoinSession(threading.Thread):
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
+        retval = c_xsocket.XupdateRV(sockfd, interface);
+        if retval != 0:
+            logging.error("Failed notifying RV service of new location")
+        logging.info("Rendezvous service notified")
 
         # Retrieve handshake two info to be included in handshake three
         gateway_session_id = netjoin_h2.get_gateway_session_id()
@@ -341,7 +345,7 @@ class NetjoinSession(threading.Thread):
             else:
                 logging.info("Route set up for {}".format(client_hid))
             # Inform local xrouted about this HID registration
-            router_register_msg = "2^{}^".format(client_hid)
+            router_register_msg = "2^{}^{}^".format(client_hid, interface)
             rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
             router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
             c_xsocket.Xsendto(rsockfd, router_register_msg, 0, router_dag_str)

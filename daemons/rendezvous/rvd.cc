@@ -143,8 +143,8 @@ void config(int argc, char** argv)
 
 	if(!control_plane_dag_known) {
 		// Read Data plane DAG from resolv.conf
-		if(XreadRVServerAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
-			syslog(LOG_INFO, "Data plane DAG: %s", control_plane_DAG);
+		if(XreadRVServerControlAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
+			syslog(LOG_INFO, "Control plane DAG: %s", control_plane_DAG);
 		} else {
 			// Build a DAG from scratch
 			if(buildDAGFromRandomSID(control_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
@@ -396,22 +396,25 @@ void process_control_message(int controlsock)
 	bzero(dag, dagLength+1);
 	controlMsg.unpack(dag, &dagLength);
 
-	uint16_t timestampLength = controlMsg.peekUnpackLength();
-	assert(timestampLength == (uint16_t) sizeof(double));
-	double timestamp;
-	controlMsg.unpack((char *)&timestamp, &timestampLength);
+	uint16_t timestampstrLength = controlMsg.peekUnpackLength();
+	char timestampstr[timestampstrLength+1];
+	bzero(timestampstr, timestampstrLength+1);
+	controlMsg.unpack(timestampstr, &timestampstrLength);
+	double timestamp = strtod(timestampstr, NULL);
 
 	// Verify hash(pubkey) matches HID
 	if(!xs_pubkeyMatchesXID(pubkey, hid)) {
 		syslog(LOG_ERR, "ERROR: Public key does not match HID of control message sender");
 		return;
 	}
+	syslog(LOG_INFO, "Valid pubkey in control message");
 
 	// Verify signature using pubkey
 	if(!xs_isValidSignature((const unsigned char *)controlMsgBuffer, controlMsgLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
 		syslog(LOG_ERR, "ERROR: Invalid signature");
 		return;
 	}
+	syslog(LOG_INFO, "Signature valid");
 
 	// Verify that the timestamp is newer than seen before
 	HIDtoTimestampIterator = HIDtoTimestamp.find(hid);

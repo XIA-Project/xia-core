@@ -190,6 +190,7 @@ message X_GetIfAddrs_Msg {
     optional uint32 flags = 2;
     optional string src_addr_str = 3;
     optional string dst_addr_str = 4;
+    optional bool is_rv_dag = 5;
   }
 
   repeated IfAddr ifaddrs = 1;
@@ -237,8 +238,7 @@ message X_Poll_Msg {
 }
 
 message X_Updaterv_Msg {
-  required string rvdag = 1;
-  required int32 interface = 2;
+  required int32 interface = 1;
 }
 
 message X_ManageFID_Msg {
