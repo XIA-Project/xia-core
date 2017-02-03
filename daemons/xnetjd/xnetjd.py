@@ -42,8 +42,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description="XIA Network Joining Manager")
     parser.add_argument("-c", "--client",
             help="process network discovery beacons", action="store_true")
-    parser.add_argument("-a", "--accesspoint",
+    parser.add_argument("-a", "--controller",
             help="announce network on all interfaces", action="store_true")
+    parser.add_argument("-r", "--router",
+            help="join network then announce it", action="store_true")
     parser.add_argument("-i", "--beacon_interval",
             help="beacon interval in seconds(float)", type=float, default=0.5)
     parser.add_argument("--hostname",
@@ -86,7 +88,7 @@ def main():
     policy = NetjoinPolicy()
 
     announcer = None
-    if args.accesspoint:
+    if args.controller:
         logging.debug("Announcing network and listening for join requests")
         # Determine the Layer2 type for retransmission rate and attempts
         l2_type = NetjoinL2Handler.l2_str_to_type[args.layer2]
@@ -95,7 +97,7 @@ def main():
                 shutdown_event)
         announcer.announce()
 
-    if args.client:
+    if args.client or args.router:
         logging.debug("Listening for network announcements")
 
     # Start a new thread to listen for messages
