@@ -333,7 +333,7 @@ router()
 		"start")
 			cd $XIADIR/bin
 			./xrouted -h $host $LOG_FLAGS &
-			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
+			./xnetjd --controller --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
