@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <limits.h>
 #include <ifaddrs.h>
@@ -179,7 +180,9 @@ DECLARE(ssize_t, writev, int fd, const struct iovec *iov, int iovcnt);
 DECLARE(struct hostent *,gethostbyaddr, const void *addr, socklen_t len, int type);
 DECLARE(int, gethostbyaddr_r, const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
 DECLARE(struct hostent *,gethostbyname, const char *name);
+DECLARE(struct hostent *,gethostbyname2, const char *name);
 DECLARE(int, gethostbyname_r, const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
+DECLARE(int, gethostbyname2_r, const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
 DECLARE(int, getnameinfo, const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags);
 DECLARE(struct servent*, getservbyname, const char *name, const char *proto);
 DECLARE(int, getservbyname_r, const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result);
@@ -306,6 +309,27 @@ static void _LoadSIDs()
 
 
 
+// the non reentrant gethostbyX functions require a static hostent
+// build it in place here
+static struct hostent *_makehostent(const char *name, struct in_addr *ia)
+{
+	static struct hostent he;
+	static char _h_name[256];
+	static struct in_addr *_h_addr_list[2];
+	static struct in_addr _h_addr;
+
+	he.h_name         = strncpy(_h_name, name, sizeof(_h_name));
+	he.h_aliases      = NULL;
+	he.h_addrtype     = AF_INET;
+	he.h_length       = 4;
+	he.h_addr_list    = (char**)_h_addr_list;
+	he.h_addr_list[0] = (char*)memcpy(&_h_addr, ia, sizeof(struct in_addr));
+	he.h_addr_list[1] = NULL;
+	return &he;
+}
+
+
+
 /* Naming swiss army knife
 ** inputs:
 **	addr: if non-NULL, use the address to create an ID and optionally map
@@ -365,8 +389,6 @@ static int _GetIP(const sockaddr_x *sax, struct sockaddr_in *sin, const char *ad
 	} else {
 		strcpy(id, addr);
 	}
-
-	printf("new id = %s\n", id);
 
 	// if we have a DAG, create a mapping between the IPv4 sockaddr and the DAG
 	if (sax) {
@@ -755,7 +777,6 @@ static int _LookupHost(const char *hname, unsigned short port, struct sockaddr *
 		// create mapping between the IP and the hoststring
 		id2host[_IDstring(iid, sizeof(iid), (sockaddr_in*)sa)] = id;
 		host2id[id] = iid;
-		printf("created iid %s\n", iid);
 	}
 
 	return rc;
@@ -1007,7 +1028,9 @@ void __attribute__ ((constructor)) xwrap_init(void)
 	GET_FCN(gethostbyaddr);
 	GET_FCN(gethostbyaddr_r);
 	GET_FCN(gethostbyname);
+	GET_FCN(gethostbyname2);
 	GET_FCN(gethostbyname_r);
+	GET_FCN(gethostbyname2_r);
 	GET_FCN(getnameinfo);
 	GET_FCN(getservbyname);
 	GET_FCN(getservbyname_r);
@@ -2143,16 +2166,27 @@ int execve(const char *filename, char *const argv[], char *const envp[])
 	return rc;
 }
 
-/********************************************************************
-** INFO ONLY FUNCTION MAPPINGS
-********************************************************************/
+
+
 struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type)
 {
+	// FIXME: the real gethostbyaddr returns failure if it can't do
+	// a reverse name lookup
+	// this will always return a success for now
 	TRACE();
-	ALERT();
 
-	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyaddr(addr, len, type);
+	char name[32];
+
+	if (type != AF_INET) {
+		return __real_gethostbyaddr(addr, len, type);
+
+	} else if (len < sizeof(struct in_addr)) {
+		return NULL;
+	}
+
+	inet_ntop(AF_INET, addr, name, sizeof(name));
+
+	return _makehostent(name, (struct in_addr*)addr);
 }
 
 
@@ -2171,6 +2205,37 @@ int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *
 struct hostent *gethostbyname (const char *name)
 {
 	TRACE();
+
+	struct in_addr addr;
+	struct sockaddr_in sa;
+	sockaddr_x sax;
+
+	if (inet_pton(AF_INET, name, &addr) == 0) {
+		// it's not an IP address
+		addr.s_addr = 0x01020304;
+
+		if (_LookupHost(name, 0, (struct sockaddr*)&sa, &sax) == 0) {
+			// success!
+			memcpy(&addr, &sa.sin_addr, sizeof(addr));
+
+		} else {
+			// nof found in the name server
+			return NULL;
+		}
+
+	} else {
+		// addr was setup by the inet_pton call
+	}
+
+
+	return _makehostent(name, &addr);
+}
+
+
+
+struct hostent *gethostbyname2 (const char *name)
+{
+	TRACE();
 	ALERT();
 	MSG("name=%s\n", name);
 
@@ -2178,7 +2243,7 @@ struct hostent *gethostbyname (const char *name)
 	// everything is for XIA
 
 	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyname(name);
+	return __real_gethostbyname2(name);
 }
 
 
@@ -2195,6 +2260,21 @@ int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, si
 
 
 
+int gethostbyname2_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
+{
+	TRACE();
+	ALERT();
+	MSG("name=%s\n", name);
+
+	// FIXME: add code here to map between IPv4 and XIA
+	return __real_gethostbyname2_r(name, result_buf, buf, buflen, result, h_errnop);
+}
+
+
+
+/********************************************************************
+** INFO ONLY FUNCTION MAPPINGS
+********************************************************************/
 int getnameinfo (const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags)
 {
 	TRACE();
