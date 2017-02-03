@@ -28,6 +28,7 @@ SCRIPT=""
 
 NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
+RESOLVCONF=$XIADIR/etc/resolv.conf
 
 ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
 
@@ -414,11 +415,12 @@ rendezvous()
 	local host=$1
 	local action=$2
 
+	DATASID=`cat $ADDRCONF |grep rendezvous|awk {'print $3'}`
 	cd $XIADIR/bin
 	case $action in
 		"start")
 			echo ./xrendezvous -h $host $LOG_FLAGS
-			./xrendezvous -h $host $LOG_FLAGS &
+			./xrendezvous -h $host -d $DATASID $LOG_FLAGS &
 			;;
 		"stop")
 			kill_service $host "xrendezvous"
@@ -553,7 +555,7 @@ clean_conf_and_keys()
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
 	echo "Deleting content files"
-	sudo rm /tmp/content/*
+	sudo rm -f /tmp/content/*
 
 }
 
@@ -641,6 +643,11 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
+		if [ "$NODETYPE" == "router" ] && [ "$NAMESERVER" == "0" ] && [ ! -f $RESOLVCONF ]; then
+			echo "ERROR: $RESOLVCONF not found"
+			echo "Copy resolv.conf from the nameserver host and start again"
+			exit -1
+		fi
 		[ $NO_CLICK != 1 ] && start_click
 		process_nodes "start"
 		visualizer "start"

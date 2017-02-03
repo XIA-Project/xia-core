@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python
 #
 # Copyright 2016 Carnegie Mellon University
 #
@@ -14,55 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PORT=7777
-ELEMENT=$(hostname -s)/cf/cidFilter
+import socket
+import argparse
+import clicksock
+import xiapyutils
 
-check() {
-	# see if click is running
-	[ "$(pgrep click)" == "" ] && printf "Click is not running, aborting...\n" && exit 1
-}
+APP_VERSION="1.0"
+CACHE_ELEMENT="/cf/cidFilter"
 
-get() {
-	check
-	printf "The cache is "
-	printf "read $ELEMENT.status\nquit\n" | nc localhost $PORT | sed -n '4p'
-}
+parser = argparse.ArgumentParser(description = 'xcache controller %s' % APP_VERSION)
+parser.add_argument("caching", nargs='?', help='enable caching', choices=['on', 'off'])
+args = parser.parse_args()
 
-put() {
-	check
-	printf "write $ELEMENT.enable $1\nquit\n" | nc localhost $PORT > /dev/null
-}
+hostname = xiapyutils.getxiaclickhostname()
+status = hostname + CACHE_ELEMENT + ".status"
+enable = hostname + CACHE_ELEMENT + ".enable"
 
-help() {
-	cat << EOH
+with clicksock.clicksock() as click:
+	if args.caching == 'on':
+		click.writeData(enable + " true")
+	elif args.caching == 'off':
+		click.writeData(enable + " false")
 
-Enable/Disable in-path caching on this router
-
-usage: cachectl [on|off]
-
-where:
-  no parameter displays current state
-  on  enables caching
-  off disables caching
-
-EOH
-	exit 0
-}
-
-check
-
-if [ $# != 0 ]; then
-	case $1 in
-		on)
-			put true;
-			;;
-		off)
-			put false;
-			;;
-		*)
-			help
-			;;
-	esac
-fi
-
-get status
+	print "caching is " + click.readData(status)

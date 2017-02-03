@@ -81,6 +81,9 @@ extern "C" {
 
 #define DEFAULT_CHUNK_SIZE	2000
 
+// XIA specific ifaddr flags
+// must exceed last entry in enum net_device_flags in /usr/include/linux/if.h
+#define XIFA_RVDAG 1<<25	// past /usr/include/linux/if.h net_device_flags
 
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
@@ -152,9 +155,12 @@ extern int XsetXcacheSID(int sockfd, char *, unsigned);
 extern int Xgetifaddrs(struct ifaddrs **ifap);
 extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
+extern int XcreateFID(char *fid, int len);
+extern int XremoveFID(const char *fid);
+
 /* internal only functions */
 extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
-extern int XupdateRV(int sockfd, int interface, const char *rv_control_dag);
+extern int XupdateRV(int sockfd, int interface);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);

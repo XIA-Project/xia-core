@@ -4,28 +4,21 @@
 #include<click/xiamigrate.hh>
 #include<click/xiasecurity.hh>
 
-bool _pack_String(XIASecurityBuffer &buf, String data)
-{
-    int datalen = strlen(data.c_str()) + 1;
-    buf.pack(data.c_str(), datalen);
-    return true;
-}
-
 bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
         XIAPath &src_path, XIAPath &dst_path, String &migrate_ts)
 {
 
-    if(!_pack_String(migrate_payload, src_path.unparse())) {
+    if(!migrate_payload.pack(src_path.unparse().c_str())) {
         click_chatter("Failed packing src_path into migrate message");
         return false;
     }
 
-    if(!_pack_String(migrate_payload, dst_path.unparse())) {
+    if(!migrate_payload.pack(dst_path.unparse().c_str())) {
         click_chatter("Failed packing dst_path into migrate message");
         return false;
     }
 
-    if(!_pack_String(migrate_payload, migrate_ts)) {
+    if(!migrate_payload.pack(migrate_ts.c_str())) {
         click_chatter("Failed packing timestamp into migrate message");
         return false;
     }
@@ -33,6 +26,7 @@ bool _build_migrate_payload(XIASecurityBuffer &migrate_payload,
     return true;
 }
 
+/*
 bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
         std::string xid_str)
 {
@@ -72,6 +66,7 @@ bool _sign_and_pack(XIASecurityBuffer &buf, XIASecurityBuffer &payloadbuf,
 
     return true;
 }
+*/
 
 bool build_migrate_message(XIASecurityBuffer &migrate_msg,
         XIAPath &src_path, XIAPath &dst_path, String &migrate_ts)
@@ -88,7 +83,7 @@ bool build_migrate_message(XIASecurityBuffer &migrate_msg,
     // Sign and include pubkey into migrate message
 	std::string src_xid_str = src_path.intent_sid_str();
 
-    if(!_sign_and_pack(migrate_msg, migrate_payload, src_xid_str)) {
+    if(!migrate_msg.sign_and_pack(migrate_payload, src_xid_str)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }
@@ -253,12 +248,12 @@ bool _build_migrateack_payload(XIASecurityBuffer &migrateack_payload,
         XIAPath their_addr, String timestamp)
 {
     // their_addr is the new DAG we have accepted
-    if(!_pack_String(migrateack_payload, their_addr.unparse())) {
+    if(!migrateack_payload.pack(their_addr.unparse().c_str())) {
         click_chatter("Failed packing their addr into migrateack message");
         return false;
     }
 
-    if(!_pack_String(migrateack_payload, timestamp)) {
+    if(!migrateack_payload.pack(timestamp.c_str())) {
         click_chatter("Failed to pack timestamp into migrateack message");
         return false;
     }
@@ -280,7 +275,7 @@ bool build_migrateack_message(XIASecurityBuffer &migrateack_msg,
 	std::string my_xid_str = our_addr.intent_sid_str();
 
     // Sign and include public key
-    if(!_sign_and_pack(migrateack_msg, migrateack_payload, my_xid_str)) {
+    if(!migrateack_msg.sign_and_pack(migrateack_payload, my_xid_str)) {
         click_chatter("Failed to sign and create migrate message");
         return false;
     }

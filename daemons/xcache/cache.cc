@@ -132,7 +132,7 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 	struct cache_download *download;
 	xcache_meta *meta = new xcache_meta(cid);
 
-	meta->set_state(OVERHEARING);
+	meta->set_state(CACHING);
 	meta->set_seq(ntohl(tcp->th_seq));
 	meta->set_dest_sid(sid);
 
@@ -188,22 +188,14 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	}
 
 	switch (meta->state()) {
-		case OVERHEARING:
+		case CACHING:
 			// drop into the code below the switch
 			break;
 
 		case AVAILABLE:
+		case FETCHING:
 			ctrl->release_meta(meta);
 			syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
-			return;
-
-		case FETCHING:
-			// FIXME: this probably should not be a state, but rather a count of
-			// number of concurrent accessors of this chunk.
-			// fetching should never be an issue here, but only when deleting
-			// content to be sure it is safe to remove.
-			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
 			return;
 
 		case EVICTING:
@@ -287,6 +279,8 @@ skip_data:
 
 			meta->set_ttl(ntohl(download->header.ttl));
 			meta->set_created();
+			meta->set_length(ntohl(download->header.length));
+			printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;

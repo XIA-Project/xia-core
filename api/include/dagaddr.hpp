@@ -32,6 +32,7 @@ public:
 	static const std::string XID_TYPE_HID_STRING;
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
+	static const std::string XID_TYPE_FID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
 
 public:
@@ -65,7 +66,7 @@ private:
 	static XidMap xids;
 	static XidMap load_xids();
 
-	
+
 
 	void acquire() const;
 	void release() const;

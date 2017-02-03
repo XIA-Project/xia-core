@@ -79,7 +79,7 @@ bool XIAInterface::update_rv_dag(String rv_dag)
 	}
 
 	_rv_dag = rv_dag;
-	click_chatter("XIAInterface: new RVC DAG: %s", _rv_control_dag.c_str());
+	click_chatter("XIAInterface: new RV DAG: %s", _rv_control_dag.c_str());
 
 	return true;
 }
@@ -217,9 +217,8 @@ void XIAInterfaceTable::_insert(int iface, String dag)
 }
 
 // Erase entry. Caller makes sure entry exist.
-void XIAInterfaceTable::_erase(int iface, String dag)
+void XIAInterfaceTable::_erase(int iface, String /* dag */)
 {
 	interfaces.erase(iface);
 	numInterfaces--;
 }
-

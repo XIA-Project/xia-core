@@ -115,6 +115,7 @@ const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
 const std::string Node::XID_TYPE_SID_STRING = "SID";
 const std::string Node::XID_TYPE_IP_STRING = "IP";
+const std::string Node::XID_TYPE_FID_STRING = "FID";
 
 
 /**
@@ -160,6 +161,7 @@ Node::Node(uint32_t type, const void* id, int dummy)
 *			\n Node::XID_TYPE_HID (Host)
 *			\n Node::XID_TYPE_CID (Content)
 *			\n Node::XID_TYPE_SID (Service)
+*			\n Node::XID_TYPE_FID (Flood)
 *			\n Node::XID_TYPE_IP (IPv4 / 4ID)
 *
 * @param id_str The node's XID as a string. This should be 20 pairs of two
@@ -190,6 +192,7 @@ Node::Node(int type, const std::string id_str)
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
 *			\n Node::XID_TYPE_SID_STRING
+*			\n Node::XID_TYPE_FID_STRING
 *			\n Node::XID_TYPE_IP_STRING
 *
 * @param id_str The node's XID as a string. This should be 20 pairs of two
@@ -282,6 +285,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_SID;
 	else if (typestr == XID_TYPE_IP_STRING)
 		ptr_->type = XID_TYPE_IP;
+	else if (typestr == XID_TYPE_FID_STRING)
+		ptr_->type = XID_TYPE_FID;
 	else if (typestr == XID_TYPE_DUMMY_SOURCE_STRING)
 		ptr_->type = XID_TYPE_DUMMY_SOURCE;
 	else
@@ -350,6 +355,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
 *			\n Node::XID_TYPE_SID_STRING
+*			\n Node::XID_TYPE_FID_STRING
 *			\n Node::XID_TYPE_IP_STRING
 *			\n Node::XID_TYPE_DUMMY_SOURCE
 *			\n Node:: ID_TYPE_UNKNOWN_STRING
@@ -368,6 +374,8 @@ Node::type_string() const
 			return XID_TYPE_CID_STRING;
 		case XID_TYPE_SID:
 			return XID_TYPE_SID_STRING;
+		case XID_TYPE_FID:
+			return XID_TYPE_FID_STRING;
 		case XID_TYPE_IP:
 			return XID_TYPE_IP_STRING;
 		case XID_TYPE_DUMMY_SOURCE:
@@ -1035,6 +1043,7 @@ Graph::intent_SID_str() const
 }
 
 
+
 /**
 * @brief Return the graph in string form
 *
@@ -1102,7 +1111,7 @@ Graph::dag_string() const
 	return dag_string;
 }
 
-std::string 
+std::string
 Graph::http_url_string() const{
 	std::string dag_string = this->dag_string();
 	dag_string.erase(std::remove(dag_string.begin(), dag_string.end(), '\n'), dag_string.end());
@@ -1834,6 +1843,7 @@ Graph::get_final_intent() const
 *			\n Node::XID_TYPE_HID (Host)
 *			\n Node::XID_TYPE_CID (Content)
 *			\n Node::XID_TYPE_SID (Service)
+*			\n Node::XID_TYPE_FID (Flood)
 *			\n Node::XID_TYPE_IP (IPv4 / 4ID)
 *
 * @return List of pointers to nodes of the specified type.

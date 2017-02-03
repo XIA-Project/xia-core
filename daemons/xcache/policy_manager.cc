@@ -3,10 +3,11 @@
 
 bool xcache_policy_manager::cacheable(xcache_meta *meta)
 {
-	int ret = -1;
+	bool ret = false;
 
-	std::cout << "PolicyManager: Store\n";
+	// FIXME: this logic doesn't make a lot of sense
 	for(std::vector<xcache_eviction_policy *>::iterator i = policy_vector.begin(); i != policy_vector.end(); ++i) {
+		meta->set_policy(*i);
 		ret = (*i)->store(meta);
 	}
 

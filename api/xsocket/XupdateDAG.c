@@ -73,7 +73,7 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   return 0;
 }
 
-int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
+int XupdateRV(int sockfd, int interface)
 {
 	int rc;
 
@@ -84,7 +84,6 @@ int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
 
 	xia::X_Updaterv_Msg *x_updaterv_msg = xsm.mutable_x_updaterv();
 	x_updaterv_msg->set_interface(interface);
-	x_updaterv_msg->set_rvdag(rv_control_dag);
 
 	if((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error asking Click transport to update RV: %s", strerror(errno));

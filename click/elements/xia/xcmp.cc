@@ -144,7 +144,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 			memset(msg + xlen, 0, NUM_EMPTY_BYTES);	// first 4 bytes after xcmp header are 0
 			xlen += NUM_EMPTY_BYTES;
-      
+
 			assert(hdr.hdr_size() <= (MAX_PACKET-xlen));
 			memcpy(msg + xlen, hdr.hdr(), hdr.hdr_size());
 			xlen += hdr.hdr_size();
@@ -206,7 +206,7 @@ XCMP::processUnreachable(Packet *p_in)
 		WARN("XCMP::processUnreachable ERROR Invalid dst path in pkt.\n");
 		return;
 	}
-	String broadcast_xid(BHID);
+	String broadcast_xid(BFID);
 	XID bcast_xid;
 	bcast_xid.parse(broadcast_xid);
 
@@ -218,12 +218,6 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	// don't send undeliverables back to broadcast packets
-	if (dst_path.intent_hid_str().compare(BHID)) {
-
-		return;
-	}
-
 	// the xia_path code seems to discard the visited values, so we need to go
 	// into the dags directly
 	const struct click_xia *h = hdr.hdr();
@@ -232,12 +226,24 @@ XCMP::processUnreachable(Packet *p_in)
 	const struct click_xia_xid_node *n = &h->node[0];
 	int bad_node = -1;
 
-	if (last == -1) {
+	// get the current valid XID
+	if (last == LAST_NODE_DEFAULT) {
+		// last is the default value, so we we haven't progressed
+		// yet and want the node pointed to by the final xid in the dag
 		n += (dnodes - 1);
 	} else {
 		n += last;
 	}
 
+	// return if the current node in the path is a FID
+	//  - we don't send undeliverables in response to flooded packets
+	// FIXME: is this the correct behavior if it's not the broadcast fid?
+	if (ntohl(n->xid.type) == CLICK_XIA_XID_TYPE_FID) {
+		return;
+	}
+
+	// find the node that triggered the undeliverable
+	// it will be the first unvisited edge
 	for (int i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
 		if (!n->edge[i].visited) {
 			bad_node = n->edge[i].idx;
@@ -253,6 +259,10 @@ XCMP::processUnreachable(Packet *p_in)
 				break;
 			case CLICK_XIA_XID_TYPE_HID:
 				code = XCMP_UNREACH_HOST;
+				break;
+			case CLICK_XIA_XID_TYPE_FID:
+				// FIXME: what should this do?
+				INFO("Unreachable for a FID!");
 				break;
 			default:
 				code = XCMP_UNREACH_INTENT;

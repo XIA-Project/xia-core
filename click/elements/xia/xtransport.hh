@@ -49,8 +49,6 @@ using namespace xia;
 #define ACK_DELAY			300
 #define MIGRATEACK_DELAY	3000
 #define TEARDOWN_DELAY		240000
-#define HLIM_DEFAULT		250
-#define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
@@ -173,8 +171,6 @@ public:
 	ErrorHandler    *_errhandler;
 
 public:
-	XIAXIDRouteTable *_routeTable;
-
 	// list of ids wanting xcmp notifications
 	list<uint32_t> xcmp_listeners;
 
@@ -247,6 +243,7 @@ public:
 	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -272,18 +269,17 @@ public:
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	// modify routing table
-	void addRoute(const XID &sid) {
-		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-		HandlerCall::call_write(_routeTable, "add", cmd);
+	void manageRoute(const XID &xid, bool create);
+	void addRoute(const XID &xid) {
+		manageRoute(xid, true);
 	}
-
-	void delRoute(const XID &sid) {
-		String cmd = sid.unparse();
-		HandlerCall::call_write(_routeTable, "remove", cmd);
+	void delRoute(const XID &xid) {
+		manageRoute(xid, false);
 	}
 
 	uint32_t NewID();
 
+	uint32_t NextFIDSeqNo(sock *sk, XIAPath &dst);
 	bool run_task(Task*);
 
 };
@@ -312,10 +308,6 @@ class sock : public Element {
     void set_src_path(XIAPath p) {src_path = p;}
     XIAPath get_dst_path() {return dst_path;}
     void set_dst_path(XIAPath p) {dst_path = p;}
-    int get_nxt() {return nxt;}
-    void set_nxt(int n) {nxt = n;}
-    int get_last() {return last;}
-    void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
     uint8_t get_hop_count() {return hop_count;}
@@ -371,6 +363,11 @@ class sock : public Element {
 	int refcount;				// # of processes that have this socket open
 
 	/* =========================
+	 * Flooding state
+	 * ========================= */
+	 HashTable<XIDpair, uint32_t> flood_sequence_numbers;
+
+	/* =========================
 	 * "TCP" state
 	 * ========================= */
 	unsigned backlog;			// max # of outstanding connections
@@ -424,9 +421,6 @@ protected:
     XTRANSPORT *transport;
     HandlerState hstate;
     XIDpair key;
-
-    int nxt;
-    int last;
 
 	uint32_t id;
 

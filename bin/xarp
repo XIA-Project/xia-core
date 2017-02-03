@@ -1,0 +1,200 @@
+#!/usr/bin/python
+#
+# Copyright 2017 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import re
+import sys
+import socket
+import argparse
+import clicksock
+import xiapyutils
+
+APP_VERSION="1.0"
+HASHLEN = 2 * 20
+HIDLEN = len("HID:") + HASHLEN
+
+# ARP table format string
+TABLE_FMT="%-42s %-18s %-8s %s"
+
+# command strings to send to click
+ARP_ELEMENT = "%s/xlc%s/xarpq."
+PRINT_CMD   = ARP_ELEMENT + "table"
+ADD_CMD     = ARP_ELEMENT + "insert %s %s %s"
+DELETE_CMD  = ARP_ELEMENT + "delete %s"
+PURGE_CMD   = ARP_ELEMENT + "clear"
+
+#
+# the main logic of the xroute app
+#
+def main():
+	global cards
+	global hostname
+	global click
+
+	hostname = xiapyutils.getxiaclickhostname()
+	cards = {}
+
+	parser = argparse.ArgumentParser(description = 'XIA ARP %s' % APP_VERSION,
+		epilog='Note: add, clear, and delete are mutually exclusive')
+	parser.add_argument("-p", "--print", action='store_true', dest='print_it', help='print the ARP table (default action)')
+	parser.add_argument("-c", "--clear", action="store_true", help='purge all entries in the ARP tables')
+	parser.add_argument("-a", "--add", nargs=4, help='Add an ARP table entry', metavar=('iface','hid','mac','static'))
+	parser.add_argument("-d", "--delete", nargs=2, help='Delete an ARP table entry', metavar=('iface', 'hid'))
+	args = parser.parse_args()
+
+	if args.clear == False and args.add == None and args.delete == None:
+		# always print if not options are given
+		args.print_it = True
+
+	# setup
+	#click = clicksock.clicksock()
+	with clicksock.clicksock() as click:
+		loadCards()
+
+		if args.add != None:
+			# add an entry to the ARP table
+			addEntry(args.add)
+		elif args.delete != None:
+			# delete the specified ARP entry
+			deleteEntry(args.delete)
+		elif args.clear == True:
+			# clear the ARP table
+			purge()
+
+		if args.print_it:
+			# print the ARP tables to stdout
+			printTable()
+
+		#click.shutdown()
+
+#
+# print an error message and exit the app with an error
+#
+def errorExit(msg):
+	print msg
+	click.shutdown()
+	sys.exit(-1)
+
+#
+# parse the click config file and get all defined
+# interfaces and matching card #
+#
+def loadCards():
+	conf = click.readData("config")
+	lines = conf.split('\n')
+
+	rx = re.compile("FromDevice\((\w+)\).*\[(\w+)\]")
+
+	for line in lines:
+		fields = rx.match(line)
+		if fields != None:
+			cards[fields.group(1)] = fields.group(2)
+
+#
+# find the card number for the specified interface name
+#
+def findCard(iface):
+	if iface in cards:
+		return cards[iface]
+	else:
+		errorExit("%s is not a valid XIA interface" % iface)
+
+#
+# make sure the HID is properly formatted
+#
+def validateHID(hid):
+	if "HID:" not in hid or len(hid) != HIDLEN:
+		errorExit("Invalid HID: '%s'" % hid)
+
+#
+# print the ARP table to stdout
+#
+def cardTable(card, iface):
+	cmd = PRINT_CMD % (hostname, card)
+	data = click.readData(cmd)
+
+	lines = data.lower().split("\n")
+	for l in lines:
+		# reformat mac address to use : instead of -
+		line = re.sub('-', ':', l)
+
+		if line != "":
+			(hid, mac, age, static) = line.split(' ')
+
+			if static == '0':
+				a = "%.2f" % float(age)
+			else:
+				a = "static"
+			print TABLE_FMT % (hid[4:], mac, iface, a)
+
+
+#
+# format the route table header and loop through the requested XID tables
+#
+def printTable():
+	print TABLE_FMT % ("HID", "HW ADDRESS", "IFACE", "AGE (s)")
+	print "-" * 78
+
+	# print the ARP table for each network interface
+	for (iface, card) in cards.iteritems():
+		cardTable(card, iface)
+
+#
+# send an individual delete route command to click
+#
+# only minor error checking is done here, click will do the rest of it
+#
+def deleteEntry(args):
+	iface = args[0]
+	hid = args[1].upper()
+
+	card = findCard(iface)
+	validateHID(hid)
+
+	cmd = DELETE_CMD % (hostname, card, hid.upper())
+	click.writeData(cmd)
+	print "deleted arp entry for %s" % (hid)
+
+
+#
+# Add an ARP table entry
+#
+# only minor error checking is done here, click will do the rest of it
+#
+def addEntry(args):
+	iface = args[0]
+	hid = args[1].upper()
+	mac = args[2]
+	static = args[3]	# if true, table entry won't expire
+
+	card = findCard(iface)
+	validateHID(hid)
+	# eth addr is validated by click
+
+	cmd = ADD_CMD % (hostname, card, hid.upper(), mac, static)
+	click.writeData(cmd)
+	print "added arp entry for %s: HID %s ETH %s" % (iface, hid, mac)
+
+#
+# purge all entries in the table
+#
+def purge():
+	for (iface, card) in cards.iteritems():
+		cmd = PURGE_CMD % (hostname, card)
+		click.writeData(cmd)
+
+
+if __name__ == "__main__":
+	main()

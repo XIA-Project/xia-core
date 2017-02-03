@@ -4,7 +4,7 @@
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2005 Regents of the University of California
- * Copyright (c) 2008-2009 Meraki, Inc. 
+ * Copyright (c) 2008-2009 Meraki, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -16,8 +16,8 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
- 
-// Modified from original ARP table code 
+
+// Modified from original ARP table code
 
 #include <click/config.h>
 #include "xarpquerier.hh"
@@ -114,7 +114,8 @@ XARPTable::slim(click_jiffies_t now)
     // Delete old entries.
     while ((ae = _age.front())
 	   && (ae->expired(now, _timeout_j)
-	       || (_entry_capacity && _entry_count > _entry_capacity))) {
+	   || (_entry_capacity && _entry_count > _entry_capacity))
+	   && ae->_perm == false) {
 	_table.erase(ae->_xid);
 	_age.pop_front();
 
@@ -182,7 +183,7 @@ XARPTable::ensure(XID xid, click_jiffies_t now)
 }
 
 int
-XARPTable::insert(XID xid, const EtherAddress &eth, Packet **head)
+XARPTable::insert(XID xid, bool perm, const EtherAddress &eth, Packet **head)
 {
     click_jiffies_t now = click_jiffies();
     XARPEntry *ae = ensure(xid, now);
@@ -191,6 +192,7 @@ XARPTable::insert(XID xid, const EtherAddress &eth, Packet **head)
 
     ae->_eth = eth;
     ae->_known = !eth.is_broadcast();
+	ae->_perm = perm;
 
     ae->_live_at_j = now;
     ae->_polled_at_j = ae->_live_at_j - CLICK_HZ;
@@ -287,19 +289,25 @@ XARPTable::reverse_lookup(const EtherAddress &eth)
 String
 XARPTable::read_handler(Element *e, void *user_data)
 {
-    XARPTable *xarpt = (XARPTable *) e;
-    StringAccum sa;
-    click_jiffies_t now = click_jiffies();
-    switch (reinterpret_cast<uintptr_t>(user_data)) {
-    case h_table:
-	for (XARPEntry *ae = xarpt->_age.front(); ae; ae = ae->_age_link.next()) {
-	    int ok = ae->known(now, xarpt->_timeout_j);
-	    sa << ae->_xid << ' ' << ok << ' ' << ae->_eth << ' '
-	       << Timestamp::make_jiffies(now - ae->_live_at_j) << '\n';
+	XARPTable *xarpt = (XARPTable *) e;
+	StringAccum sa;
+	click_jiffies_t now = click_jiffies();
+
+	switch (reinterpret_cast<uintptr_t>(user_data)) {
+	case h_table:
+		for (XARPEntry *ae = xarpt->_age.front(); ae; ae = ae->_age_link.next()) {
+				int ok = ae->known(now, xarpt->_timeout_j);
+
+				if (ok) {
+					sa  << ae->_xid << ' ' << ae->_eth << ' '
+						<< Timestamp::make_jiffies(now - ae->_live_at_j) << ' '
+						<< (ae->_perm ? 1 : 0)
+						<< '\n';
+				}
+		}
+		break;
 	}
-	break;
-    }
-    return sa.take_string();
+	return sa.take_string();
 }
 
 int
@@ -310,12 +318,14 @@ XARPTable::write_handler(const String &str, Element *e, void *user_data, ErrorHa
       case h_insert: {
 	  XID xid;
 	  EtherAddress eth;
+	  bool perm;
 	  if (Args(xarpt, errh).push_back_words(str)
 	      .read_mp("XID", xid)
 	      .read_mp("ETH", eth)
+		  .read_mp("STATIC", perm)
 	      .complete() < 0)
 	      return -1;
-	  xarpt->insert(xid, eth);
+	  xarpt->insert(xid, perm, eth);
 	  return 0;
       }
       case h_delete: {
@@ -324,7 +334,7 @@ XARPTable::write_handler(const String &str, Element *e, void *user_data, ErrorHa
 	      .read_mp("XID", xid)
 	      .complete() < 0)
 	      return -1;
-	  xarpt->insert(xid, EtherAddress::make_broadcast()); // XXX?
+	  xarpt->insert(xid, false, EtherAddress::make_broadcast()); // XXX?
 	  return 0;
       }
       case h_clear:

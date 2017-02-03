@@ -40,14 +40,14 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 		LOGF("Flags: %s\n", xferFlags(flags));
 	}
 
-	LOGF("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
+	// LOGF("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
+	// msg->msg_name,
+	// (size_t)msg->msg_namelen,
+	// msg->msg_iov,
+	// (size_t)msg->msg_iovlen,
+	// msg->msg_control,
+	// (size_t)msg->msg_controllen,
+	// msg->msg_flags);
 
 	int connected = (getConnState(fd) == CONNECTED);
 
@@ -72,7 +72,7 @@ ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)
 		socklen_t *len = (sax != NULL ? &msg->msg_namelen : NULL);
 
 		rc = _xrecvfrom(fd, buf, size, flags, sax, len, &iface);
-		LOGF("returned:%d\n", rc);
+//		LOGF("returned:%d\n", rc);
 	}
 
 	if (rc > 0) {
@@ -125,15 +125,15 @@ ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags)
 	int rc;
 	size_t size;
 
-	LOGF("fd:%d flags:%08x\n", fd, flags);
-	LOGF("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
-	msg->msg_name,
-	(size_t)msg->msg_namelen,
-	msg->msg_iov,
-	(size_t)msg->msg_iovlen,
-	msg->msg_control,
-	(size_t)msg->msg_controllen,
-	msg->msg_flags);
+	// LOGF("fd:%d flags:%08x\n", fd, flags);
+	// LOGF("msghdr:\n name:%p namelen:%zu iov:%p iovlen:%zu control:%p clen:%zu flags:%08x\n",
+	// msg->msg_name,
+	// (size_t)msg->msg_namelen,
+	// msg->msg_iov,
+	// (size_t)msg->msg_iovlen,
+	// msg->msg_control,
+	// (size_t)msg->msg_controllen,
+	// msg->msg_flags);
 
 	int connected = (getConnState(fd) == CONNECTED);
 
@@ -160,13 +160,13 @@ ssize_t Xsendmsg(int fd, const struct msghdr *msg, int flags)
 	char *buf = NULL;
 	if (msg->msg_iovlen > 1) {
 		size = _iovPack(msg->msg_iov, msg->msg_iovlen, &buf);
-	
+
 	} else {
 		size = _iovSize(msg->msg_iov, msg->msg_iovlen);
-		buf = (char *)msg->msg_iov[0].iov_base;		
+		buf = (char *)msg->msg_iov[0].iov_base;
 	}
 
-	LOGF("sending:%zu\n", size);
+	// LOGF("sending:%zu\n", size);
 
 	if (connected) {
 		rc = send(fd, buf, size, flags);
