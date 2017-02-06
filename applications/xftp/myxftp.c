@@ -256,8 +256,8 @@ int getFile(int sock, const char *fin, const char *fout)
 	}
 
 	say("Received file %s\n", fout);
-	//say("Total elapsedTime: %f\n", totalElapseTime
-	printf("Total elapsedTime: %f\n", totalElapseTime
+	//say("Total elapsedTime: %f\n", totalElapseTime);
+	printf("Total elapsedTime: %f\n", totalElapseTime);
 	sendCmd(sock, "done");
 	return status;
 }
