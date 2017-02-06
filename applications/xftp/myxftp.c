@@ -186,10 +186,10 @@ int retrieveChunk(FILE *fd, char *url)
 		}
 		gettimeofday(&t2, NULL);
 
-		printf("------------------------\n");
+		//printf("------------------------\n");
 		//g.print_graph();
 		say("fetch hop count is %d\n", XgetPrevFetchHopCount());
-		printf("------------------------\n");
+		//printf("------------------------\n");
 
 
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
