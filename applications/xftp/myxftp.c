@@ -215,7 +215,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	char reply[5120];
 	int status = 0;
 	struct timeval t1, t2;
-	
+	totalElapseTime =0;
 	// send the file request
 	sprintf(cmd, "get %s",  fin);
 	sendCmd(sock, cmd);
