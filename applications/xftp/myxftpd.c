@@ -82,14 +82,7 @@ void getConfig(int argc, char** argv)
 		switch (c) {
 			case 'c':
 				if ((chunksize = atoi(optarg)) != 0) {
-					if (chunksize < 100) {
-						chunksize = 100;
-					} else if (chunksize > MAXCHUNKSIZE) {
-						chunksize = MAXCHUNKSIZE;
-					}
-					else {
-						chunksize *= 1024;
-					}
+					chunksize *= 1024;
 				}
 				break;
 
