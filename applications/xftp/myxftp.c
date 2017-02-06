@@ -187,7 +187,7 @@ int retrieveChunk(FILE *fd, char *url)
 		gettimeofday(&t2, NULL);
 
 		printf("------------------------\n");
-		g.print_graph();
+		//g.print_graph();
 		say("fetch hop count is %d\n", XgetPrevFetchHopCount());
 		printf("------------------------\n");
 
