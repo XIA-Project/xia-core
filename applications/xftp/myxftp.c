@@ -325,7 +325,7 @@ int main(int argc, char **argv)
 	sock = initializeClient(name);
 	usage();
 	
-	for(int i=1; i<=5;+i){
+	for(int i=1; i<=5;++i){
 		strcpy(cmd, "get 1 1");
 		cmd[4] = i + '0';
 		cmd[6] = i + '0';
