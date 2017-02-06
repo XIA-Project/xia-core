@@ -179,10 +179,10 @@ DECLARE(ssize_t, writev, int fd, const struct iovec *iov, int iovcnt);
 // not ported to XIA, remapped for warning purposes *****************
 DECLARE(struct hostent *,gethostbyaddr, const void *addr, socklen_t len, int type);
 DECLARE(int, gethostbyaddr_r, const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-DECLARE(struct hostent *,gethostbyname, const char *name);
-DECLARE(struct hostent *,gethostbyname2, const char *name);
+DECLARE(struct hostent *, gethostbyname, const char *name);
+DECLARE(struct hostent *, gethostbyname2, const char *name, int af);
 DECLARE(int, gethostbyname_r, const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
-DECLARE(int, gethostbyname2_r, const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
+DECLARE(int, gethostbyname2_r, int af, const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop);
 DECLARE(int, getnameinfo, const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, unsigned int flags);
 DECLARE(struct servent*, getservbyname, const char *name, const char *proto);
 DECLARE(int, getservbyname_r, const char *name, const char *proto, struct servent *result_buf, char *buf, size_t buflen, struct servent **result);
@@ -2218,12 +2218,12 @@ struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type)
 	char name[32];
 
 	if (type != AF_INET) {
-		// h_errno = EAFNOSUPPORT;
-		// return NULL;
-		return __real_gethostbyaddr(addr, len, type);
+		h_errno = HOST_NOT_FOUND;
+		return NULL;
+		//return __real_gethostbyaddr(addr, len, type);
 
 	} else if (len < sizeof(struct in_addr)) {
-		h_errno = NO_ADDRESS;
+		h_errno = NO_DATA;
 		return NULL;
 	}
 
@@ -2243,8 +2243,13 @@ int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *
 
 	char name[32];
 
+	*h_errnop = 0;
+
 	if (type != AF_INET) {
-		return __real_gethostbyaddr_r(addr, len, type, he, buf, buflen, result, h_errnop);
+		*h_errnop = HOST_NOT_FOUND;
+		result = NULL;
+		return -1;
+		// return __real_gethostbyaddr_r(addr, len, type, he, buf, buflen, result, h_errnop);
 
 	} else if (len < sizeof(struct in_addr)) {
 		h_errno = NO_ADDRESS;
@@ -2291,17 +2296,16 @@ struct hostent *gethostbyname (const char *name)
 
 
 
-struct hostent *gethostbyname2 (const char *name)
+struct hostent *gethostbyname2 (const char *name, int af)
 {
 	TRACE();
-	ALERT();
-	MSG("name=%s\n", name);
 
-	// There's no state to work with so we have to assume
-	// everything is for XIA
+	if (af != AF_INET) {
+		h_errno = HOST_NOT_FOUND;
+		return NULL;
+	}
 
-	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyname2(name);
+	return gethostbyname(name);
 }
 
 
@@ -2314,6 +2318,8 @@ int gethostbyname_r (const char *name, struct hostent *he, char *buf, size_t buf
 	struct sockaddr_in sa;
 	sockaddr_x sax;
 
+	*h_errnop = 0;
+
 	if (inet_pton(AF_INET, name, &addr) == 0) {
 		// it's not an IP address
 
@@ -2324,6 +2330,7 @@ int gethostbyname_r (const char *name, struct hostent *he, char *buf, size_t buf
 		} else {
 			// not found in the name server
 			*h_errnop = HOST_NOT_FOUND;
+			*result = NULL;
 			return -1;
 		}
 
@@ -2337,14 +2344,17 @@ int gethostbyname_r (const char *name, struct hostent *he, char *buf, size_t buf
 
 
 
-int gethostbyname2_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
+int gethostbyname2_r (const char *name, int af, struct hostent *he, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
 	TRACE();
-	ALERT();
-	MSG("name=%s\n", name);
 
-	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyname2_r(name, result_buf, buf, buflen, result, h_errnop);
+	if (af != AF_INET) {
+		*h_errnop = HOST_NOT_FOUND;
+		*result = NULL;
+		return -1;
+	}
+
+	return gethostbyname_r(name, he, buf, buflen, result, h_errnop);
 }
 
 

@@ -66,22 +66,17 @@ void dump(struct hostent *he)
 }
 
 
-void status(const char *name, struct hostent *he, int *rc, int *ec)
+void status(const char *name, struct hostent *he, int *ec)
 {
+	int err = (ec == NULL ? h_errno : *ec);
+
 	if (he == NULL) {
-		printf("   %-20s: error (%s)", name, hstrerror(h_errno));
-		if (rc) {
-			printf(" rc:%d", *rc);
-		}
-		if (ec) {
-			printf(" ec:%d", *ec);
-		}
+		printf("   %-20s: error (%s)\n", name, hstrerror(err));
 
 	} else {
-		printf("   %-20s: success", name);
+		printf("   %-20s: success\n", name);
 	}
 
-	printf("\n");
 	dump(he);
 }
 
@@ -91,7 +86,7 @@ void gethostbyname_test(const char *name)
 	struct hostent *he;
 
 	he = gethostbyname(name);
-	status(name, he, NULL, NULL);
+	status(name, he, NULL);
 }
 
 void gethostbyname_r_test(const char *name)
@@ -101,8 +96,8 @@ void gethostbyname_r_test(const char *name)
 	struct hostent *result;
 	int err;
 
-	int rc = gethostbyname_r(name, &he, buf, sizeof(buf), &result, &err);
-	status(name, result, &rc, &err);
+	gethostbyname_r(name, &he, buf, sizeof(buf), &result, &err);
+	status(name, result, &err);
 }
 
 void gethostbyname2_r_test(const char *name)
@@ -112,8 +107,8 @@ void gethostbyname2_r_test(const char *name)
 	struct hostent *result;
 	int err;
 
-	int rc = gethostbyname2_r(name, AF_INET, &he, buf, sizeof(buf), &result, &err);
-	status(name, result, &rc, &err);
+	gethostbyname2_r(name, AF_INET, &he, buf, sizeof(buf), &result, &err);
+	status(name, result, &err);
 }
 
 
@@ -122,7 +117,7 @@ void gethostbyname2_test(const char *name)
 	struct hostent *he;
 
 	he = gethostbyname2(name, AF_INET);
-	status(name, he, NULL, NULL);
+	status(name, he, NULL);
 }
 
 void gethostbyaddr_test(const char *name)
@@ -132,7 +127,7 @@ void gethostbyaddr_test(const char *name)
 
 	inet_pton(AF_INET, name, &addr);
 	he = gethostbyaddr(&addr, sizeof(addr), AF_INET);
-	status(name, he, NULL, NULL);
+	status(name, he, NULL);
 }
 
 void gethostbyaddr_r_test(const char *name)
@@ -144,8 +139,8 @@ void gethostbyaddr_r_test(const char *name)
 	int err;
 
 	inet_pton(AF_INET, name, &addr);
-	int rc = gethostbyaddr_r(&addr, sizeof(addr), AF_INET, &he, buf, sizeof(buf), &result, &err);
-	status(name, result, &rc, &err);
+	gethostbyaddr_r(&addr, sizeof(addr), AF_INET, &he, buf, sizeof(buf), &result, &err);
+	status(name, result, &err);
 }
 
 int main()
@@ -167,21 +162,21 @@ int main()
 		gethostbyname_r_test(*addr);
 	}
 
-	// printf("gethostbyname2:\n");
-	// for (const char **name = names; *name; name++) {
-	// 	gethostbyname2_test(*name);
-	// }
-	// for (const char **addr = addrs; *addr; addr++) {
-	// 	gethostbyname2_test(*addr);
-	// }
+	printf("gethostbyname2:\n");
+	for (const char **name = names; *name; name++) {
+		gethostbyname2_test(*name);
+	}
+	for (const char **addr = addrs; *addr; addr++) {
+		gethostbyname2_test(*addr);
+	}
 
-	// printf("gethostbyname2_r:\n");
-	// for (const char **name = names; *name; name++) {
-	// 	gethostbyname2_r_test(*name);
-	// }
-	// for (const char **addr = addrs; *addr; addr++) {
-	// 	gethostbyname2_r_test(*addr);
-	// }
+	printf("gethostbyname2_r:\n");
+	for (const char **name = names; *name; name++) {
+		gethostbyname2_r_test(*name);
+	}
+	for (const char **addr = addrs; *addr; addr++) {
+		gethostbyname2_r_test(*addr);
+	}
 
 	printf("\ngethostbyaddr:\n");
 	for (const char **addr = addrs; *addr; addr++) {
