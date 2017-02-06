@@ -311,7 +311,7 @@ static void _LoadSIDs()
 
 // the non reentrant gethostbyX functions require a static hostent
 // build it in place here
-static struct hostent *_makehostent(const char *name, struct in_addr *ia)
+static struct hostent *_makehostent(const char *name, const struct in_addr *ia)
 {
 	static struct hostent he;
 	static char _h_name[256];
@@ -326,6 +326,43 @@ static struct hostent *_makehostent(const char *name, struct in_addr *ia)
 	he.h_addr_list[0] = (char*)memcpy(&_h_addr, ia, sizeof(struct in_addr));
 	he.h_addr_list[1] = NULL;
 	return &he;
+}
+
+
+static struct hostent *_makehostent_r(const char *name, const struct in_addr *ia, struct hostent *he, char *buf, size_t buflen, int *err)
+{
+	size_t nlen = strlen(name) + 1;
+	size_t plen = sizeof(struct in_addr*) * 2;
+	size_t alen = sizeof(struct in_addr);
+	size_t needed = nlen + plen + alen;
+
+	if (needed > buflen) {
+		*err = ERANGE;
+		return NULL;
+	}
+
+	struct in_addr *hia = (struct in_addr*)(buf + plen);
+	memcpy(hia, ia, sizeof(struct in_addr));
+
+	he->h_name         = buf + plen + alen;
+	he->h_aliases      = NULL;
+	he->h_addrtype     = AF_INET;
+	he->h_length       = 4;
+	he->h_addr_list    = (char **)buf;
+	he->h_addr_list[0] = (char *)hia;
+	he->h_addr_list[1] = NULL;
+
+	strcpy(he->h_name, name);
+
+	// printf("p size = %d\n", sizeof(struct in_addr*));
+	// printf("buf: %p\n", buf);
+	// printf("name: %p %s\n", he->h_name, he->h_name);
+	// printf("addr_list: %p\n", he->h_addr_list);
+	// printf("addr_list[0]: %p\n", he->h_addr_list[0]);
+	// printf("addr_list[1]: %p\n", he->h_addr_list[1]);
+
+	*err = 0;
+	return he;
 }
 
 
@@ -495,7 +532,7 @@ static int _i2x(struct sockaddr_in *sin, sockaddr_x *sax)
 
 
 // map from IP to XIA
-static int _h2x(const char *name, unsigned short port, sockaddr_x *sax)
+static int _h2x(const char *name, unsigned short port, sockaddr_in *sin, sockaddr_x *sax)
 {
 	char h[HOSTLEN];
 	int rc = 0;
@@ -512,6 +549,11 @@ static int _h2x(const char *name, unsigned short port, sockaddr_x *sax)
 
 		Graph g(dag);
 		g.fill_sockaddr(sax);
+
+		// also fill in the sockaddr
+		inet_pton(AF_INET, host2id[name].c_str(), &sin->sin_addr);
+		sin->sin_family = AF_INET;
+		sin->sin_port = htons(port);
 
 	} else {
 		MSG("No mapping for %s\n", h);
@@ -705,12 +747,10 @@ static int _Lookup(const struct sockaddr_in *addr, sockaddr_x *sax)
 		return EAI_NONAME;
 	}
 
-
 	inet_ntop(AF_INET, &addr->sin_addr, ip, ID_LEN);
-printf("id = %s ip = %s\n", id, ip);
+
 	id2host_t::iterator it = id2host.find(ip);
 	if (it != id2host.end()) {
-		printf("found a mapping ip-name\n");
 		_hoststring(id, ID_LEN, it->second.c_str(), addr->sin_port);
 	}
 
@@ -743,7 +783,7 @@ static int _LookupHost(const char *hname, unsigned short port, struct sockaddr *
 	char id[HOSTLEN];
 	socklen_t len = sizeof(sockaddr_x);
 
-	if (_h2x(hname, port, sax) == 0) {
+	if (_h2x(hname, port, (struct sockaddr_in *)sa, sax) == 0) {
 		// found locally
 		return rc;
 	}
@@ -2178,26 +2218,44 @@ struct hostent *gethostbyaddr (const void *addr, socklen_t len, int type)
 	char name[32];
 
 	if (type != AF_INET) {
+		// h_errno = EAFNOSUPPORT;
+		// return NULL;
 		return __real_gethostbyaddr(addr, len, type);
 
 	} else if (len < sizeof(struct in_addr)) {
+		h_errno = NO_ADDRESS;
 		return NULL;
 	}
 
-	inet_ntop(AF_INET, addr, name, sizeof(name));
+	if (inet_ntop(AF_INET, addr, name, sizeof(name)) == NULL) {
+		return NULL;
 
-	return _makehostent(name, (struct in_addr*)addr);
+	} else {
+		return _makehostent(name, (struct in_addr*)addr);
+	}
 }
 
 
 
-int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
+int gethostbyaddr_r (const void *addr, socklen_t len, int type, struct hostent *he, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
 	TRACE();
-	ALERT();
 
-	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyaddr_r(addr, len, type, result_buf, buf, buflen, result, h_errnop);
+	char name[32];
+
+	if (type != AF_INET) {
+		return __real_gethostbyaddr_r(addr, len, type, he, buf, buflen, result, h_errnop);
+
+	} else if (len < sizeof(struct in_addr)) {
+		h_errno = NO_ADDRESS;
+	}
+
+	if (inet_ntop(AF_INET, addr, name, sizeof(name)) == NULL) {
+		return -1;
+	}
+
+	*result = _makehostent_r(name, (const struct in_addr*)addr, he, buf, buflen, h_errnop);
+	return (*result != NULL ? 0 : -1);
 }
 
 
@@ -2212,14 +2270,14 @@ struct hostent *gethostbyname (const char *name)
 
 	if (inet_pton(AF_INET, name, &addr) == 0) {
 		// it's not an IP address
-		addr.s_addr = 0x01020304;
 
 		if (_LookupHost(name, 0, (struct sockaddr*)&sa, &sax) == 0) {
 			// success!
 			memcpy(&addr, &sa.sin_addr, sizeof(addr));
 
 		} else {
-			// nof found in the name server
+			// not found in the name server
+			h_errno = HOST_NOT_FOUND;
 			return NULL;
 		}
 
@@ -2248,14 +2306,33 @@ struct hostent *gethostbyname2 (const char *name)
 
 
 
-int gethostbyname_r (const char *name, struct hostent *result_buf, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
+int gethostbyname_r (const char *name, struct hostent *he, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
 	TRACE();
-	ALERT();
-	MSG("name=%s\n", name);
 
-	// FIXME: add code here to map between IPv4 and XIA
-	return __real_gethostbyname_r(name, result_buf, buf, buflen, result, h_errnop);
+	struct in_addr addr;
+	struct sockaddr_in sa;
+	sockaddr_x sax;
+
+	if (inet_pton(AF_INET, name, &addr) == 0) {
+		// it's not an IP address
+
+		if (_LookupHost(name, 0, (struct sockaddr*)&sa, &sax) == 0) {
+			// success!
+			memcpy(&addr, &sa.sin_addr, sizeof(addr));
+
+		} else {
+			// not found in the name server
+			*h_errnop = HOST_NOT_FOUND;
+			return -1;
+		}
+
+	} else {
+		// addr was setup by the inet_pton call
+	}
+
+	*result = _makehostent_r(name, &addr, he, buf, buflen, h_errnop);
+	return (*result != NULL ? 0 : -1);
 }
 
 
