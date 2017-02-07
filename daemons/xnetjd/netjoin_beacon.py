@@ -15,10 +15,10 @@ from netjoin_authsession import NetjoinAuthsession
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
 class NetjoinBeacon(object):
-    def __init__(self):
+    def __init__(self, xip_netid):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
-        self.xip_netid = None
+        self.xip_netid = xip_netid
         self.raw_verify_key = None
 
     def beacon_str(self):
@@ -50,9 +50,8 @@ class NetjoinBeacon(object):
         self._update_object_from_net_descriptor()
 
     # For now we just build a beacon with a dummy AuthCapStruct
-    def initialize(self, raw_verify_key, l2_type, guid=None, xip_netid=None):
+    def initialize(self, raw_verify_key, l2_type, guid=None):
         self.guid = guid
-        self.xip_netid = xip_netid
         self.raw_verify_key = raw_verify_key
 
         if self.guid == None:
@@ -60,8 +59,8 @@ class NetjoinBeacon(object):
             logging.warning("GUID not provided. Assigning a temporary one")
 
         if self.xip_netid == None:
-            self.xip_netid = uuid.uuid4().bytes
-            logging.warning("XIP NID not given. Assigning a temporary one")
+            logging.error("XIP NID not given. Assigning a temporary one")
+            raise RuntimeError("XIP network ID not known.")
 
         # If l2 type is not known throw an exception and end
         if l2_type not in NetjoinL2Handler.l2_type_info:

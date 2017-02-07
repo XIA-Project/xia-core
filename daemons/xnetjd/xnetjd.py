@@ -92,8 +92,12 @@ def main():
         logging.debug("Announcing network and listening for join requests")
         # Determine the Layer2 type for retransmission rate and attempts
         l2_type = NetjoinL2Handler.l2_str_to_type[args.layer2]
+
+        # Read in the network ID (AD) from etc/address.conf
+        net_id = conf.get_raw_ad()
+
         # Start an auth session for announcer
-        announcer = NetjoinAnnouncer(l2_type, args.beacon_interval,
+        announcer = NetjoinAnnouncer(l2_type, net_id, args.beacon_interval,
                 shutdown_event)
         announcer.announce()
 
