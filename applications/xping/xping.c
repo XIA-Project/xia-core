@@ -35,7 +35,6 @@
 #include <signal.h>
 
 #include "Xsocket.h"
-#include "dagaddr.hpp"
 
 #include "xip.h"
 
@@ -89,19 +88,20 @@ int srcSet = 0;
 
 int main(int argc, char **argv)
 {
-    sockaddr_x from;
+	char buf[1024];
+	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
-        int c = argc;
+		int c = argc;
 		while (*++av[0]) {
-            if (c != argc) {
-                break;
+			if (c != argc) {
+				break;
 			}
 
-            switch (*av[0]) {
+			switch (*av[0]) {
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
@@ -111,29 +111,29 @@ int main(int argc, char **argv)
 			case 'f':
 				pingflags |= FLOOD;
 				break;
-            case 'i':
-                argc--, av++;
-                interval = atof(av[0]);
-                break;
-            case 'c':
-                argc--, av++;
-                npackets = atoi(av[0]);
-                break;
-            case 't':
-                argc--, av++;
-                catcher_timeout = atoi(av[0]);
-                break;
-            case 's':
-                argc--, av++;
-                len = sizeof(wherefrom);
-                srcSet = 1;
-                if (XgetDAGbyName(av[0], &wherefrom, &len) < 0) {
-                    printf("Error Resolving XID\n");
-                    exit(-1);
-                }
-                break;
-            }
-        }
+			case 'i':
+				argc--, av++;
+				interval = atof(av[0]);
+				break;
+			case 'c':
+				argc--, av++;
+				npackets = atoi(av[0]);
+				break;
+			case 't':
+				argc--, av++;
+				catcher_timeout = atoi(av[0]);
+				break;
+			case 's':
+				argc--, av++;
+				len = sizeof(wherefrom);
+				srcSet = 1;
+				if (XgetDAGbyName(av[0], &wherefrom, &len) < 0) {
+					printf("Error Resolving XID\n");
+					exit(-1);
+				}
+				break;
+			}
+		}
 		argc--, av++;
 	}
 	if (argc < 1 || argc > 4)  {
@@ -142,7 +142,9 @@ int main(int argc, char **argv)
 	}
 
 	len = sizeof(whereto);
-	if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
+	if (xia_pton(AF_XIA, av[0], &whereto) == 1) {
+		// we've got it
+	} else if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
 	  printf("Error Resolving XID\n");
 	  exit(-1);
 	}
@@ -181,15 +183,15 @@ int main(int argc, char **argv)
 	  exit(-1);
 	}
 
-    if (srcSet) {
-        if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
-            printf("Xbind failed\n");
-            exit(-1);
-        }
-    }
+	if (srcSet) {
+		if (Xbind(s, (struct sockaddr *)&wherefrom, sizeof(sockaddr_x)) < 0) {
+			printf("Xbind failed\n");
+			exit(-1);
+		}
+	}
 
-	Graph g(&whereto);
-	printf("PING %s: %ld data bytes\n\n", g.dag_string().c_str(), (long int)datalen);
+	xia_ntop(AF_XIA, &whereto, buf, sizeof(buf));
+	printf("PING %s: %ld data bytes\n\n", buf, (long int)datalen);
 
 	setlinebuf(stdout);
 
@@ -229,8 +231,8 @@ int main(int argc, char **argv)
 			perror("ping: recvfrom");
 			continue;
 		}
-		Graph gf(&from);
-		pr_pack(packet, cc, (char *)gf.dag_string().c_str());
+		inet_ntop(AF_XIA, &from, buf, sizeof(buf));
+		pr_pack(packet, cc, buf);
 		if (npackets && nreceived >= npackets) {
 			finish();
 		}
@@ -254,16 +256,16 @@ void catcher()
 	int waittime;
 
 	pinger();
-    nCatcher += interval;
-    if (catcher_timeout && nCatcher >= catcher_timeout) {
-        rc = nreceived ? 0 : -1;
-        finish();
-    }
+	nCatcher += interval;
+	if (catcher_timeout && nCatcher >= catcher_timeout) {
+		rc = nreceived ? 0 : -1;
+		finish();
+	}
 	if (npackets == 0 || ntransmitted < npackets) {
-        if (interval < 1) {
-            ualarm((int)(interval*1000000), 0);
-        } else {
-            alarm((int)interval);
+		if (interval < 1) {
+			ualarm((int)(interval*1000000), 0);
+		} else {
+			alarm((int)interval);
 		}
 	} else {
 		if (nreceived) {
@@ -381,7 +383,7 @@ pr_type(register int t)
  */
 void pr_pack(u_char *buf, int cc, char *from)
 {
-    struct xip *xp;
+	struct xip *xp;
 	register struct icmp *icp;
 	register long *lp = (long *) packet;
 	register int i;
@@ -394,7 +396,7 @@ void pr_pack(u_char *buf, int cc, char *from)
 
 	xp = (struct xip *)buf;
 
-   	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
+	hlen = sizeof(struct xip) + sizeof(struct xia_xid_node) * (xp->dnode+xp->snode);
 
 	if (cc < hlen + ICMP_MINLEN) {
 		if (pingflags & VERBOSE) {
@@ -412,7 +414,7 @@ void pr_pack(u_char *buf, int cc, char *from)
 
 		if (pingflags & VERBOSE) {
 			for(i = 0; i < 12; i++) {
-			    printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)), (unsigned int)*lp++);
+				printf("x%2.2x: x%8.8x\n", (unsigned int)(i*sizeof(long)), (unsigned int)*lp++);
 		   }
 		}
 		return;
@@ -542,7 +544,7 @@ void finish()
 	}
 	printf("\n");
 	if (nreceived && timing) {
-	    printf("round-trip (ms)  min/avg/max = %d/%d/%d\n", tmin, tsum / nreceived, tmax);
+		printf("round-trip (ms)  min/avg/max = %d/%d/%d\n", tmin, tsum / nreceived, tmax);
 	}
 	fflush(stdout);
 

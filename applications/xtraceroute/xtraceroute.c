@@ -35,7 +35,6 @@
 #include <signal.h>
 
 #include "Xsocket.h"
-#include "dagaddr.hpp"
 
 #include "xip.h"
 
@@ -131,7 +130,9 @@ int main(int argc, char **argv)
 	}
 
 	len = sizeof(whereto);
-	if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
+	if (xia_pton(AF_XIA, av[0], &whereto) == 1) {
+		// we've got it
+	} else if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
 	  printf("Error Resolving XID\n");
 	  exit(-1);
 	}
@@ -173,8 +174,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	Graph g(&whereto);
-	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
+	xia_ntop(AF_XIA, &whereto, s_to, sizeof(s_to));
 	printf("TRACEROUTE (%u hops %lu bytes) to\n%s:\n\n", npackets, datalen, s_to);
 
 	setlinebuf(stdout);
@@ -197,8 +197,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		Graph gf(&from);
-		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
+		inet_ntop(AF_XIA, &from, s_from, sizeof(s_from));
 		pr_pack(packet, cc, s_from);
 
 
@@ -449,7 +448,7 @@ void pr_pack(u_char *buf, int cc, const char *from)
 	// 	}
 	// }
 	//
- 	//	if (timing) {
+	//	if (timing) {
 	//		printf(" time=%d ms\n", triptime);
 	// } else {
 	//		putchar('\n');

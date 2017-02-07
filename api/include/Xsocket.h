@@ -14,8 +14,8 @@
 ** limitations under the License.
 */
 /*!
-  @file Xsocket.h
-  @brief Xsocket API header file
+	@file Xsocket.h
+	@brief Xsocket API header file
 */
 
 #ifndef XSOCKET_H
@@ -44,13 +44,13 @@ extern "C" {
 #define MAXBUFLEN    62000	// Must be smaller than the MTU of localhost to allow for the protobuf and its contained data
 							// this isn't calculated, so make sure more than enough room is available for now
 #ifdef __mips__ // to add missing constants
-    #define F_SETOWN_EX 15
-    #define F_GETOWN_EX 16
-    #define F_SETPIPE_SZ 1031
-    #define F_GETPIPE_SZ 1032
-    #define SO_REUSEPORT 15
-    #define IPPROTO_BEETPH 94
-    #define MSG_FASTOPEN 0x20000000
+	#define F_SETOWN_EX 15
+	#define F_GETOWN_EX 16
+	#define F_SETPIPE_SZ 1031
+	#define F_GETPIPE_SZ 1032
+	#define SO_REUSEPORT 15
+	#define IPPROTO_BEETPH 94
+	#define MSG_FASTOPEN 0x20000000
 #endif
 
 
@@ -178,6 +178,9 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
+
+const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
+int xia_pton(int af, const char *src, sockaddr_x *dst);
 
 #ifdef __cplusplus
 }

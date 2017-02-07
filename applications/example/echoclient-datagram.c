@@ -29,7 +29,6 @@
 #include <libgen.h>
 #endif
 #include "Xsocket.h"
-#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Datagram Echo Client"
@@ -323,6 +322,7 @@ void quithandler(int)
 */
 int main(int argc, char **argv)
 {
+	char buf[256];
 	srand(time(NULL));
 	getConfig(argc, argv);
 
@@ -334,8 +334,8 @@ int main(int argc, char **argv)
 		die(-1, "unable to lookup name %s\n", DGRAM_NAME);
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	Graph g(sa);
-	printf("\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\n%s\n", buf);
 
 	if (threads == 1)
 		// just do it

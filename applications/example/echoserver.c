@@ -155,7 +155,7 @@ void process(int sock)
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 
-   	while (1) {
+	while (1) {
 		memset(buf, 0, sizeof(buf));
 
 		tv.tv_sec = WAIT_FOR_DATA;
@@ -209,6 +209,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
+	char buf[256];
 	int acceptor, sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
@@ -259,14 +260,13 @@ void echo_stream()
 		}
 	}
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nStream DAG\n%s\n", buf);
 
-    if (XregisterName(STREAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", STREAM_NAME);
+	if (XregisterName(STREAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", STREAM_NAME);
 	say("registered name: \n%s\n", STREAM_NAME);
 
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
@@ -287,9 +287,9 @@ void echo_stream()
 			continue;
 		}
 
-		Graph g(&sa);
+		xia_ntop(AF_XIA, &sa, buf, sizeof(buf));
 		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str()); 
+		say("peer:%s\n", buf);
 
 		pid_t pid = Xfork();
 
@@ -331,11 +331,11 @@ void echo_dgram()
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nDatagram DAG\n%s\n", buf);
 
-    if (XregisterName(DGRAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", DGRAM_NAME);
+	if (XregisterName(DGRAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", DGRAM_NAME);
 	say("registered name: \n%s\n", DGRAM_NAME);
 
 	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
