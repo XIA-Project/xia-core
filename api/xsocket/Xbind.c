@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xbind.c
-** @brief implements Xbind()
+** @brief Xbind() - bind a name to a socket
 */
 
 #include "Xsocket.h"

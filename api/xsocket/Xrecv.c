@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xrecv.c
-** @brief implements Xrecv()
+** @brief Xrecv(), Xrecvfrom() - receive a message from a socket
 */
 
 #include <errno.h>
@@ -186,7 +186,7 @@ int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 	sockaddr_x *addr, socklen_t *addrlen, int *iface)
 {
-    int numbytes;
+	int numbytes;
 
 	if (!rbuf || (addr && !addrlen)) {
 		LOG("null pointer!\n");
@@ -252,7 +252,7 @@ int _xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
 		*addrlen = sizeof(sockaddr_x);
 	}
 
-    return paylen;
+	return paylen;
 }
 
 int _xrecvfromconn(int sockfd, void *rbuf, size_t len, int flags, int *iface)

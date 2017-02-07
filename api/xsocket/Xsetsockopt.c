@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsetsockopt.c
-** @brief implements Xsetsockopt() and Xgetsockopt()
+** @brief Xsetsockopt(),X getsockopt() - get and set options on sockets
 */
 
 #include "Xsocket.h"
@@ -24,7 +24,7 @@
 #include "Xutil.h"
 #include <errno.h>
 
-int ssoCheckSize(unsigned *size, unsigned needed)
+static int ssoCheckSize(unsigned *size, unsigned needed)
 {
 	if (*size < needed) {
 		*size = needed;
@@ -40,7 +40,7 @@ int ssoCheckSize(unsigned *size, unsigned needed)
 /*
 ** get an integer sized parameter from click
 */
-int ssoGetInt(int sockfd, int optname, int *optval, socklen_t *optlen)
+static int ssoGetInt(int sockfd, int optname, int *optval, socklen_t *optlen)
 {
 	if (ssoCheckSize(optlen, sizeof(int)) < 0)
 		return -1;
@@ -74,7 +74,7 @@ int ssoGetInt(int sockfd, int optname, int *optval, socklen_t *optlen)
 /*
 ** get an integer sized parameter from click
 */
-int ssoPutInt(int sockfd, int optname, const int *optval, socklen_t optlen)
+static int ssoPutInt(int sockfd, int optname, const int *optval, socklen_t optlen)
 {
 	if (ssoCheckSize(&optlen, sizeof(int)) < 0)
 		return -1;
@@ -100,7 +100,7 @@ int ssoPutInt(int sockfd, int optname, const int *optval, socklen_t optlen)
 	return 0;
 }
 
-int ssoGetParam(int param, void *optval, socklen_t *optlen)
+static int ssoGetParam(int param, void *optval, socklen_t *optlen)
 {
 	if (ssoCheckSize(optlen, sizeof(int)) < 0) {
 		return -1;

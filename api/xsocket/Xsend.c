@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xsend.c
-** @brief implements Xsend()
+** @brief Xsend(), Xsendto() - - send a message on a socket
 */
 #include "Xsocket.h"
 #include "Xinit.h"

@@ -1,4 +1,23 @@
 // COMPILE: gcc -o genkeypair genkeypair.c -lcrypto -lssl
+/*
+** Copyright 2012 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+/*!
+ @file Xkeys.c
+ @brief XmakeNewSID(), XremoveSID(), XcreateFID(), XremoveFID() -- create/delete cryptographic SIDs & FIDs
+*/
 #include <string.h>
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -13,13 +32,13 @@
 // Convert a SHA1 hash to a hex string
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
 {
-    int i;
+	int i;
 	assert(digest_len == SHA_DIGEST_LENGTH);
 	assert(hex_string_len == (2*SHA_DIGEST_LENGTH) + 1);
-    for(i=0;i<digest_len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
+	for(i=0;i<digest_len;i++) {
+		sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
+	}
+	hex_string[hex_string_len-1] = '\0';
 }
 
 // Calculate SHA1 hash of a public key in PEM format
@@ -220,13 +239,13 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 {
 	int retval = -1;
 	int state = 0;
-    int keylen;
-    RSA *r = NULL;
-    BIGNUM *bne = NULL;
+	int keylen;
+	RSA *r = NULL;
+	BIGNUM *bne = NULL;
 	BIO *pubkeybuf = NULL;
 	char *pubkeystr = NULL;
 	unsigned char pubkeyhash[SHA_DIGEST_LENGTH];
-    unsigned long e = RSA_F4;
+	unsigned long e = RSA_F4;
 
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
@@ -240,25 +259,25 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 		goto cleanup_generate_keypair;
 	}
 
-    // Create BIGNUM argument for key generation
-    bne = BN_new();
+	// Create BIGNUM argument for key generation
+	bne = BN_new();
 	if(bne == NULL) {
 		goto cleanup_generate_keypair;
 	}
 	state = 1;
 
-    if(BN_set_word(bne, e) != 1) {
-        goto cleanup_generate_keypair;
-    }
+	if(BN_set_word(bne, e) != 1) {
+		goto cleanup_generate_keypair;
+	}
 
 	// Create a new RSA key pair
-    r = RSA_new();
-    if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
-        goto cleanup_generate_keypair;
-    }
+	r = RSA_new();
+	if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
+		goto cleanup_generate_keypair;
+	}
 	state = 2;
 
-    // Derive filename from hash of public key and write keys to filesystem
+	// Derive filename from hash of public key and write keys to filesystem
 	pubkeybuf = BIO_new(BIO_s_mem());
 	if(pubkeybuf == NULL) {
 		goto cleanup_generate_keypair;
@@ -296,7 +315,7 @@ cleanup_generate_keypair:
 		case 1: BN_free(bne);
 	};
 
-    return retval;
+	return retval;
 }
 
 int XmakeNewSID(char *randomSID, int randomSIDlen)
@@ -433,7 +452,7 @@ int XexistsSID(const char *sid)
 int main(int argc, char* argv[])
 {
 	char pubkeyhexdigest[SHA_DIGEST_LENGTH*2+1];
-    int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));
+	int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));
 	if(!retval) {
 		printf("Generated key:%s:\n", pubkeyhexdigest);
 	}

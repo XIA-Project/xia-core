@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xlisten.c
-** @brief implements Xlisten()
+** @brief Xlisten() - listen for connections on a socket
 */
 
 #include <errno.h>
@@ -33,17 +33,6 @@
 ** and returns a new Xsocket descriptor referring to that socket. The newly
 ** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
-**
-** Xaccept does not currently have a non-blocking mode, and will block
-** until a connection is made. However, the standard socket API calls select
-** and poll may be used with the Xsocket. Either function will deliver a
-** readable event when a new connection is attempted and you may then call
-** Xaccept() to get a socket for that connection.
-**
-** @note Unlike standard sockets, there is currently no Xlisten function.
-** Callers must create the listening socket by calling Xsocket with the
-** XSOCK_STREAM transport_type and bind it to a source DAG with Xbind(). XAccept
-** may then be called to wait for connections.
 **
 ** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
 ** and bound to a local DAG with Xbind()

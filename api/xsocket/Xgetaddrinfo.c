@@ -16,7 +16,7 @@
 */
 /*!
  @file Xgetaddrinfo.c
- @brief Implements Xgetgetaddrinfo(), Xfreeaddrinfo(), and Xgai_strerror()
+ @brief Xgetaddrinfo(), Xfreeaddrinfo(), Xgai_strerror() - network address and service translation
 */
 #include <errno.h>
 #include <netdb.h>
@@ -47,7 +47,7 @@
 
 
 // XIA specific addrinfo error strings
-const char *xerr_unimplemented = "This feature is not currently supported";
+static const char *xerr_unimplemented = "This feature is not currently supported";
 
 
 
@@ -117,7 +117,7 @@ int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 	return ret;
 }
 
-int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int protocol, int cname)
+static int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int protocol, int cname)
 {
 	struct addrinfo *ai = NULL;
 	// allocate memory needed
@@ -160,13 +160,28 @@ int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int pro
 	return 0;
 }
 
-/*
-** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
-**  they are just checked to make sure no IPv4 code slips past us by mistake.
-*/
 
+/*!
+** @brief Get the full DAG of the remote socket.
+**
+** @param sockfd An Xsocket of type SOCK_STREAM
+** @param dag A sockaddr to hold the returned DAG.
+** @param len On input contans the size of the sockaddr
+**  on output contains sizeof(sockaddr_x).
+**
+** @returns 0 on success
+** @returns -1 on failure with errno set
+** @returns errno = EFAULT if dag is NULL
+** @returns errno = EOPNOTSUPP if sockfd is not of type XSSOCK_STREAM
+** @returns errno = ENOTCONN if sockfd is not in a connected state
+**
+*/
 int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
+	/*
+	** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
+	**  they are just checked to make sure no IPv4 code slips past us by mistake.
+	*/
 	int rc;
 	sockaddr_x sa;
 	socklen_t slen;

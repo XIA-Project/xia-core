@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xselect.c
-** @brief implements Xselect() and Xpoll()
+** @brief Xselect(), Xpoll() - synchronous I/O multiplexing
 */
 #include <sys/select.h>
 #include <sys/poll.h>
@@ -248,7 +248,7 @@ done:
 	return rc;
 }
 
-void XselectCancel(int sock)
+static void XselectCancel(int sock)
 {
 	xia::XSocketMsg xsm;
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();

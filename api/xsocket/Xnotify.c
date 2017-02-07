@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xnotify.c
-** @brief implements Xnotify()
+** @brief Xnotify() - get notification of network changes
 */
 
 #include "Xsocket.h"

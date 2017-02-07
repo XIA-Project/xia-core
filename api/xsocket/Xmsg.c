@@ -15,7 +15,7 @@
 */
 /*!
 ** @file Xmsg.c
-** @brief implements Xrecvmsg, Xsendmsg()
+** @brief Xrecvmsg(), Xsendmsg() - send/receive a message on a socket
 */
 
 #include <errno.h>

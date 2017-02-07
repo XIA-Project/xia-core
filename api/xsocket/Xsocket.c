@@ -16,7 +16,7 @@
 */
 /*!
  @file Xsocket.c
- @brief Implements Xsocket()
+ @brief Xsocket() - create a socket
 */
 
 #include <sys/types.h>

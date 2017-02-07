@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xclose.c
-** @brief implements Xclose()
+** @brief Xclose() - close a socket
 */
 
 #include "Xsocket.h"

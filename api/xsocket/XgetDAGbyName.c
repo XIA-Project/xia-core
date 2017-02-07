@@ -16,8 +16,8 @@
 */
 /*!
  @file XgetDAGbyName.c
- @brief Implements XgetDAGbyName(), XgetNamebyDAG(), XregisterName(), Xgetpeername(),
-  Xgetsockname(), xia_ntop(), xia_pton()
+ @brief XgetDAGbyName(), XgetNamebyDAG(), XregisterName(), Xgetpeername(),
+  Xgetsockname(), xia_ntop(), xia_pton() - network address management
 
 */
 #include <errno.h>

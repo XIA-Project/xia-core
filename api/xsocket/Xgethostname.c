@@ -16,7 +16,7 @@
 */
 /*!
  @file Xgethostname.c
- @brief Implements Xgethostname()
+ @brief Xgethostname() - get XIA host name
 */
 #include <errno.h>
 #include <netdb.h>
@@ -29,9 +29,32 @@
 #include <sys/types.h>
 #include <ifaddrs.h>
 
-// TODO: Set errno for various errors
+/*!
+** @brief get the XIA host name
+**
+** Performs  one  of the operations described below on the open file descriptor sockfd.
+** The operation is determined by cmd.
+**
+** Returns the null-terminated hostname in the character array name, which has a length of
+** len bytes. If the null-terminated hostname is too large to fit, then the name is truncated,
+**  and no error is returned.
+**
+** File status flags
+**	F_GETFL (void)
+**		Get the file access mode and the file status flags; arg is ignored.
+**
+**	F_SETFL (int)
+**		Currently only O_NONBLOCK is allowed
+**
+** @param name the destination for the host name
+** @param len the length of name
+**
+** @returns  0 on success
+** @returns -1 on failure with errno is set appropriately.
+*/
 int Xgethostname(char *name, size_t len)
 {
+	// TODO: Set errno for various errors
 	int rc;
 
 	// A socket that Click can associate us with
@@ -48,31 +71,31 @@ int Xgethostname(char *name, size_t len)
 	xsm.set_sequence(seq);
 
 	printf("Xgethostname: sending request to Click\n");
-    if ((rc = click_send(sockfd, &xsm)) < 0) {
-        LOGF("Error talking to Click: %s", strerror(errno));
-        return -1;
-    }
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		return -1;
+	}
 
 	printf("Xgethostname: waiting for Click response\n");
-    xia::XSocketMsg xsm1;
-    if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
-        LOGF("Error retrieving status from Click: %s", strerror(errno));
-        return -1;
-    }
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		return -1;
+	}
 
 	printf("Xgethostname: retrieving hostname from Click response\n");
 	// Send list of interfaces up to the application
-    if (xsm1.type() == xia::XGETHOSTNAME) {
-        xia::X_GetHostName_Msg *msg = xsm1.mutable_x_gethostname();
+	if (xsm1.type() == xia::XGETHOSTNAME) {
+		xia::X_GetHostName_Msg *msg = xsm1.mutable_x_gethostname();
 		std::string hostname = msg->hostname();
 		if(len < hostname.length()) {
 			LOGF("Hostname truncated: actual: %d, returned %d\n", (int)hostname.length(), (int)len);
 		}
 		strncpy(name, hostname.c_str(), len);
-        rc = 0;
-    } else {
-        LOG("Xgethostname: ERROR: Invalid response for XGETHOSTNAME request");
-        rc = -1;
-    }
+		rc = 0;
+	} else {
+		LOG("Xgethostname: ERROR: Invalid response for XGETHOSTNAME request");
+		rc = -1;
+	}
 	return rc;
 }

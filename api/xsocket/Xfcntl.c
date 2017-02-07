@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xfcntl.c
-** @brief implements Xfcntl()
+** @brief Xfcntl() - manipulate a socket
 */
 
 #include <errno.h>
@@ -25,7 +25,6 @@
 #include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
-
 /*!
 ** @brief manipulate Xsocket
 **

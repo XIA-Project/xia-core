@@ -16,7 +16,7 @@
 */
 /*!
  @file Xgetifaddrs.c
- @brief Implements Xgetifaddrs(), Xfreeifaddrs()
+ @brief Xgetifaddrs(), Xfreeifaddrs() - get interface addresses
 */
 #include <errno.h>
 #include <netdb.h>
@@ -29,7 +29,7 @@
 #include <sys/types.h>
 #include <ifaddrs.h>
 
-int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifaddr)
+static int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifaddr)
 {
 	int retval = -1;
 	int state = 0;
@@ -123,9 +123,23 @@ add_ifaddr_done:
 	return retval;
 }
 
-// TODO: Set errno for various errors
+/*!
+** @brief get a list of XIA network interfaces
+**
+** Create a linked list of structures describing the network interfaces
+** of the local system, and stores the address of the first item of the list
+**  in *ifap.
+**
+** See the man page for the normal getifaddrs function for more details.
+**
+** @param ifap pointer to a pointer to accecpt the returned ifaddrs structure
+**
+** @returns 0 on success
+** @returns -1 on error with errno set appropriately.
+*/
 int Xgetifaddrs(struct ifaddrs **ifap)
 {
+	// TODO: Set errno for various errors
 	int rc;
 
 	// A socket that Click can associate us with
@@ -145,38 +159,45 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 	xsm.set_sequence(seq);
 
 	//printf("Xgetifaddrs: sending request to Click\n");
-    if ((rc = click_send(sockfd, &xsm)) < 0) {
-        LOGF("Error talking to Click: %s", strerror(errno));
-        Xclose(sockfd);
-        return -1;
-    }
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
+		LOGF("Error talking to Click: %s", strerror(errno));
+		Xclose(sockfd);
+		return -1;
+	}
 
 	//printf("Xgetifaddrs: waiting for Click response\n");
-    xia::XSocketMsg xsm1;
-    if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
-        LOGF("Error retrieving status from Click: %s", strerror(errno));
-        Xclose(sockfd);
-        return -1;
-    }
+	xia::XSocketMsg xsm1;
+	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
+		LOGF("Error retrieving status from Click: %s", strerror(errno));
+		Xclose(sockfd);
+		return -1;
+	}
 
 	//printf("Xgetifaddrs: converting Click response to struct ifaddrs\n");
 	// Send list of interfaces up to the application
-    if (xsm1.type() == xia::XGETIFADDRS) {
-        xia::X_GetIfAddrs_Msg *msg = xsm1.mutable_x_getifaddrs();
+	if (xsm1.type() == xia::XGETIFADDRS) {
+		xia::X_GetIfAddrs_Msg *msg = xsm1.mutable_x_getifaddrs();
 		for(int i=0; i<msg->ifaddrs_size(); i++) {
 			if(add_ifaddr(ifap, msg->ifaddrs(i))) {
 				LOG("Error adding ifaddr for an ifaddrs entry from Click");
 			}
 		}
-        rc = 0;
-    } else {
-        LOG("Xgetifaddrs: ERROR: Invalid response for XGETIFADDRS request");
-        rc = -1;
-    }
+		rc = 0;
+	} else {
+		LOG("Xgetifaddrs: ERROR: Invalid response for XGETIFADDRS request");
+		rc = -1;
+	}
 	Xclose(sockfd);
 	return rc;
 }
 
+/*!
+** @brief free memory allocated by Xgetifaddrs
+**
+** @param ifa pointer to ifaddr structure to be freed.
+**
+** @returns void
+*/
 void Xfreeifaddrs(struct ifaddrs *ifa)
 {
 	// no xia specific processing required at the moment

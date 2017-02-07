@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xaccept.c
-** @brief implements Xaccept()
+** @brief Xaccept(), Xaccept4() - accept/reject jobs sent to a destination
 */
 
 #include <errno.h>

@@ -14,8 +14,8 @@
 ** limitations under the License.
 */
 /*!
-** @file Xselect.c
-** @brief implements Xselect() and Xpoll()
+** @file Xfork.c
+** @brief Xfork() - create a child process
 */
 #include <sys/select.h>
 #include <sys/poll.h>
@@ -84,7 +84,19 @@ done:
 }
 
 
-
+/*!
+** @brief Creates a new process by duplicating the calling process.
+**
+** This function wraps the system fork() call so that we can we can
+** maintain correct internal socket state. This prevents issues such as
+** Xclose in the child process also closing the same socket in the
+** parent process.
+**
+** @note See the normal fork() documentation for full fork details.
+*
+** @returns The PID of the child process is returned in the parent, and 0 is returned in the child.
+** @returns -1 on failure to the parent. No child process is created, and errno is set appropriately.
+*/
 int Xfork(void)
 {
 	int rc = -1;

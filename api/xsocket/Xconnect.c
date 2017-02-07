@@ -16,7 +16,7 @@
 */
 /*!
 ** @file Xconnect.c
-** @brief implements Xconnect()
+** @brief Xconnect() - initiate a connection on a socket
 */
 
 #include <errno.h>
@@ -26,7 +26,7 @@
 #include "Xkeys.h"
 #include "dagaddr.hpp"
 
-int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
+static int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	UNUSED(addrlen);
 	int rc = 0;
@@ -57,7 +57,7 @@ int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	return rc;
 }
 
-int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
+static int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
 	UNUSED(addrlen);
 	int rc;
@@ -101,7 +101,7 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 			LOG("Unable to create a new SID with key pair");
 			return -1;
 		}
-        LOGF("Generated SID:%s:", src_SID);
+		LOGF("Generated SID:%s:", src_SID);
 
 		// Convert SID to a default DAG
 		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
@@ -144,12 +144,12 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 	}
 
 	// Waiting for SYNACK from destination server
-    int clickrc = click_reply(sockfd, 0, &xsm);
-    if (clickrc < 0 || xsm.x_connect().status() != xia::X_Connect_Msg::XCONNECTED) {
-        setConnState(sockfd, UNCONNECTED);
-        LOGF("Xconnect failed: %s", strerror(errno));
-        return -1;
-    }
+	int clickrc = click_reply(sockfd, 0, &xsm);
+	if (clickrc < 0 || xsm.x_connect().status() != xia::X_Connect_Msg::XCONNECTED) {
+		setConnState(sockfd, UNCONNECTED);
+		LOGF("Xconnect failed: %s", strerror(errno));
+		return -1;
+	}
 
 	setConnState(sockfd, CONNECTED);
 	return 0;
@@ -161,10 +161,6 @@ int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 ** The Xconnect() call connects the socket referred to by sockfd to the
 ** SID specified by dDAG. It is only valid for use with sockets created
 ** with the XSOCK_STREAM Xsocket type.
-**
-** @note Xconnect() differs from the standard connect API in that it does
-** not currently support use with Xsockets created with the XSOCK_DGRAM
-** socket type.
 **
 ** @param sockfd	The control socket
 ** @param addr	The address (SID) of the remote service to connect to.
