@@ -101,7 +101,7 @@
                                                          //idle time bef. drop */
 #define	TCPTV_MIN       (1*PR_SLOWHZ) //(1*PR_SLOWHZ/100) /* minimum allowable value */
 #define	TCPTV_REXMTMAX	(64*PR_SLOWHZ) /* max allowable REXMT value */
-#define	TCP_MAXRXTSHIFT	30//12  /* maximum retransmits */
+#define	TCP_MAXRXTSHIFT	12  /* maximum retransmits */
 #define	TCP_LINGERTIME	120 /* linger at most 2 minutes UNUSED! */
 
 #ifdef	TCPTIMERS
