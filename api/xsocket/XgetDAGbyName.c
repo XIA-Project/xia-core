@@ -16,7 +16,9 @@
 */
 /*!
  @file XgetDAGbyName.c
- @brief Implements XgetDAGbyName(), XregisterName(), Xgetpeername() and Xgetsockname()
+ @brief Implements XgetDAGbyName(), XgetNamebyDAG(), XregisterName(), Xgetpeername(),
+  Xgetsockname(), xia_ntop(), xia_pton()
+
 */
 #include <errno.h>
 #include <unistd.h>
@@ -29,6 +31,80 @@
 
 #define ETC_HOSTS "/etc/hosts.xia"
 #define MAX_SEND_RETRIES 5
+
+
+
+/*!
+** @brief convert a DAG from binary  to text form
+**
+** This  function  converts  the network address structure src in the
+** AF_XIA address family into a character string. The resulting string
+** is copied to the buffer pointed to by dst, which must be a non-null
+** pointer. The caller specifies the number of bytes available in this
+** buffer in the argument size.
+
+** @param af family (must be AF_XIA)
+** @param src DAG to convert
+** @param dst buffer to hold the converted address
+** @param size length of dst
+**
+** @returns non-null pointer to dst on success
+** @returns NULL with errno set on failure.
+*/
+const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size)
+{
+	if (af != AF_XIA) {
+		errno = EAFNOSUPPORT;
+		return NULL;
+	}
+
+	Graph g(src);
+
+	if (g.dag_string().size() >= size) {
+		errno = ENOSPC;
+		return NULL;
+	}
+	strncpy(dst, g.dag_string().c_str(), size);
+
+	return dst;
+}
+
+/*!
+** @brief convert a DAG from binary  to text form
+**
+** This  function  converts  the network address structure src in the
+** AF_XIA address family into a character string. The resulting string
+** is copied to the buffer pointed to by dst, which must be a non-null
+** pointer. The caller specifies the number of bytes available in this
+** buffer in the argument size.
+
+** @param af family (must be AF_XIA)
+** @param src text representation of the DAG to convert. Can be, DAG, RE, or HTTP formatted
+** @param dst destination
+** @param size length of dst
+**
+** @returns 1 on success (network address was successfully converted)
+** @returns 0 if src does not contain a character string representing a valid network address
+** @returns -1 with errno set to EAFNOSUPPORT If af is not AF_XIA
+*/
+int xia_pton(int af, const char *src, sockaddr_x *dst)
+{
+	if (af != AF_XIA) {
+		errno = EAFNOSUPPORT;
+		return -1;
+	}
+
+	Graph g(src);
+
+	if (g.num_nodes() == 1 && g.get_node(0).type() == CLICK_XIA_XID_TYPE_DUMMY) {
+		// the dag didn't parse correctly
+		return 0;
+	}
+
+	g.fill_sockaddr(dst);
+	return 1;
+}
+
 
 /*!
 ** @brief Send data to a host and wait for a response to be ready
@@ -44,7 +120,7 @@
 ** @returns -1 on failure. NOTE: Closes sock.
 */
 
-int _send_and_wait(int sock, const char *buf, size_t len,
+static int _send_and_wait(int sock, const char *buf, size_t len,
 		const sockaddr *destaddr, unsigned int timeout) {
 
 	int rc;
@@ -110,7 +186,7 @@ int _send_and_wait(int sock, const char *buf, size_t len,
 ** @returns NULL on failure
 **
 */
-char *hostsLookup(const char *name) {
+static char *hostsLookup(const char *name) {
 	char line[512];
 	char *linend;
 	char *dag;
@@ -191,18 +267,18 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
-        // check to see if name is actually a dag to begin with
-        Graph gcheck(name);
+		// check to see if name is actually a dag to begin with
+		Graph gcheck(name);
 
-        // check to see if the returned dag was valid
-        // we may want a better check for this in the future
-        if (gcheck.num_nodes() > 0) {
-            std::string s = gcheck.dag_string();
-            gcheck.fill_sockaddr((sockaddr_x*)addr);
-            *addrlen = sizeof(sockaddr_x);
-            return 0;
-        }
-    }
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (gcheck.num_nodes() > 0) {
+			std::string s = gcheck.dag_string();
+			gcheck.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
 	*/
 
 	// Prepare to talk to the nameserver
@@ -334,18 +410,18 @@ int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
-        // check to see if name is actually a dag to begin with
-        Graph gcheck(name);
+		// check to see if name is actually a dag to begin with
+		Graph gcheck(name);
 
-        // check to see if the returned dag was valid
-        // we may want a better check for this in the future
-        if (gcheck.num_nodes() > 0) {
-            std::string s = gcheck.dag_string();
-            gcheck.fill_sockaddr((sockaddr_x*)addr);
-            *addrlen = sizeof(sockaddr_x);
-            return 0;
-        }
-    }
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (gcheck.num_nodes() > 0) {
+			std::string s = gcheck.dag_string();
+			gcheck.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
 
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -428,18 +504,18 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 
 	if (!strncmp(name, "RE ", 3) || !strncmp(name, "DAG ", 4)) {
 
-        // check to see if name is actually a dag to begin with
-        Graph gcheck(name);
+		// check to see if name is actually a dag to begin with
+		Graph gcheck(name);
 
-        // check to see if the returned dag was valid
-        // we may want a better check for this in the future
-        if (gcheck.num_nodes() > 0) {
-            std::string s = gcheck.dag_string();
-            gcheck.fill_sockaddr((sockaddr_x*)addr);
-            *addrlen = sizeof(sockaddr_x);
-            return 0;
-        }
-    }
+		// check to see if the returned dag was valid
+		// we may want a better check for this in the future
+		if (gcheck.num_nodes() > 0) {
+			std::string s = gcheck.dag_string();
+			gcheck.fill_sockaddr((sockaddr_x*)addr);
+			*addrlen = sizeof(sockaddr_x);
+			return 0;
+		}
+	}
 
 	// not found locally, check the name server
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0)
@@ -557,7 +633,7 @@ int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG)
 /*
 ** called by XregisterName and XregisterHost to do the actual work
 */
-int _xregister(const char *name, sockaddr_x *DAG, short flags) {
+static int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 	int sock;
 	int rc;
 	int result;
@@ -807,7 +883,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
-    if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -877,7 +953,7 @@ int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	xsm.set_sequence(seq);
 
 	// send the protobuf containing the user data to click
-    if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
@@ -941,7 +1017,7 @@ int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz)
 				return 0;
 			strcpy(end, np->name);
 			end += strlen(np->name) + 1;
- 
+
 			strcpy(end, np->dag);
 			end += strlen(np->dag) + 1;
 			break;
