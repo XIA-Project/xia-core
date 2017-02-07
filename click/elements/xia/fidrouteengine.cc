@@ -449,7 +449,10 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	}
 
 	// get the source and destination intent xids
-	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
+	// HACK HACK HACK until new routing is in place. All route code is using the same SIDs
+	// which causes conflicts. Use the source HID instead for now
+	//const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
+	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 2];
 	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
 	XID src(snode.xid);
 	XID dst(dnode.xid);
