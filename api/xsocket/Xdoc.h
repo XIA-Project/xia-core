@@ -63,7 +63,19 @@ on the function calls.
 - xia_pton() - convert a string to binary address
 
 <h3>Content (Chunk) Oriented Functions</h3>
-- add new chunk APIs here
+- XbufAdd() - append data to a buffer
+- XbufFree() - free a buffer
+- XbufInit() - initialize a buffer
+- XbufPut() - load a buffer into the cache
+- XcacheHandleDestroy() - delete handle to a cache context
+- XcacheHandleInit() - initialize a cache context handle
+- XcacheHandleSetTtl() - set default lifetime
+- XevictChunk() - remove a chunk from the cache
+- XfetchChunk() - fetch a chunk form a remote cache
+- XputBuffer() - put a buffer into the cache
+- XputChunk() - put a chunk into the cache
+- XputFile() - put a file into the cache
+- XputMetaChunk() - put a descriptive chunk into the cache
 
 
 @warning
@@ -73,8 +85,5 @@ transport layer. Using this socket with normal unix socket calls will cause
 unexpected behaviors.
 Attempting to pass a socket created with the the normal socket function
 to the Xsocket API will have similar results.
-
-@todo add description of DAGs (who can provide?)
-@todo add chunk APIs
 */
 
