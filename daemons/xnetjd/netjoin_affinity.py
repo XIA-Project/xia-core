@@ -22,7 +22,7 @@ class NetjoinAffinity(object):
     """
     MAX_AFFINITY = 2
     MIN_AFFINITY = -10
-    THRESHOLD = 5
+    THRESHOLD = 1
 
     def __init__(self, decrement_interval=0.6):
         """Start with no known affinity to any beacon or interface."""
