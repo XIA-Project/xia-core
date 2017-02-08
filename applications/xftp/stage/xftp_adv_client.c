@@ -129,7 +129,7 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
         //}
 		int retry=5;
 		while(retry--){
-			if ((len = XfetchChunk(&h, &((void*)data), CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
+			if ((len = XfetchChunk(&h, (&(void*)data), CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
 			
 
 		
