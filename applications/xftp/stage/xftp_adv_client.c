@@ -91,7 +91,7 @@ say("---------CID:%s\n",cid);
 
     // chunk fetching begins
     //char data[CHUNKSIZE];
-	char *data = (char*)malloc(CHUNKSIZE);
+	void *data;// = (char*)malloc(CHUNKSIZE);
     for (unsigned int i = 0; i < CIDs.size(); i++) {
 
         say("The number of chunks is %d.\n", CIDs.size());
@@ -129,7 +129,7 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
         //}
 		int retry=5;
 		while(retry--){
-			if ((len = XfetchChunk(&h, (&(void*)data), CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
+			if ((len = XfetchChunk(&h, &data, CHUNKSIZE, XCF_BLOCK, &addr, sizeof(addr))) < 0) {
 			
 
 		
@@ -150,7 +150,7 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
         fetchTime = end_time - start_time;
         //------------//logFile << i <<" Chunk. Running time is: " << end_time - start_time << " ms. req: " << req << endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
-        fwrite(data, 1, len, fd);
+        fwrite((char*)data, 1, len, fd);
         bytes += len;
         chunkSize.push_back(len);
         //latency.push_back(end_time - start_time);
