@@ -254,7 +254,7 @@ XStream::tcp_input(WritablePacket *p)
 
 					return;
 				}
-			} else if (ti.ti_ack == tp->snd_una &&
+			} else if (0 && ti.ti_ack == tp->snd_una &&
 				(_q_recv.is_empty() || _q_recv.is_ordered()) &&
 				(so_recv_buffer_size > _q_recv.bytes_ok() + ti.ti_len)) {
 				/* this is a pure, in-sequence data packet
