@@ -112,10 +112,15 @@ say("---------CID:%s\n",cid);
                 die(-1, "fail to recv from stageManager!");
             }
             say("Get NewDag: %s\n", cmd);
-            url_to_dag(&addr, cmd, len);
+            //url_to_dag(&addr, cmd, len);
+			Graph g(cmd);
+			g.fill_sockaddr(&addr);
         }
         else {
-            url_to_dag(&addr, (char*)CIDs[i].c_str(), CIDs[i].size());
+            //url_to_dag(&addr, (char*)CIDs[i].c_str(), CIDs[i].size());
+			Graph g((char*)CIDs[i].c_str());
+			g.fill_sockaddr(&addr);
+			
 say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
         }
         long start_time = now_msec();
