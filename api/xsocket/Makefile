@@ -38,8 +38,9 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
-doc: mainpage.dox $(SOURCES)
-	doxygen XsocketsAPI.cfg
+doc: mainpage.dox api-*.cfg $(SOURCES)
+	doxygen api-man.cfg
+	doxygen api-html.cfg
 	make -C python doc
 
 unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
