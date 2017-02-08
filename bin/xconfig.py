@@ -91,10 +91,7 @@ def getHostname():
     global hostname
     if (len(hostname) == 0):
         hostname = xiapyutils.getxiaclickhostname()
-    dot = hostname.find(".")
-    if (dot >= 0):
-        hostname = hostname[:dot]
-    return ''.join(char for char in hostname if char.isalnum())  # make sure we don't return characters illegal in click element names
+    return hostname
 
 #
 # get list of network interfaces on OS X
