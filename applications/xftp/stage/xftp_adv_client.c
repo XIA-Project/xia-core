@@ -134,7 +134,11 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
 			die(-1, "XfetchChunk Failed\n");
         long end_time = now_msec();
         char req[256];
-        dag_to_url(req,256,&addr);
+        //dag_to_url(req,256,&addr);
+		Graph g(&addr);
+		g.fill_sockaddr(&addr);
+		strcpy(req, g.http_url_string().c_str());
+		
         fetchTime = end_time - start_time;
         //------------//logFile << i <<" Chunk. Running time is: " << end_time - start_time << " ms. req: " << req << endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
