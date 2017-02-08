@@ -38,7 +38,7 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
-doc: Xdoc.h $(SOURCES)
+doc: mainpage.dox $(SOURCES)
 	doxygen XsocketsAPI.cfg
 	make -C python doc
 

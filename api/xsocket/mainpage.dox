@@ -1,9 +1,5 @@
-/*!
-  @file Xdoc.h
-  @brief dummy file to contain main API documentation
-*/
-/*!
-  @mainpage
+/**
+@mainpage
 
 <h1>XSocket API</h1>
 
@@ -85,5 +81,5 @@ transport layer. Using this socket with normal unix socket calls will cause
 unexpected behaviors.
 Attempting to pass a socket created with the the normal socket function
 to the Xsocket API will have similar results.
-*/
 
+*/
