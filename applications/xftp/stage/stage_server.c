@@ -48,7 +48,10 @@ void stageControl(int sock, char *cmd)
 
     for (auto CID : CIDs) {
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
-        url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
+        //url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
+		Graph g((char*)CID.c_str());
+		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
+		
         SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
         SIDToProfile[remoteSID][CID].fetchFinishTimestamp = 0;
     }
