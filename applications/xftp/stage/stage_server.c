@@ -74,7 +74,7 @@ void stageControl(int sock, char *cmd)
         }*/
 		int retry=5;
 		while(retry--){
-			if ((ret = XfetchChunk(&xcache, &buf, CHUNKSIZE, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
+			if ((ret = XfetchChunk(&xcache, &buf, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
 				//die(-1, "XfetchChunk Failed\n");
 				say("unable to request chunks, retrying");
 			}
