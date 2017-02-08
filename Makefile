@@ -7,12 +7,12 @@ endif
 MAKEDIRS=api click daemons applications arada tools
 
 # make sure we run clean in anything we built in
-CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
+CLEANDIRS=$(addsuffix .build, $(MAKEDIRS) doc)
 
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-.PHONY: all config clean test fresh $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
+.PHONY: all config clean test fresh doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
 
 #### BUILD RULES
@@ -73,6 +73,10 @@ trickclean:
 
 $(CLEANDIRS):
 	-make -C $(basename $@) clean
+
+# documents
+doc:
+	-make -C doc
 
 #### print out the value of a variable such as CFLAGS
 dump-% :
