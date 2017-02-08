@@ -92,9 +92,17 @@ void stageControl(int sock, char *cmd)
         SIDToProfile[remoteSID][CID].fetchState = READY;
         //add the lock and unlock action    --Lwy   1.16
         char reply[XIA_MAX_BUF] = "";
-        dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
-	char oldUrl[256];
-	dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
+		//dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
+		Graph g(&addrs[i]);
+		g.fill_sockaddr(&addrs[i]);
+		strcpy(url, g.http_url_string().c_str());
+		
+		char oldUrl[256];
+		//dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
+		Graph oldg(&addrs[i]);
+		oldg.fill_sockaddr(&addrs[i]);
+		strcpy(oldurl, oldg.http_url_string().c_str());
+		
         memset(reply, 0 ,sizeof(reply));
         sprintf(reply, "ready %s %s %ld", oldUrl, url,
                 SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
