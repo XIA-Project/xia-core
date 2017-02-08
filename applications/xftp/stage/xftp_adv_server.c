@@ -55,7 +55,11 @@ say("Receive cmd: %s\n", cmd);
 					sprintf(reply, "cont");
 					char url[256];
 					for (i = offset; i < offset + num; i++) {
-						dag_to_url(url, 256, &info[i]);
+						//dag_to_url(url, 256, &info[i]);
+						Graph g(&info[i]);
+						g.fill_sockaddr(&info[i]);
+						strcpy(url, g.http_url_string().c_str());
+						
 						strcat(reply, " ");
 						strcat(reply, url);
 					}
