@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "Xsocket.h"
-#include "dagaddr.h"
+//#include "dagaddr.h"
 #include "dagaddr.hpp"
 #include <assert.h>
 #include <sys/socket.h>
