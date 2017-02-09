@@ -182,7 +182,7 @@ int retrieveChunk(FILE *fd, char *url)
 
         gettimeofday(&t1, NULL);
 		while((ret = XfetchChunk(&h, &buf, XCF_BLOCK | global_flags, &addr, sizeof(addr))) < 0){
-			warn(-1, "XfetchChunk Failed! Retrying!!!\n");
+			warn("XfetchChunk Failed! Retrying!!!\n");
 		}
 		gettimeofday(&t2, NULL);
 
