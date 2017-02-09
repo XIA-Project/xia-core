@@ -44,7 +44,6 @@ class NetjoinBeacon(object):
         # TODO: Create graph and walk like the policy module does
         for node in self.net_descriptor.auth_cap.nodes:
             if node.HasField('xip'):
-                logging.info("Found xip node")
                 self.xip_netid = node.xip.NetworkId
                 break
         assert(self.xip_netid != None)
