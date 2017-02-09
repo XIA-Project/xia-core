@@ -16,7 +16,7 @@ from netjoin_message_pb2 import NetjoinMessage
 class NetjoinReceiver(threading.Thread):
 
     def __init__(self, hostname, policy, announcer, shutdown,
-            xnetjd_addr=("127.0.0.1", 9228)):
+            xnetjd_addr=("127.0.0.1", 9228), is_router=False):
         threading.Thread.__init__(self)
         self.BUFSIZE = 1024
         self.sockfd = None
@@ -24,6 +24,7 @@ class NetjoinReceiver(threading.Thread):
         self.hostname = hostname
         self.policy = policy
         self.announcer = announcer    # None, unless running as access point
+        self.is_router = is_router
         self.client_sessions = {}
         self.server_sessions = {}
         self.existing_sessions = {}
@@ -54,6 +55,7 @@ class NetjoinReceiver(threading.Thread):
         # Initiate a NetjoinSession thread to join the network
         session = NetjoinSession(self.hostname, self.shutdown,
                 receiver=self,
+                is_router=self.is_router,
                 beacon_id=beacon.get_ID(), policy=self.policy)
         session.daemon = True
         session.start()

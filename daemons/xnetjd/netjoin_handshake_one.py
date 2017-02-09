@@ -15,12 +15,13 @@ from netjoin_message_pb2 import SignedMessage
 # Build a HandshakeOne protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeOne(object):
 
-    def __init__(self, session, mymac, challenge=None):
+    def __init__(self, session, mymac, is_router=False, challenge=None):
         self.handshake_one = jacp_pb2.HandshakeOne()
         self.payload = jacp_pb2.HandshakeOne.HandshakeOneEncrypted.Payload()
         self.session = session
         self.conf = NetjoinXIAConf()
         self.challenge = challenge
+        self.is_router = is_router
 
         # No challenge, means AP got this handshake
         # It will use from_wire_handshake_one() to fill in everything
@@ -42,7 +43,10 @@ class NetjoinHandshakeOne(object):
         #core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         #core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
-        core.client_credentials.null.SetInParent()
+        if (self.is_router):
+            core.router_credentials.null.SetInParent
+        else:
+            core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
 
     def hex_client_hid(self):

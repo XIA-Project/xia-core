@@ -101,11 +101,15 @@ def main():
                 shutdown_event)
         announcer.announce()
 
-    if args.client or args.router:
+    if args.client:
         logging.debug("Listening for network announcements")
 
+    if args.router:
+        logging.debug("Waiting to hear from other routers or controller")
+
     # Start a new thread to listen for messages
-    receiver = NetjoinReceiver(args.hostname, policy, announcer, shutdown_event)
+    receiver = NetjoinReceiver(args.hostname, policy, announcer,
+            shutdown_event, is_router=args.router)
     receiver.daemon = True
     receiver.start()
     threads.append(receiver)

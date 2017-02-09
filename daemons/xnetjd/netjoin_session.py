@@ -36,6 +36,7 @@ class NetjoinSession(threading.Thread):
     # policy is set only on client side
     def __init__(self, hostname, shutdown_event,
             receiver=None,
+            is_router=False,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
 
@@ -49,6 +50,7 @@ class NetjoinSession(threading.Thread):
         self.auth = auth
         self.beacon_id = beacon_id
         self.policy = policy
+        self.is_router = is_router
         self.l2_handler = None    # Created on receiving beacon or handshake1
         self.last_message_tuple = None # (message, outgoing_interface, theirmac)
         self.last_message_remaining_iterations = None
@@ -163,7 +165,8 @@ class NetjoinSession(threading.Thread):
         gw_nonce = join_auth_info.gateway_nonce
 
         # Build handshake one
-        netjoin_h1 = NetjoinHandshakeOne(self, mymac, challenge=gw_nonce)
+        netjoin_h1 = NetjoinHandshakeOne(self, mymac,
+                is_router=self.is_router, challenge=gw_nonce)
 
         # Send handshake one
         self.send_netjoin_message(netjoin_h1, interface, theirmac)

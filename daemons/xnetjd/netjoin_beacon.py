@@ -15,7 +15,7 @@ from netjoin_authsession import NetjoinAuthsession
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
 class NetjoinBeacon(object):
-    def __init__(self, xip_netid):
+    def __init__(self, xip_netid=None):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
         self.xip_netid = xip_netid
@@ -39,6 +39,15 @@ class NetjoinBeacon(object):
         # NOTE: we don't have xip_netid received beacon
         self.guid = self.net_descriptor.GUID
         self.raw_verify_key = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key
+
+        # Walk the nodes to the end to find XIP network
+        # TODO: Create graph and walk like the policy module does
+        for node in self.net_descriptor.auth_cap.nodes:
+            if node.HasField('xip'):
+                logging.info("Found xip node")
+                self.xip_netid = node.xip.NetworkId
+                break
+        assert(self.xip_netid != None)
 
     def from_net_descriptor(self, net_descriptor):
         self.net_descriptor.CopyFrom(net_descriptor)
