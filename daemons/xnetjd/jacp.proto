@@ -427,6 +427,8 @@ message IPv4Request {
 
 message NullClientCredential {
 }
+message NullRouterCredential {
+}
 
 // Some\ dummy\ /\ placeholder\ stubs:1 ends here
 
