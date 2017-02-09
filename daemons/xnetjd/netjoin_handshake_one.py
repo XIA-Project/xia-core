@@ -158,7 +158,14 @@ class NetjoinHandshakeOne(object):
         if not self.is_l3_valid():
             logging.error("L3 creds invalid")
             return False
-        # Handle client credentials
+        # Handle client/router credentials
+        if (self.payload.core.HasField('client_credentials')):
+            logging.info("Join request from a client")
+        elif (self.payload.core.HasField('router_credentials')):
+            logging.info("Join request from a router")
+        else:
+            logging.warning("No credentials in join request")
+            return False
         return True
 
 if __name__ == "__main__":
