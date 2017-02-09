@@ -102,8 +102,8 @@ void stageControl(int sock, char *cmd)
 		
 		char oldUrl[256];
 		//dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
-		Graph oldg(&addrs[i]);
-		oldg.fill_sockaddr(&addrs[i]);
+		Graph oldg(&SIDToProfile[remoteSID][CID].oldDag);
+		oldg.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
 		strcpy(oldUrl, oldg.http_url_string().c_str());
 		
         memset(reply, 0 ,sizeof(reply));
