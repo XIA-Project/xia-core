@@ -44,7 +44,7 @@ class NetjoinHandshakeOne(object):
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         #core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
         if (self.is_router):
-            core.router_credentials.null.SetInParent
+            core.router_credentials.null.SetInParent()
         else:
             core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
