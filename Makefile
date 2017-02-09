@@ -76,7 +76,8 @@ $(CLEANDIRS):
 
 # documents
 doc:
-	-make -C doc
+	-make -C doc doc
+	-make -C bin doc
 
 #### print out the value of a variable such as CFLAGS
 dump-% :

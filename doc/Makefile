@@ -4,7 +4,7 @@
 MANDIRS="xsocket xcache"
 HTMLDIRS="xsocket xcache include"
 
-all: html man
+doc: html man
 
 html:
 	cd ../api && DOHTML=YES DIRS=$(HTMLDIRS) doxygen ../doc/api.cfg

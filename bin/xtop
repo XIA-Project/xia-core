@@ -3,10 +3,19 @@
 # run top with xia related processes only
 #
 
-if [ "$1" == "-h" ]; then
-	echo "run top showing only the xia related processes"
-	echo "usage: xtop [name] [name] ..."
-	echo   "where name is/are the name(s) of any addition processes to monitor"
+[ "$1" == "-v" ] || [ "$1" == "--version" ] && echo "xtop 1.0" && exit 0
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+xtop [name] [name] ...
+
+run top showing only the XIA related processes
+
+options:
+  name          additional processes to monitor
+  -h, --help    display this help
+  -v, --version display the version number
+EOH
 	exit 0
 fi
 
