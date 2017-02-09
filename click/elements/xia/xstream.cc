@@ -254,7 +254,7 @@ XStream::tcp_input(WritablePacket *p)
 
 					return;
 				}
-			} else if (0 && ti.ti_ack == tp->snd_una &&
+			} else if (ti.ti_ack == tp->snd_una &&
 				(_q_recv.is_empty() || _q_recv.is_ordered()) &&
 				(so_recv_buffer_size > _q_recv.bytes_ok() + ti.ti_len)) {
 				/* this is a pure, in-sequence data packet
@@ -1584,8 +1584,8 @@ XStream::slowtimo() {
 }
 
 static int tcp_backoff[TCP_MAXRXTSHIFT] = {1, 1, 2, 4, 8, 16, 32, 64, 128, \
-  256, 512, 1024};/*, 1024, 1024, 1024, 2048, 2048, 2048, 2048, 2048, 2048, 2048, \
-  4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096};*/
+  256, 512, 1024, 1024, 1024, 1024, 2048, 2048, 2048, 2048, 2048, 2048, 2048, \
+  4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096};
 
 void
 XStream::tcp_timers (int timer) {
