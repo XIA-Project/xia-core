@@ -96,15 +96,15 @@ void stageControl(int sock, char *cmd)
         //add the lock and unlock action    --Lwy   1.16
         char reply[XIA_MAX_BUF] = "";
 		//dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
-		Graph g(&addrs[i]);
-		g.fill_sockaddr(&addrs[i]);
+		Graph g(&SIDToProfile[remoteSID][CID].newDag);
+		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].newDag);
 		strcpy(url, g.http_url_string().c_str());
 		
 		char oldUrl[256];
 		//dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
 		Graph oldg(&addrs[i]);
 		oldg.fill_sockaddr(&addrs[i]);
-		strcpy(oldurl, oldg.http_url_string().c_str());
+		strcpy(oldUrl, oldg.http_url_string().c_str());
 		
         memset(reply, 0 ,sizeof(reply));
         sprintf(reply, "ready %s %s %ld", oldUrl, url,
