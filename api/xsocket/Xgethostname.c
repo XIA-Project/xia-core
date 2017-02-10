@@ -18,35 +18,28 @@
  @file Xgethostname.c
  @brief Xgethostname() - get XIA host name
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <netdb.h>
 #include "minIni.h"
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
+/*! \endcond */
 
 /*!
 ** @brief get the XIA host name
 **
-** Performs  one  of the operations described below on the open file descriptor sockfd.
-** The operation is determined by cmd.
+* * Returns teh XIA host name in a null-terminated string.
 **
-** Returns the null-terminated hostname in the character array name, which has a length of
-** len bytes. If the null-terminated hostname is too large to fit, then the name is truncated,
-**  and no error is returned.
-**
-** File status flags
-**	F_GETFL (void)
-**		Get the file access mode and the file status flags; arg is ignored.
-**
-**	F_SETFL (int)
-**		Currently only O_NONBLOCK is allowed
-**
-** @param name the destination for the host name
+** @param name the destination for the host name. On exit name
+** contains a null terminated string. It will be truncated if
+** there is not enough room.
 ** @param len the length of name
 **
 ** @returns  0 on success

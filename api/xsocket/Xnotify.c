@@ -20,23 +20,25 @@
 */
 
 #include "Xsocket.h"
+/*! \cond */
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+/*! \endcond */
 
 /*!
 ** @brief Block waiting for notification that the network interface has changed state.
 **
-** WARNING: THIS IS A STOPGAP API THAT WILL BE REPLACED ONCE WE DETERMIN WHAT
-** THE LONGERM NOTIFICATION MECHANISM LOOKS LIKE. BE PREPARED FOR THIS CALL
-** TO BE DEPRECATED OR MODIFIED
-**
-** Blocks and waits for for click to return a status when the XHCP client daemon
+** Blocks and waits for for click to return a status when the joining daemon
 ** changes the AD or other network parameters. Multiple applications or threads
 ** may call this API, and all will be nofitied when a change occurs.
 **
-** Do not call Xfork while blocking on this function. Only one of the processes will
+** DO NOT call Xfork while blocking on this function. Only one of the processes will
 ** properly recieve the notification.
+**
+** WARNING, THIS IS A STOPGAP API THAT WILL BE REPLACED ONCE WE DETERMIN WHAT
+** THE LONGERM NOTIFICATION MECHANISM LOOKS LIKE. BE PREPARED FOR THIS CALL
+** TO BE DEPRECATED OR MODIFIED
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set

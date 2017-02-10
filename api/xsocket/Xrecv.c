@@ -18,11 +18,13 @@
 ** @brief Xrecv(), Xrecvfrom() - receive a message from a socket
 */
 
-#include <errno.h>
 #include "Xsocket.h"
+/*! \cond */
+#include <errno.h>
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
+/*! \endcond */
 
 /*!
 ** @brief Receive data from an Xsocket

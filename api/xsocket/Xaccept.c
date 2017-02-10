@@ -19,13 +19,15 @@
 ** @brief Xaccept(), Xaccept4() - accept/reject jobs sent to a destination
 */
 
-#include <errno.h>
 #include "Xsocket.h"
+/*! \cond */
+#include <errno.h>
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
 #include <iostream>
 #include <stdio.h>
+/*! \endcond */
 
 static unsigned hop_count = -1;
 
@@ -138,16 +140,16 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 }
 
 /*!
-** @brief Accept a conection from a remote Xsocket
+** @brief accept a connection on an Xsocket
 **
 ** The Xaccept system call is is only valid with Xsockets created with
-** the XSOCK_STREAM transport type. It accepts the first available connection
+** the SOCK_STREAM transport type. It accepts the first available connection
 ** request for the listening socket, sockfd, creates a new connected socket,
 ** and returns a new Xsocket descriptor referring to that socket. The newly
 ** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
-** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
+** @param sockfd an Xsocket previously created with the SOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
 ** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
@@ -170,23 +172,25 @@ int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrle
 }
 
 /*!
-** @brief Accept a conection from a remote Xsocket
+** @brief accept a connection on an Xsocket
 **
 ** The Xaccept4 system call is is only valid with Xsockets created with
-** the XSOCK_STREAM transport type. It accepts the first available connection
+** the SOCK_STREAM transport type. It accepts the first available connection
 ** request for the listening socket, sockfd, creates a new connected socket,
 ** and returns a new Xsocket descriptor referring to that socket. The newly
 ** created socket is not in the listening state. The original socket
 ** sockfd is unaffected by this call.
 **
-** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
+** @param sockfd	an Xsocket previously created with the SOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
 ** @param addr if non-NULL, points to a block of memory that will contain the
 ** address of the peer on return
 ** @param addrlen on entry, contains the size of addr, on exit contains the actual
 ** size of the address. addr will be truncated, if the size passed in is smaller than
 ** the actual size.
-** @param flags retained for compatability, Xaccept4 will return an error if non-zero
+** @param flags if SOCK_NONBLOCK is set, the new socket will be non-blocking. An error
+** will be returned if any other bits in the flags are set.
+**
 **
 ** @returns a non-negative integer that is the new Xsocket id
 ** @returns -1 on error with errno set to an error compatible with those

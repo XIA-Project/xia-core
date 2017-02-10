@@ -18,12 +18,13 @@
  @file XgetDAGbyName.c
  @brief XgetDAGbyName(), XgetNamebyDAG(), XregisterName(), Xgetpeername(),
   Xgetsockname(), xia_ntop(), xia_pton() - network address management
-
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <unistd.h>
 #include <syslog.h>
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "xns.h"
@@ -32,17 +33,23 @@
 #define ETC_HOSTS "/etc/hosts.xia"
 #define MAX_SEND_RETRIES 5
 
+#define MAX_RV_DAG_SIZE 1024
+#define MAX_XID_STR_SIZE 64
+/*! \endcond */
+
 
 
 /*!
-** @brief convert a DAG from binary  to text form
+** @brief convert a DAG from binary to text form
 **
-** This  function  converts  the network address structure src in the
+** This  function  converts the network address structure src in the
 ** AF_XIA address family into a character string. The resulting string
 ** is copied to the buffer pointed to by dst, which must be a non-null
 ** pointer. The caller specifies the number of bytes available in this
 ** buffer in the argument size.
-
+**
+** The returned text is formatted in the DAG text string format.
+**
 ** @param af family (must be AF_XIA)
 ** @param src DAG to convert
 ** @param dst buffer to hold the converted address
@@ -58,6 +65,11 @@ const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size)
 		return NULL;
 	}
 
+	if (src == NULL || dst == NULL) {
+		errno = EFAULT;
+		return NULL;
+	}
+
 	Graph g(src);
 
 	if (g.dag_string().size() >= size) {
@@ -70,18 +82,15 @@ const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size)
 }
 
 /*!
-** @brief convert a DAG from binary  to text form
+** @brief convert a DAG from binary to text form
 **
-** This  function  converts  the network address structure src in the
-** AF_XIA address family into a character string. The resulting string
-** is copied to the buffer pointed to by dst, which must be a non-null
-** pointer. The caller specifies the number of bytes available in this
-** buffer in the argument size.
-
+** This function converts the character string src into an
+** XIA network address structure, then copies the network
+** address structure to dst.
+**
 ** @param af family (must be AF_XIA)
 ** @param src text representation of the DAG to convert. Can be, DAG, RE, or HTTP formatted
 ** @param dst destination
-** @param size length of dst
 **
 ** @returns 1 on success (network address was successfully converted)
 ** @returns 0 if src does not contain a character string representing a valid network address
@@ -91,6 +100,11 @@ int xia_pton(int af, const char *src, sockaddr_x *dst)
 {
 	if (af != AF_XIA) {
 		errno = EAFNOSUPPORT;
+		return -1;
+	}
+
+	if (dst == NULL) {
+		errno = EFAULT;
 		return -1;
 	}
 
@@ -226,7 +240,24 @@ static char *hostsLookup(const char *name) {
 	return NULL;
 }
 
-// User passes a buffer and we fill it in
+/*!
+** @brief reverse lookup, find a name based on the specified network address
+**
+** Performs a reverse name lookup to find the name associated with addr.
+**
+** The local hosts.xia file is checked first and if name is not found,
+** a query is sent to the nameserver.
+**
+** @param name pointer to menory that will contain the returned name
+** @param namlen the size of name
+** @param addr the network address to lookup
+** @param addrlen pointer to the length of addr
+**
+** @returns 0 with name filled in with a null terminted string. If name
+** is not long enough, the returned name will be truncated.
+** @returns -1 on failure with errno set appropraitely
+**
+*/
 int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen)
 {
 	int sock;
@@ -358,20 +389,23 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 
 
 /*!
-** @brief Lookup a DAG based using a host or service name.
+** @brief lookup a DAG using a host or service name
 **
-** The name should be a string such as www_s.example.xia or host.example.xia.
-** By convention services are indicated by '_s' appended to the service name.
-** The memory returned is dynamically allocated and should be released with a
-** call to free() when the caller is done with it.
+** Lookup the DAG associated with name.
 **
-** This is a very simple implementation of the name query function.
-** It will be replaces in a future release.
+** The local hosts.xia file is checked first and if addr is not found,
+** a query is sent to the nameserver.
 **
-** @param name The name of an XIA service or host.
+** @note Xgetaddrinfo should be used rather than this function as it is
+** very primative.
 **
-** @returns a character point to the dag on success
-** @returns NULL on failure
+** @param name a test string representing the name of an XIA service or host
+** @param addr a sockaddr_x to received the address
+** @param addrlen pointer to the length of addr on call, contains actual
+** length on return
+**
+** @returns 0 with addr filled in and addrlen specifying the length of addr
+** @returns NULL on failure with errno set appropriately
 **
 */
 int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
@@ -579,8 +613,7 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 	return 0;
 }
 
-#define MAX_RV_DAG_SIZE 1024
-#define MAX_XID_STR_SIZE 64
+
 int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG)
 {
 	// Find the rendezvous service control address
@@ -718,19 +751,15 @@ static int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 }
 
 /*!
-** @brief Register a service or hostname with the name server.
+** @brief register a service or hostname with the name server
 **
 ** Register a host or service name with the XIA nameserver.
-** By convention services are indicated by '_s' appended to the service name.
-** The memory returned is dynamically allocated and should be released with a
-** call to free() when the caller is done with it.
 **
-** This is a very simple implementation and will be replaced in a
-** future release. This version does not check correctness of the name or dag,
-** nor does it check to ensure that the client is allowed to bind to name.
+** @note this function does not currently check to ensure
+** that the client is allowed to bind to name.
 **
-** @param name - The name of an XIA service or host.
-** @param DAG  - the DAG to be bound to name.
+** @param name the name of an XIA service or host
+** @param DAG  the DAG to be bound to name
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
@@ -739,6 +768,7 @@ static int _xregister(const char *name, sockaddr_x *DAG, short flags) {
 int XregisterName(const char *name, sockaddr_x *DAG) {
 	return _xregister(name, DAG, 0);
 }
+
 
 int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 	int sock;
@@ -835,10 +865,16 @@ int XregisterHost(const char *name, sockaddr_x *DAG) {
 }
 
 /*!
-** @brief Get the full DAG of the remote socket.
+** @brief get name of connected peer socket
 **
-** @param sockfd An Xsocket of type SOCK_STREAM
-** @param dag A sockaddr to hold the returned DAG.
+** This function returns the address of the peer connected to
+** the Xsocket sockfd, in the buffer pointed to by addr.
+**
+** @note See the man page for the standard getpeername() call
+** for more details.
+**
+** @param sockfd a connected Xsocket
+** @param dag A sockaddr to hold the returned DAG
 ** @param len On input contans the size of the sockaddr
 **  on output contains sizeof(sockaddr_x).
 **
@@ -866,7 +902,7 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 	int stype = getSocketType(sockfd);
 	if (stype != SOCK_STREAM && stype != SOCK_DGRAM) {
-		LOG("Xgetpeername is only valid with stream sockets.");
+		LOG("Xgetpeername is only valid with stream and datagram sockets.");
 		errno = EOPNOTSUPP;
 		return -1;
 	}
@@ -911,18 +947,23 @@ int Xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 /*!
-** @brief Get the full DAG of the local socket.
+** @brief get socket name
 **
-** @param sockfd An Xsocket of type SOCK_STREAM
-** @param dag A sockaddr to hold the returned DAG.
-** @param len On input contans the size of the sockaddr,
+** Returns the current address to which the socket sockfd
+** is bound, in the buffer pointed to by addr.
+**
+** @note See the man page for the standard getsockname() call
+** for more details.
+**
+** @param sockfd An Xsocket
+** @param dag A sockaddr_x to hold the returned DAG.
+** @param len On input contans the size of the addr,
 **  on output contains sizeof(sockaddr_x).
 **
 ** @returns 0 on success
 ** @returns -1 on failure with errno set
 ** @returns errno = EFAULT if dag is NULL
-** @returns errno = EOPNOTSUPP if sockfd is not of type XSSOCK_STREAM
-** @returns errno = ENOTCONN if sockfd is not in a connected state
+** @returns errno = EOPNOTSUPP if sockfd is not an Xsocket
 **
 */
 int Xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)

@@ -18,12 +18,14 @@
  @file Xgetaddrinfo.c
  @brief Xgetaddrinfo(), Xfreeaddrinfo(), Xgai_strerror() - network address and service translation
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <netdb.h>
 #include <string.h>
 #include <strings.h>
 #include "minIni.h"
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
@@ -35,8 +37,6 @@
 ** philisophical questions:
 ** - is there an equivilent loopback address in XIA?
 ** - are there well know SIDs in XIA that should be findable in a getservbyname function?
-** - are there multiple interfaces allowed in XIA?
-** - are multiple AD/HIDs allowed on either the same interface, or different interfaces?
 */
 
 //#define DAG_PLUS4ID   "RE ( %s ) %s %s"
@@ -45,10 +45,13 @@
 //#define DAG_F 		  "RE ( %s %s )"
 #define XID_LEN		  64
 
+#define CONFIG_PATH_BUF_SIZE 1024
+#define RESOLV_CONF "/etc/resolv.conf"
+/*! \endcond */
+
 
 // XIA specific addrinfo error strings
 static const char *xerr_unimplemented = "This feature is not currently supported";
-
 
 
  const char *Xgai_strerror(int code)
@@ -67,8 +70,7 @@ static const char *xerr_unimplemented = "This feature is not currently supported
 	return msg;
  }
 
-#define CONFIG_PATH_BUF_SIZE 1024
-#define RESOLV_CONF "/etc/resolv.conf"
+
 
 // Read DAG for rendezvous server data plane from resolv.conf
 int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)

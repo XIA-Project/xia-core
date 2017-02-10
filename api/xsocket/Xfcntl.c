@@ -19,22 +19,28 @@
 ** @brief Xfcntl() - manipulate a socket
 */
 
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
+/*! \endcond */
+
+
 /*!
-** @brief manipulate Xsocket
+** @brief manipulate an Xsocket
 **
-** Performs  one  of the operations described below on the open file descriptor sockfd.
-** The operation is determined by cmd.
+** Xfcntl() performs a subset of the fcntl() system call supporting the
+** operations described below on the open Xsocket sockfd. The operation
+** is determined by cmd.
 **
-** Xfcntl() can take an optional third argument.  Whether or not this argument is required is
-** determined by cmd.  The required argument type is indicated in parentheses after each cmd
-** name (in most cases, the required type is int, and we identify  the  argument  using  the
-** name arg), or void is specified if the argument is not required.
+** Xfcntl() can take an optional third argument.  Whether or not this
+** argument is required is determined by cmd.  The required argument
+** type is indicated in parentheses after each cmd name (in most
+** cases, the required type is int, and we identify  the  argument  using
+**  the name arg), or void is specified if the argument is not required.
 **
 ** File status flags
 **	F_GETFL (void)
@@ -43,9 +49,12 @@
 **	F_SETFL (int)
 **		Currently only O_NONBLOCK is allowed
 **
+** @note See the man page for the standard fcntl() call for more details.
+**
 ** @param sockfd a file descriptor create by Xsocket()
 ** @param cmd the command to execute
 ** @param arg the flag to set if cmd == F_GETFL, otherwise omitted
+**
 ** @returns  socket flags if cmd == F_GETFL
 ** @returns 0 on success if cmd == F_SETFL
 ** @returns -1 on error with errno set to an error compatible with those
