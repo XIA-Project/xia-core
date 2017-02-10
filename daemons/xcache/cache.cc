@@ -181,7 +181,12 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	if (!(meta = ctrl->acquire_meta(cid))) {
 		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
-		ctrl->add_meta(start_new_meta(tcp, cid, sid));
+
+		xcache_meta *new_meta = start_new_meta(tcp, cid, sid);
+
+		if (new_meta != NULL) {
+			ctrl->add_meta(new_meta);
+		}
 
 		// it's a syn-ack so there's no data to handle yet
 		return;
