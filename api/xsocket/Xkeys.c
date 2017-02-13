@@ -61,12 +61,14 @@ static int write_key_files(const char *keydir, char *pubkeyhashstr, RSA *r)
 
 	privfilepath = (char *)calloc(filepathlen, 1);
 	if(privfilepath == NULL) {
+		LOG("ERROR: Allocating memory for private file name");
 		goto cleanup_write_key_files;
 	}
 	state = 1;
 
 	pubfilepath = (char *)calloc(filepathlen + strlen(".pub"), 1);
 	if(pubfilepath == NULL) {
+		LOG("ERROR: Allocating memory for public file name");
 		goto cleanup_write_key_files;
 	}
 	state = 2;
@@ -75,23 +77,29 @@ static int write_key_files(const char *keydir, char *pubkeyhashstr, RSA *r)
 	sprintf(pubfilepath, "%s.pub", privfilepath);
 	pubfilebio = BIO_new_file(pubfilepath, "w+");
 	if(pubfilebio == NULL) {
+		LOGF("ERROR: creating %s in %s", pubfilepath, keydir);
 		goto cleanup_write_key_files;
 	}
 	state = 3;
 
 	if(PEM_write_bio_RSA_PUBKEY(pubfilebio, r) != 1) {
+		LOGF("ERROR: writing %s in %s", pubfilepath, keydir);
 		goto cleanup_write_key_files;
 	}
 	privfilebio = BIO_new_file(privfilepath, "w+");
 	if(privfilebio == NULL) {
+		LOGF("ERROR: creating %s in %s", privfilepath, keydir);
 		goto cleanup_write_key_files;
 	}
 	state = 4;
 
 	if(PEM_write_bio_RSAPrivateKey(privfilebio, r, NULL, NULL, 0, NULL, NULL) != 1) {
+		LOGF("ERROR: writing to %s in %s", privfilepath, keydir);
 		goto cleanup_write_key_files;
 	}
+
 	retval = 0;
+
 cleanup_write_key_files:
 	switch(state) {
 		case 4: BIO_free_all(privfilebio);
@@ -139,9 +147,11 @@ static const char *get_keydir()
 	if(keydir == NULL) {
 		keydir = (const char *)calloc(MAX_KEYDIR_PATH_LEN, 1);
 		if(keydir == NULL) {
+			LOG("ERROR: Allocating memory to store key dir name");
 			return NULL;
 		}
 		if(XrootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
+			LOG("ERROR: Unable to get XIA root directory name");
 			return NULL;
 		}
 		strcat((char *)keydir, "/");
@@ -228,63 +238,89 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 	unsigned char pubkeyhash[SHA_DIGEST_LENGTH];
     unsigned long e = RSA_F4;
 
+	// Get location of key directory
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
 		LOG("generate_keypair: ERROR: Key directory not found");
 		goto cleanup_generate_keypair;
 	}
 
-	// Check that the directory provided by user is valid
+	// Check that the key directory exists
 	if(!dir_exists(keydir)) {
 		LOG("generate_keypair: ERROR: No key directory");
+		goto cleanup_generate_keypair;
+	}
+
+	// Check if we can write to the key directory
+	if(access(keydir, W_OK)) {
+		LOGF("generate_keypair: ERROR: Cannot write to %s", keydir);
+		LOGF("generate_keypair: Check permissions - chmod 777 %s", keydir);
 		goto cleanup_generate_keypair;
 	}
 
     // Create BIGNUM argument for key generation
     bne = BN_new();
 	if(bne == NULL) {
+		LOG("generate_keypair: ERROR creating BIGNUM object");
 		goto cleanup_generate_keypair;
 	}
 	state = 1;
 
     if(BN_set_word(bne, e) != 1) {
+		LOG("generate_keypair: ERROR setting BIGNUM to RSA_F4");
         goto cleanup_generate_keypair;
     }
 
 	// Create a new RSA key pair
     r = RSA_new();
     if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
+		LOG("generate_keypair: ERROR: RSA_generate_key_ex");
         goto cleanup_generate_keypair;
     }
 	state = 2;
 
-    // Derive filename from hash of public key and write keys to filesystem
+	// Convert public key into a string
+
 	pubkeybuf = BIO_new(BIO_s_mem());
 	if(pubkeybuf == NULL) {
+		LOG("generate_keypair: ERROR: Creating buffer for public key");
 		goto cleanup_generate_keypair;
 	}
 	state = 3;
 
 	if(PEM_write_bio_RSA_PUBKEY(pubkeybuf, r) != 1) {
+		LOG("generate_keypair: ERROR: Writing public key to buffer");
 		goto cleanup_generate_keypair;
 	}
+
 	keylen = BIO_pending(pubkeybuf);
 	pubkeystr = (char *)calloc(keylen+1, 1);
 	if(pubkeystr == NULL) {
+		LOG("generate_keypair: ERROR: allocating memory for pubkey str");
 		goto cleanup_generate_keypair;
 	}
 	state = 4;
 
 	if(BIO_read(pubkeybuf, pubkeystr, keylen) <= 0) {
+		LOG("generate_keypair: ERROR: writing pubkey from buffer to str");
 		goto cleanup_generate_keypair;
 	}
+
+	// Get SHA1 hash of pubkey string - XID for this key pair
+
 	if(sha1_hash_of_pubkey(pubkeyhash, SHA_DIGEST_LENGTH, pubkeystr, keylen+1)) {
+		LOG("generate_keypair: ERROR: getting sha1 hash of pubkey");
 		goto cleanup_generate_keypair;
 	}
+
 	sha1_hash_to_hex_string(pubkeyhash, SHA_DIGEST_LENGTH, pubkeyhashstr, hashstrlen);
+
+	// Store keys in filename based on XID created above
 	if(write_key_files(keydir, pubkeyhashstr, r)) {
+		LOGF("generate_keypair: ERROR writing %s to %s", pubkeyhashstr, keydir);
 		goto cleanup_generate_keypair;
 	}
+
 	// Successfully written files
 	retval = 0;
 
@@ -401,13 +437,13 @@ int exists_keypair(const char *pubkeyhashstr)
 	pubfilepathlen = privfilepathlen + strlen(".pub");
 	privfilepath = (char *)calloc(privfilepathlen, 1);
 	if(privfilepath == NULL) {
-		LOG("Unable to allocate memory to store private-file path");
+		LOG("ERROR: Allocating memory to store private-file path");
 		goto exists_keypair_done;
 	}
 	state = 1;
 	pubfilepath = (char *)calloc(pubfilepathlen, 1);
 	if(pubfilepath == NULL) {
-		LOG("Unable to allocate memory to store public-file path");
+		LOG("ERROR: Allocating memory to store public-file path");
 		goto exists_keypair_done;
 	}
 	state = 2;
