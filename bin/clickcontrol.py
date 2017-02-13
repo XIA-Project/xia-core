@@ -18,6 +18,7 @@ import os
 import re
 import sys
 import socket
+import xiapyutils
 
 # Number of interfaces for each host type
 numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
@@ -224,7 +225,7 @@ class ClickControl:
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":
-    hostname = socket.gethostname()
+    hostname = xiapyutils.getxiaclickhostname()
     hosttype = 'XIAEndHost'
     hid = 'HID:abf1014f0cc6b4d98b6748f23a7a8f22a3f7b199'
     dag = 'RE AD:abf1014f0cc6b4d98b6748f23a7a8f22a0000000' + ' ' + hid
