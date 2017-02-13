@@ -96,6 +96,13 @@ class ClickControl:
     def receive(self):
         return self.sock.recv(1024)
 
+    # Call a read handler in Click
+    def readCommand(self, command):
+        cmd = 'read %s\n' % command
+        self.send(cmd)
+        response = self.receive()
+        return response.split('\r\n')[-1]
+
     # Call a write handler in Click
     def writeCommand(self, command):
         cmd = 'write %s\n' % command
@@ -182,6 +189,21 @@ class ClickControl:
         if not self.addLocalRoute(hostname, ad):
             return False
         return True
+
+    def getParam(self, hostname, param):
+        return self.readCommand(hostname + '/xrc/xtransport.' + param)
+
+    def getDefaultAddr(self, hostname):
+        return self.getParam(hostname, 'address')
+
+    def getNSAddr(self, hostname):
+        return self.getParam(hostname, 'nameserver')
+
+    def getRVAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous')
+
+    def getRVControlAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous_control')
 
     # Assign a Rendezvous DAG to an interface. All interfaces by default.
     def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
