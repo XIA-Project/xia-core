@@ -17,6 +17,11 @@
 
 #include "xstream.hh"
 #include "xtransport.hh"
+#include "xlog.hh"
+
+// FIXME: we shouldn't have 2 different copies of the so_error variable.
+// right now it's in the tcp control block, and the sock class.
+
 
 #define TCPTIMERS
 #define TCPOUTFLAGS
@@ -396,15 +401,19 @@ XStream::tcp_input(WritablePacket *p)
 				tcp_set_state(TCPS_ESTABLISHED); // 3-way handshake complete
 
 				// Notify API that the connection is established
-				XSocketMsg xsm;
-				xsm.set_type(XCONNECT);
-				xsm.set_id(get_id());
-				xsm.set_sequence(0); // TODO: what should this be?
-				xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-				connect_msg->set_ddag(src_path.unparse().c_str());
-				connect_msg->set_status(X_Connect_Msg::XCONNECTED);
+				tp->so_error = so_error = 0;
+				if (isBlocking) {
+					XSocketMsg xsm;
+					xsm.set_type(XCONNECT);
+					xsm.set_id(get_id());
+					xsm.set_sequence(0); // TODO: what should this be?
+					xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+					connect_msg->set_ddag(src_path.unparse().c_str());
+					connect_msg->set_status(X_Connect_Msg::XCONNECTED);
 
-				get_transport()->ReturnResult(port, &xsm);
+					get_transport()->ReturnResult(port, &xsm);
+				}
+
 				if (polling){
 					// tell API we are writble now
 					get_transport()->ProcessPollEvent(get_id(), POLLOUT);
@@ -593,13 +602,13 @@ XStream::tcp_input(WritablePacket *p)
 		//printf("551\n");
 		switch (tp->t_state) {
 		case TCPS_SYN_RECEIVED:
-			tp->so_error = ECONNREFUSED;
+			tp->so_error = so_error = ECONNREFUSED;
 			goto close;
 		case TCPS_ESTABLISHED:
 		case TCPS_FIN_WAIT_1:
 		case TCPS_FIN_WAIT_2:
 		case TCPS_CLOSE_WAIT:
-			tp->so_error = ECONNRESET;
+			tp->so_error = so_error = ECONNRESET;
 		close:
 			tp->t_state = TCPS_CLOSED;
 			get_transport()->_tcpstat.tcps_drops++;
@@ -1809,20 +1818,30 @@ XStream::tcp_xmit_timer(short rtt) {
 void
 XStream::tcp_drop(int err)
 {
-	// Notify API that the connection failed
 	XSocketMsg xsm;
-	xsm.set_type(xia::XCONNECT);
-	xsm.set_sequence(0); // TODO: what should This be?
-	xsm.set_id(get_id());
-	xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
-	connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
-	connect_msg->set_ddag(dst_path.unparse().c_str());
-	get_transport()->ReturnResult(port, &xsm);
+
+	// Notify API that the connection failed
+
+	tp->so_error = so_error = err;
+
+	if (isBlocking) {
+		if (err == ECONNREFUSED) {
+			xsm.set_type(xia::XCONNECT);
+			xsm.set_sequence(0); // TODO: what should This be?
+			xsm.set_id(get_id());
+			xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
+			connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
+			connect_msg->set_ddag(dst_path.unparse().c_str());
+			get_transport()->ReturnResult(port, &xsm);
+		} else {
+			// FIXME: make sure we return errors up the stack when necessary!
+			INFO("we should be telling the transport about this!\n");
+		}
+	}
 
 	if (polling){
 		get_transport()->ProcessPollEvent(get_id(), POLLHUP);
 	}
-	tp->so_error = err;
 	tcp_set_state(TCPS_CLOSED);
 	if (TCPS_HAVERCVDSYN(tp->t_state)){
 		tcp_output();
