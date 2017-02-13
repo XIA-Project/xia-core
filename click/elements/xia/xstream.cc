@@ -681,7 +681,9 @@ XStream::tcp_input(WritablePacket *p)
 			goto dropafterack;
 		}
 
-		if (SEQ_LEQ(ti.ti_ack, tp->snd_una)){
+		// note: not considering fin packets as duplicate acks prevents
+		// a fsm deadlock when both parties close the connection at the same time
+		if (SEQ_LEQ(ti.ti_ack, tp->snd_una) && !(ti.ti_flags & XTH_FIN)){
 			if (ti.ti_len == 0 && tiwin == tp->snd_wnd){
 				get_transport()->_tcpstat.tcps_rcvdupack++;
 				/*
