@@ -76,6 +76,12 @@ class XIAInterfaceTable {
 		bool hasRVDAG(int iface) {
 			return interfaces[iface].has_rv_dag();
 		}
+		String getRVControlDAG(int iface) {
+			return interfaces[iface].rv_control_dag();
+		}
+		bool hasRVControlDAG(int iface) {
+			return interfaces[iface].has_rv_control_dag();
+		}
 		XIAInterface getInterface(int iface) {
 			return interfaces[iface];
 		}
