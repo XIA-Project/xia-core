@@ -498,6 +498,41 @@ String XTRANSPORT::Netstat(Element *e, void *)
 }
 
 
+String XTRANSPORT::default_addr(Element *e, void *)
+{
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	return xt->_local_addr.unparse();
+}
+
+String XTRANSPORT::ns_addr(Element *e, void *)
+{
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	return xt->_nameserver_addr.unparse();
+}
+
+String XTRANSPORT::rv_addr(Element *e, void *)
+{
+	String rv_dag = "";
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	if (xt->_interfaces.hasRVDAG(0)) {
+		rv_dag = xt->_interfaces.getRVDAG(0);
+	}
+	return rv_dag;
+}
+
+String XTRANSPORT::rv_control_addr(Element *e, void *)
+{
+	String rv_control_dag = "";
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	if (xt->_interfaces.hasRVControlDAG(0)) {
+		rv_control_dag = xt->_interfaces.getRVControlDAG(0);
+	}
+	return rv_control_dag;
+}
 
 void XTRANSPORT::add_handlers()
 {
@@ -509,6 +544,10 @@ void XTRANSPORT::add_handlers()
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);
+	add_read_handler("address", default_addr, 0);
+	add_read_handler("nameserver", ns_addr, 0);
+	add_read_handler("rendezvous", rv_addr, 0);
+	add_read_handler("rendezvous_control", rv_control_addr, 0);
 }
 
 

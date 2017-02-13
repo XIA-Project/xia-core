@@ -264,6 +264,10 @@ public:
 	void ChangeState(sock *sk, SocketState state);
 
 	static String Netstat(Element *e, void *thunk);
+	static String default_addr(Element *e, void *thunk);
+	static String ns_addr(Element *e, void *thunk);
+	static String rv_addr(Element *e, void *thunk);
+	static String rv_control_addr(Element *e, void *thunk);
 	static int purge(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 	int IfaceFromSIDPath(XIAPath sidPath);
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
