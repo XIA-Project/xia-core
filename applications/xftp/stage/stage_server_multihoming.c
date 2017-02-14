@@ -157,7 +157,7 @@ void preStage(int sock, char *cmd)
 		
 		SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
         SIDToProfile[remoteSID][CID].fetchFinishTimestamp = 0;
-   
+    }
 
     // send the chunk ready msg one by one
     char url[256];
