@@ -149,12 +149,15 @@ void preStage(int sock, char *cmd)
 
     vector<string> CIDs = strVector(cmd);
 
-    /*for (auto CID : CIDs) {
+    for (auto CID : CIDs) {
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
-        url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
-        SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
+		//url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
+        Graph g((char*)CID.c_str());
+		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
+		
+		SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
         SIDToProfile[remoteSID][CID].fetchFinishTimestamp = 0;
-    }*/
+   
 
     // send the chunk ready msg one by one
     char url[256];
@@ -174,7 +177,6 @@ void preStage(int sock, char *cmd)
         }*/
 		int retry=5;
 		while(retry--){
-			
 			if ((ret = XfetchChunk(&xcache, &buf, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
 				//die(-1, "XfetchChunk Failed\n");
 				say("unable to request chunks, retrying");
