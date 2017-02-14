@@ -12,7 +12,6 @@
 
 #include <fcntl.h>
 #include <cstdint> // uint32_t
-#include <chrono> // rui, only for debugging
 #include <cassert>
 
 #include "xstream.hh"
@@ -123,7 +122,7 @@ XStream::tcp_input(WritablePacket *p)
 		click_chatter("Invalid header\n");
 		return;
 	}
-	//printf("Tcp input with state %d\n", tp->t_state);
+
 	get_transport()->_tcpstat.tcps_rcvtotal++;
 
 	/* we need to copy ti, since we need it later */
@@ -133,10 +132,6 @@ XStream::tcp_input(WritablePacket *p)
 	ti.ti_flags = ntohs(tcph->th_flags);
 	ti.ti_win = ntohl(tcph->th_win);
 	ti.ti_len = (uint16_t)(thdr.plen());
-
-	/* debugging no longer necessary
-	printf("%lu RX sock %u seq %u to %u len(%u) ack=%u rcv_nxt=%u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), this->id, ti.ti_seq, ti.ti_seq+ti.ti_len, ti.ti_len, ti.ti_ack, tp->rcv_nxt, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
-	*/
 
 	/*205 packet should be sane, skip tests */
 	off = ti.ti_off << 2;
@@ -212,8 +207,6 @@ XStream::tcp_input(WritablePacket *p)
 					SEQ_LEQ(ti.ti_ack, tp->snd_max) &&
 					tp->snd_cwnd >= tp->snd_wnd){
 
-					//cout << "this is a pure ack for outstanding data" << endl;
-					//debug_output(VERB_TCP, "[%s] got pure ack: [%u]", SPKRNAME, ti.ti_ack);
 					++(get_transport()->_tcpstat.tcps_predack);
 					if (ts_present){
 						tcp_xmit_timer((get_transport()->tcp_now()) - ts_ecr+1);
@@ -273,7 +266,7 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->_tcpstat.tcps_rcvbyte += ti.ti_len;
 
 				/* Drop TCP/IP hdrs and TCP opts, add data to recv queue. */
-				WritablePacket *copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+				WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 
 				/* _q_recv.push() corresponds to the tcp_reass function whose purpose is
 				 * to put all data into the TCPQueue for both possible reassembly and
@@ -311,7 +304,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = NULL;
 	if (ti.ti_len){
-		copy = WritablePacket::make(2048, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+    copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 	}
 
 	int win = so_recv_buffer_space();
@@ -688,7 +681,9 @@ XStream::tcp_input(WritablePacket *p)
 			goto dropafterack;
 		}
 
-		if (SEQ_LEQ(ti.ti_ack, tp->snd_una)){
+		// note: not considering fin packets as duplicate acks prevents
+		// a fsm deadlock when both parties close the connection at the same time
+		if (SEQ_LEQ(ti.ti_ack, tp->snd_una) && !(ti.ti_flags & XTH_FIN)){
 			if (ti.ti_len == 0 && tiwin == tp->snd_wnd){
 				get_transport()->_tcpstat.tcps_rcvdupack++;
 				/*
@@ -731,8 +726,6 @@ XStream::tcp_input(WritablePacket *p)
 					tp->snd_cwnd = tp->snd_ssthresh; // fast recovery!
 					//debug_output(VERB_TCP, "[%s] now: [%u] cwnd: %u, 3 dups, slowstart", SPKRNAME, get_transport()->tcp_now(), tp->snd_cwnd);
 
-					//printf("%lu sndCwnd -> slow start %u bec dupAck\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_cwnd); // rui
-
 					tcp_output();
 					tp->snd_cwnd = tp->snd_ssthresh + tp->t_maxseg *
 						tp->t_dupacks;
@@ -759,8 +752,6 @@ XStream::tcp_input(WritablePacket *p)
 		if (tp->t_dupacks > TCP_REXMT_THRESH &&
 			tp->snd_cwnd > tp->snd_ssthresh){
 			tp->snd_cwnd = tp->snd_ssthresh;
-
-			//printf("%lu snd_cwnd -> sstresh %u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_cwnd); // rui
 
 			//debug_output(VERB_TCP, "%u: cwnd: %u, reduced to ssthresh", get_transport()->tcp_now(), tp->snd_cwnd );
 		}
@@ -806,8 +797,6 @@ XStream::tcp_input(WritablePacket *p)
 		}
 		tp->snd_cwnd = min(cw + incr, (u_int) TCP_MAXWIN << tp->snd_scale);
 		//debug_output(VERB_TCP, "[%s] now: [%u] cwnd: %u, increase: %u", SPKRNAME, get_transport()->tcp_now(), tp->snd_cwnd, incr);
-
-		//printf("%lu snd_cwnd up to %u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_cwnd); // rui
 		}
 
 		/* 943 */
@@ -1092,7 +1081,6 @@ void XStream::tcp_output(){
 	//								  {	  off	  }
 	// 		   			{  _q_usr_input.byte_length() }
 
-//again:
 	sendalot = 0;
 	/*71*/
 	/* off is the offset in bytes from the beginning of the send buf of the
@@ -1447,17 +1435,6 @@ send:
 
 	// THE MAGIC MOMENT! Our beloved tcp data segment goes to be wrapped in IP and
 	// sent to its tcp-speaking destination :-)
-	//Add XIA headers
-
-	//static unsigned nacks = 0;
-	//printf("%lu TX ACK #%u: up to %u\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, ++nacks, ntohl(ti.th_ack)); // rui
-
-	/* debugging no longer necessary
-	if (flags & XTH_SYN){
-		static unsigned ntx = 0;
-		printf("%lu TX SYN #%u sock %u srcpath %s \t dstpath %s\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()), ++ntx, this->id, this->src_path.unparse().c_str(), this->dst_path.unparse().c_str()); // rui
-	}
-	*/
 
 	// if there is no data to send, create an empty packet
 	if (p == NULL){
@@ -1489,7 +1466,6 @@ send:
 	 * (tp->rcv_adv). Any pending ACK has now been sent. */
 
 	if (sendalot){
-		//goto again;
 		_outputTask.reschedule(); // reschedule to send another packet.
 						// but don't send immediately because
 						// there may be some acks we need to
@@ -1529,7 +1505,7 @@ XStream::tcp_respond(tcp_seq_t ack, tcp_seq_t seq, int flags)
 
 	StreamHeaderEncap *send_hdr = StreamHeaderEncap::MakeTCPHeader(&th);
 	// sending a control packet
-	WritablePacket *p =  WritablePacket::make((uint32_t)2048, '\0', 0, 0);
+	WritablePacket *p =  WritablePacket::make((uint32_t)0, '\0', 0, 0);
 	WritablePacket *tcp_payload = send_hdr->encap(p);
 	xiah.set_plen(send_hdr->hlen()); // XIA payload = transport header + transport-layer data
 	tcp_payload = xiah.encap(tcp_payload, false);
@@ -1651,21 +1627,6 @@ XStream::tcp_timers (int timer) {
 		  TCPT_RANGESET(tp->t_rxtcur, rexmt,
 		  		tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
-
-		  // debugging now unnecessary
-		  printf("%lu REXMT timer #%d fired for sock id %d rxtcur %d srtt %d \
-		  rttvar %d tcp_state %u", \
-		  ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(\
-		  std::chrono::system_clock::now().time_since_epoch()).count()), \
-		  tp->t_rxtshift, this->id, tp->t_rxtcur, tp->t_srtt, tp->t_rttvar, \
-		  tp->t_state);
-/*
-		  if (tp->t_rxtshift > 5){
-			printf(" dst_path %s src_path %s", this->dst_path.unparse().c_str(), \
-				this->src_path.unparse().c_str());
-		  }*/
-		  printf("\n");
-
 
 		  if (tp->t_rxtshift == 5){ // meaning this is the sixth retransmission
 			/* If we backed off this far, our srtt estimate is probably bogus.
@@ -2321,8 +2282,6 @@ XStream::tcp_newtcpcb()
 		((TCPTV_SRTTBASE >> 2) + (TCPTV_SRTTDFLT << 2)) >> 1, TCPTV_MIN,
 		TCPTV_REXMTMAX);
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
-
-	//printf("%lu sndCwnd starting out as %u tcp_newtcpcb\n", ((unsigned long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count())-startMillis, tp->snd_cwnd); // rui
 
 	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 

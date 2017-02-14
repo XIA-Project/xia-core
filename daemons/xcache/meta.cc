@@ -146,6 +146,8 @@ int meta_map::walk(void)
 					syslog(LOG_INFO, "removing stalled cid:%s", c.c_str());
 					delete m;
 					_map.erase(i++);
+				} else {
+					++i;
 				}
 				break;
 
