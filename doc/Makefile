@@ -1,11 +1,13 @@
 
 .PHONY: all html man clean
 
-MANDIRS="xsocket xcache"
-HTMLDIRS="xsocket xcache include"
+MANDIRS="xsocket xcache dagaddr/cpp"
+HTMLDIRS="xsocket xcache dagaddr/cpp include"
 
-doc: html man
+doc: html man apps
 
+apps:
+	make -C ../bin doc
 html:
 	cd ../api && DOHTML=YES DIRS=$(HTMLDIRS) doxygen ../doc/api.cfg
 
