@@ -392,11 +392,11 @@ void *preStageData(void *)
                pthread_mutex_unlock(&profileLock); 
                break;
             }
-            for (int i = beg, j = 0; j < chunkToStage - alreadyStage && i < int(dags.size()); ++i) {
+			for (int i = beg, j = 0; j < chunkToStage - alreadyStage && j < 3 && i < int(dags.size()); ++i) {
                 say("Before needStage: i = %d, beg = %d, dag = %s State: %d\n",i, beg, dags[i].c_str(),SIDToProfile[sock][dags[i]].state);
-                if (SIDToProfile[sock][dags[i]].state != READY) {
-                    say("pre_needStage: i = %d, beg = %d, dag = %s\n",i, beg, dags[i].c_str());
-                    //SIDToProfile[sock][dags[i]].state = PENDING;
+                if (SIDToProfile[sock][dags[i]].state == BLANK) {
+                    say("needStage: i = %d, beg = %d, dag = %s\n",i, beg, dags[i].c_str());
+                    SIDToProfile[sock][dags[i]].state = PENDING;
                     needStage.insert(dags[i]);
                     j++;
                 }
