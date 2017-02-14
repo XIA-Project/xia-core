@@ -49,6 +49,9 @@ class NetjoinHandshakeOne(object):
             core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
 
+    def is_from_router(self):
+        return self.payload.core.HasField('router_credentials')
+
     def hex_client_hid(self):
         raw_hid = self.payload.core.client_l3_req.xip.single.ClientHID
         return self.conf.raw_hid_to_hex(raw_hid)

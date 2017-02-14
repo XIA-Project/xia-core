@@ -197,6 +197,7 @@ class NetjoinSession(threading.Thread):
             logging.info("HandshakeOne invalid, denying connection request")
         logging.info("Accepted handshake one from client")
         self.client_hid = netjoin_h1.hex_client_hid()
+        client_is_router = netjoin_h1.is_from_router()
 
         # Retrieve handshake one info to be included in handshake two
         client_session_id = netjoin_h1.client_session_id()
@@ -262,7 +263,7 @@ class NetjoinSession(threading.Thread):
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:
                 # TODO: Switch out router HID with client HID
-                if click.assignRVDAG(self.hostname, "XIAEndHost",
+                if click.assignRVDAG(self.hostname,
                         str(router_rv_dag), interface) == False:
                     logging.error("Failed updating RV DAG in XIA Stack")
                     return
