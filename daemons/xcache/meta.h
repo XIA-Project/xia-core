@@ -131,8 +131,8 @@ public:
 	meta_map();
 	~meta_map();
 
-	int read_lock(void)  { return pthread_rwlock_wrlock(&_rwlock); };
-	int write_lock(void) { return pthread_rwlock_rdlock(&_rwlock); };
+	int read_lock(void)  { return pthread_rwlock_rdlock(&_rwlock); };
+	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
 	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
 
 	xcache_meta *acquire_meta(std::string cid);
