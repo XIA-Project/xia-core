@@ -96,6 +96,13 @@ class ClickControl:
     def receive(self):
         return self.sock.recv(1024)
 
+    # Call a read handler in Click
+    def readCommand(self, command):
+        cmd = 'read %s\n' % command
+        self.send(cmd)
+        response = self.receive()
+        return response.split('\r\n')[-1]
+
     # Call a write handler in Click
     def writeCommand(self, command):
         cmd = 'write %s\n' % command
@@ -183,15 +190,30 @@ class ClickControl:
             return False
         return True
 
+    def getParam(self, hostname, param):
+        return self.readCommand(hostname + '/xrc/xtransport.' + param)
+
+    def getDefaultAddr(self, hostname):
+        return self.getParam(hostname, 'address')
+
+    def getNSAddr(self, hostname):
+        return self.getParam(hostname, 'nameserver')
+
+    def getRVAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous')
+
+    def getRVControlAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous_control')
+
     # Assign a Rendezvous DAG to an interface. All interfaces by default.
-    def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
+    def assignRVDAG(self, hostname, dag, iface=-1):
         cmd = '%s/xrc/xtransport.rvDAG %d,%s' % (hostname, iface, dag)
         if not self.writeCommand(cmd):
             return False
         return True
 
     # Assign a Rendezvous Control-plane DAG to an interface. default=all.
-    def assignRVControlDAG(self, hostname, hosttype, dag, iface=-1):
+    def assignRVControlDAG(self, hostname, dag, iface=-1):
         cmd = '%s/xrc/xtransport.rvcDAG %d,%s' % (hostname, iface, dag)
         if not self.writeCommand(cmd):
             return False

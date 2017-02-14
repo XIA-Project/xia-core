@@ -90,6 +90,28 @@ def main():
     announcer = None
     if args.controller:
         logging.debug("Announcing network and listening for join requests")
+
+        # Read in various DAGs from config files and assign them into Click
+        ns_dag = conf.get_ns_dag()
+        router_dag = conf.get_router_dag()
+        rv_dag = conf.get_rv_dag()
+        rv_control_dag = conf.get_rv_control_dag()
+        with ClickControl as click:
+            if click.setNSDAG(ns_dag) == False:
+                logging.error("Failed updating NS DAG in XIA Stack")
+            logging.info("Nameserver DAG is now known to Click stack")
+            # TODO: Set router/rv dags into click somewhere
+            if len(rv_dag) > 20:
+                if click.assignRVDAG(args.hostname, rv_dag) == False:
+                    logging.error("Failed updating RV DAG")
+                logging.info("RV DAG now known to Click stack")
+            if len(rv_control_dag) > 20:
+                if click.assignRVControlDAG(args.hostname,
+                        rv_control_dag) == False:
+                    logging.error("Failed updating RV Control DAG")
+                logging.info("RV Control DAG now known to Click stack")
+
+
         # Determine the Layer2 type for retransmission rate and attempts
         l2_type = NetjoinL2Handler.l2_str_to_type[args.layer2]
 

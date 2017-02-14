@@ -197,6 +197,7 @@ class NetjoinSession(threading.Thread):
             logging.info("HandshakeOne invalid, denying connection request")
         logging.info("Accepted handshake one from client")
         self.client_hid = netjoin_h1.hex_client_hid()
+        client_is_router = netjoin_h1.is_from_router()
 
         # Retrieve handshake one info to be included in handshake two
         client_session_id = netjoin_h1.client_session_id()
@@ -262,7 +263,7 @@ class NetjoinSession(threading.Thread):
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:
                 # TODO: Switch out router HID with client HID
-                if click.assignRVDAG(self.hostname, "XIAEndHost",
+                if click.assignRVDAG(self.hostname,
                         str(router_rv_dag), interface) == False:
                     logging.error("Failed updating RV DAG in XIA Stack")
                     return
@@ -279,7 +280,9 @@ class NetjoinSession(threading.Thread):
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
         retval = c_xsocket.XupdateRV(sockfd, interface);
+        c_xsocket.Xclose(sockfd)
         if retval != 0:
             logging.error("Failed notifying RV service of new location")
         logging.info("Rendezvous service notified")
