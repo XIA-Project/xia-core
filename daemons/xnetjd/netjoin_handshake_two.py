@@ -8,11 +8,13 @@ import threading
 import nacl.utils
 import netjoin_session
 from netjoin_xiaconf import NetjoinXIAConf
+from clickcontrol import ClickControl
 
 # Build a HandshakeTwo protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeTwo(object):
 
     def __init__(self, session, deny=False,
+            hostname=None,
             client_session=None, l2_reply=None,
             client_is_router=False):
         self.session = session
@@ -34,6 +36,9 @@ class NetjoinHandshakeTwo(object):
         if not client_session:
             logging.info("Got handshake two over wire")
             return
+
+        # We are building a new handshake two, must know hostname
+        assert(hostname is not None)
 
         # Put in the plaintext client_session_id
         self.handshake_two.client_session_id = client_session
@@ -58,12 +63,12 @@ class NetjoinHandshakeTwo(object):
 
             # Get router/ns/rv dags from click and fill into xhcp_reply
             with ClickControl() as click:
-                xhcp_reply.router_dag = click.getDefaultAddr()
-                xhcp_reply.nameserver_dag = click.getNSAddr()
+                xhcp_reply.router_dag = click.getDefaultAddr(hostname)
+                xhcp_reply.nameserver_dag = click.getNSAddr(hostname)
 
                 # Set RV DAGs in protobuf only if they exist
-                router_rv_dag = click.getRVAddr()
-                control_rv_dag = click.getRVControlAddr()
+                router_rv_dag = click.getRVAddr(hostname)
+                control_rv_dag = click.getRVControlAddr(hostname)
                 if len(router_rv_dag) > 0:
                     xhcp_reply.router_rv_dag = router_rv_dag
                 if len(control_rv_dag) > 0:

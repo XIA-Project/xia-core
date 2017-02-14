@@ -18,6 +18,7 @@ conf = NetjoinXIAConf()
 sys.path.append(conf.get_swig_path())
 sys.path.append(conf.get_clickcontrol_path())
 
+from clickcontrol import ClickControl
 from netjoin_policy import NetjoinPolicy
 from netjoin_receiver import NetjoinReceiver
 from netjoin_announcer import NetjoinAnnouncer
@@ -96,16 +97,16 @@ def main():
         router_dag = conf.get_router_dag()
         rv_dag = conf.get_rv_dag()
         rv_control_dag = conf.get_rv_control_dag()
-        with ClickControl as click:
+        with ClickControl() as click:
             if click.setNSDAG(ns_dag) == False:
                 logging.error("Failed updating NS DAG in XIA Stack")
             logging.info("Nameserver DAG is now known to Click stack")
             # TODO: Set router/rv dags into click somewhere
-            if len(rv_dag) > 20:
+            if rv_dag:
                 if click.assignRVDAG(args.hostname, rv_dag) == False:
                     logging.error("Failed updating RV DAG")
                 logging.info("RV DAG now known to Click stack")
-            if len(rv_control_dag) > 20:
+            if rv_control_dag:
                 if click.assignRVControlDAG(args.hostname,
                         rv_control_dag) == False:
                     logging.error("Failed updating RV Control DAG")

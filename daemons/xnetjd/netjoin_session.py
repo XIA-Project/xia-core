@@ -205,6 +205,7 @@ class NetjoinSession(threading.Thread):
         # Now build a handshake two message
         logging.info("Now sending handshake two")
         netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
+                hostname=self.hostname,
                 client_session=client_session_id, l2_reply=l2_reply)
 
         # Send handshake two
