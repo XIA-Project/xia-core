@@ -2264,8 +2264,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 	}
 	// Add new RHID route pointing to new RHID
-	cmd = hid_table_str + ".add";
-	cmdargs = new_rhid.c_str() + String(" ") + String(interface);
+	cmd = hid_table_str + ".set4";
+	cmdargs = String(new_rhid.c_str()) + "," + String(interface) + "," + new_rhid.c_str() + "," + String(0xffff);
+	click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	// Replace intent HID in router's DAG to form new_dag
