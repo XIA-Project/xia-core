@@ -35,17 +35,24 @@ class NetjoinBeacon(object):
         # TODO: store hash if this method is called several times
         return hashlib.sha256(fixed_descriptor.SerializeToString()).hexdigest()
 
-    def _update_object_from_net_descriptor(self):
-        # NOTE: we don't have xip_netid received beacon
-        self.guid = self.net_descriptor.GUID
-        self.raw_verify_key = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key
+    def find_xip_netid(self):
+        netid = None
 
         # Walk the nodes to the end to find XIP network
         # TODO: Create graph and walk like the policy module does
         for node in self.net_descriptor.auth_cap.nodes:
             if node.HasField('xip'):
-                self.xip_netid = node.xip.NetworkId
+                netid = node.xip.NetworkId
                 break
+
+        return netid
+
+    def _update_object_from_net_descriptor(self):
+        # NOTE: we don't have xip_netid received beacon
+        self.guid = self.net_descriptor.GUID
+        self.raw_verify_key = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key
+        self.xip_netid = self.find_xip_netid()
+
         assert(self.xip_netid != None)
 
     def from_net_descriptor(self, net_descriptor):
@@ -67,7 +74,7 @@ class NetjoinBeacon(object):
             logging.warning("GUID not provided. Assigning a temporary one")
 
         if self.xip_netid == None:
-            logging.error("XIP NID not given. Assigning a temporary one")
+            logging.error("XIP NID not given.")
             raise RuntimeError("XIP network ID not known.")
 
         # If l2 type is not known throw an exception and end
