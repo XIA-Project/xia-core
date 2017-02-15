@@ -8,7 +8,6 @@ import logging
 import threading
 from clickcontrol import ClickControl
 from netjoin_beacon import NetjoinBeacon
-from netjoin_xiaconf import NetjoinXIAConf
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_message_pb2 import NetjoinMessage
 
@@ -44,7 +43,6 @@ class NetjoinAnnouncer(object):
         self.auth = NetjoinAuthsession()
         self.xianetjoin = ("127.0.0.1", 9882)
         self.shutdown_event = shutdown_event
-        self.conf = NetjoinXIAConf()
         self.net_id = net_id
 
         # A socket for sending messages to XIANetJoin
@@ -53,14 +51,6 @@ class NetjoinAnnouncer(object):
         # A beacon object we will send to announce the network
         self.beacon = NetjoinBeacon(self.net_id)
         self.beacon.initialize(self.auth.get_raw_verify_key(), l2_type)
-
-        # TODO: Find a better place to setup ns_dag in click
-        # Inform click about the nameserver dag we will be advertising
-        ns_dag = self.conf.get_ns_dag()
-        with ClickControl() as click:
-            if click.setNSDAG(ns_dag) == False:
-                logging.error("Failed updating NS DAG in XIA Stack")
-        logging.info("Nameserver DAG is now known to Click stack")
 
 # Parse arguments and launch necessary threads
 def main():
