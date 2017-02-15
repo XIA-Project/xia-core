@@ -12,6 +12,7 @@ import c_xsocket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from netjoin_beacon import NetjoinBeacon
+from netjoin_announcer import NetjoinAnnouncer
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_dsrc_handler import NetjoinDSRCHandler
@@ -155,6 +156,9 @@ class NetjoinSession(threading.Thread):
         # A layer 2 handler for creating/processing l2 requests
         l2_type = message.net_descriptor.l2_id.l2_type
         self.l2_handler = self.create_l2_handler(l2_type)
+
+        # Save the network descriptor (beacon)
+        self.beacon.from_net_descriptor(message.net_descriptor)
 
         # Save access point verify key included in NetDescriptor message
         join_auth_info = message.net_descriptor.ac_shared.ja
@@ -400,6 +404,21 @@ class NetjoinSession(threading.Thread):
         total_joining_time = time.time() - self.start_time
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
         self.state = self.HS_DONE
+
+        # If we are running as a router, start announcing this network
+        if self.is_router:
+
+            # TODO: Need to get l2_type to announce from a config file
+            # TODO: Need to get beacon_interval from a config file
+            l2_type = LayerTwoIdentifier.ETHERNET
+            beacon_interval = 0.5
+            net_id = self.beacon.find_xip_netid()
+            assert(net_id is not None)
+
+            # Ask the NetjoinReceiver to announce the newly joined network
+            # TODO: CRITICAL - only start one announcer for one net_id
+            self.receiver.announce(l2_type, net_id, beacon_interval)
+
         return True
 
     # Note: we forget the last message on disabling retransmission

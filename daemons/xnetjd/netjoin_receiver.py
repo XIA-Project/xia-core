@@ -9,6 +9,7 @@ import threading
 from netjoin_policy import NetjoinBeacon
 from netjoin_policy import NetjoinPolicy
 from netjoin_session import NetjoinSession
+from netjoin_announcer import NetjoinAnnouncer
 from netjoin_message_pb2 import NetjoinMessage
 
 # Receiver thread, only responsible for receiving netjoin related packets
@@ -35,6 +36,12 @@ class NetjoinReceiver(threading.Thread):
         # A socket we will bind to and listen on
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.bind(xnetjd_addr)
+
+    def announce(self, l2_type, net_id, beacon_interval):
+
+	self.announcer = NetjoinAnnouncer(l2_type, net_id, beacon_interval,
+		self.shutdown)
+	self.announcer.announce()
 
     def handle_net_descriptor(self, message_tuple):
 
