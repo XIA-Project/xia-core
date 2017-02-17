@@ -13,7 +13,6 @@ from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from dagaddr import Graph
 from netjoin_beacon import NetjoinBeacon
-from netjoin_announcer import NetjoinAnnouncer
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_dsrc_handler import NetjoinDSRCHandler
@@ -425,6 +424,7 @@ class NetjoinSession(threading.Thread):
             # TODO: CRITICAL - only start one announcer for one net_id
             self.receiver.announce(l2_type, net_id, beacon_interval)
 
+        logging.info("Announcing the newly joined network now")
         return True
 
     # Note: we forget the last message on disabling retransmission
