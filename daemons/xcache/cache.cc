@@ -80,9 +80,10 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	xip_size = sizeof(struct click_xia) + (total_nodes * sizeof(struct click_xia_xid_node));
 	x = (struct xtcp *)(pkt + xip_size);
 
+	uint16_t flags = ntohs(x->th_flags);
 	// we only see the flow from server to client, so we'll never see a plain SYN here
 	// FIXME: we should probably be smart enough to deal with other flags like RST here eventually
-	if (x->th_flags == XTH_ACK) {
+	if (flags == XTH_ACK) {
 		ushort hlen = (ushort)(x->th_off) << 2;
 
 		if (hlen == ntohs(xiah->plen)) {
@@ -90,6 +91,12 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 			// so we can ignore it
 			return PACKET_NO_DATA;
 		}
+	} else if (flags == (XTH_SYN|XTH_ACK)) {
+		// packet is OK, keep going
+
+	} else if (!(flags & XTH_FIN)) {
+		// if it's not a FIN*, we don't want it
+		return PACKET_NO_DATA;
 	}
 
 	 // get the associated client SID and destination CID
