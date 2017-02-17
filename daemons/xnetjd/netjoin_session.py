@@ -11,6 +11,7 @@ import dagaddr
 import c_xsocket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
+from dagaddr import Graph
 from netjoin_beacon import NetjoinBeacon
 from netjoin_announcer import NetjoinAnnouncer
 from netjoin_message_pb2 import NetjoinMessage
@@ -282,6 +283,11 @@ class NetjoinSession(threading.Thread):
                     logging.error("Failed updating Control RV DAG in XIA Stack")
                     return
                 logging.info("Control RV DAG sent to Click and processed")
+
+        # TODO: Create XARP entry for router HID
+        router_hid = Graph(router_dag).intent_HID_str()
+        sendermacstr = "%02x:%02x:%02x:%02x:%02x:%02x" % (theirmac)
+        logging.info("XARP: {} has {}".format(sendermacstr, router_hid))
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
