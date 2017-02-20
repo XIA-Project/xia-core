@@ -311,9 +311,9 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	for (int i = 0; i < nfds; i++) {
 
 		int flags = 0;
-		int r = 0;
-		int w = 0;
-		int e = 0;
+		int r = -1;
+		int w = -1;
+		int e = -1;
 
 		if (readfds && FD_ISSET(i, readfds)) {
 			flags |= POLLIN;
@@ -348,11 +348,11 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				largest = i;
 
 			// it's a regular fd, put it into the select fdsets
-			if (r != 0)
+			if (r >= 0)
 				FD_SET(i, &rfds);
-			if (w != 0)
+			if (w >= 0)
 				FD_SET(i, &wfds);
-			if (e != 0)
+			if (e >= 0)
 				FD_SET(i, &efds);
 
 			s2i[i].fd = s2i[i].id = 0;
