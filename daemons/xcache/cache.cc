@@ -99,16 +99,24 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 		return PACKET_NO_DATA;
 	}
 
+	// FIXME: this should use the std libraries for managing DAGs instead of going in direct
 	 // get the associated client SID and destination CID
-	for (unsigned i = 0; i < total_nodes; i++) {
+	for (unsigned i = 0; i < xiah->dnode; i++) {
+		unsigned type = htonl(xiah->node[i].xid.type);
+
+		if (type == CLICK_XIA_XID_TYPE_SID) {
+			unparse_xid(&xiah->node[i], sid);
+		}
+	}
+
+	for (unsigned i = xiah->dnode; i < total_nodes; i++) {
 		unsigned type = htonl(xiah->node[i].xid.type);
 
 		if (type == CLICK_XIA_XID_TYPE_CID) {
 			unparse_xid(&xiah->node[i], cid);
-		} else if (type == CLICK_XIA_XID_TYPE_SID) {
-			unparse_xid(&xiah->node[i], sid);
 		}
 	}
+
 
 	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
@@ -116,12 +124,15 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	}
 
 	// syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
-	// syslog(LOG_INFO, "XIA plen = %d len = %d\n", htons(xiah->plen), len);
+	// syslog(LOG_INFO, "XIA plen = %d len = %lu\n", htons(xiah->plen), len);
 	// syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
 	// syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(x->th_ack));
 	// syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(x->th_seq));
 	// syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(x->th_flags));
 	// syslog(LOG_INFO, "tcp->th_off = %d\n", x->th_off);
+	// syslog(LOG_INFO, "CID = %s\n", cid.c_str());
+	// syslog(LOG_INFO, "SID = %s\n", sid.c_str());
+
 
 	*xtcp = x;
 	return PACKET_OK;
@@ -205,9 +216,10 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 			break;
 
 		case AVAILABLE:
+		case READY_TO_SAVE:
 		case FETCHING:
 			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
+			//syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
 			return;
 
 		case EVICTING:
@@ -292,6 +304,7 @@ skip_data:
 			meta->set_ttl(ntohl(download->header.ttl));
 			meta->set_created();
 			meta->set_length(ntohl(download->header.length));
+			meta->set_state(READY_TO_SAVE);
 			printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
@@ -307,6 +320,10 @@ skip_data:
 		} else {
 			// FIXME: leave this open in case more data is on the wire
 			// and let garbage collection handle it eventually? or nuke it now?
+
+			// FIXME: we're currently leaving this open. Maybe it should be marked
+			// as broken so that if a new copy of the same chunk comes through we throw
+			// the old one away and start over.
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
 		}
 	}
