@@ -182,7 +182,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	case PACKET_NO_DATA:
 		// it's a pure ACK, we can ignore it
-		syslog(LOG_INFO, "data packet is empty!");
+		// syslog(LOG_INFO, "data packet is empty!");
 		return;
 
 	case PACKET_INVALID:
@@ -237,7 +237,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		// Another stream is already getting this chunk.
 		//  so we can ignore this stream's data
 		//  otherwise we'll have memory overrun issues due to different sequence #s
-		syslog(LOG_INFO, "don't cross the streams!");
+		// syslog(LOG_INFO, "don't cross the streams!");
 		ctrl->release_meta(meta);
 		return;
 	}
@@ -305,7 +305,7 @@ skip_data:
 			meta->set_created();
 			meta->set_length(ntohl(download->header.length));
 			meta->set_state(READY_TO_SAVE);
-			printf("cache:cache length: %lu\n", meta->get_length());
+			// printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;
