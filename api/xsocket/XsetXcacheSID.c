@@ -14,10 +14,6 @@
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
 */
-/*!
- @file XupdateAD.c
- @brief Implements XreadLocalHostAddr()
-*/
 #include <errno.h>
 #include "Xsocket.h"
 #include "Xinit.h"
@@ -43,12 +39,12 @@
 */
 int XsetXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
 	int seq, rc;
-  	
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
-   	 	LOG("The socket is not a valid Xsocket");
-   	 	errno = EBADF;
-  		return -1;
- 	}
+
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
 
 	if (xcacheSID == NULL) {
 		LOG("NULL pointer!");
@@ -56,17 +52,17 @@ int XsetXcacheSID(int sockfd, char *xcacheSID, unsigned lenXcacheSID) {
 		return -1;
 	}
 
- 	xia::XSocketMsg xsm;
+	xia::XSocketMsg xsm;
 	xia::X_SetXcacheSid_Msg *msg = xsm.mutable_x_setxcachesid();
-  	xsm.set_type(xia::XSETXCACHESID);
+	xsm.set_type(xia::XSETXCACHESID);
 	msg->set_sid(xcacheSID, lenXcacheSID);
-    seq = seqNo(sockfd);
-    xsm.set_sequence(seq);
+	seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
 	return rc;
 }

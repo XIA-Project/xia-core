@@ -17,6 +17,7 @@
 /*!
  @file Xkeys.c
  @brief XmakeNewSID(), XremoveSID(), XcreateFID(), XremoveFID() -- create/delete cryptographic SIDs & FIDs
+\todo write docs
 */
 
 #include "Xsocket.h"

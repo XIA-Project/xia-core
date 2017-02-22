@@ -16,6 +16,7 @@
 /*!
 ** @file Xmsg.c
 ** @brief Xrecvmsg(), Xsendmsg() - send/receive a message on a socket
+\todo write msg api docs
 */
 
 #include "Xsocket.h"

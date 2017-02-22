@@ -29,23 +29,23 @@
 /*!
 ** @brief Receive data from an Xsocket
 **
-** Xrecv() retrieves data from a connected Xsocket of type XSOCK_STREAM.
-** sockfd must have previously been connected via Xaccept() or
-** Xconnect().
+** The Xrecv() call is used to receive messages from a connected Xsocket.
 **
-** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored at the API level. Subsequent Xrecv calls
-** return the stored data until it is drained, and will then resume requesting
-** data from the transport.
+** If no data is available at the socket, Xrecv() will wait for a message to arrive, unless the
+** socket is nonblocking (see Xfcntl()), in which case the value -1 is returned and errno
+** is set to EAGAIN or EWOULDBLOCK. This call will return any data available, up to the
+** requested amount, rather than waiting for receipt of the full amount requested.
+**
+** An application can use Xselect() or Xpoll(), or to determine when more data arrives on a socket.
 **
 ** @param sockfd The socket to receive with
 ** @param rbuf where to put the received data
 ** @param len maximum amount of data to receive. the amount of data
 ** returned may be less than len bytes.
 ** @param flags (This is not currently used but is kept to be compatible
-** with the standard sendto socket call).
+** with the standard send socket call).
 **
-** @returns the number of bytes received, which may be less than the number
+** @returns the number of bytes returned, which may be less than the number
 ** requested by the caller
 ** @returns -1 on failure with errno set to an error compatible with the standard
 ** recv call.
@@ -139,15 +139,17 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 }
 
 /*!
-** @brief receives datagram data on an Xsocket.
+** @brief receives datagram data on an Xsocket
 **
 ** Xrecvfrom() retrieves data from an Xsocket of type XSOCK_DGRAM. Unlike the
 ** standard recvfrom API, it will not work with sockets of type XSOCK_STREAM.
 **
-** NOTE: in cases where more data is received than specified by the caller,
-** the excess data will be stored in the socket state structure and will
-** be returned from there rather than from Click. Once the socket state
-** is drained, requests will be sent through to Click again.
+** If no data is available at the socket, Xrecvfrom() will wait for a message to arrive, unless the
+** socket is nonblocking (see Xfcntl()), in which case the value -1 is returned and errno
+** is set to EAGAIN or EWOULDBLOCK. This return any data available, up to the
+** requested amount, rather than  waiting for receipt of the full amount requested.
+**
+** An application can use Xselect() or Xpoll(), or to determine when more data arrives on a socket.
 **
 ** @param sockfd The socket to receive with
 ** @param rbuf where to put the received data
@@ -162,7 +164,7 @@ int Xrecv(int sockfd, void *rbuf, size_t len, int flags)
 ** of the source DAG, the returned address is truncated and addrlen will contain length
 ** of the actual address.
 **
-** @returns number of bytes received
+** @returns number of bytes returned
 ** @returns -1 on failure with errno set.
 */
 int Xrecvfrom(int sockfd, void *rbuf, size_t len, int flags,
