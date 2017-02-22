@@ -110,7 +110,7 @@ int xia_pton(int af, const char *src, sockaddr_x *dst)
 
 	Graph g(src);
 
-	if (g.num_nodes() == 1 && g.get_node(0).type() == CLICK_XIA_XID_TYPE_DUMMY) {
+	if (g.num_nodes() == 0)  {
 		// the dag didn't parse correctly
 		return 0;
 	}
@@ -399,7 +399,7 @@ int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *ad
 ** @note Xgetaddrinfo should be used rather than this function as it is
 ** very primative.
 **
-** @param name a test string representing the name of an XIA service or host
+** @param name a text string representing the name of an XIA service or host
 ** @param addr a sockaddr_x to received the address
 ** @param addrlen pointer to the length of addr on call, contains actual
 ** length on return
