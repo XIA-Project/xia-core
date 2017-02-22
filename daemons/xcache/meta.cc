@@ -140,7 +140,7 @@ int meta_map::walk(void)
 
 		switch(m->state()) {
 			case CACHING:
-			printf("walk:caching\n");
+				// printf("walk:caching\n");
 				// see if the chunk stalled for too long while caching
 				if (now - m->updated() > TOO_OLD) {
 					syslog(LOG_INFO, "removing stalled cid:%s", c.c_str());
@@ -152,14 +152,14 @@ int meta_map::walk(void)
 				break;
 
 			case AVAILABLE:
-			//printf("walk:available\n");
+				// printf("walk:available\n");
 				// see if it's time to live has expired
 				if (m->ttl() == 0) {
 					++i;
 					break;
 
 				} else {
-					printf("checking ttl\n");
+					//printf("checking ttl\n");
 					if ((now - m->created()) < m->ttl()) {
 						++i;
 						break;
@@ -171,7 +171,7 @@ int meta_map::walk(void)
 				// fall through
 
 			case EVICTING:
-			printf("walk:evicting\n");
+				// printf("walk:evicting\n");
 				// the chunk was timed out, or removed from outside
 				//  first remove it from the policy engine
 				m->policy()->remove(m);
@@ -179,7 +179,7 @@ int meta_map::walk(void)
 				// fall through
 
 			case PURGING:
-			printf("walk:purging\n");
+				// printf("walk:purging\n");
 
 				// the chunk was marked for removal by the policy engine
 
