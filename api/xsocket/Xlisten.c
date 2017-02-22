@@ -19,32 +19,31 @@
 ** @brief Xlisten() - listen for connections on a socket
 */
 
-#include <errno.h>
 #include "Xsocket.h"
+/*! \cond */
+#include <errno.h>
 #include "Xinit.h"
 #include "Xutil.h"
+/*! \endcond */
 
 /*!
-** @brief Accept a conection from a remote Xsocket
+** @brief listen for connections on a socket
 **
-** The Xaccept system call is is only valid with Xsockets created with
-** the XSOCK_STREAM transport type. It accepts the first available connection
-** request for the listening socket, sockfd, creates a new connected socket,
-** and returns a new Xsocket descriptor referring to that socket. The newly
-** created socket is not in the listening state. The original socket
-** sockfd is unaffected by this call.
+**  Xlisten() marks the socket referred to by sockfd as a passive socket,
+** that is, as a socket that will be used to accept incoming connection
+**requests using Xaccept().
 **
-** @param sockfd	an Xsocket() previously created with the XSOCK_STREAM type,
+** The backlog argument defines the maximum length to which the queue of
+** pending connections for sockfd may grow. If a connection request arrives
+** when the queue is full, the client will receive an error with an
+** indication of ECONNREFUSED.
+**
+** @param sockfd an Xsocket previously created with the SOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
-** @param addr if non-NULL, points to a block of memory that will contain the
-** address of the peer on return
-** @param addrlen on entry, contains the size of addr, on exit contains the actual
-** size of the address. addr will be truncated, if the size passed in is smaller than
-** the actual size.
+** @param backlog the number of outstanding connections allowed in the listen queue
 **
-** @returns a non-negative integer that is the new Xsocket id
-** @returns -1 on error with errno set to an error compatible with those
-** returned by the standard accept call.
+** @returns 0 on success
+** @returns -1 on error with errno set appropriately
 */
 int Xlisten(int sockfd, int backlog)
 {

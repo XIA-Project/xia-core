@@ -29,15 +29,15 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   int rc;
 
   if (!rdag) {
-    LOG("new ad is NULL!");
-    errno = EFAULT;
-    return -1;
+	LOG("new ad is NULL!");
+	errno = EFAULT;
+	return -1;
   }
 
   if (getSocketType(sockfd) == XSOCK_INVALID) {
-    LOG("The socket is not a valid Xsocket");
-    errno = EBADF;
-    return -1;
+	LOG("The socket is not a valid Xsocket");
+	errno = EBADF;
+	return -1;
   }
 
   xia::XSocketMsg xsm;
@@ -58,8 +58,8 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   // process the reply from click
   xia::XSocketMsg xsm1;
   if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
-    LOGF("Error getting status from Click: %s", strerror(errno));
-    return -1;
+	LOGF("Error getting status from Click: %s", strerror(errno));
+	return -1;
   }
   if(xsm1.type() == xia::XUPDATEDAG) {
 	  xia::X_Updatedag_Msg *msg = xsm1.mutable_x_updatedag();
@@ -110,13 +110,13 @@ int XupdateRV(int sockfd, int interface)
 **
 */
 int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID) {
-  	int rc;
+	int rc;
 
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
 		LOGF("The socket %d is not a valid Xsocket", sockfd);
-   	 	errno = EBADF;
-  		return -1;
- 	}
+		errno = EBADF;
+		return -1;
+	}
 
 	if (localhostDAG == NULL || local4ID == NULL) {
 		LOG("NULL pointer!");
@@ -124,15 +124,15 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 		return -1;
 	}
 
- 	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XREADLOCALHOSTADDR);
-  	unsigned seq = seqNo(sockfd);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XREADLOCALHOSTADDR);
+	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
 	xia::XSocketMsg xsm1;
 	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
@@ -169,8 +169,8 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 }
 
 
-/*!
-** @tell if this node is an XIA-IPv4 dual-stack router
+/*
+** @brief tell if this node is an XIA-IPv4 dual-stack router
 **
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
@@ -181,23 +181,23 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 **
 */
 int XisDualStackRouter(int sockfd) {
-  	int rc;
+	int rc;
 
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
-   	 	LOG("The socket is not a valid Xsocket");
-   	 	errno = EBADF;
-  		return -1;
- 	}
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
 
- 	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XISDUALSTACKROUTER);
-  	unsigned seq = seqNo(sockfd);
-  	xsm.set_sequence(seq);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XISDUALSTACKROUTER);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
 	xia::XSocketMsg xsm1;
 	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {

@@ -2,18 +2,17 @@ include ../../../xia.mk
 
 .PHONY: all clean
 
-TARGET=dagaddr_example
+TARGETS=dag_examples dagaddr_example
 LDFLAGS += $(LIBS)
-ifeq ($(wildcard $(XLIB)/libdagaddr.a),)
-	LDFLAGS += $(XLIB)/libdagaddr.so
-else
-	LDFLAGS += $(XLIB)/libdagaddr.a -Bstatic
-endif
+CFLAGS += -Wno-unused-result
 
-all: $(TARGET)
+all: $(TARGETS)
+
+%: %.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
 %: %.cpp
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lpthread
 
 clean:
 	-rm -f $(TARGET)

@@ -1,6 +1,17 @@
 #!/bin/bash
 
-[ "$1" == "-h" ] && echo "list pids for XIA processes" && exit 0
+
+[ "$1" == "-v" ] || [ "$1" == "--version" ] && echo "psx 1.0" && exit 0
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+list process IDs for XIA system processes
+
+options:
+  -h, --help    display this help
+  -v, --version display the version number
+EOH
+	exit 0
+fi
 
 pgrep -l "click|xroute|xcache|xname|statsserver|xstats"
 pgrep -fa xnetj | cut -d\  -f1,3 | sed 's/\.\///'

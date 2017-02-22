@@ -20,27 +20,25 @@
 */
 
 #include "Xsocket.h"
+/*! \cond */
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
 #include <errno.h>
 #include "dagaddr.hpp"
+/*! \endcond */
 
 /*!
-** @brief Bind an Xsocket to a DAG.
+** @brief bind a DAG to an Xsocket
 **
 ** Assign the specified DAG to to the Xsocket referred to by sockfd. The DAG's
 ** final intent should be a valid SID.
 **
-** It is necessary to assign a local DAG using Xbind() before an XSOCK_STREAM
-** socket may receive connections (see accept()).
-**
-** An un-bound Xsocket will be given a random local SID that is currently not
-** available to the application.
-**
-** @param sockfd	The control socket
-** @param addr		The source service (local) DAG
+** @param sockfd	The socket
+** @param addr		sockaddr_x structure containing the DAG to be assigned
 ** @param addrlen	The size of addr
+**
+** @note See the man page for the standard bind() call for more details.
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set to an error compatible with those

@@ -18,16 +18,18 @@
  @file Xgetifaddrs.c
  @brief Xgetifaddrs(), Xfreeifaddrs() - get interface addresses
 */
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <netdb.h>
 #include "minIni.h"
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <ifaddrs.h>
+/*! \endcond */
 
 static int add_ifaddr(struct ifaddrs **ifap, const xia::X_GetIfAddrs_Msg::IfAddr& ifaddr)
 {
@@ -126,11 +128,49 @@ add_ifaddr_done:
 /*!
 ** @brief get a list of XIA network interfaces
 **
-** Create a linked list of structures describing the network interfaces
-** of the local system, and stores the address of the first item of the list
-**  in *ifap.
+** The Xgetifaddrs() function creates a linked list of structures describing
+** XIA enabled network interfaces of the local system, and stores the address
+** of the first item of the list in *ifap. The list consists of ifaddrs
+** structures, defined as follows:
 **
-** See the man page for the normal getifaddrs function for more details.
+\verbatim
+ struct ifaddrs {
+		struct ifaddrs  *ifa_next;    // Next item in list
+		char            *ifa_name;    // Name of interface
+		unsigned int     ifa_flags;   // Flags from SIOCGIFFLAGS
+		struct sockaddr *ifa_addr;    // Address of interface
+		struct sockaddr *ifa_netmask; // Netmask of interface
+		union {
+			struct sockaddr *ifu_broadaddr;
+			// Broadcast address of interface
+			struct sockaddr *ifu_dstaddr;
+			// Point-to-point destination address
+		} ifa_ifu;
+		#define          ifa_broadaddr ifa_ifu.ifu_broadaddr
+		#define          ifa_dstaddr   ifa_ifu.ifu_dstaddr
+		void            *ifa_data;    // Address-specific data
+	};
+\endverbatim
+**
+** The ifa_next field contains a pointer to the next structure on the list, or
+** NULL if this is the last item of the list.
+**
+** The ifa_name points to the null-terminated interface name.
+**
+** The ifa_flags field contains the interface flags, as returned by the
+** SIOCGIFFLAGS ioctl(2) operation (see netdevice(7) for a list of these flags).
+**
+** The ifa_addr field points to a structure containing the interface address.
+** Under XIA, these will all be of type sockaddr_x. This field may contain a null pointer.
+**
+** The ifa_netmask field points will always be NULL under XIA.
+**
+** Currently the ifa_ifu union will never contain a broadcast address.
+**
+** The ifa_data pointer will always be NULL
+**
+** The data returned by Xgetifaddrs() is dynamically allocated and should be
+** freed using Xfreeifaddrs() when no longer needed.
 **
 ** @param ifap pointer to a pointer to accecpt the returned ifaddrs structure
 **
@@ -193,6 +233,8 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 
 /*!
 ** @brief free memory allocated by Xgetifaddrs
+**
+** Free's the memory allocated by XgetifAddrs().
 **
 ** @param ifa pointer to ifaddr structure to be freed.
 **

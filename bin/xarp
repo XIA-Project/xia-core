@@ -21,6 +21,7 @@ import argparse
 import clicksock
 import xiapyutils
 
+APP="xarp"
 APP_VERSION="1.0"
 HASHLEN = 2 * 20
 HIDLEN = len("HID:") + HASHLEN
@@ -46,13 +47,17 @@ def main():
 	hostname = xiapyutils.getxiaclickhostname()
 	cards = {}
 
-	parser = argparse.ArgumentParser(description = 'XIA ARP %s' % APP_VERSION,
-		epilog='Note: add, clear, and delete are mutually exclusive')
+	parser = argparse.ArgumentParser(epilog='Note: add, clear, and delete are mutually exclusive')
+	parser.add_argument("-v", "--version", action='store_true', help='display version number')
 	parser.add_argument("-p", "--print", action='store_true', dest='print_it', help='print the ARP table (default action)')
 	parser.add_argument("-c", "--clear", action="store_true", help='purge all entries in the ARP tables')
 	parser.add_argument("-a", "--add", nargs=4, help='Add an ARP table entry', metavar=('iface','hid','mac','static'))
 	parser.add_argument("-d", "--delete", nargs=2, help='Delete an ARP table entry', metavar=('iface', 'hid'))
 	args = parser.parse_args()
+
+	if args.version == True:
+		print "%s %s" % (APP, APP_VERSION)
+		sys.exit(0)
 
 	if args.clear == False and args.add == None and args.delete == None:
 		# always print if not options are given

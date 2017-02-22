@@ -1,0 +1,12 @@
+#!/bin/sh
+
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XMANPATH=$XIADIR/doc/man
+
+if [ ! -d $XMANPATH/man3 ]; then
+	echo XIA man pages not found
+	echo run make doc to create them
+	exit
+fi
+
+man -M $XMANPATH $*

@@ -19,12 +19,14 @@
 ** @brief Xconnect() - initiate a connection on a socket
 */
 
-#include <errno.h>
 #include "Xsocket.h"
+/*! \cond */
+#include <errno.h>
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+/*! \endcond */
 
 static int _connDgram(int sockfd, const sockaddr *addr, socklen_t addrlen)
 {
@@ -156,14 +158,26 @@ static int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 }
 
 /*!
-** @brief Initiate a connection on an Xsocket of type XSOCK_STREAM
+** @brief Initiate a connection on a socket
 **
-** The Xconnect() call connects the socket referred to by sockfd to the
-** SID specified by dDAG. It is only valid for use with sockets created
-** with the XSOCK_STREAM Xsocket type.
+*I The  Xconnect() call connects the socket referred to by the sockfd to the
+** address specified by addr.
 **
-** @param sockfd	The control socket
-** @param addr	The address (SID) of the remote service to connect to.
+** If sockfd is of type SOCK_DGRAM, then addr is the address to which datagrams
+** are sent by default, and the only address from which datagrams are received.
+**
+** If the socket is of type SOCK_STREAM this call attempts to make a connection
+** to the socket that is bound to the address specified by addr.
+**
+** SOCK_STREAM sockets may successfully Xconnect() only once; SOCK_DGRAM sockets
+** may use Xconnect() multiple times to change their association.  SOCK_DGRAM
+** sockets may dissolve the association by connecting to an address with the
+** sa_family member of sockaddr set to AF_UNSPEC.
+**
+** @note See the man page for the standard connect() call for more details.
+**
+** @param sockfd  The control socket
+** @param addr	  The address (SID) of the remote service to connect to.
 ** @param addrlen The length of addr
 **
 ** @returns 0 on success

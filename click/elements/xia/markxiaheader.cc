@@ -21,27 +21,19 @@ MarkXIAHeader::~MarkXIAHeader()
 int
 MarkXIAHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _offset = 0;
-    return cp_va_kparse(conf, this, errh,
-  		      "OFFSET", cpkP, cpUnsigned, &_offset,
-  		      cpEnd);
+	_offset = 0;
+	return cp_va_kparse(conf, this, errh,
+			  "OFFSET", cpkP, cpUnsigned, &_offset,
+			  cpEnd);
 }
 
 Packet *
 MarkXIAHeader::simple_action(Packet *p)
 {
-    const click_xia *xiah = reinterpret_cast<const click_xia *>(p->data() + _offset);
+	const click_xia *xiah = reinterpret_cast<const click_xia *>(p->data() + _offset);
 
-	if ((xiah->dnode > CLICK_XIA_ADDR_MAX_NODES)
-		|| (xiah->snode > CLICK_XIA_ADDR_MAX_NODES)) {
-		WARN("MarkXIAHeader dropping packet with bad header");
-		// drop the packet
-		p->kill();
-		return NULL;
-	}
-    p->set_xia_header(xiah, XIAHeader::hdr_size(xiah->dnode + xiah->snode));
-
-    return p;
+	p->set_xia_header(xiah, XIAHeader::hdr_size(xiah->dnode + xiah->snode));
+	return p;
 }
 
 CLICK_ENDDECLS

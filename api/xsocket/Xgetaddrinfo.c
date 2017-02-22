@@ -18,16 +18,66 @@
  @file Xgetaddrinfo.c
  @brief Xgetaddrinfo(), Xfreeaddrinfo(), Xgai_strerror() - network address and service translation
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <netdb.h>
 #include <string.h>
 #include <strings.h>
 #include "minIni.h"
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
+
+#if 0
+
+
+typedef struct {
+	unsigned int  s_type;
+	unsigned char s_id[XID_SIZE];
+} xid_t;
+
+typedef struct {
+	xid_t         s_xid;
+	unsigned char s_edge[EDGES_MAX];
+} node_t;
+
+typedef struct click_xia_xid xid_t;
+
+typedef struct click_xia_xid_node node_t;
+
+typedef struct {
+	unsigned char s_count;
+	node_t        s_addr[NODES_MAX];
+} x_addr_t;
+
+
+
+typedef struct {
+	// common sockaddr fields
+#ifdef __APPLE__
+	unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
+	unsigned char sx_family;
+#else
+	unsigned short sx_family;
+#endif
+
+	// XIA specific fields
+	x_addr_t      sx_addr;
+} sockaddr_x;
+
+
+/*! @struct sockaddr_x
+ *  @brief This structure blah blah blah...
+ *  @var foreignstruct::a
+ *  Member 'a' contains...
+ *  @var foreignstruct::b
+ *  Member 'b' contains...
+ */
+
+#endif
 /* FIXME:
 ** - should we have XIA specific protocols for use in the addrinfo structure, or should it always be 0?
 ** - do something with the fallback flag
@@ -35,8 +85,6 @@
 ** philisophical questions:
 ** - is there an equivilent loopback address in XIA?
 ** - are there well know SIDs in XIA that should be findable in a getservbyname function?
-** - are there multiple interfaces allowed in XIA?
-** - are multiple AD/HIDs allowed on either the same interface, or different interfaces?
 */
 
 //#define DAG_PLUS4ID   "RE ( %s ) %s %s"
@@ -45,10 +93,19 @@
 //#define DAG_F 		  "RE ( %s %s )"
 #define XID_LEN		  64
 
+#define CONFIG_PATH_BUF_SIZE 1024
+#define RESOLV_CONF "/etc/resolv.conf"
+/*! \endcond */
+
+/*! struct xid_t
+** @brief XID definition
+** @var xid_t::s_type
+** @var xid_t::s_id
+*/
+
 
 // XIA specific addrinfo error strings
 static const char *xerr_unimplemented = "This feature is not currently supported";
-
 
 
  const char *Xgai_strerror(int code)
@@ -67,8 +124,7 @@ static const char *xerr_unimplemented = "This feature is not currently supported
 	return msg;
  }
 
-#define CONFIG_PATH_BUF_SIZE 1024
-#define RESOLV_CONF "/etc/resolv.conf"
+
 
 // Read DAG for rendezvous server data plane from resolv.conf
 int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
@@ -163,6 +219,8 @@ static int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, 
 
 /*!
 ** @brief Get the full DAG of the remote socket.
+**
+** \todo flesh out Xgetaddrinfo() text
 **
 ** @param sockfd An Xsocket of type SOCK_STREAM
 ** @param dag A sockaddr to hold the returned DAG.
