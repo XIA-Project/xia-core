@@ -24,6 +24,7 @@ typedef enum {
 	FETCHING,
 	CACHING,
 	EVICTING,
+	READY_TO_SAVE,
 	PURGING
 } chunk_states;
 
