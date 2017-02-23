@@ -12,6 +12,7 @@ UTILITIES=     \
 	xarp       \
 	xdag       \
 	xdebug     \
+	xdocs      \
 	xianet     \
 	xinfo      \
 	xlog       \
@@ -73,6 +74,9 @@ $(MANDIR)/xtop.1: ./xtop
 
 $(MANDIR)/xwrap.1: ./xwrap
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "run application using the XIA interposition library" ./$< -o$@
+
+$(MANDIR)/xdocs.1: ./xdocs
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "view online documentation" ./$< -o$@
 
 $(MANDIR):
 	@[ ! -d $(MANDIR) ] && mkdir $(MANDIR)

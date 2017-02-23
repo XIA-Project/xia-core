@@ -1,0 +1,83 @@
+#!/bin/bash
+VERSION="xdocs 1.0"
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+DOCS=$XIADIR/doc
+INDEX=$DOCS/html/index.html
+
+LOCAL=file:///$INDEX
+NOTFOUND=file:///$DOCS/notfound.html
+API=http://cs.cmu.edu/~xia/api/
+WIKI=https://github.com/XIA-Project/xia-core/wiki/
+HOMEPAGE=http://cs.cmu.edu/~xia/
+
+
+help() {
+	cat << EOH
+xdocs [-aowxhv]
+
+view XIA documentation in a browser
+
+options:
+  -a view the local copy of the API documentation (default)
+  -o view the online API documentation
+  -w view the XIA wiki
+  -x view the XIA home page
+
+  -h display this help
+  -v display the version number
+EOH
+exit 0
+}
+
+URL=$LOCAL
+if [ ! -f $INDEX ]; then
+	URL=$NOTFOUND
+fi
+
+[ "$1" == "--version" ] && echo $VERSION && exit 0
+
+while getopts "ahovwx" opt; do
+	case $opt in
+		a)
+			;;
+		o)
+			URL=$API
+			;;
+		w)
+			URL=$WIKI
+			;;
+		x)
+			URL=$HOMEPAGE
+			;;
+		v)
+			echo $VERSION
+			exit 0
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+
+if  hash lynx ; then
+	BROWSER=lynx
+elif hash elinks; then
+	BROWSER=elinks
+elif  hash links; then
+	BROWSER=links
+fi
+
+if xset q &>/dev/null ; then
+	BROWSER=xdg-open
+fi
+
+if [ $BROWSER ]; then
+$BROWSER $URL
+else
+	echo no browser found
+fi
