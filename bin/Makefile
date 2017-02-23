@@ -13,6 +13,7 @@ UTILITIES=     \
 	xdag       \
 	xdebug     \
 	xdocs      \
+	xiaman     \
 	xianet     \
 	xinfo      \
 	xlog       \
@@ -47,6 +48,9 @@ $(MANDIR)/xdag.1: ./xdag
 
 $(MANDIR)/xdebug.1: ./xdebug
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "attach gdb to a running process" ./$< -o$@
+
+$(MANDIR)/xiaman.1: ./xiaman
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "display XIA man pages" ./$< -o $@
 
 $(MANDIR)/xianet.1: ./xianet
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "control XIA node" ./$< -o $@
