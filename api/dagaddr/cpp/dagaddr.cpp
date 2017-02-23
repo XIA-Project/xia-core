@@ -307,6 +307,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		if (!found) {
 			ptr_->type = 0;
 			printf("WARNING: Unrecognized XID type: %s\n", typestr.c_str());
+			delete ptr_;
+			throw std::range_error("Creating Node from unknown XID");
 		}
 	}
 
@@ -331,13 +333,18 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		if (id_str.length() != 40)
 		{
 			printf("WARNING: XID string must be 40 characters (20 hex digits): %s\n", id_str.c_str());
-			return;
+			delete ptr_;
+			throw std::range_error("XID string must be 40 characters");
 		}
 		for (std::size_t i = 0; i < ID_LEN; i++)
 		{
 			int num = stoi(id_str.substr(2*i, 2), 0, 16);
 			if (num == -1)
+			{
 				printf("WARNING: Error parsing XID string (should be 20 hex digits): %s\n", id_str.c_str());
+				delete ptr_;
+				throw std::range_error("Error parsing XID string");
+			}
 			else {
                 const uint8_t byte = (uint8_t) num;
 				memcpy(&(ptr_->id[i]), &byte, 1);
@@ -1471,8 +1478,7 @@ Graph::construct_from_dag_string(std::string dag_string)
 	if (check_dag_string(dag_string) == -1)
 	{
 		printf("WARNING: DAG string is malformed: %s\n", dag_string.c_str());
-		add_node(Node()); // Add one dummy node to keep other code from blowing up
-		return;
+		throw std::range_error("Invalid DAG string");
 	}
 
 	// remove newline chars
@@ -1546,8 +1552,7 @@ Graph::construct_from_re_string(std::string re_string)
 	if (check_re_string(re_string) == -1)
 	{
 		printf("WARNING: RE string is malformed: %s\n", re_string.c_str());
-		add_node(Node()); // Add one dummy node to keep other code from blowing up
-		return;
+		throw std::range_error("Malformed RE string");
 	}
 
 	// split on ' '
@@ -1773,7 +1778,7 @@ Graph::from_sockaddr(const sockaddr_x *s)
 	// FIXME: This function should return an error instead of empty Graph
 	if(s->sx_family != AF_XIA) {
 		printf("Graph::from_sockaddr: Error: sockaddr_x family is not XIA\n");
-		return;
+		throw std::range_error("sockaddr_x family is not XIA");
 	}
 
 	uint8_t num_nodes = s->sx_addr.s_count;
