@@ -8,6 +8,7 @@ LDFLAGS +=-lprotobuf -lc -ldl -lcrypto -lssl $(XLIB)/libdagaddr.so
 
 SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XgetDAGbyName.c Xinit.c  \
+	XdefaultInterface.c \
 	Xrecv.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
 	XupdateDAG.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
 	Xmsg.c Xfork.c Xnotify.c \

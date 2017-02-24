@@ -498,8 +498,7 @@ Graph::Graph(std::string dag_string)
 	}
 	else
 	{
-		printf("WARNING: dag_string must be in either DAG or RE format. Returning empty Graph.\n");
-		add_node(Node());
+		throw std::range_error("Improperly formatted string");
 	}
 }
 
@@ -1775,7 +1774,6 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 void
 Graph::from_sockaddr(const sockaddr_x *s)
 {
-	// FIXME: This function should return an error instead of empty Graph
 	if(s->sx_family != AF_XIA) {
 		printf("Graph::from_sockaddr: Error: sockaddr_x family is not XIA\n");
 		throw std::range_error("sockaddr_x family is not XIA");
