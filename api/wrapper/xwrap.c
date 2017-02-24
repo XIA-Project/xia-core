@@ -1834,7 +1834,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 {
 	int rc;
 
-	TRACE();
+	// TRACE();
 
 	selectDump(nfds, readfds, writefds, exceptfds, 0);
 
@@ -1843,7 +1843,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 	if (rc > 0) {
 		// we found at least one event
-		selectDump(nfds, readfds, writefds, exceptfds, 1);
+		// selectDump(nfds, readfds, writefds, exceptfds, 1);
 	}
 
 	return rc;
