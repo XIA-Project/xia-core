@@ -1,11 +1,33 @@
 #include "stage_utils.h"
-
+#include <stdlib.h> 
+#include <errno.h>
+#include <unistd.h>
+#include <getopt.h>
 #define VERSION "v1.0"
 #define TITLE "XIA Advanced FTP Server"
 
 char myAD[MAX_XID_SIZE];
 char myHID[MAX_XID_SIZE];
 char my4ID[MAX_XID_SIZE];
+int CHUNKSIZE = 512 * 1024;
+void getConfig(int argc, char** argv)
+{
+        int c;
+        opterr = 0;
+
+        while ((c = getopt(argc, argv, "c:")) != -1) {
+                switch (c) {
+                        case 'c':
+                        	if ((CHUNKSIZE = atoi(optarg)) != 0) {
+                            	CHUNKSIZE *= 1024;
+                       		}
+                        	break;
+                        
+                        default:
+                                break;
+                }
+        }
+}
 
 void *recvCmd (void *socketid) 
 {
@@ -105,8 +127,9 @@ say("Receive cmd: %s\n", cmd);
 	pthread_exit(NULL);
 }
 
-int main() 
-{	
+int main(int argc, char **argv) 
+{
+	getConfig(argc, argv);	
 	int ftpListenSock = registerStreamReceiver(getXftpName(), myAD, myHID, my4ID);
 	blockListener((void *)&ftpListenSock, recvCmd);
 	return 0;

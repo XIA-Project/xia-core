@@ -36,7 +36,7 @@
 #define XIA_MAX_BUF 15600
 #define MAX_CID_NUM 3
 
-#define CHUNKSIZE 1024 * 512
+//#define CHUNKSIZE 1024 * 512
 
 #define REREQUEST 6
 #define NUM_CHUNKS 1 // 12 is the max NUM_CHUNKS to fetch at one time for 1024 K
