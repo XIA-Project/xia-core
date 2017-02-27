@@ -61,6 +61,7 @@
 #include "Xutil.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+#include "xns.h"
 #include <algorithm>
 #include "minIni.h"
 #include <map>
@@ -208,7 +209,7 @@ typedef std::vector<std::string> address_t;
 
 static address_t addresses;
 
-// ID (IP-port) <=> DAG mapping tables *****************************
+// ID (IP:port) <=> DAG mapping tables *****************************
 typedef std::map<std::string, std::string> id2dag_t;
 typedef std::map<std::string, std::string> dag2id_t;
 typedef std::map<std::string, std::string> id2host_t;
@@ -471,7 +472,7 @@ static char *_NewSID(char *buf, unsigned len, unsigned short port)
 
 
 
-// convert a IPv4 sockaddr into an id string in the form of A.B.C.D-port
+// convert a IPv4 sockaddr into an id string in the form of A.B.C.D:port
 static char *_IDstring(char *s, unsigned len, const struct sockaddr_in* sa)
 {
 	char ip[ID_LEN];
@@ -482,13 +483,13 @@ static char *_IDstring(char *s, unsigned len, const struct sockaddr_in* sa)
 	if (sa->sin_port == 0)
 		snprintf(s, len, "%s", ip);
 	else
-		snprintf(s, len, "%s-%u", ip, ntohs(sa->sin_port));
+		snprintf(s, len, "%s:%u", ip, ntohs(sa->sin_port));
 	return s;
 }
 
 
 
-// convert a hostname&port into an id string in the form of hostname-port
+// convert a hostname&port into an id string in the form of hostname:port
 static const char *_hoststring(char *s, unsigned len, const char *name, unsigned short port)
 {
 
@@ -496,7 +497,7 @@ MSG("%s:%u\n", name, ntohs(port));
 
 	if (port != 0) {
 		// make an id from the ip address and port
-		snprintf(s, len, "%s-%u", name, ntohs(port));
+		snprintf(s, len, "%s:%u", name, ntohs(port));
 	} else {
 		// just use the hostname
 		strncpy(s, name, len);
@@ -584,7 +585,7 @@ static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 		MSG("Found: %s\n", id);
 
 		// chop name into ip address and port
-		char *p = strchr(id, '-');
+		char *p = strchr(id, ':');
 		*p++ = 0;
 
 		inet_pton(AF_INET, id, &sin->sin_addr);
@@ -644,9 +645,9 @@ static int _Register(const struct sockaddr_in *sa)
 		MSG("rc:%d err:%s\n", rc, strerror(rc));
 	}
 
-	// register it in the name server with the ip-port id
-	XregisterName(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
-	//XregisterName(_hoststring(hname, HOSTLEN, hostname, sa->sin_port), (sockaddr_x*)ai->ai_addr);
+	// register it in the name server with the ip:port id
+	XregisterAddrID(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
+	XregisterHostID(_hoststring(hname, HOSTLEN, hostname, sa->sin_port), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -692,25 +693,24 @@ static int _ReverseLookup(const sockaddr_x *sax, struct sockaddr_in *sin)
 {
 	int rc = 0;
 	char id[ID_LEN];
-	socklen_t slen = sizeof(sockaddr_x);
 
 	if (_x2i(sax, sin) < 0) {
 		// we don't have a local mapping for this yet
 
 		// See if it's in the nameserver
-		if ( XgetNamebyDAG(id, ID_LEN, sax, &slen) >= 0) {
+		if ( XgetAddrIDbyDAG(id, ID_LEN, sax) >= 0) {
 			// found on the name server
 			MSG("reverse lookup = %s\n", id);
 
 			// chop name into ip address and port
-			char *p = strchr(id, '-');
+			char *p = strchr(id, ':');
 			*p++ = 0;
 
 			inet_pton(AF_INET, id, &sin->sin_addr);
 			sin->sin_port = htons(atoi(p));
 			sin->sin_family = AF_INET;
 
-			*(p-1) = '-';
+			*(p-1) = ':';
 
 			// put it into the mapping tables
 			Graph g(sax);
