@@ -428,6 +428,41 @@ Node::to_string() const
 	return type_string() + ":" + id_string();
 }
 
+
+/**
+ * @brief Check if the XID represented by this node is valid
+ *
+ * @return true if node has a valid XID, false otherwise
+ */
+bool
+Node::has_valid_xid() const
+{
+	bool valid = false;
+
+	// Check that the type is not dummy
+	switch (this->type()) {
+		case XID_TYPE_UNKNOWN:
+		case XID_TYPE_DUMMY_SOURCE:
+			valid = false;
+			break;
+		case XID_TYPE_AD:
+		case XID_TYPE_IP:
+		case XID_TYPE_CID:
+		case XID_TYPE_FID:
+		case XID_TYPE_HID:
+		case XID_TYPE_SID:
+			valid = true;
+		default:
+			std::string s = xids[this->type()];
+			if (!s.empty()) {
+				valid = true;
+			}
+	}
+
+	return valid;
+}
+
+
 /**
 * @brief Create an empty graph
 *
@@ -1185,6 +1220,37 @@ Graph::xid_str_from_index(std::size_t node) const
 		return "";
 	}
 	return nodes_[node].to_string();
+}
+
+/**
+ * @brief Check if this is a valid graph
+ *
+ * Make sure this Graph represents a valid XIA DAG. For now we just do
+ * a bunch of simple checks like making sure there's at least one node
+ * and that the intent node has a valid XID type.
+ *
+ * @return true if the graph is valid, false otherwise
+ */
+
+bool
+Graph::is_valid() const
+{
+	// A series of checks to make sure this is a valid graph
+
+	// Should have at least one node
+	if (num_nodes() < 1) {
+		return false;
+	}
+
+	// Ensure that the Node at intent index has a valid XID type
+	std::size_t intent = final_intent_index();
+	Node intent_node = nodes_[intent];
+	if (!intent_node.has_valid_xid()) {
+		return false;
+	}
+
+	// All checked out fine
+	return true;
 }
 
 /**
