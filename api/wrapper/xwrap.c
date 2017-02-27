@@ -197,7 +197,7 @@ DECLARE(int, clone, int (*fn)(void *), void *child_stack,int flags, void *arg, .
 
 
 // local "IP" address & name ***************************************
-#define HOSTLEN 64
+#define HOSTLEN 256
 
 char hostname[HOSTLEN];
 struct ifaddrs default_ifa;
@@ -599,7 +599,7 @@ static int _x2i(const sockaddr_x *sax, sockaddr_in *sin)
 	return rc;
 }
 
-// Try to register our hostname with them esapping server
+// Try to register our hostname with the mapping server
 // we need a host only entry for the xgetXbyY functions
 // and also for getaddrinfo when called with no service
 static int _RegisterHost()
@@ -634,7 +634,11 @@ static int _Register(const struct sockaddr_in *sa)
 	struct addrinfo *ai;
 
 	// create a DAG for this host in the form of "(4ID) AD HID SID"
-	rc = Xgetaddrinfo(NULL, _NewSID(sid, sizeof(sid), sa->sin_port), NULL, &ai);
+	if (_NewSID(sid, sizeof(sid), sa->sin_port) == NULL) {
+		return 0;
+	}
+
+	rc = Xgetaddrinfo(NULL, sid, NULL, &ai);
 
 	if (rc != 0) {
 		MSG("rc:%d err:%s\n", rc, strerror(rc));
@@ -642,7 +646,7 @@ static int _Register(const struct sockaddr_in *sa)
 
 	// register it in the name server with the ip-port id
 	XregisterName(_IDstring(id, ID_LEN, sa), (sockaddr_x*)ai->ai_addr);
-	XregisterName(_hoststring(hname, HOSTLEN, hostname, sa->sin_port), (sockaddr_x*)ai->ai_addr);
+	//XregisterName(_hoststring(hname, HOSTLEN, hostname, sa->sin_port), (sockaddr_x*)ai->ai_addr);
 
 	// put it into the mapping tables
 	Graph g((sockaddr_x*)ai->ai_addr);
@@ -1164,7 +1168,10 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len)
 
 		if (FORCE_XIA()) {
 			// create a mapping from IP/port to a dag and register it
-			_Register(&sin);
+			if (!_Register(&sin)) {
+				errno = EADDRNOTAVAIL;
+				return -1;
+			}
 
 			char id[ID_LEN];
 			_IDstring(id, ID_LEN, &sin);
@@ -1834,7 +1841,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 {
 	int rc;
 
-	// TRACE();
+	TRACE();
 
 	selectDump(nfds, readfds, writefds, exceptfds, 0);
 
