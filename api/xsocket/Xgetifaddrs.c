@@ -183,7 +183,7 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 	int rc;
 
 	// A socket that Click can associate us with
-	int sockfd = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	int sockfd = MakeApiSocket(SOCK_DGRAM);
 	if(sockfd < 0) {
 		LOG("Xgetifaddrs: unable to create Xsocket");
 		return -1;
@@ -227,7 +227,9 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 		LOG("Xgetifaddrs: ERROR: Invalid response for XGETIFADDRS request");
 		rc = -1;
 	}
-	Xclose(sockfd);
+
+	freeSocketState(sockfd);
+	(_f_close)(sockfd);
 	return rc;
 }
 
