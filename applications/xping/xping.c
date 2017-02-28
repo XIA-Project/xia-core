@@ -38,6 +38,8 @@
 
 #include "xip.h"
 
+#define VER_STR     "xping 1.1"
+
 #define	MAXWAIT		10		// max time to wait for response, sec.
 #define	MAXPACKET	1024	// max packet size
 #define VERBOSE		0x01	// verbose flag
@@ -65,7 +67,7 @@ size_t datalen;		// How much data
 sockaddr_x whereto;
 sockaddr_x wherefrom;
 
-char usage[] = "Usage:  xping [-fqrv] host [packetsize [count [preload]]]\n";
+char usage[] = "Usage:  xping [-fhqvV] host [packetsize [count [preload]]]\n";
 
 char *hostname;
 int npackets;
@@ -85,6 +87,32 @@ float interval = 1;
 int rc = 0;
 int srcSet = 0;
 
+void help()
+{
+	printf("xping [-fqrv] [-c COUNT] [-i INTERVAL] [-l PRELOAD] [-s PKTSIZE] host\n\n");
+
+	printf("options:\n");
+	printf("  -c COUNT\n");
+	printf("     stop after sending pings\n");
+	printf("  -h, --help\n");
+	printf("     display this help\n");
+	printf("  -f flood ping. For every ECHO_REQUEST sent a period '.' is printed,\n");
+	printf("     while for ever ECHO_REPLY received a backspace is printed. This\n");
+	printf("     provides a rapid display of how many packets are being dropped.\n");
+	printf("  -i INTERVAL\n");
+	printf("     wait interval seconds between packets\n");
+	printf("  -l PRELOAD\n");
+	printf("     fire off PRELOAD packets immediately\n");
+	printf("     wait interval seconds between pings\n");
+	printf("  -q quiet mode\n");
+	printf("  -s PKTSIZE\n");
+	printf("     send packets of size PKTSIZE bytes\n");
+	printf("  -v verbose output\n");
+	printf("  -V  --version\n");
+	printf("     display the version number\n");
+	exit(0);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -92,6 +120,8 @@ int main(int argc, char **argv)
 	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
+
+	datalen = 64 - 8;
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
@@ -102,6 +132,14 @@ int main(int argc, char **argv)
 			}
 
 			switch (*av[0]) {
+			case '-':
+				// see if it's a long option
+				if (strcmp(av[0], "-version") == 0) {
+					printf("%s\n", VER_STR);
+					return 0;
+				} else if  (strcmp(av[0], "-help") == 0) {
+					help();
+				}
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
@@ -119,26 +157,39 @@ int main(int argc, char **argv)
 				argc--, av++;
 				npackets = atoi(av[0]);
 				break;
-			case 't':
+			case 'l':
 				argc--, av++;
-				catcher_timeout = atoi(av[0]);
+				preload = atoi(av[0]);
 				break;
 			case 's':
 				argc--, av++;
-				len = sizeof(wherefrom);
-				srcSet = 1;
-				if (XgetDAGbyName(av[0], &wherefrom, &len) < 0) {
-					printf("Error Resolving XID\n");
-					exit(-1);
-				}
+				datalen = atoi(av[0]);
+				break;
+			// case 't':
+			// 	argc--, av++;
+			// 	catcher_timeout = atoi(av[0]);
+			// 	break;
+			// case 's':
+			// 	argc--, av++;
+			// 	len = sizeof(wherefrom);
+			// 	srcSet = 1;
+			// 	if (XgetDAGbyName(av[0], &wherefrom, &len) < 0) {
+			// 		printf("Error Resolving XID\n");
+			// 		exit(-1);
+			// 	}
+			// 	break;
+			case 'V':
+				printf("%s\n", VER_STR);
+				return 0;
+			case 'h':
+				help();
 				break;
 			}
 		}
 		argc--, av++;
 	}
-	if (argc < 1 || argc > 4)  {
-	  printf("%s",usage);
-		exit(1);
+	if (argc != 1)  {
+		help();
 	}
 
 	len = sizeof(whereto);
@@ -149,11 +200,6 @@ int main(int argc, char **argv)
 	  exit(-1);
 	}
 
-	if (argc >= 2) {
-		datalen = atoi(av[1]);
-	} else {
-		datalen = 64 - 8;
-	}
 	if (datalen > MAXPACKET) {
 		fprintf(stderr, "ping: packet size too large: max allowed size = %d\n", MAXPACKET);
 		exit(1);
@@ -161,13 +207,6 @@ int main(int argc, char **argv)
 	if (datalen >= 8) {
 		// can we time 'em?
 		timing = 1;
-	}
-	if (argc >= 3) {
-		npackets = atoi(av[2]);
-	}
-
-	if (argc == 4) {
-		preload = atoi(av[3]);
 	}
 
 	ident = htons(getpid() & 0xFFFF);
@@ -454,7 +493,7 @@ void pr_pack(u_char *buf, int cc, char *from)
 			printf("from %s\n\n", from);
 
 		} else {
-			putchar('b');
+			putchar('\b');
 			fflush(stdout);
 		}
 	}

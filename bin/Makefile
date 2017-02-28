@@ -20,8 +20,10 @@ UTILITIES=     \
 	xmakehosts \
 	xmodified  \
 	xnetstat   \
+	xping      \
 	xroute     \
 	xtop       \
+	xtraceroute\
 	xwrap
 
 
@@ -70,11 +72,17 @@ $(MANDIR)/xmodified.1: ./xmodified
 $(MANDIR)/xnetstat.1: ./xnetstat
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "manage socket table" ./$< -o$@
 
+$(MANDIR)/xping.1: ./xping
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "send XCMP ECHO_REQUEST to network hosts" ./$< -o$@
+
 $(MANDIR)/xroute.1: ./xroute
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "manage XIA route tables" ./$< -o$@
 
 $(MANDIR)/xtop.1: ./xtop
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "display XIA system processes in top" ./$< -o$@
+
+$(MANDIR)/xtraceroute.1: ./xtraceroute
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "print the route packets trace to network host" ./$< -o$@
 
 $(MANDIR)/xwrap.1: ./xwrap
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "run application using the XIA interposition library" ./$< -o$@
