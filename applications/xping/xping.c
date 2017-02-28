@@ -67,8 +67,6 @@ size_t datalen;		// How much data
 sockaddr_x whereto;
 sockaddr_x wherefrom;
 
-char usage[] = "Usage:  xping [-fhqvV] host [packetsize [count [preload]]]\n";
-
 char *hostname;
 int npackets;
 int preload = 0;		// number of packets to "preload"
@@ -89,7 +87,7 @@ int srcSet = 0;
 
 void help()
 {
-	printf("xping [-fqrv] [-c COUNT] [-i INTERVAL] [-l PRELOAD] [-s PKTSIZE] host\n\n");
+	printf("xping [-fqrvV] [-c COUNT] [-i INTERVAL] [-l PRELOAD] [-s PKTSIZE] host\n\n");
 
 	printf("options:\n");
 	printf("  -c COUNT\n");
@@ -140,6 +138,7 @@ int main(int argc, char **argv)
 				} else if  (strcmp(av[0], "-help") == 0) {
 					help();
 				}
+				break;
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
