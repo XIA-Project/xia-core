@@ -182,7 +182,6 @@ void process(int sock)
 	// 	break;
 	// }
 	int count = 0;
-	printf("185\n");
 	while ((count = Xrecv(sock, buf, sizeof(buf), 0)) != 0) {
 		say("%5d received %d bytes\n", pid, count);
 		n += count;

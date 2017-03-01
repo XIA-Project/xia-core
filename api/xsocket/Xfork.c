@@ -121,6 +121,10 @@ int Xfork(void)
 			// fork failed, so don't bother to check return value here
 			makeList(false);
 			errno = e;
+
+		} else if (rc == 0) {
+			// reset the select socket id so the child generates a new one
+			_select_fd = -1;
 		}
 
 	} else {

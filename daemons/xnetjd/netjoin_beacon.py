@@ -19,6 +19,7 @@ class NetjoinBeacon(object):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
         self.xip_netid = None
+        self.xip_hid = None
         self.raw_verify_key = None
 
     def beacon_str(self):
@@ -50,9 +51,11 @@ class NetjoinBeacon(object):
         self._update_object_from_net_descriptor()
 
     # For now we just build a beacon with a dummy AuthCapStruct
-    def initialize(self, raw_verify_key, l2_type, guid=None, xip_netid=None):
+    def initialize(self, raw_verify_key, l2_type, guid=None, xip_netid=None,
+            xip_hid=None):
         self.guid = guid
         self.xip_netid = xip_netid
+        self.xip_hid = xip_hid
         self.raw_verify_key = raw_verify_key
 
         if self.guid == None:
@@ -97,6 +100,8 @@ class NetjoinBeacon(object):
         # The network provides XIP with NID xip_netid
         node3.xip.is_global = True
         node3.xip.NetworkId = self.xip_netid
+        if self.xip_hid != None:
+            node3.xip.HostId = self.xip_hid
 
         # 4 edges total
         edge1 = auth_cap.edges.add()

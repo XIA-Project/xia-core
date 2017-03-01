@@ -208,7 +208,7 @@ int process(int sock)
 	else
 		size = pktSize;
 	randomString(buf1, size);
-	printf("%d\n", (int)size);
+
 	int count = size;
 
 	sent = Xsend(sock, buf1, count, 0);
