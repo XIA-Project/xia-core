@@ -78,8 +78,8 @@ sock::sock(
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	port = apiport;
 	transport = trans;
@@ -129,8 +129,8 @@ sock::sock() {
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	refcount = 1;
 	xcacheSock = false;
@@ -945,6 +945,14 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
+				// Check if this new request was modified by rendezvous service
+				bool rv_modified_dag = false;
+
+				XIAPath bound_dag = sk->get_src_path();
+				XIAPath pkt_dag = dst_path; // Our address that client sent
+				if (usingRendezvousDAG(bound_dag, pkt_dag)) {
+					rv_modified_dag = true;
+				}
 
 				uint8_t hop_count = -1;
 				// we have received a syn for CID,
@@ -983,6 +991,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
+				new_sk->rv_modified_dag = rv_modified_dag;
 				int iface;
 				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 					new_sk->outgoing_iface = iface;
