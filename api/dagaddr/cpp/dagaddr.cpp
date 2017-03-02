@@ -1987,7 +1987,12 @@ Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
 	paths.push_back(nodes_[node]);
 
 	// Follow all outgoing edges; sink will have none
-	std::vector<std::size_t> out_edges = get_out_edges(node);
+	std::vector<std::size_t> out_edges;
+	if (node == source_index()) {
+		out_edges = get_out_edges(-1); // get_out_edges takes dag string index
+	} else {
+		out_edges = get_out_edges(node);
+	}
 	std::vector<std::size_t>::const_iterator it;
 	for(it = out_edges.begin(); it != out_edges.end(); it++) {
 		// Recursively follow each outgoing edge
