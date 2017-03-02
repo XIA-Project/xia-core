@@ -56,6 +56,8 @@ extern sendto_t _f_sendto;
 extern recvfrom_t _f_recvfrom;
 extern fork_t _f_fork;
 
+extern __thread int _select_fd;
+
 extern size_t api_mtu();
 
 }

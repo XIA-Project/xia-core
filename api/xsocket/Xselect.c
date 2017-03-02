@@ -146,7 +146,11 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	// the rfds (Real fd) list has the fds flipped negative for the xsockets so they will be ignored
 	//  for the same reason
 
-	sock = MakeApiSocket(SOCK_DGRAM);
+	if (_select_fd == -1) {
+		_select_fd = MakeApiSocket(SOCK_DGRAM);
+		printf("select_fd = %d\n", _select_fd);
+	}
+	sock = _select_fd;
 
 	click_send(sock, &xsm);
 
@@ -238,10 +242,10 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 done:
 	int eno = errno;
-	if (sock > 0) {
-		freeSocketState(sock);
-		(_f_close)(sock);
-	}
+	// if (sock > 0) {
+	// 	freeSocketState(sock);
+	// 	(_f_close)(sock);
+	// }
 	free(rfds);
 	free(s2i);
 	errno = eno;
@@ -365,7 +369,10 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 		goto done;
 	}
 
-	sock = MakeApiSocket(SOCK_DGRAM);
+	if (_select_fd == -1) {
+		_select_fd = MakeApiSocket(SOCK_DGRAM);
+	}
+	sock = _select_fd;
 
 	pollMsg->set_type(xia::X_Poll_Msg::DOPOLL);
 	pollMsg->set_nfds(nx);
@@ -463,10 +470,10 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 
 done:
 	int eno = errno;
-	if (sock > 0) {
-		freeSocketState(sock);
-		(_f_close)(sock);
-	}
+	// if (sock > 0) {
+	// 	freeSocketState(sock);
+	// 	(_f_close)(sock);
+	// }
 	free(s2i);
 	errno = eno;
 	return (rc <= 0 ? rc : count);
