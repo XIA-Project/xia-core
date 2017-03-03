@@ -90,13 +90,12 @@ done:
 /*!
 ** @brief Creates a new process by duplicating the calling process.
 **
-** This function is required to be used rather than the standard fork()
+** This function must be used rather than the standard fork()
 ** call when uisng Xsockets. Because all of the XIA code resides in user
 ** space, we don't get the correct behavior from systems calls that affect
-*** the kernel. Xfork() wraps the system fork() call so that we can we can
-** maintain correct internal socket state. This prevents issues such as
-** calling Xclose() in the child process also closing the same socket in the
-** parent process.
+** the kernel. Xfork() wraps the system fork() call so that correct internal
+** socket state is maintained. This prevents issues such as calling Xclose()
+** in a child process also closing the same socket in the parent process.
 **
 ** @note See the man page for the standard fork() call for more details.
 *

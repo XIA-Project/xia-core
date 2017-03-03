@@ -402,6 +402,21 @@ static int manageFID(const char *fid, bool create)
 	return rc;
 }
 
+/*!
+** @brief create and register an FID
+**
+** Returns a text string containing a FID made from the a 160 bit cryptographic hash
+** from a newly created public/private keypair in the form of <code>FID:nnnnn....</code>.
+**
+** The new FID is also registered in the local routing table so that destination
+** DAGs using the FID will be handled locally.
+**
+** @param fid  a buffer to receive the newly created FID.
+** @param len  the length of fid. If less then 45 characters an error will be returned.
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int XcreateFID(char *fid, int len)
 {
 	int tlen = strlen(FID_PREFIX);
@@ -418,6 +433,17 @@ int XcreateFID(char *fid, int len)
 	return manageFID(fid, true);
 }
 
+/*!
+** @brief delete and un-register an FID
+**
+** Remove the FID from the local routing table and delete
+** the associated keypair.
+**
+** @param fid  the FID to remove
+**
+** @returns 0 on success
+** @returns -1 on error
+*/
 int XremoveFID(const char *fid)
 {
 	int tlen = strlen(FID_PREFIX);

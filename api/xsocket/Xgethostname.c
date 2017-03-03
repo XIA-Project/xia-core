@@ -35,7 +35,7 @@
 /*!
 ** @brief get the XIA host name
 **
-* * Returns teh XIA host name in a null-terminated string.
+* * Returns the XIA host name in a null-terminated string.
 **
 ** @param name the destination for the host name. On exit name
 ** contains a null terminated string. It will be truncated if

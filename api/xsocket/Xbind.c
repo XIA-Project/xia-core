@@ -20,13 +20,13 @@
 */
 
 #include "Xsocket.h"
-/*! \cond */
+/** @cond */
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
 #include <errno.h>
 #include "dagaddr.hpp"
-/*! \endcond */
+/** @endcond */
 
 /*!
 ** @brief bind a DAG to an Xsocket

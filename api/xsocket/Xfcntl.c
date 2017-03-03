@@ -38,21 +38,15 @@
 **
 ** Xfcntl() can take an optional third argument.  Whether or not this
 ** argument is required is determined by cmd.  The required argument
-** type is indicated in parentheses after each cmd name (in most
-** cases, the required type is int, and we identify  the  argument  using
-**  the name arg), or void is specified if the argument is not required.
-**
-** File status flags
-**	F_GETFL (void)
-**		Get the file access mode and the file status flags; arg is ignored.
-**
-**	F_SETFL (int)
-**		Currently only O_NONBLOCK is allowed
+** type is an int or void if the argument is not required.
 **
 ** @note See the man page for the standard fcntl() call for more details.
 **
 ** @param sockfd a file descriptor create by Xsocket()
 ** @param cmd the command to execute
+** <br/>F_GETFL: Get the socket's status flags
+** <br/>F_SETFL: Set the socket's flags. Currently only O_NONBLOCK is
+** supported. Other flags are ignored but do not cause an error.
 ** @param arg the flag to set if cmd == F_GETFL, otherwise omitted
 **
 ** @returns  socket flags if cmd == F_GETFL

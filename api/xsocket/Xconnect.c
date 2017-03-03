@@ -160,7 +160,7 @@ static int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 /*!
 ** @brief Initiate a connection on a socket
 **
-*I The  Xconnect() call connects the socket referred to by the sockfd to the
+** The  Xconnect() call connects the socket referred to by the sockfd to the
 ** address specified by addr.
 **
 ** If sockfd is of type SOCK_DGRAM, then addr is the address to which datagrams

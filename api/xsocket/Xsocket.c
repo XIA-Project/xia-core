@@ -18,11 +18,11 @@
  @file Xsocket.c
  @brief Xsocket() - create a socket
 */
-
+#include "Xsocket.h"
+/*! \cond */
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include <stdlib.h>
@@ -30,6 +30,7 @@
 #include <limits.h>
 #include <pthread.h>
 #include <errno.h>
+/*! \endcond */
 
 /*!
 ** @brief Create an XIA socket

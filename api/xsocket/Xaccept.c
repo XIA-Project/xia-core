@@ -157,6 +157,8 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 ** size of the address. addr will be truncated, if the size passed in is smaller than
 ** the actual size.
 **
+** @note See the man page for the standard accept() call for more details.
+**
 ** @returns a non-negative integer that is the new Xsocket id
 ** @returns -1 on error with errno set to an error compatible with those
 ** returned by the standard accept call.
@@ -191,6 +193,7 @@ int XacceptAs(int sockfd, struct sockaddr *remote_addr, socklen_t *remote_addrle
 ** @param flags if SOCK_NONBLOCK is set, the new socket will be non-blocking. An error
 ** will be returned if any other bits in the flags are set.
 **
+** @note See the man page for the standard accept() call for more details.
 **
 ** @returns a non-negative integer that is the new Xsocket id
 ** @returns -1 on error with errno set to an error compatible with those

@@ -38,6 +38,8 @@
 ** when the queue is full, the client will receive an error with an
 ** indication of ECONNREFUSED.
 **
+** @note See the man page for the standard listen() call for more details.
+**
 ** @param sockfd an Xsocket previously created with the SOCK_STREAM type,
 ** and bound to a local DAG with Xbind()
 ** @param backlog the number of outstanding connections allowed in the listen queue

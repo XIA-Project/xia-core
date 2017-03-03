@@ -20,9 +20,11 @@
 */
 
 #include "Xsocket.h"
+/*! \cond */
 #include "Xinit.h"
 #include "Xutil.h"
 #include <errno.h>
+/*! \endcond */
 
 static int ssoCheckSize(unsigned *size, unsigned needed)
 {
@@ -119,9 +121,14 @@ static int ssoGetParam(int param, void *optval, socklen_t *optlen)
 ** used by the API to communicate with Click.
 **
 ** Supported Options:
-**	\n XOPT_HLIM	Sets the 'hop limit' (hlim) element of the XIA header to the
+**	\n XOPT_HLIM: sets the 'hop limit' (hlim) element of the XIA header to the
 **		specified integer value. (Default is 250)
-**	\n XOPT_NEXT_PROTO Sets the next proto field in the XIA header
+**	\n XOPT_NEXT_PROTO: sets the next proto field in the XIA header
+**  \n XOPT_BLOCK: alternate method of setting the blocking flag
+**  Xfcntl() or Xsocket() is preferred
+**  \n SO_ERROR: set the socket error code inside click. (Not recommended)
+**  \n SO_DEBUG: enable debug mode for this socket
+**  \n most other socket options will do nothing and return success
 **
 ** @param sockfd	The control socket
 ** @param optname	The socket option to set
@@ -303,9 +310,15 @@ int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen)
 ** socket passed in which is used by the API to communicate with Click.
 **
 ** Supported Options:
-**	\n XOPT_HLIM	Retrieves the 'hop limit' element of the XIA header as an integer value
-**	\n XOPT_NEXT_PROTO Gets the next proto field in the XIA header
-**	\n SO_TYPE 		Returns the type of socket (SOCK_STREAM, etc...)
+**	\n XOPT_HLIM: retrieves the 'hop limit' element of the XIA header as an integer value
+**	\n XOPT_NEXT_PROTO: gets the next proto field in the XIA header
+**	\n SO_TYPE: returns the type of socket (SOCK_STREAM, etc...)
+**  \n XOPT_ERROR_PEEK: returns the socket's error code without resetting it
+**  \n SO_ACCEPTCONN: indicates whether the socket is in listen mode
+**  \n SO_ERROR: return the socket's error cod. Useful for non-blocking connect calls
+**  \n SO_DEBUG: return the value of the socket's debug flag
+**  \n SO_DOMAIN: always returns AF_XIA
+**  \n SO_PROTOCOL: returns the socket's protocol flags. Currently always 0.
 **
 ** @param sockfd	The control socket
 ** @param optname	The socket option to set (currently must be IP_TTL)
