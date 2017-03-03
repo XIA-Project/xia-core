@@ -642,13 +642,10 @@ void config(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-	int rc, selectRetVal;
+	int rc;
 	size_t found, start;
-	char recv_message[1024];
+	char recv_message[2048];
 	sockaddr_x theirDAG;
-	fd_set socks;
-	struct timeval timeoutval;
-	vector<string> routers;
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -680,19 +677,19 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
+	struct pollfd pfd;
+
+	pfd.fd = route_state.sock;
+	pfd.events = POLLIN;
 
 	time_t last_purge = time(NULL);
 	int iteration = 0;
 	while (1) {
 		iteration++;
-		FD_ZERO(&socks);
-		FD_SET(route_state.sock, &socks);
-		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = MAIN_LOOP_USEC *2; // Main loop runs every 1000 usec
 
-		// every 0.001 sec, check if any received packets
-		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
-		if (selectRetVal > 0) {
+		pfd.revents = 0;
+		rc = Xpoll(&pfd, 1, MAIN_LOOP_MSEC);
+		if (rc > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 
@@ -757,9 +754,9 @@ int main(int argc, char *argv[])
 						break;
 				}
 			}
-		} else if (selectRetVal < 0) {
+		} else if (rc < 0) {
 			perror("Xselect failed");
-			syslog(LOG_WARNING, "ERROR: Xselect returned %d", selectRetVal);
+			syslog(LOG_WARNING, "ERROR: Xselect returned %d", rc);
 		}
 		// Send HELLO every 100 ms
 		if((iteration % HELLO_ITERS) == 0) {
