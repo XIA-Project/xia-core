@@ -1240,6 +1240,11 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XMANAGEFID:
 		XmanageFID(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XUPDATEDEFIFACE:
+		Xupdatedefiface(_sport, id, &xia_socket_msg);
+		break;
+	case xia::XDEFIFACE:
+		Xdefaultiface(_sport, id, &xia_socket_msg);
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -2412,7 +2417,30 @@ void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
 	ReturnResult(_sport, xia_socket_msg);
 }
 
+void XTRANSPORT::Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg * xia_socket_msg)
+{
+	UNUSED(id);
+	UNUSED(_sport);
 
+	xia::X_UpdateDefIface_Msg *x_updatedefiface_msg =
+		xia_socket_msg->mutable_x_updatedefiface();
+	int interface = x_updatedefiface_msg->interface();
+	if (interface < 0 || interface > 4) {
+		click_chatter("ERROR: invalid default interface %d", interface);
+		return;
+	}
+	_interfaces.set_default(interface);
+}
+
+void XTRANSPORT::Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(id);
+
+	xia::X_DefIface_Msg *_msg = xia_socket_msg->mutable_x_defiface();
+	_msg->set_interface(_interfaces.default_interface());
+
+	ReturnResult(_sport, xia_socket_msg);
+}
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {

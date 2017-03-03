@@ -53,7 +53,6 @@ elementclass GenericPostRouteProc {
 elementclass XIAPacketRoute {
 	$num_ports |
 
-
 	// input: a packet to process
 	// output[0]: forward (painted)
 	// output[1]: arrived at destination node
@@ -125,11 +124,11 @@ elementclass XIAPacketRoute {
 	// if the XID should be treated like a SID and will return data to the API, add it to lines 1,3,4,6,7
 
 	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_FID[0]-> GPRP;
-	rt_AD[1], rt_HID[1], 			           rt_IP[1], rt_FID[1]-> XIANextHop -> check_dest;
-	                     rt_SID[1], rt_CID[1]			-> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+	rt_AD[1], rt_HID[1], 					   rt_IP[1], rt_FID[1]-> XIANextHop -> check_dest;
+						 rt_SID[1], rt_CID[1]					  -> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
 	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_FID[2]-> consider_next_path;
 	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3], rt_FID[3]-> Discard;
-			  			 rt_SID[3]					    -> [3]output;
+						 rt_SID[3]								  -> [3]output;
 	//NITIN disable XCMP REDIRECT messages
 	//NITIN rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] rt_FID[4]-> x; // xcmp redirect message
 };
@@ -137,7 +136,6 @@ elementclass XIAPacketRoute {
 
 elementclass RouteEngine {
 	$num_ports |
-
 
 	// input[0]: a packet arrived at the node from outside (i.e. routing with caching)
 	// input[1]: a packet to send from a node (i.e. routing without caching)
@@ -171,8 +169,9 @@ elementclass XIALineCard {
 	// output[0]: send out to network
 	// output[1]: send up to the higher stack (i.e. router or end host)
 
-	// setup XARP module
-	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE, 12/9991);  // XARP (query) or XARP (response) or XIP or XIANetJoin
+	// setup XARP & XNetJoin modules
+	//				XARP (query)	 XARP (response)  XIP	   XIANetJoin
+	c :: Classifier(12/9990 20/0001, 12/9990 20/0002, 12/C0DE, 12/9991);
 	xarpq :: XARPQuerier($mac);
 	xarpr :: XARPResponder($mac);
 
@@ -182,7 +181,7 @@ elementclass XIALineCard {
 	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
 	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
 
-    // AIP challenge-response HID verification module
+	// AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(INTERFACE $num, ACTIVE $isrouter);
 	xresp :: XIAChallengeResponder(ACTIVE $ishost);
 
@@ -190,9 +189,9 @@ elementclass XIALineCard {
 	// we only want to print/count the XIA packets
 	toNet :: Tee(3) -> Queue(200) -> [0]output;   // send all packets
 	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
-    toNet[2] -> xrespFilter :: Classifier(12/C0DE, -) -> Strip(14) -> MarkXIAHeader() -> [1]xresp[2] -> Discard
+	toNet[2] -> xrespFilter :: Classifier(12/C0DE, -) -> Strip(14) -> CheckXIAHeader -> MarkXIAHeader -> [1]xresp[2] -> Discard;
 	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
-    xrespFilter[1] -> Discard
+	xrespFilter[1] -> Discard;
 
 	// On receiving a packet from the host
 	input[1] -> xarpq;
@@ -206,10 +205,10 @@ elementclass XIALineCard {
 	input[2] -> [1]xnetj[1] -> [2]output;
 
 	// Receiving an XIA packet
-	c[2] -> Strip(14) -> MarkXIAHeader() -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> [1]output; // this should send out to [0]n;
+	c[2] -> Strip(14) -> CheckXIAHeader -> MarkXIAHeader -> [0]xchal[0] -> [0]xresp[0] -> XIAPaint($num) -> [1]output;
 
 	xchal[1] -> xarpq;
-	xresp[1] -> MarkXIAHeader() -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+	xresp[1] -> CheckXIAHeader -> MarkXIAHeader -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
 
 	// On receiving ARP response
 	c[1] -> [1]xarpq -> toNet;
@@ -232,7 +231,7 @@ elementclass IPLineCard {
 	// output[1]: send up to the higher stack (i.e. router or end host)
 
 	// Set up ARP querier and responder
-	//				ARP query		 ARP response	IP	 UDP  4ID port
+	//				ARP query		 ARP response	  IP	  UDP   4ID port
 	c :: Classifier(12/0806 20/0001, 12/0806 20/0002, 12/0800 23/11 36/35d5);
 	arpq :: ARPQuerier($ip, $mac);
 	arpr :: ARPResponder($ip/32 $mac);
@@ -257,7 +256,7 @@ elementclass IPLineCard {
 
 	// Receiving an XIA-encapped-in-IP packet; strip the ethernet, IP, and UDP headers,
 	// leaving bare XIP packet, then paint so we know which port it came in on
-	c[2] -> Strip(14) -> CheckIPHeader() -> IPClassifier(dst host $ip and dst udp port 13781) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> MarkXIAHeader
+	c[2] -> Strip(14) -> CheckIPHeader() -> IPClassifier(dst host $ip and dst udp port 13781) -> MarkIPHeader -> StripIPHeader -> Strip(8) -> CheckXIAHeader -> MarkXIAHeader
 	-> Paint($num) -> [1]output; // this should be send out to [0]n;
 
 	// Receiving an ARP Response; return it to querier
@@ -270,7 +269,7 @@ elementclass IPLineCard {
 elementclass XIADualLineCard {
 	$mac, $num, $ip , $gw, $ip_active, $ishost, $isrouter |
 
- 	// input[0]: a packet arriving from the network
+	// input[0]: a packet arriving from the network
 	// input[1]: a packet arriving from the higher stack (i.e. router or end host)
 	// output[0]: send out to network
 	// output[1]: send up to the higher stack (i.e. router or end host)
@@ -350,7 +349,7 @@ elementclass XIARoutingCore {
 
 // 2-port router
 elementclass XIARouter2Port {
-    $click_port, $hostname, $external_ip, $mac0, $mac1, |
+	$click_port, $hostname, $external_ip, $mac0, $mac1, |
 
 	// $external_ip: an ingress IP address for this XIA cloud (given to hosts via XHCP)  TODO: be able to handle more than one
 
@@ -403,7 +402,7 @@ elementclass XIARouter4Port {
 // 4-port router node with XRoute process running and IP support
 elementclass XIADualRouter4Port {
 	$click_port, $hostname, $local_ad, $external_ip,
-    $click_in_port, $click_out_port,
+	$click_in_port, $click_out_port,
 	$ip_active0, $ip0, $mac0, $gw0,
 	$ip_active1, $ip1, $mac1, $gw1,
 	$ip_active2, $ip2, $mac2, $gw2,
@@ -450,7 +449,7 @@ elementclass XIADualRouter4Port {
 
 	cf :: CacheFilter;
 
-    input => dlc0, dlc1, dlc2, dlc3 => output;
+	input => dlc0, dlc1, dlc2, dlc3 => output;
 	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]dlc0[1], [1]dlc1[1], [1]dlc2[1], [1]dlc3[1] -> [0]xrc;
 };
 

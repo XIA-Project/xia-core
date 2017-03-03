@@ -155,7 +155,7 @@ void process(int sock)
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 
-   	while (1) {
+	while (1) {
 		memset(buf, 0, sizeof(buf));
 
 		tv.tv_sec = WAIT_FOR_DATA;
@@ -182,7 +182,6 @@ void process(int sock)
 	// 	break;
 	// }
 	int count = 0;
-	printf("185\n");
 	while ((count = Xrecv(sock, buf, sizeof(buf), 0)) != 0) {
 		say("%5d received %d bytes\n", pid, count);
 		n += count;
@@ -265,8 +264,8 @@ void echo_stream()
 
 	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
 
-    if (XregisterName(STREAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", STREAM_NAME);
+	if (XregisterName(STREAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", STREAM_NAME);
 	say("registered name: \n%s\n", STREAM_NAME);
 
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
@@ -289,7 +288,7 @@ void echo_stream()
 
 		Graph g(&sa);
 		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str()); 
+		say("peer:%s\n", g.dag_string().c_str());
 
 		pid_t pid = Xfork();
 
@@ -334,8 +333,8 @@ void echo_dgram()
 	Graph g((sockaddr_x*)ai->ai_addr);
 	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
 
-    if (XregisterName(DGRAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", DGRAM_NAME);
+	if (XregisterName(DGRAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", DGRAM_NAME);
 	say("registered name: \n%s\n", DGRAM_NAME);
 
 	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {
