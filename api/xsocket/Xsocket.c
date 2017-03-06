@@ -93,10 +93,7 @@ int Xsocket(int family, int transport_type, int protocol)
 	}
 
 
-	if ((sockfd = MakeApiSocket(transport_type)) == -1) {
-		LOGF("error creating Xsocket: %s", strerror(errno));
-		return -1;
-	}
+
 
 	// protobuf message
 	xia::XSocketMsg xsm;
@@ -106,6 +103,14 @@ int Xsocket(int family, int transport_type, int protocol)
 
 	xia::X_Socket_Msg *x_socket_msg = xsm.mutable_x_socket();
 	x_socket_msg->set_type(transport_type);
+
+
+//	printf("%s\n", x_socket_msg->DebugString());
+
+		if ((sockfd = MakeApiSocket(transport_type)) == -1) {
+		LOGF("error creating Xsocket: %s", strerror(errno));
+		return -1;
+	}
 
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));

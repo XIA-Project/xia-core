@@ -41,11 +41,11 @@ class WritablePacket;
 
 class Packet { public:
 
-    /** @name Data */
-    //@{
-    // PACKET CREATION
+	/** @name Data */
+	//@{
+	// PACKET CREATION
 
-    enum {
+	enum {
 #ifdef CLICK_MINIOS
 	default_headroom = 48,		///< Increase headroom for improved performance.
 #else
@@ -54,642 +54,642 @@ class Packet { public:
 #endif
 	min_buffer_length = 64		///< Minimum buffer_length() for
 					///  Packet::make()
-    };
+	};
 
-    static WritablePacket *make(uint32_t headroom, const void *data,
+	static WritablePacket *make(uint32_t headroom, const void *data,
 				uint32_t length, uint32_t tailroom) CLICK_WARN_UNUSED_RESULT;
-    static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
-    static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
+	static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
+	static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
-    static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
+	static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_BSDMODULE
-    // Packet::make(mbuf *) wraps a Packet around an existing mbuf.
-    // Packet now owns the mbuf.
-    static inline Packet *make(struct mbuf *mbuf) CLICK_WARN_UNUSED_RESULT;
+	// Packet::make(mbuf *) wraps a Packet around an existing mbuf.
+	// Packet now owns the mbuf.
+	static inline Packet *make(struct mbuf *mbuf) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_USERLEVEL || CLICK_MINIOS
-    typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
-    static WritablePacket* make(unsigned char* data, uint32_t length,
+	typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
+	static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+								void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
 #endif
 
-    static void static_cleanup();
+	static void static_cleanup();
 
-    inline void kill();
+	inline void kill();
 
-    inline bool shared() const;
-    Packet *clone() CLICK_WARN_UNUSED_RESULT;
-    inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
+	inline bool shared() const;
+	Packet *clone() CLICK_WARN_UNUSED_RESULT;
+	inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
 
-    inline const unsigned char *data() const;
-    inline const unsigned char *end_data() const;
-    inline uint32_t length() const;
-    inline uint32_t headroom() const;
-    inline uint32_t tailroom() const;
-    inline const unsigned char *buffer() const;
-    inline const unsigned char *end_buffer() const;
-    inline uint32_t buffer_length() const;
+	inline const unsigned char *data() const;
+	inline const unsigned char *end_data() const;
+	inline uint32_t length() const;
+	inline uint32_t headroom() const;
+	inline uint32_t tailroom() const;
+	inline const unsigned char *buffer() const;
+	inline const unsigned char *end_buffer() const;
+	inline uint32_t buffer_length() const;
 
 #if CLICK_LINUXMODULE
-    struct sk_buff *skb()		{ return (struct sk_buff *)this; }
-    const struct sk_buff *skb() const	{ return (const struct sk_buff*)this; }
+	struct sk_buff *skb()		{ return (struct sk_buff *)this; }
+	const struct sk_buff *skb() const	{ return (const struct sk_buff*)this; }
 #elif CLICK_BSDMODULE
-    struct mbuf *m()			{ return _m; }
-    const struct mbuf *m() const	{ return (const struct mbuf *)_m; }
-    struct mbuf *steal_m();
-    struct mbuf *dup_jumbo_m(struct mbuf *mbuf);
+	struct mbuf *m()			{ return _m; }
+	const struct mbuf *m() const	{ return (const struct mbuf *)_m; }
+	struct mbuf *steal_m();
+	struct mbuf *dup_jumbo_m(struct mbuf *mbuf);
 #elif CLICK_USERLEVEL || CLICK_MINIOS
-    buffer_destructor_type buffer_destructor() const {
+	buffer_destructor_type buffer_destructor() const {
 	return _destructor;
-    }
+	}
 
-    void set_buffer_destructor(buffer_destructor_type destructor) {
-        _destructor = destructor;
-    }
+	void set_buffer_destructor(buffer_destructor_type destructor) {
+		_destructor = destructor;
+	}
 
-    void* destructor_argument() {
-        return _destructor_argument;
-    }
+	void* destructor_argument() {
+		return _destructor_argument;
+	}
 
-    void reset_buffer() {
+	void reset_buffer() {
 	assert(!shared());
 	_head = _data = _tail = _end = 0;
 	_destructor = 0;
-    }
+	}
 #endif
 
 
-    /** @brief Add space for a header before the packet.
-     * @param len amount of space to add
-     * @return packet with added header space, or null on failure
-     *
-     * Returns a packet with an additional @a len bytes of uninitialized space
-     * before the current packet's data().  A copy of the packet data is made
-     * if there isn't enough headroom() in the current packet, or if the
-     * current packet is shared().  If no copy is made, this operation is
-     * quite efficient.
-     *
-     * If a data copy would be required, but the copy fails because of lack of
-     * memory, then the current packet is freed.
-     *
-     * push() is usually used like this:
-     * @code
-     * WritablePacket *q = p->push(14);
-     * if (!q)
-     *     return 0;
-     * // p must not be used here.
-     * @endcode
-     *
-     * @post new length() == old length() + @a len (if no failure)
-     *
-     * @sa nonunique_push, push_mac_header, pull */
-    WritablePacket *push(uint32_t len) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Add space for a header before the packet.
+	 * @param len amount of space to add
+	 * @return packet with added header space, or null on failure
+	 *
+	 * Returns a packet with an additional @a len bytes of uninitialized space
+	 * before the current packet's data().  A copy of the packet data is made
+	 * if there isn't enough headroom() in the current packet, or if the
+	 * current packet is shared().  If no copy is made, this operation is
+	 * quite efficient.
+	 *
+	 * If a data copy would be required, but the copy fails because of lack of
+	 * memory, then the current packet is freed.
+	 *
+	 * push() is usually used like this:
+	 * @code
+	 * WritablePacket *q = p->push(14);
+	 * if (!q)
+	 *     return 0;
+	 * // p must not be used here.
+	 * @endcode
+	 *
+	 * @post new length() == old length() + @a len (if no failure)
+	 *
+	 * @sa nonunique_push, push_mac_header, pull */
+	WritablePacket *push(uint32_t len) CLICK_WARN_UNUSED_RESULT;
 
-    /** @brief Add space for a MAC header before the packet.
-     * @param len amount of space to add and length of MAC header
-     * @return packet with added header space, or null on failure
-     *
-     * Combines the action of push() and set_mac_header().  @a len bytes are
-     * pushed for a MAC header, and on success, the packet's returned MAC and
-     * network header pointers are set as by set_mac_header(data(), @a len).
-     *
-     * @sa push */
-    WritablePacket *push_mac_header(uint32_t len) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Add space for a MAC header before the packet.
+	 * @param len amount of space to add and length of MAC header
+	 * @return packet with added header space, or null on failure
+	 *
+	 * Combines the action of push() and set_mac_header().  @a len bytes are
+	 * pushed for a MAC header, and on success, the packet's returned MAC and
+	 * network header pointers are set as by set_mac_header(data(), @a len).
+	 *
+	 * @sa push */
+	WritablePacket *push_mac_header(uint32_t len) CLICK_WARN_UNUSED_RESULT;
 
-    /** @brief Add space for a header before the packet.
-     * @param len amount of space to add
-     * @return packet with added header space, or null on failure
-     *
-     * This is a variant of push().  Returns a packet with an additional @a
-     * len bytes of uninitialized space before the current packet's data().  A
-     * copy of the packet data is made if there isn't enough headroom() in the
-     * current packet.  However, no copy is made if the current packet is
-     * shared; and if no copy is made, this operation is quite efficient.
-     *
-     * If a data copy would be required, but the copy fails because of lack of
-     * memory, then the current packet is freed.
-     *
-     * @note Unlike push(), nonunique_push() returns a Packet object, which
-     * has non-writable data.
-     *
-     * @sa push */
-    Packet *nonunique_push(uint32_t len) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Add space for a header before the packet.
+	 * @param len amount of space to add
+	 * @return packet with added header space, or null on failure
+	 *
+	 * This is a variant of push().  Returns a packet with an additional @a
+	 * len bytes of uninitialized space before the current packet's data().  A
+	 * copy of the packet data is made if there isn't enough headroom() in the
+	 * current packet.  However, no copy is made if the current packet is
+	 * shared; and if no copy is made, this operation is quite efficient.
+	 *
+	 * If a data copy would be required, but the copy fails because of lack of
+	 * memory, then the current packet is freed.
+	 *
+	 * @note Unlike push(), nonunique_push() returns a Packet object, which
+	 * has non-writable data.
+	 *
+	 * @sa push */
+	Packet *nonunique_push(uint32_t len) CLICK_WARN_UNUSED_RESULT;
 
-    /** @brief Remove a header from the front of the packet.
-     * @param len amount of space to remove
-     *
-     * Removes @a len bytes from the initial part of the packet, usually
-     * corresponding to some network header (for example, pull(14) removes an
-     * Ethernet header).  This operation is efficient: it just bumps a
-     * pointer.
-     *
-     * It is an error to attempt to pull more than length() bytes.
-     *
-     * @post new data() == old data() + @a len
-     * @post new length() == old length() - @a len
-     *
-     * @sa push */
-    void pull(uint32_t len);
+	/** @brief Remove a header from the front of the packet.
+	 * @param len amount of space to remove
+	 *
+	 * Removes @a len bytes from the initial part of the packet, usually
+	 * corresponding to some network header (for example, pull(14) removes an
+	 * Ethernet header).  This operation is efficient: it just bumps a
+	 * pointer.
+	 *
+	 * It is an error to attempt to pull more than length() bytes.
+	 *
+	 * @post new data() == old data() + @a len
+	 * @post new length() == old length() - @a len
+	 *
+	 * @sa push */
+	void pull(uint32_t len);
 
-    /** @brief Add space for data after the packet.
-     * @param len amount of space to add
-     * @return packet with added trailer space, or null on failure
-     *
-     * Returns a packet with an additional @a len bytes of uninitialized space
-     * after the current packet's data (starting at end_data()).  A copy of
-     * the packet data is made if there isn't enough tailroom() in the current
-     * packet, or if the current packet is shared().  If no copy is made, this
-     * operation is quite efficient.
-     *
-     * If a data copy would be required, but the copy fails because of lack of
-     * memory, then the current packet is freed.
-     *
-     * put() is usually used like this:
-     * @code
-     * WritablePacket *q = p->put(100);
-     * if (!q)
-     *     return 0;
-     * // p must not be used here.
-     * @endcode
-     *
-     * @post new length() == old length() + @a len (if no failure)
-     *
-     * @sa nonunique_put, take */
-    WritablePacket *put(uint32_t len) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Add space for data after the packet.
+	 * @param len amount of space to add
+	 * @return packet with added trailer space, or null on failure
+	 *
+	 * Returns a packet with an additional @a len bytes of uninitialized space
+	 * after the current packet's data (starting at end_data()).  A copy of
+	 * the packet data is made if there isn't enough tailroom() in the current
+	 * packet, or if the current packet is shared().  If no copy is made, this
+	 * operation is quite efficient.
+	 *
+	 * If a data copy would be required, but the copy fails because of lack of
+	 * memory, then the current packet is freed.
+	 *
+	 * put() is usually used like this:
+	 * @code
+	 * WritablePacket *q = p->put(100);
+	 * if (!q)
+	 *     return 0;
+	 * // p must not be used here.
+	 * @endcode
+	 *
+	 * @post new length() == old length() + @a len (if no failure)
+	 *
+	 * @sa nonunique_put, take */
+	WritablePacket *put(uint32_t len) CLICK_WARN_UNUSED_RESULT;
 
-    /** @brief Add space for data after the packet.
-     * @param len amount of space to add
-     * @return packet with added trailer space, or null on failure
-     *
-     * This is a variant of put().  Returns a packet with an additional @a len
-     * bytes of uninitialized space after the current packet's data (starting
-     * at end_data()).  A copy of the packet data is made if there isn't
-     * enough tailroom() in the current packet.  However, no copy is made if
-     * the current packet is shared; and if no copy is made, this operation is
-     * quite efficient.
-     *
-     * If a data copy would be required, but the copy fails because of lack of
-     * memory, then the current packet is freed.
-     *
-     * @sa put */
-    Packet *nonunique_put(uint32_t len) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Add space for data after the packet.
+	 * @param len amount of space to add
+	 * @return packet with added trailer space, or null on failure
+	 *
+	 * This is a variant of put().  Returns a packet with an additional @a len
+	 * bytes of uninitialized space after the current packet's data (starting
+	 * at end_data()).  A copy of the packet data is made if there isn't
+	 * enough tailroom() in the current packet.  However, no copy is made if
+	 * the current packet is shared; and if no copy is made, this operation is
+	 * quite efficient.
+	 *
+	 * If a data copy would be required, but the copy fails because of lack of
+	 * memory, then the current packet is freed.
+	 *
+	 * @sa put */
+	Packet *nonunique_put(uint32_t len) CLICK_WARN_UNUSED_RESULT;
 
-    /** @brief Remove space from the end of the packet.
-     * @param len amount of space to remove
-     *
-     * Removes @a len bytes from the end of the packet.  This operation is
-     * efficient: it just bumps a pointer.
-     *
-     * It is an error to attempt to pull more than length() bytes.
-     *
-     * @post new data() == old data()
-     * @post new end_data() == old end_data() - @a len
-     * @post new length() == old length() - @a len
-     *
-     * @sa push */
-    void take(uint32_t len);
+	/** @brief Remove space from the end of the packet.
+	 * @param len amount of space to remove
+	 *
+	 * Removes @a len bytes from the end of the packet.  This operation is
+	 * efficient: it just bumps a pointer.
+	 *
+	 * It is an error to attempt to pull more than length() bytes.
+	 *
+	 * @post new data() == old data()
+	 * @post new end_data() == old end_data() - @a len
+	 * @post new length() == old length() - @a len
+	 *
+	 * @sa push */
+	void take(uint32_t len);
 
 
-    /** @brief Shift packet data within the data buffer.
-     * @param offset amount to shift packet data
-     * @param free_on_failure if true, then delete the input packet on failure
-     * @return a packet with shifted data, or null on failure
-     *
-     * Useful to align packet data.  For example, if the packet's embedded IP
-     * header is located at pointer value 0x8CCA03, then shift_data(1) or
-     * shift_data(-3) will both align the header on a 4-byte boundary.
-     *
-     * If the packet is shared() or there isn't enough headroom or tailroom
-     * for the operation, the packet is passed to uniqueify() first.  This can
-     * fail if there isn't enough memory.  If it fails, shift_data returns
-     * null, and if @a free_on_failure is true (the default), the input packet
-     * is freed.
-     *
-     * The packet's mac_header, network_header, and transport_header areas are
-     * preserved, even if they lie within the headroom.  Any headroom outside
-     * these regions may be overwritten, as may any tailroom.
-     *
-     * @post new data() == old data() + @a offset (if no copy is made)
-     * @post new buffer() == old buffer() (if no copy is made) */
-    Packet *shift_data(int offset, bool free_on_failure = true) CLICK_WARN_UNUSED_RESULT;
+	/** @brief Shift packet data within the data buffer.
+	 * @param offset amount to shift packet data
+	 * @param free_on_failure if true, then delete the input packet on failure
+	 * @return a packet with shifted data, or null on failure
+	 *
+	 * Useful to align packet data.  For example, if the packet's embedded IP
+	 * header is located at pointer value 0x8CCA03, then shift_data(1) or
+	 * shift_data(-3) will both align the header on a 4-byte boundary.
+	 *
+	 * If the packet is shared() or there isn't enough headroom or tailroom
+	 * for the operation, the packet is passed to uniqueify() first.  This can
+	 * fail if there isn't enough memory.  If it fails, shift_data returns
+	 * null, and if @a free_on_failure is true (the default), the input packet
+	 * is freed.
+	 *
+	 * The packet's mac_header, network_header, and transport_header areas are
+	 * preserved, even if they lie within the headroom.  Any headroom outside
+	 * these regions may be overwritten, as may any tailroom.
+	 *
+	 * @post new data() == old data() + @a offset (if no copy is made)
+	 * @post new buffer() == old buffer() (if no copy is made) */
+	Packet *shift_data(int offset, bool free_on_failure = true) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_USERLEVEL || CLICK_MINIOS
-    inline void shrink_data(const unsigned char *data, uint32_t length);
-    inline void change_headroom_and_length(uint32_t headroom, uint32_t length);
+	inline void shrink_data(const unsigned char *data, uint32_t length);
+	inline void change_headroom_and_length(uint32_t headroom, uint32_t length);
 #endif
-    //@}
+	//@}
 
-    /** @name Header Pointers */
-    //@{
-    inline bool has_mac_header() const;
-    inline const unsigned char *mac_header() const;
-    inline int mac_header_offset() const;
-    inline uint32_t mac_header_length() const;
-    inline int mac_length() const;
-    inline void set_mac_header(const unsigned char *p);
-    inline void set_mac_header(const unsigned char *p, uint32_t len);
-    inline void clear_mac_header();
+	/** @name Header Pointers */
+	//@{
+	inline bool has_mac_header() const;
+	inline const unsigned char *mac_header() const;
+	inline int mac_header_offset() const;
+	inline uint32_t mac_header_length() const;
+	inline int mac_length() const;
+	inline void set_mac_header(const unsigned char *p);
+	inline void set_mac_header(const unsigned char *p, uint32_t len);
+	inline void clear_mac_header();
 
-    inline bool has_network_header() const;
-    inline const unsigned char *network_header() const;
-    inline int network_header_offset() const;
-    inline uint32_t network_header_length() const;
-    inline int network_length() const;
-    inline void set_network_header(const unsigned char *p, uint32_t len);
-    inline void set_network_header_length(uint32_t len);
-    inline void clear_network_header();
+	inline bool has_network_header() const;
+	inline const unsigned char *network_header() const;
+	inline int network_header_offset() const;
+	inline uint32_t network_header_length() const;
+	inline int network_length() const;
+	inline void set_network_header(const unsigned char *p, uint32_t len);
+	inline void set_network_header_length(uint32_t len);
+	inline void clear_network_header();
 
-    inline bool has_transport_header() const;
-    inline const unsigned char *transport_header() const;
-    inline int transport_header_offset() const;
-    inline int transport_length() const;
-    inline void clear_transport_header();
+	inline bool has_transport_header() const;
+	inline const unsigned char *transport_header() const;
+	inline int transport_header_offset() const;
+	inline int transport_length() const;
+	inline void clear_transport_header();
 
-    // CONVENIENCE HEADER ANNOTATIONS
-    inline const click_ether *ether_header() const;
-    inline void set_ether_header(const click_ether *ethh);
+	// CONVENIENCE HEADER ANNOTATIONS
+	inline const click_ether *ether_header() const;
+	inline void set_ether_header(const click_ether *ethh);
 
-    inline const click_ip *ip_header() const;
-    inline int ip_header_offset() const;
-    inline uint32_t ip_header_length() const;
-    inline void set_ip_header(const click_ip *iph, uint32_t len);
+	inline const click_ip *ip_header() const;
+	inline int ip_header_offset() const;
+	inline uint32_t ip_header_length() const;
+	inline void set_ip_header(const click_ip *iph, uint32_t len);
 
-    inline const click_ip6 *ip6_header() const;
-    inline int ip6_header_offset() const;
-    inline uint32_t ip6_header_length() const;
-    inline void set_ip6_header(const click_ip6 *ip6h);
-    inline void set_ip6_header(const click_ip6 *ip6h, uint32_t len);
+	inline const click_ip6 *ip6_header() const;
+	inline int ip6_header_offset() const;
+	inline uint32_t ip6_header_length() const;
+	inline void set_ip6_header(const click_ip6 *ip6h);
+	inline void set_ip6_header(const click_ip6 *ip6h, uint32_t len);
 
 	#if HAVE_XIA
-    inline void set_xia_header(const click_xia *xiah, uint32_t len);
-    inline const click_xia *xia_header() const;
+	inline void set_xia_header(const click_xia *xiah, uint32_t len);
+	inline const click_xia *xia_header() const;
 	#endif
 
-    inline const click_icmp *icmp_header() const;
-    inline const click_tcp *tcp_header() const;
-    inline const click_udp *udp_header() const;
-    //@}
+	inline const click_icmp *icmp_header() const;
+	inline const click_tcp *tcp_header() const;
+	inline const click_udp *udp_header() const;
+	//@}
 
 #if CLICK_LINUXMODULE
 # if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET) || \
-     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
   protected:
-    typedef typeof(((struct sk_buff*)0)->mac_header) mac_header_type;
-    typedef typeof(((struct sk_buff*)0)->network_header) network_header_type;
-    typedef typeof(((struct sk_buff*)0)->transport_header) transport_header_type;
+	typedef typeof(((struct sk_buff*)0)->mac_header) mac_header_type;
+	typedef typeof(((struct sk_buff*)0)->network_header) network_header_type;
+	typedef typeof(((struct sk_buff*)0)->transport_header) transport_header_type;
 # endif
 #endif
 
   private:
-    /** @cond never */
-    union Anno;
+	/** @cond never */
+	union Anno;
 #if CLICK_LINUXMODULE
-    const Anno *xanno() const		{ return (const Anno *)skb()->cb; }
-    Anno *xanno()			{ return (Anno *)skb()->cb; }
+	const Anno *xanno() const		{ return (const Anno *)skb()->cb; }
+	Anno *xanno()			{ return (Anno *)skb()->cb; }
 #else
-    const Anno *xanno() const		{ return &_aa.cb; }
-    Anno *xanno()			{ return &_aa.cb; }
+	const Anno *xanno() const		{ return &_aa.cb; }
+	Anno *xanno()			{ return &_aa.cb; }
 #endif
-    /** @endcond never */
+	/** @endcond never */
   public:
 
-    /** @name Annotations */
-    //@{
+	/** @name Annotations */
+	//@{
 
-    enum {
+	enum {
 	#if HAVE_XIA
-	anno_size = 92			///< Size of annotation area.
+	anno_size = 100			///< Size of annotation area.
 	#else
 	anno_size = 56			///< Size of annotation area.
 	#endif
-    };
+	};
 
-    /** @brief Return the timestamp annotation. */
-    inline const Timestamp &timestamp_anno() const;
-    /** @overload */
-    inline Timestamp &timestamp_anno();
-    /** @brief Set the timestamp annotation.
-     * @param t new timestamp */
-    inline void set_timestamp_anno(const Timestamp &t);
+	/** @brief Return the timestamp annotation. */
+	inline const Timestamp &timestamp_anno() const;
+	/** @overload */
+	inline Timestamp &timestamp_anno();
+	/** @brief Set the timestamp annotation.
+	 * @param t new timestamp */
+	inline void set_timestamp_anno(const Timestamp &t);
 
-    /** @brief Return the device annotation. */
-    inline net_device *device_anno() const;
-    /** @brief Set the device annotation */
-    inline void set_device_anno(net_device *dev);
+	/** @brief Return the device annotation. */
+	inline net_device *device_anno() const;
+	/** @brief Set the device annotation */
+	inline void set_device_anno(net_device *dev);
 
-    /** @brief Values for packet_type_anno().
-     * Must agree with Linux's PACKET_ constants in <linux/if_packet.h>. */
-    enum PacketType {
+	/** @brief Values for packet_type_anno().
+	 * Must agree with Linux's PACKET_ constants in <linux/if_packet.h>. */
+	enum PacketType {
 	HOST = 0,		/**< Packet was sent to this host. */
 	BROADCAST = 1,		/**< Packet was sent to a link-level multicast
-				     address. */
+					 address. */
 	MULTICAST = 2,		/**< Packet was sent to a link-level multicast
-				     address. */
+					 address. */
 	OTHERHOST = 3,		/**< Packet was sent to a different host, but
-				     received anyway.  The receiving device is
-				     probably in promiscuous mode. */
+					 received anyway.  The receiving device is
+					 probably in promiscuous mode. */
 	OUTGOING = 4,		/**< Packet was generated by this host and is
-				     being sent elsewhere. */
+					 being sent elsewhere. */
 	LOOPBACK = 5,
 	FASTROUTE = 6
-    };
-    /** @brief Return the packet type annotation. */
-    inline PacketType packet_type_anno() const;
-    /** @brief Set the packet type annotation. */
-    inline void set_packet_type_anno(PacketType t);
+	};
+	/** @brief Return the packet type annotation. */
+	inline PacketType packet_type_anno() const;
+	/** @brief Set the packet type annotation. */
+	inline void set_packet_type_anno(PacketType t);
 
 #if CLICK_NS
-    class SimPacketinfoWrapper { public:
+	class SimPacketinfoWrapper { public:
 	simclick_simpacketinfo _pinfo;
 	SimPacketinfoWrapper() {
-	    // The uninitialized value for the simulator packet data can't be
-	    // all zeros (0 is a valid packet id) or random junk out of memory
-	    // since the simulator will look at this info to see if the packet
-	    // was originally generated by it. Accidental collisions with
-	    // other packet IDs or bogus packet IDs can cause weird things to
-	    // happen. So we set it to all -1 here to keep the simulator from
-	    // getting confused.
-	    memset(&_pinfo,-1,sizeof(_pinfo));
+		// The uninitialized value for the simulator packet data can't be
+		// all zeros (0 is a valid packet id) or random junk out of memory
+		// since the simulator will look at this info to see if the packet
+		// was originally generated by it. Accidental collisions with
+		// other packet IDs or bogus packet IDs can cause weird things to
+		// happen. So we set it to all -1 here to keep the simulator from
+		// getting confused.
+		memset(&_pinfo,-1,sizeof(_pinfo));
 	}
-    };
-    simclick_simpacketinfo *get_sim_packetinfo() {
+	};
+	simclick_simpacketinfo *get_sim_packetinfo() {
 	return &(_sim_packetinfo._pinfo);
-    }
-    void set_sim_packetinfo(simclick_simpacketinfo* pinfo) {
+	}
+	void set_sim_packetinfo(simclick_simpacketinfo* pinfo) {
 	_sim_packetinfo._pinfo = *pinfo;
-    }
+	}
 #endif
 
-    /** @brief Return the next packet annotation. */
-    inline Packet *next() const;
-    /** @overload */
-    inline Packet *&next();
-    /** @brief Set the next packet annotation. */
-    inline void set_next(Packet *p);
+	/** @brief Return the next packet annotation. */
+	inline Packet *next() const;
+	/** @overload */
+	inline Packet *&next();
+	/** @brief Set the next packet annotation. */
+	inline void set_next(Packet *p);
 
-    /** @brief Return the previous packet annotation. */
-    inline Packet *prev() const;
-    /** @overload */
-    inline Packet *&prev();
-    /** @brief Set the previous packet annotation. */
-    inline void set_prev(Packet *p);
+	/** @brief Return the previous packet annotation. */
+	inline Packet *prev() const;
+	/** @overload */
+	inline Packet *&prev();
+	/** @brief Set the previous packet annotation. */
+	inline void set_prev(Packet *p);
 
-    enum {
+	enum {
 	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
-    dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
+	dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
 #if HAVE_XIA
-    src_ip_anno_offset = 52, src_ip_anno_size = 4,
+	src_ip_anno_offset = 52, src_ip_anno_size = 4,
 	nexthop_neighbor_xid_anno_offset = 64, nexthop_neighbor_xid_anno_size = 24
 #else
 	src_ip_anno_offset = 52, src_ip_anno_size = 4
 #endif
-    };
+	};
 
 
 #if HAVE_XIA
-    /** @brief Return the nexthop_neighbor_xid annotation.
-     *
-     * The value is taken from the address annotation area. */
-    inline XID nexthop_neighbor_xid_anno() const;
+	/** @brief Return the nexthop_neighbor_xid annotation.
+	 *
+	 * The value is taken from the address annotation area. */
+	inline XID nexthop_neighbor_xid_anno() const;
 
-    /** @brief Set the destination IPv4 address annotation.
-     *
-     * The value is stored in the address annotation area. */
-    inline void set_nexthop_neighbor_xid_anno(XID x);
+	/** @brief Set the destination IPv4 address annotation.
+	 *
+	 * The value is stored in the address annotation area. */
+	inline void set_nexthop_neighbor_xid_anno(XID x);
 #endif
 
-    /** @brief Return the destination IPv4 address annotation.
-     *
-     * The value is taken from the address annotation area. */
-    inline IPAddress dst_ip_anno() const;
+	/** @brief Return the destination IPv4 address annotation.
+	 *
+	 * The value is taken from the address annotation area. */
+	inline IPAddress dst_ip_anno() const;
 
-    /** @brief Set the destination IPv4 address annotation.
-     *
-     * The value is stored in the address annotation area. */
-    inline void set_dst_ip_anno(IPAddress addr);
+	/** @brief Set the destination IPv4 address annotation.
+	 *
+	 * The value is stored in the address annotation area. */
+	inline void set_dst_ip_anno(IPAddress addr);
 
-    /** @brief Return the source IPv4 address annotation.
-     *
-     * The value is taken from the address annotation area. */
-    inline IPAddress src_ip_anno() const;
+	/** @brief Return the source IPv4 address annotation.
+	 *
+	 * The value is taken from the address annotation area. */
+	inline IPAddress src_ip_anno() const;
 
-    /** @brief Set the source IPv4 address annotation.
-     *
-     * The value is stored in the address annotation area. */
-    inline void set_src_ip_anno(IPAddress addr);
+	/** @brief Set the source IPv4 address annotation.
+	 *
+	 * The value is stored in the address annotation area. */
+	inline void set_src_ip_anno(IPAddress addr);
 
-    /** @brief Return a pointer to the annotation area.
-     *
-     * The area is @link Packet::anno_size anno_size @endlink bytes long. */
-    void *anno()			{ return xanno(); }
+	/** @brief Return a pointer to the annotation area.
+	 *
+	 * The area is @link Packet::anno_size anno_size @endlink bytes long. */
+	void *anno()			{ return xanno(); }
 
-    /** @overload */
-    const void *anno() const		{ return xanno(); }
+	/** @overload */
+	const void *anno() const		{ return xanno(); }
 
-    /** @brief Return a pointer to the annotation area as uint8_ts. */
-    uint8_t *anno_u8()			{ return &xanno()->u8[0]; }
+	/** @brief Return a pointer to the annotation area as uint8_ts. */
+	uint8_t *anno_u8()			{ return &xanno()->u8[0]; }
 
-    /** @brief overload */
-    const uint8_t *anno_u8() const	{ return &xanno()->u8[0]; }
+	/** @brief overload */
+	const uint8_t *anno_u8() const	{ return &xanno()->u8[0]; }
 
-    /** @brief Return a pointer to the annotation area as uint32_ts. */
-    uint32_t *anno_u32()		{ return &xanno()->u32[0]; }
+	/** @brief Return a pointer to the annotation area as uint32_ts. */
+	uint32_t *anno_u32()		{ return &xanno()->u32[0]; }
 
-    /** @brief overload */
-    const uint32_t *anno_u32() const	{ return &xanno()->u32[0]; }
+	/** @brief overload */
+	const uint32_t *anno_u32() const	{ return &xanno()->u32[0]; }
 
-    /** @brief Return annotation byte at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink */
-    uint8_t anno_u8(int i) const {
+	/** @brief Return annotation byte at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink */
+	uint8_t anno_u8(int i) const {
 	assert(i >= 0 && i < anno_size);
 	return xanno()->u8[i];
-    }
+	}
 
-    /** @brief Set annotation byte at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink */
-    void set_anno_u8(int i, uint8_t x) {
+	/** @brief Set annotation byte at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink */
+	void set_anno_u8(int i, uint8_t x) {
 	assert(i >= 0 && i < anno_size);
 	xanno()->u8[i] = x;
-    }
+	}
 
-    /** @brief Return 16-bit annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
-     * @pre On aligned targets, @a i must be evenly divisible by 2.
-     *
-     * Affects annotation bytes [@a i, @a i+1]. */
-    uint16_t anno_u16(int i) const {
+	/** @brief Return 16-bit annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
+	 * @pre On aligned targets, @a i must be evenly divisible by 2.
+	 *
+	 * Affects annotation bytes [@a i, @a i+1]. */
+	uint16_t anno_u16(int i) const {
 	assert(i >= 0 && i < anno_size - 1);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 2 == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_uint16_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set 16-bit annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
-     * @pre On aligned targets, @a i must be evenly divisible by 2.
-     *
-     * Affects annotation bytes [@a i, @a i+1]. */
-    void set_anno_u16(int i, uint16_t x) {
+	/** @brief Set 16-bit annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
+	 * @pre On aligned targets, @a i must be evenly divisible by 2.
+	 *
+	 * Affects annotation bytes [@a i, @a i+1]. */
+	void set_anno_u16(int i, uint16_t x) {
 	assert(i >= 0 && i < anno_size - 1);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 2 == 0);
 #endif
 	*reinterpret_cast<click_aliasable_uint16_t *>(xanno()->c + i) = x;
-    }
+	}
 
-    /** @brief Return 16-bit annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
-     * @pre On aligned targets, @a i must be evenly divisible by 2.
-     *
-     * Affects annotation bytes [@a i, @a i+1]. */
-    int16_t anno_s16(int i) const {
+	/** @brief Return 16-bit annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
+	 * @pre On aligned targets, @a i must be evenly divisible by 2.
+	 *
+	 * Affects annotation bytes [@a i, @a i+1]. */
+	int16_t anno_s16(int i) const {
 	assert(i >= 0 && i < anno_size - 1);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 2 == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_int16_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set 16-bit annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
-     * @pre On aligned targets, @a i must be evenly divisible by 2.
-     *
-     * Affects annotation bytes [@a i, @a i+1]. */
-    void set_anno_s16(int i, int16_t x) {
+	/** @brief Set 16-bit annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 1
+	 * @pre On aligned targets, @a i must be evenly divisible by 2.
+	 *
+	 * Affects annotation bytes [@a i, @a i+1]. */
+	void set_anno_s16(int i, int16_t x) {
 	assert(i >= 0 && i < anno_size - 1);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 2 == 0);
 #endif
 	*reinterpret_cast<click_aliasable_int16_t *>(xanno()->c + i) = x;
-    }
+	}
 
-    /** @brief Return 32-bit annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
-     * @pre On aligned targets, @a i must be evenly divisible by 4.
-     *
-     * Affects user annotation bytes [@a i, @a i+3]. */
-    uint32_t anno_u32(int i) const {
+	/** @brief Return 32-bit annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
+	 * @pre On aligned targets, @a i must be evenly divisible by 4.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+3]. */
+	uint32_t anno_u32(int i) const {
 	assert(i >= 0 && i < anno_size - 3);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 4 == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_uint32_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set 32-bit annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
-     * @pre On aligned targets, @a i must be evenly divisible by 4.
-     *
-     * Affects user annotation bytes [@a i, @a i+3]. */
-    void set_anno_u32(int i, uint32_t x) {
+	/** @brief Set 32-bit annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
+	 * @pre On aligned targets, @a i must be evenly divisible by 4.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+3]. */
+	void set_anno_u32(int i, uint32_t x) {
 	assert(i >= 0 && i < anno_size - 3);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 4 == 0);
 #endif
 	*reinterpret_cast<click_aliasable_uint32_t *>(xanno()->c + i) = x;
-    }
+	}
 
-    /** @brief Return 32-bit annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
-     *
-     * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
-    int32_t anno_s32(int i) const {
+	/** @brief Return 32-bit annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
+	 *
+	 * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
+	int32_t anno_s32(int i) const {
 	assert(i >= 0 && i < anno_size - 3);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 4 == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_int32_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set 32-bit annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
-     * @pre On aligned targets, @a i must be evenly divisible by 4.
-     *
-     * Affects user annotation bytes [@a i, @a i+3]. */
-    void set_anno_s32(int i, int32_t x) {
+	/** @brief Set 32-bit annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 3
+	 * @pre On aligned targets, @a i must be evenly divisible by 4.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+3]. */
+	void set_anno_s32(int i, int32_t x) {
 	assert(i >= 0 && i < anno_size - 3);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % 4 == 0);
 #endif
 	*reinterpret_cast<click_aliasable_int32_t *>(xanno()->c + i) = x;
-    }
+	}
 
 #if HAVE_INT64_TYPES
-    /** @brief Return 64-bit annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 7
-     * @pre On aligned targets, @a i must be aligned properly for uint64_t.
-     *
-     * Affects user annotation bytes [@a i, @a i+7]. */
-    uint64_t anno_u64(int i) const {
+	/** @brief Return 64-bit annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 7
+	 * @pre On aligned targets, @a i must be aligned properly for uint64_t.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+7]. */
+	uint64_t anno_u64(int i) const {
 	assert(i >= 0 && i < anno_size - 7);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % __alignof__(uint64_t) == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_uint64_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set 64-bit annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 7
-     * @pre On aligned targets, @a i must be aligned properly for uint64_t.
-     *
-     * Affects user annotation bytes [@a i, @a i+7]. */
-    void set_anno_u64(int i, uint64_t x) {
+	/** @brief Set 64-bit annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - 7
+	 * @pre On aligned targets, @a i must be aligned properly for uint64_t.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+7]. */
+	void set_anno_u64(int i, uint64_t x) {
 	assert(i >= 0 && i < anno_size - 7);
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % __alignof__(uint64_t) == 0);
 #endif
 	*reinterpret_cast<click_aliasable_uint64_t *>(xanno()->c + i) = x;
-    }
+	}
 #endif
 
-    /** @brief Return void * sized annotation at offset @a i.
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - sizeof(void *)
-     * @pre On aligned targets, @a i must be aligned properly.
-     *
-     * Affects user annotation bytes [@a i, @a i+sizeof(void *)]. */
-    void *anno_ptr(int i) const {
+	/** @brief Return void * sized annotation at offset @a i.
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - sizeof(void *)
+	 * @pre On aligned targets, @a i must be aligned properly.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+sizeof(void *)]. */
+	void *anno_ptr(int i) const {
 	assert(i >= 0 && i <= anno_size - (int)sizeof(void *));
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % __alignof__(void *) == 0);
 #endif
 	return *reinterpret_cast<const click_aliasable_void_pointer_t *>(xanno()->c + i);
-    }
+	}
 
-    /** @brief Set void * sized annotation at offset @a i.
-     * @param i annotation offset in bytes
-     * @param x value
-     * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - sizeof(void *)
-     * @pre On aligned targets, @a i must be aligned properly.
-     *
-     * Affects user annotation bytes [@a i, @a i+sizeof(void *)]. */
-    void set_anno_ptr(int i, const void *x) {
+	/** @brief Set void * sized annotation at offset @a i.
+	 * @param i annotation offset in bytes
+	 * @param x value
+	 * @pre 0 <= @a i < @link Packet::anno_size anno_size @endlink - sizeof(void *)
+	 * @pre On aligned targets, @a i must be aligned properly.
+	 *
+	 * Affects user annotation bytes [@a i, @a i+sizeof(void *)]. */
+	void set_anno_ptr(int i, const void *x) {
 	assert(i >= 0 && i <= anno_size - (int)sizeof(void *));
 #if !HAVE_INDIFFERENT_ALIGNMENT
 	assert(i % __alignof__(void *) == 0);
 #endif
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
-    }
+	}
 
-    inline void clear_annotations(bool all = true);
-    inline void copy_annotations(const Packet *);
-    //@}
+	inline void clear_annotations(bool all = true);
+	inline void copy_annotations(const Packet *);
+	//@}
 
-    /** @cond never */
-    enum {
+	/** @cond never */
+	enum {
 	DEFAULT_HEADROOM = default_headroom,
 	MIN_BUFFER_LENGTH = min_buffer_length,
 	addr_anno_offset = 0,
@@ -701,49 +701,49 @@ class Packet { public:
 	USER_ANNO_U16_SIZE = USER_ANNO_SIZE / 2,
 	USER_ANNO_U32_SIZE = USER_ANNO_SIZE / 4,
 	USER_ANNO_U64_SIZE = USER_ANNO_SIZE / 8
-    } CLICK_PACKET_DEPRECATED_ENUM;
-    inline const unsigned char *buffer_data() const CLICK_DEPRECATED;
-    inline void *addr_anno() CLICK_DEPRECATED;
-    inline const void *addr_anno() const CLICK_DEPRECATED;
-    inline void *user_anno() CLICK_DEPRECATED;
-    inline const void *user_anno() const CLICK_DEPRECATED;
-    inline uint8_t *user_anno_u8() CLICK_DEPRECATED;
-    inline const uint8_t *user_anno_u8() const CLICK_DEPRECATED;
-    inline uint32_t *user_anno_u32() CLICK_DEPRECATED;
-    inline const uint32_t *user_anno_u32() const CLICK_DEPRECATED;
-    inline uint8_t user_anno_u8(int i) const CLICK_DEPRECATED;
-    inline void set_user_anno_u8(int i, uint8_t v) CLICK_DEPRECATED;
-    inline uint16_t user_anno_u16(int i) const CLICK_DEPRECATED;
-    inline void set_user_anno_u16(int i, uint16_t v) CLICK_DEPRECATED;
-    inline uint32_t user_anno_u32(int i) const CLICK_DEPRECATED;
-    inline void set_user_anno_u32(int i, uint32_t v) CLICK_DEPRECATED;
-    inline int32_t user_anno_s32(int i) const CLICK_DEPRECATED;
-    inline void set_user_anno_s32(int i, int32_t v) CLICK_DEPRECATED;
+	} CLICK_PACKET_DEPRECATED_ENUM;
+	inline const unsigned char *buffer_data() const CLICK_DEPRECATED;
+	inline void *addr_anno() CLICK_DEPRECATED;
+	inline const void *addr_anno() const CLICK_DEPRECATED;
+	inline void *user_anno() CLICK_DEPRECATED;
+	inline const void *user_anno() const CLICK_DEPRECATED;
+	inline uint8_t *user_anno_u8() CLICK_DEPRECATED;
+	inline const uint8_t *user_anno_u8() const CLICK_DEPRECATED;
+	inline uint32_t *user_anno_u32() CLICK_DEPRECATED;
+	inline const uint32_t *user_anno_u32() const CLICK_DEPRECATED;
+	inline uint8_t user_anno_u8(int i) const CLICK_DEPRECATED;
+	inline void set_user_anno_u8(int i, uint8_t v) CLICK_DEPRECATED;
+	inline uint16_t user_anno_u16(int i) const CLICK_DEPRECATED;
+	inline void set_user_anno_u16(int i, uint16_t v) CLICK_DEPRECATED;
+	inline uint32_t user_anno_u32(int i) const CLICK_DEPRECATED;
+	inline void set_user_anno_u32(int i, uint32_t v) CLICK_DEPRECATED;
+	inline int32_t user_anno_s32(int i) const CLICK_DEPRECATED;
+	inline void set_user_anno_s32(int i, int32_t v) CLICK_DEPRECATED;
 #if HAVE_INT64_TYPES
-    inline uint64_t user_anno_u64(int i) const CLICK_DEPRECATED;
-    inline void set_user_anno_u64(int i, uint64_t v) CLICK_DEPRECATED;
+	inline uint64_t user_anno_u64(int i) const CLICK_DEPRECATED;
+	inline void set_user_anno_u64(int i, uint64_t v) CLICK_DEPRECATED;
 #endif
-    inline const uint8_t *all_user_anno() const CLICK_DEPRECATED;
-    inline uint8_t *all_user_anno() CLICK_DEPRECATED;
-    inline const uint32_t *all_user_anno_u() const CLICK_DEPRECATED;
-    inline uint32_t *all_user_anno_u() CLICK_DEPRECATED;
-    inline uint8_t user_anno_c(int) const CLICK_DEPRECATED;
-    inline void set_user_anno_c(int, uint8_t) CLICK_DEPRECATED;
-    inline int16_t user_anno_s(int) const CLICK_DEPRECATED;
-    inline void set_user_anno_s(int, int16_t) CLICK_DEPRECATED;
-    inline uint16_t user_anno_us(int) const CLICK_DEPRECATED;
-    inline void set_user_anno_us(int, uint16_t) CLICK_DEPRECATED;
-    inline int32_t user_anno_i(int) const CLICK_DEPRECATED;
-    inline void set_user_anno_i(int, int32_t) CLICK_DEPRECATED;
-    inline uint32_t user_anno_u(int) const CLICK_DEPRECATED;
-    inline void set_user_anno_u(int, uint32_t) CLICK_DEPRECATED;
-    /** @endcond never */
+	inline const uint8_t *all_user_anno() const CLICK_DEPRECATED;
+	inline uint8_t *all_user_anno() CLICK_DEPRECATED;
+	inline const uint32_t *all_user_anno_u() const CLICK_DEPRECATED;
+	inline uint32_t *all_user_anno_u() CLICK_DEPRECATED;
+	inline uint8_t user_anno_c(int) const CLICK_DEPRECATED;
+	inline void set_user_anno_c(int, uint8_t) CLICK_DEPRECATED;
+	inline int16_t user_anno_s(int) const CLICK_DEPRECATED;
+	inline void set_user_anno_s(int, int16_t) CLICK_DEPRECATED;
+	inline uint16_t user_anno_us(int) const CLICK_DEPRECATED;
+	inline void set_user_anno_us(int, uint16_t) CLICK_DEPRECATED;
+	inline int32_t user_anno_i(int) const CLICK_DEPRECATED;
+	inline void set_user_anno_i(int, int32_t) CLICK_DEPRECATED;
+	inline uint32_t user_anno_u(int) const CLICK_DEPRECATED;
+	inline void set_user_anno_u(int, uint32_t) CLICK_DEPRECATED;
+	/** @endcond never */
 
   private:
 
-    // Anno must fit in sk_buff's char cb[48].
-    /** @cond never */
-    union Anno {
+	// Anno must fit in sk_buff's char cb[48].
+	/** @cond never */
+	union Anno {
 	char c[anno_size];
 	uint8_t u8[anno_size];
 	uint16_t u16[anno_size / 2];
@@ -752,12 +752,12 @@ class Packet { public:
 	uint64_t u64[anno_size / 8];
 #endif
 	// allocations: see packet_anno.hh
-    };
+	};
 
 #if !CLICK_LINUXMODULE
-    // All packet annotations are stored in AllAnno so that
-    // clear_annotations(true) can memset() the structure to zero.
-    struct AllAnno {
+	// All packet annotations are stored in AllAnno so that
+	// clear_annotations(true) can memset() the structure to zero.
+	struct AllAnno {
 	Anno cb;
 	unsigned char *mac;
 	unsigned char *nh;
@@ -767,101 +767,101 @@ class Packet { public:
 	Packet *next;
 	Packet *prev;
 	AllAnno()
-	    : timestamp(Timestamp::uninitialized_t()) {
+		: timestamp(Timestamp::uninitialized_t()) {
 	}
-    };
+	};
 #endif
-    /** @endcond never */
+	/** @endcond never */
 
 #if !CLICK_LINUXMODULE
-    // User-space and BSD kernel module implementations.
-    atomic_uint32_t _use_count;
-    Packet *_data_packet;
-    /* mimic Linux sk_buff */
-    unsigned char *_head; /* start of allocated buffer */
-    unsigned char *_data; /* where the packet starts */
-    unsigned char *_tail; /* one beyond end of packet */
-    unsigned char *_end;  /* one beyond end of allocated buffer */
+	// User-space and BSD kernel module implementations.
+	atomic_uint32_t _use_count;
+	Packet *_data_packet;
+	/* mimic Linux sk_buff */
+	unsigned char *_head; /* start of allocated buffer */
+	unsigned char *_data; /* where the packet starts */
+	unsigned char *_tail; /* one beyond end of packet */
+	unsigned char *_end;  /* one beyond end of allocated buffer */
 # if CLICK_BSDMODULE
-    struct mbuf *_m;
+	struct mbuf *_m;
 # endif
-    AllAnno _aa;
+	AllAnno _aa;
 # if CLICK_NS
-    SimPacketinfoWrapper _sim_packetinfo;
+	SimPacketinfoWrapper _sim_packetinfo;
 # endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
-    buffer_destructor_type _destructor;
-    void* _destructor_argument;
+	buffer_destructor_type _destructor;
+	void* _destructor_argument;
 # endif
 #endif
 
-    inline Packet() {
+	inline Packet() {
 #if CLICK_LINUXMODULE
 	panic("Packet constructor");
 #endif
-    }
-    Packet(const Packet &x);
-    ~Packet();
-    Packet &operator=(const Packet &x);
+	}
+	Packet(const Packet &x);
+	~Packet();
+	Packet &operator=(const Packet &x);
 
 #if !CLICK_LINUXMODULE
-    bool alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom);
+	bool alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom);
 #endif
 #if CLICK_BSDMODULE
-    static void assimilate_mbuf(Packet *p);
-    void assimilate_mbuf();
+	static void assimilate_mbuf(Packet *p);
+	void assimilate_mbuf();
 #endif
 
-    inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
-    WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure);
-    WritablePacket *expensive_push(uint32_t nbytes);
-    WritablePacket *expensive_put(uint32_t nbytes);
+	inline void shift_header_annotations(const unsigned char *old_head, int32_t extra_headroom);
+	WritablePacket *expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom, bool free_on_failure);
+	WritablePacket *expensive_push(uint32_t nbytes);
+	WritablePacket *expensive_put(uint32_t nbytes);
 
-    friend class WritablePacket;
+	friend class WritablePacket;
 
 };
 
 
 class WritablePacket : public Packet { public:
 
-    inline unsigned char *data() const;
-    inline unsigned char *end_data() const;
-    inline unsigned char *buffer() const;
-    inline unsigned char *end_buffer() const;
-    inline unsigned char *mac_header() const;
-    inline click_ether *ether_header() const;
-    inline unsigned char *network_header() const;
-    inline click_ip *ip_header() const;
-    inline click_ip6 *ip6_header() const;
-    inline unsigned char *transport_header() const;
+	inline unsigned char *data() const;
+	inline unsigned char *end_data() const;
+	inline unsigned char *buffer() const;
+	inline unsigned char *end_buffer() const;
+	inline unsigned char *mac_header() const;
+	inline click_ether *ether_header() const;
+	inline unsigned char *network_header() const;
+	inline click_ip *ip_header() const;
+	inline click_ip6 *ip6_header() const;
+	inline unsigned char *transport_header() const;
 #if HAVE_XIA
-    inline click_xia *xia_header() const;
+	inline click_xia *xia_header() const;
 #endif
-    inline click_icmp *icmp_header() const;
-    inline click_tcp *tcp_header() const;
-    inline click_udp *udp_header() const;
+	inline click_icmp *icmp_header() const;
+	inline click_tcp *tcp_header() const;
+	inline click_udp *udp_header() const;
 
-    /** @cond never */
-    inline unsigned char *buffer_data() const CLICK_DEPRECATED;
-    /** @endcond never */
+	/** @cond never */
+	inline unsigned char *buffer_data() const CLICK_DEPRECATED;
+	/** @endcond never */
 
  private:
 
-    inline WritablePacket() { }
+	inline WritablePacket() { }
 #if !CLICK_LINUXMODULE
-    inline void initialize();
+	inline void initialize();
 #endif
-    WritablePacket(const Packet &x);
-    ~WritablePacket() { }
+	WritablePacket(const Packet &x);
+	~WritablePacket() { }
 
 #if HAVE_CLICK_PACKET_POOL
-    static WritablePacket *pool_allocate(bool with_data);
-    static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
+	static WritablePacket *pool_allocate(bool with_data);
+	static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
 					 uint32_t tailroom);
-    static void recycle(WritablePacket *p);
+	static void recycle(WritablePacket *p);
 #endif
 
-    friend class Packet;
+	friend class Packet;
 
 };
 
@@ -882,8 +882,8 @@ inline void
 Packet::clear_annotations(bool all)
 {
 #if CLICK_LINUXMODULE
-    memset(xanno(), 0, sizeof(Anno));
-    if (all) {
+	memset(xanno(), 0, sizeof(Anno));
+	if (all) {
 	set_packet_type_anno(HOST);
 	set_device_anno(0);
 	set_timestamp_anno(Timestamp());
@@ -894,9 +894,9 @@ Packet::clear_annotations(bool all)
 
 	set_next(0);
 	set_prev(0);
-    }
+	}
 #else
-    memset(&_aa, 0, all ? sizeof(AllAnno) : sizeof(Anno));
+	memset(&_aa, 0, all ? sizeof(AllAnno) : sizeof(Anno));
 #endif
 }
 
@@ -911,10 +911,10 @@ Packet::clear_annotations(bool all)
 inline void
 Packet::copy_annotations(const Packet *p)
 {
-    *xanno() = *p->xanno();
-    set_packet_type_anno(p->packet_type_anno());
-    set_device_anno(p->device_anno());
-    set_timestamp_anno(p->timestamp_anno());
+	*xanno() = *p->xanno();
+	set_packet_type_anno(p->packet_type_anno());
+	set_device_anno(p->device_anno());
+	set_timestamp_anno(p->timestamp_anno());
 }
 
 
@@ -922,14 +922,14 @@ Packet::copy_annotations(const Packet *p)
 inline void
 WritablePacket::initialize()
 {
-    _use_count = 1;
-    _data_packet = 0;
+	_use_count = 1;
+	_data_packet = 0;
 # if CLICK_USERLEVEL || CLICK_MINIOS
-    _destructor = 0;
+	_destructor = 0;
 # elif CLICK_BSDMODULE
-    _m = 0;
+	_m = 0;
 # endif
-    clear_annotations();
+	clear_annotations();
 }
 #endif
 
@@ -940,9 +940,9 @@ inline const unsigned char *
 Packet::data() const
 {
 #if CLICK_LINUXMODULE
-    return skb()->data;
+	return skb()->data;
 #else
-    return _data;
+	return _data;
 #endif
 }
 
@@ -955,12 +955,12 @@ Packet::end_data() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_tail_pointer(skb());
+	return skb_tail_pointer(skb());
 # else
-    return skb()->tail;
+	return skb()->tail;
 # endif
 #else
-    return _tail;
+	return _tail;
 #endif
 }
 
@@ -972,9 +972,9 @@ inline const unsigned char *
 Packet::buffer() const
 {
 #if CLICK_LINUXMODULE
-    return skb()->head;
+	return skb()->head;
 #else
-    return _head;
+	return _head;
 #endif
 }
 
@@ -987,12 +987,12 @@ Packet::end_buffer() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_end_pointer(skb());
+	return skb_end_pointer(skb());
 # else
-    return skb()->end;
+	return skb()->end;
 # endif
 #else
-    return _end;
+	return _end;
 #endif
 }
 
@@ -1001,9 +1001,9 @@ inline uint32_t
 Packet::length() const
 {
 #if CLICK_LINUXMODULE
-    return skb()->len;
+	return skb()->len;
 #else
-    return _tail - _data;
+	return _tail - _data;
 #endif
 }
 
@@ -1015,7 +1015,7 @@ Packet::length() const
 inline uint32_t
 Packet::headroom() const
 {
-    return data() - buffer();
+	return data() - buffer();
 }
 
 /** @brief Return the packet's tailroom.
@@ -1026,7 +1026,7 @@ Packet::headroom() const
 inline uint32_t
 Packet::tailroom() const
 {
-    return end_buffer() - end_data();
+	return end_buffer() - end_data();
 }
 
 /** @brief Return the packet's buffer length.
@@ -1035,16 +1035,16 @@ Packet::tailroom() const
 inline uint32_t
 Packet::buffer_length() const
 {
-    return end_buffer() - buffer();
+	return end_buffer() - buffer();
 }
 
 inline Packet *
 Packet::next() const
 {
 #if CLICK_LINUXMODULE
-    return (Packet *)(skb()->next);
+	return (Packet *)(skb()->next);
 #else
-    return _aa.next;
+	return _aa.next;
 #endif
 }
 
@@ -1052,9 +1052,9 @@ inline Packet *&
 Packet::next()
 {
 #if CLICK_LINUXMODULE
-    return (Packet *&)(skb()->next);
+	return (Packet *&)(skb()->next);
 #else
-    return _aa.next;
+	return _aa.next;
 #endif
 }
 
@@ -1062,9 +1062,9 @@ inline void
 Packet::set_next(Packet *p)
 {
 #if CLICK_LINUXMODULE
-    skb()->next = p->skb();
+	skb()->next = p->skb();
 #else
-    _aa.next = p;
+	_aa.next = p;
 #endif
 }
 
@@ -1072,9 +1072,9 @@ inline Packet *
 Packet::prev() const
 {
 #if CLICK_LINUXMODULE
-    return (Packet *)(skb()->prev);
+	return (Packet *)(skb()->prev);
 #else
-    return _aa.prev;
+	return _aa.prev;
 #endif
 }
 
@@ -1082,9 +1082,9 @@ inline Packet *&
 Packet::prev()
 {
 #if CLICK_LINUXMODULE
-    return (Packet *&)(skb()->prev);
+	return (Packet *&)(skb()->prev);
 #else
-    return _aa.prev;
+	return _aa.prev;
 #endif
 }
 
@@ -1092,9 +1092,9 @@ inline void
 Packet::set_prev(Packet *p)
 {
 #if CLICK_LINUXMODULE
-    skb()->prev = p->skb();
+	skb()->prev = p->skb();
 #else
-    _aa.prev = p;
+	_aa.prev = p;
 #endif
 }
 
@@ -1105,12 +1105,12 @@ Packet::has_mac_header() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_mac_header_was_set(skb());
+	return skb_mac_header_was_set(skb());
 # else
-    return skb()->mac.raw != 0;
+	return skb()->mac.raw != 0;
 # endif
 #else
-    return _aa.mac != 0;
+	return _aa.mac != 0;
 #endif
 }
 
@@ -1123,12 +1123,12 @@ Packet::mac_header() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_mac_header(skb());
+	return skb_mac_header(skb());
 # else
-    return skb()->mac.raw;
+	return skb()->mac.raw;
 # endif
 #else
-    return _aa.mac;
+	return _aa.mac;
 #endif
 }
 
@@ -1140,15 +1140,15 @@ Packet::has_network_header() const
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
 #  if NET_SKBUFF_DATA_USES_OFFSET
-    return skb()->network_header != (network_header_type) ~0U;
+	return skb()->network_header != (network_header_type) ~0U;
 #  else
-    return skb()->network_header != 0;
+	return skb()->network_header != 0;
 #  endif
 # else
-    return skb()->nh.raw != 0;
+	return skb()->nh.raw != 0;
 # endif
 #else
-    return _aa.nh != 0;
+	return _aa.nh != 0;
 #endif
 }
 
@@ -1161,12 +1161,12 @@ Packet::network_header() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_network_header(skb());
+	return skb_network_header(skb());
 # else
-    return skb()->nh.raw;
+	return skb()->nh.raw;
 # endif
 #else
-    return _aa.nh;
+	return _aa.nh;
 #endif
 }
 
@@ -1178,15 +1178,15 @@ Packet::has_transport_header() const
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
 #  if NET_SKBUFF_DATA_USES_OFFSET
-    return skb()->transport_header != (transport_header_type) ~0U;
+	return skb()->transport_header != (transport_header_type) ~0U;
 #  else
-    return skb()->transport_header != 0;
+	return skb()->transport_header != 0;
 #  endif
 # else
-    return skb()->h.raw != 0;
+	return skb()->h.raw != 0;
 # endif
 #else
-    return _aa.h != 0;
+	return _aa.h != 0;
 #endif
 }
 
@@ -1199,12 +1199,12 @@ Packet::transport_header() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    return skb_transport_header(skb());
+	return skb_transport_header(skb());
 # else
-    return skb()->h.raw;
+	return skb()->h.raw;
 # endif
 #else
-    return _aa.h;
+	return _aa.h;
 #endif
 }
 
@@ -1215,7 +1215,7 @@ Packet::transport_header() const
 inline const click_ether *
 Packet::ether_header() const
 {
-    return reinterpret_cast<const click_ether *>(mac_header());
+	return reinterpret_cast<const click_ether *>(mac_header());
 }
 
 #if HAVE_XIA
@@ -1226,7 +1226,7 @@ Packet::ether_header() const
 inline const click_xia *
 Packet::xia_header() const
 {
-    return reinterpret_cast<const click_xia *>(network_header());
+	return reinterpret_cast<const click_xia *>(network_header());
 }
 #endif
 
@@ -1237,7 +1237,7 @@ Packet::xia_header() const
 inline const click_ip *
 Packet::ip_header() const
 {
-    return reinterpret_cast<const click_ip *>(network_header());
+	return reinterpret_cast<const click_ip *>(network_header());
 }
 
 /** @brief Return the packet's network header pointer as IPv6.
@@ -1247,7 +1247,7 @@ Packet::ip_header() const
 inline const click_ip6 *
 Packet::ip6_header() const
 {
-    return reinterpret_cast<const click_ip6 *>(network_header());
+	return reinterpret_cast<const click_ip6 *>(network_header());
 }
 
 /** @brief Return the packet's transport header pointer as ICMP.
@@ -1257,7 +1257,7 @@ Packet::ip6_header() const
 inline const click_icmp *
 Packet::icmp_header() const
 {
-    return reinterpret_cast<const click_icmp *>(transport_header());
+	return reinterpret_cast<const click_icmp *>(transport_header());
 }
 
 /** @brief Return the packet's transport header pointer as TCP.
@@ -1267,7 +1267,7 @@ Packet::icmp_header() const
 inline const click_tcp *
 Packet::tcp_header() const
 {
-    return reinterpret_cast<const click_tcp *>(transport_header());
+	return reinterpret_cast<const click_tcp *>(transport_header());
 }
 
 /** @brief Return the packet's transport header pointer as UDP.
@@ -1277,7 +1277,7 @@ Packet::tcp_header() const
 inline const click_udp *
 Packet::udp_header() const
 {
-    return reinterpret_cast<const click_udp *>(transport_header());
+	return reinterpret_cast<const click_udp *>(transport_header());
 }
 
 /** @brief Return the packet's length starting from its MAC header pointer.
@@ -1286,7 +1286,7 @@ Packet::udp_header() const
 inline int
 Packet::mac_length() const
 {
-    return end_data() - mac_header();
+	return end_data() - mac_header();
 }
 
 /** @brief Return the packet's length starting from its network header pointer.
@@ -1295,7 +1295,7 @@ Packet::mac_length() const
 inline int
 Packet::network_length() const
 {
-    return end_data() - network_header();
+	return end_data() - network_header();
 }
 
 /** @brief Return the packet's length starting from its transport header pointer.
@@ -1304,7 +1304,7 @@ Packet::network_length() const
 inline int
 Packet::transport_length() const
 {
-    return end_data() - transport_header();
+	return end_data() - transport_header();
 }
 
 inline const Timestamp &
@@ -1312,12 +1312,12 @@ Packet::timestamp_anno() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 13)
-    return *reinterpret_cast<const Timestamp *>(&skb()->stamp);
+	return *reinterpret_cast<const Timestamp *>(&skb()->stamp);
 # else
-    return *reinterpret_cast<const Timestamp *>(&skb()->tstamp);
+	return *reinterpret_cast<const Timestamp *>(&skb()->tstamp);
 # endif
 #else
-    return _aa.timestamp;
+	return _aa.timestamp;
 #endif
 }
 
@@ -1326,33 +1326,33 @@ Packet::timestamp_anno()
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 13)
-    return *reinterpret_cast<Timestamp *>(&skb()->stamp);
+	return *reinterpret_cast<Timestamp *>(&skb()->stamp);
 # else
-    return *reinterpret_cast<Timestamp *>(&skb()->tstamp);
+	return *reinterpret_cast<Timestamp *>(&skb()->tstamp);
 # endif
 #else
-    return _aa.timestamp;
+	return _aa.timestamp;
 #endif
 }
 
 inline void
 Packet::set_timestamp_anno(const Timestamp &timestamp)
 {
-    timestamp_anno() = timestamp;
+	timestamp_anno() = timestamp;
 }
 
 inline net_device *
 Packet::device_anno() const
 {
 #if CLICK_LINUXMODULE
-    return skb()->dev;
+	return skb()->dev;
 #elif CLICK_BSDMODULE
-    if (m())
+	if (m())
 	return m()->m_pkthdr.rcvif;
-    else
+	else
 	return 0;
 #else
-    return 0;
+	return 0;
 #endif
 }
 
@@ -1360,12 +1360,12 @@ inline void
 Packet::set_device_anno(net_device *dev)
 {
 #if CLICK_LINUXMODULE
-    skb()->dev = dev;
+	skb()->dev = dev;
 #elif CLICK_BSDMODULE
-    if (m())
+	if (m())
 	m()->m_pkthdr.rcvif = dev;
 #else
-    (void) dev;
+	(void) dev;
 #endif
 }
 
@@ -1373,11 +1373,11 @@ inline Packet::PacketType
 Packet::packet_type_anno() const
 {
 #if CLICK_LINUXMODULE && PACKET_TYPE_MASK
-    return (PacketType)(skb()->pkt_type & PACKET_TYPE_MASK);
+	return (PacketType)(skb()->pkt_type & PACKET_TYPE_MASK);
 #elif CLICK_LINUXMODULE
-    return (PacketType)(skb()->pkt_type);
+	return (PacketType)(skb()->pkt_type);
 #else
-    return _aa.pkt_type;
+	return _aa.pkt_type;
 #endif
 }
 
@@ -1385,11 +1385,11 @@ inline void
 Packet::set_packet_type_anno(PacketType p)
 {
 #if CLICK_LINUXMODULE && PACKET_TYPE_MASK
-    skb()->pkt_type = (skb()->pkt_type & PACKET_CLEAN) | p;
+	skb()->pkt_type = (skb()->pkt_type & PACKET_CLEAN) | p;
 #elif CLICK_LINUXMODULE
-    skb()->pkt_type = p;
+	skb()->pkt_type = p;
 #else
-    _aa.pkt_type = p;
+	_aa.pkt_type = p;
 #endif
 }
 
@@ -1407,7 +1407,7 @@ Packet::set_packet_type_anno(PacketType p)
 inline WritablePacket *
 Packet::make(const void *data, uint32_t length)
 {
-    return make(default_headroom, data, length, 0);
+	return make(default_headroom, data, length, 0);
 }
 
 /** @brief Create and return a new packet.
@@ -1422,7 +1422,7 @@ Packet::make(const void *data, uint32_t length)
 inline WritablePacket *
 Packet::make(uint32_t length)
 {
-    return make(default_headroom, (const unsigned char *) 0, length, 0);
+	return make(default_headroom, (const unsigned char *) 0, length, 0);
 }
 
 #if CLICK_LINUXMODULE
@@ -1447,26 +1447,26 @@ Packet::make(uint32_t length)
 inline Packet *
 Packet::make(struct sk_buff *skb)
 {
-    struct sk_buff *nskb;
-    if (atomic_read(&skb->users) == 1) {
+	struct sk_buff *nskb;
+	if (atomic_read(&skb->users) == 1) {
 	skb_orphan(skb);
 	nskb = skb;
-    } else {
+	} else {
 	nskb = skb_clone(skb, GFP_ATOMIC);
 	atomic_dec(&skb->users);
-    }
+	}
 # if HAVE_SKB_LINEARIZE
 #  if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 17)
-    if (nskb && skb_linearize(nskb, GFP_ATOMIC) != 0)
+	if (nskb && skb_linearize(nskb, GFP_ATOMIC) != 0)
 #  else
-    if (nskb && skb_linearize(nskb) != 0)
+	if (nskb && skb_linearize(nskb) != 0)
 #  endif
-    {
+	{
 	kfree_skb(nskb);
 	nskb = 0;
-    }
+	}
 # endif
-    return reinterpret_cast<Packet *>(nskb);
+	return reinterpret_cast<Packet *>(nskb);
 }
 #endif
 
@@ -1479,17 +1479,17 @@ inline void
 Packet::kill()
 {
 #if CLICK_LINUXMODULE
-    struct sk_buff *b = skb();
-    b->next = b->prev = 0;
+	struct sk_buff *b = skb();
+	b->next = b->prev = 0;
 # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 15)
-    b->list = 0;
+	b->list = 0;
 # endif
-    skbmgr_recycle_skbs(b);
+	skbmgr_recycle_skbs(b);
 #elif HAVE_CLICK_PACKET_POOL
-    if (_use_count.dec_and_test())
+	if (_use_count.dec_and_test())
 	WritablePacket::recycle(static_cast<WritablePacket *>(this));
 #else
-    if (_use_count.dec_and_test())
+	if (_use_count.dec_and_test())
 	delete this;
 #endif
 }
@@ -1503,15 +1503,15 @@ Packet::assimilate_mbuf(Packet *p)
   if (!m) return;
 
   p->_head = (unsigned char *)
-	     (m->m_flags & M_EXT    ? m->m_ext.ext_buf :
-	      m->m_flags & M_PKTHDR ? m->m_pktdat :
-				      m->m_dat);
+		 (m->m_flags & M_EXT    ? m->m_ext.ext_buf :
+		  m->m_flags & M_PKTHDR ? m->m_pktdat :
+					  m->m_dat);
   p->_data = (unsigned char *)m->m_data;
   p->_tail = (unsigned char *)(m->m_data + m->m_len);
   p->_end = p->_head +
-	    (m->m_flags & M_EXT    ? min(m->m_pkthdr.len, m->m_ext.ext_size) :
-	     m->m_flags & M_PKTHDR ? MHLEN :
-				     MLEN);
+		(m->m_flags & M_EXT    ? min(m->m_pkthdr.len, m->m_ext.ext_size) :
+		 m->m_flags & M_PKTHDR ? MHLEN :
+					 MLEN);
 }
 
 inline void
@@ -1524,49 +1524,49 @@ inline Packet *
 Packet::make(struct mbuf *m)
 {
   if (!(m->m_flags & M_PKTHDR))
-    panic("trying to construct Packet from a non-packet mbuf");
+	panic("trying to construct Packet from a non-packet mbuf");
 
   Packet *p = new Packet;
   if (!p) {
-    m_freem(m);
-    return 0;
+	m_freem(m);
+	return 0;
   }
   p->_use_count = 1;
   p->_data_packet = NULL;
 
   if (m->m_pkthdr.len != m->m_len) {
-    struct mbuf *m2;
-    /* click needs contiguous data */
+	struct mbuf *m2;
+	/* click needs contiguous data */
 
-    if (m->m_pkthdr.len <= MCLBYTES) {
-      // click_chatter("m_pulldown, Click needs contiguous data");
-      m2 = m_pulldown(m, 0, m->m_pkthdr.len, NULL);
-      if (m2 == NULL)
-        panic("m_pulldown failed");
-      if (m2 != m) {
-        /*
-         * XXX: m_pulldown ensures that the data is contiguous, but
-         * it's not necessarily in the first mbuf in the chain.
-         * Currently that's not OK for Click, so we need to
-         * defragment the mbuf - which involves more copying etc.
-         */
-        m2 = m_defrag(m, M_DONTWAIT);
-        if (m2 == NULL) {
-          m_freem(m);
-          delete p;
-          return 0;
-        }
-        m = m2;
-      }
-    } else {
-      m2 = p->dup_jumbo_m(m);
-      m_freem(m);
-      if (m2 == NULL) {
-        delete p;
-        return 0;
-      }
-      m = m2;
-    }
+	if (m->m_pkthdr.len <= MCLBYTES) {
+	  // click_chatter("m_pulldown, Click needs contiguous data");
+	  m2 = m_pulldown(m, 0, m->m_pkthdr.len, NULL);
+	  if (m2 == NULL)
+		panic("m_pulldown failed");
+	  if (m2 != m) {
+		/*
+		 * XXX: m_pulldown ensures that the data is contiguous, but
+		 * it's not necessarily in the first mbuf in the chain.
+		 * Currently that's not OK for Click, so we need to
+		 * defragment the mbuf - which involves more copying etc.
+		 */
+		m2 = m_defrag(m, M_DONTWAIT);
+		if (m2 == NULL) {
+		  m_freem(m);
+		  delete p;
+		  return 0;
+		}
+		m = m2;
+	  }
+	} else {
+	  m2 = p->dup_jumbo_m(m);
+	  m_freem(m);
+	  if (m2 == NULL) {
+		delete p;
+		return 0;
+	  }
+	  m = m2;
+	}
   }
   p->_m = m;
   assimilate_mbuf(p);
@@ -1583,9 +1583,9 @@ inline bool
 Packet::shared() const
 {
 #if CLICK_LINUXMODULE
-    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+	return skb_cloned(const_cast<struct sk_buff *>(skb()));
 #else
-    return (_data_packet || _use_count > 1);
+	return (_data_packet || _use_count > 1);
 #endif
 }
 
@@ -1615,16 +1615,16 @@ Packet::shared() const
 inline WritablePacket *
 Packet::uniqueify()
 {
-    if (!shared())
+	if (!shared())
 	return static_cast<WritablePacket *>(this);
-    else
+	else
 	return expensive_uniqueify(0, 0, true);
 }
 
 inline WritablePacket *
 Packet::push(uint32_t len)
 {
-    if (headroom() >= len && !shared()) {
+	if (headroom() >= len && !shared()) {
 	WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
@@ -1637,14 +1637,14 @@ Packet::push(uint32_t len)
 # endif
 #endif
 	return q;
-    } else
+	} else
 	return expensive_push(len);
 }
 
 inline Packet *
 Packet::nonunique_push(uint32_t len)
 {
-    if (headroom() >= len) {
+	if (headroom() >= len) {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(skb(), len);
 #else				/* User-space and BSD kernel module */
@@ -1656,25 +1656,25 @@ Packet::nonunique_push(uint32_t len)
 # endif
 #endif
 	return this;
-    } else
+	} else
 	return expensive_push(len);
 }
 
 inline void
 Packet::pull(uint32_t len)
 {
-    if (len > length()) {
+	if (len > length()) {
 	click_chatter("Packet::pull %d > length %d\n", len, length());
 	len = length();
-    }
+	}
 #if CLICK_LINUXMODULE	/* Linux kernel module */
-    __skb_pull(skb(), len);
+	__skb_pull(skb(), len);
 #else				/* User-space and BSD kernel module */
-    _data += len;
+	_data += len;
 # if CLICK_BSDMODULE
-    m()->m_data += len;
-    m()->m_len -= len;
-    m()->m_pkthdr.len -= len;
+	m()->m_data += len;
+	m()->m_len -= len;
+	m()->m_pkthdr.len -= len;
 # endif
 #endif
 }
@@ -1682,7 +1682,7 @@ Packet::pull(uint32_t len)
 inline WritablePacket *
 Packet::put(uint32_t len)
 {
-    if (tailroom() >= len && !shared()) {
+	if (tailroom() >= len && !shared()) {
 	WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_put(q->skb(), len);
@@ -1694,14 +1694,14 @@ Packet::put(uint32_t len)
 # endif
 #endif
 	return q;
-    } else
+	} else
 	return expensive_put(len);
 }
 
 inline Packet *
 Packet::nonunique_put(uint32_t len)
 {
-    if (tailroom() >= len) {
+	if (tailroom() >= len) {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_put(skb(), len);
 #else				/* User-space and BSD kernel module */
@@ -1712,25 +1712,25 @@ Packet::nonunique_put(uint32_t len)
 # endif
 #endif
 	return this;
-    } else
+	} else
 	return expensive_put(len);
 }
 
 inline void
 Packet::take(uint32_t len)
 {
-    if (len > length()) {
+	if (len > length()) {
 	click_chatter("Packet::take %d > length %d\n", len, length());
 	len = length();
-    }
+	}
 #if CLICK_LINUXMODULE	/* Linux kernel module */
-    skb()->tail -= len;
-    skb()->len -= len;
+	skb()->tail -= len;
+	skb()->len -= len;
 #else				/* User-space and BSD kernel module */
-    _tail -= len;
+	_tail -= len;
 # if CLICK_BSDMODULE
-    m()->m_len -= len;
-    m()->m_pkthdr.len -= len;
+	m()->m_len -= len;
+	m()->m_pkthdr.len -= len;
 # endif
 #endif
 }
@@ -1764,11 +1764,11 @@ Packet::take(uint32_t len)
 inline void
 Packet::shrink_data(const unsigned char *data, uint32_t length)
 {
-    assert(_data_packet);
-    if (data >= _head && data + length >= data && data + length <= _end) {
+	assert(_data_packet);
+	if (data >= _head && data + length >= data && data + length <= _end) {
 	_head = _data = const_cast<unsigned char *>(data);
 	_tail = _end = const_cast<unsigned char *>(data + length);
-    }
+	}
 }
 
 /** @brief Shift the packet's data view to a different part of its buffer.
@@ -1792,10 +1792,10 @@ Packet::shrink_data(const unsigned char *data, uint32_t length)
 inline void
 Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
 {
-    if (headroom + length <= buffer_length()) {
+	if (headroom + length <= buffer_length()) {
 	_data = _head + headroom;
 	_tail = _data + length;
-    }
+	}
 }
 #endif
 
@@ -1803,53 +1803,53 @@ Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
 inline XID
 Packet::nexthop_neighbor_xid_anno() const
 {
-    struct click_xia_xid xid;
-    xid.type = xanno()->u32[nexthop_neighbor_xid_anno_offset / 4];
+	struct click_xia_xid xid;
+	xid.type = xanno()->u32[nexthop_neighbor_xid_anno_offset / 4];
 
-    for (size_t d = 0; d < sizeof(xid.id); d++) {
-    	xid.id[d] = xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d];
-    }
-    return XID ( xid );
+	for (size_t d = 0; d < sizeof(xid.id); d++) {
+		xid.id[d] = xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d];
+	}
+	return XID ( xid );
 }
 
 inline void
 Packet::set_nexthop_neighbor_xid_anno(XID x)
 {
-    struct click_xia_xid xid_temp;
-    xid_temp = x.xid();
+	struct click_xia_xid xid_temp;
+	xid_temp = x.xid();
 
-    assert(nexthop_neighbor_xid_anno_offset + 4 + sizeof(xid_temp.id) \
-      < anno_size);
-    xanno()->u32[nexthop_neighbor_xid_anno_offset / 4] = xid_temp.type;
+	assert(nexthop_neighbor_xid_anno_offset + 4 + sizeof(xid_temp.id) \
+	  < anno_size);
+	xanno()->u32[nexthop_neighbor_xid_anno_offset / 4] = xid_temp.type;
 
-    for (size_t d = 0; d < sizeof(xid_temp.id); d++) {
-    	xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d] = xid_temp.id[d];
-    }
+	for (size_t d = 0; d < sizeof(xid_temp.id); d++) {
+		xanno()->u8[nexthop_neighbor_xid_anno_offset + 4 + d] = xid_temp.id[d];
+	}
 }
 #endif
 
 inline IPAddress
 Packet::dst_ip_anno() const
 {
-    return IPAddress(xanno()->u32[dst_ip_anno_offset / 4]);
+	return IPAddress(xanno()->u32[dst_ip_anno_offset / 4]);
 }
 
 inline void
 Packet::set_dst_ip_anno(IPAddress a)
 {
-    xanno()->u32[dst_ip_anno_offset / 4] = a.addr();
+	xanno()->u32[dst_ip_anno_offset / 4] = a.addr();
 }
 
 inline IPAddress
 Packet::src_ip_anno() const
 {
-    return IPAddress(xanno()->u32[src_ip_anno_offset / 4]);
+	return IPAddress(xanno()->u32[src_ip_anno_offset / 4]);
 }
 
 inline void
 Packet::set_src_ip_anno(IPAddress a)
 {
-    xanno()->u32[src_ip_anno_offset / 4] = a.addr();
+	xanno()->u32[src_ip_anno_offset / 4] = a.addr();
 }
 
 /** @brief Set the MAC header pointer.
@@ -1857,15 +1857,15 @@ Packet::set_src_ip_anno(IPAddress a)
 inline void
 Packet::set_mac_header(const unsigned char *p)
 {
-    assert(p >= buffer() && p <= end_buffer());
+	assert(p >= buffer() && p <= end_buffer());
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb_set_mac_header(skb(), p - data());
+	skb_set_mac_header(skb(), p - data());
 # else
-    skb()->mac.raw = const_cast<unsigned char *>(p);
+	skb()->mac.raw = const_cast<unsigned char *>(p);
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.mac = const_cast<unsigned char *>(p);
+	_aa.mac = const_cast<unsigned char *>(p);
 #endif
 }
 
@@ -1876,18 +1876,18 @@ Packet::set_mac_header(const unsigned char *p)
 inline void
 Packet::set_mac_header(const unsigned char *p, uint32_t len)
 {
-    assert(p >= buffer() && p + len <= end_buffer());
+	assert(p >= buffer() && p + len <= end_buffer());
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb_set_mac_header(skb(), p - data());
-    skb_set_network_header(skb(), (p + len) - data());
+	skb_set_mac_header(skb(), p - data());
+	skb_set_network_header(skb(), (p + len) - data());
 # else
-    skb()->mac.raw = const_cast<unsigned char *>(p);
-    skb()->nh.raw = const_cast<unsigned char *>(p) + len;
+	skb()->mac.raw = const_cast<unsigned char *>(p);
+	skb()->nh.raw = const_cast<unsigned char *>(p) + len;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.mac = const_cast<unsigned char *>(p);
-    _aa.nh = const_cast<unsigned char *>(p) + len;
+	_aa.mac = const_cast<unsigned char *>(p);
+	_aa.nh = const_cast<unsigned char *>(p) + len;
 #endif
 }
 
@@ -1899,7 +1899,7 @@ Packet::set_mac_header(const unsigned char *p, uint32_t len)
 inline void
 Packet::set_ether_header(const click_ether *ethh)
 {
-    set_mac_header(reinterpret_cast<const unsigned char *>(ethh), 14);
+	set_mac_header(reinterpret_cast<const unsigned char *>(ethh), 14);
 }
 
 /** @brief Unset the MAC header pointer.
@@ -1910,22 +1910,22 @@ Packet::clear_mac_header()
 {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET
-    skb()->mac_header = (mac_header_type) ~0U;
+	skb()->mac_header = (mac_header_type) ~0U;
 # elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb()->mac_header = 0;
+	skb()->mac_header = 0;
 # else
-    skb()->mac.raw = 0;
+	skb()->mac.raw = 0;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.mac = 0;
+	_aa.mac = 0;
 #endif
 }
 
 inline WritablePacket *
 Packet::push_mac_header(uint32_t len)
 {
-    WritablePacket *q;
-    if (headroom() >= len && !shared()) {
+	WritablePacket *q;
+	if (headroom() >= len && !shared()) {
 	q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
@@ -1937,12 +1937,12 @@ Packet::push_mac_header(uint32_t len)
 	q->m()->m_pkthdr.len += len;
 # endif
 #endif
-    } else if ((q = expensive_push(len)))
+	} else if ((q = expensive_push(len)))
 	/* nada */;
-    else
+	else
 	return 0;
-    q->set_mac_header(q->data(), len);
-    return q;
+	q->set_mac_header(q->data(), len);
+	return q;
 }
 
 /** @brief Set the network and transport header pointers.
@@ -1952,18 +1952,18 @@ Packet::push_mac_header(uint32_t len)
 inline void
 Packet::set_network_header(const unsigned char *p, uint32_t len)
 {
-    assert(p >= buffer() && p + len <= end_buffer());
+	assert(p >= buffer() && p + len <= end_buffer());
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb_set_network_header(skb(), p - data());
-    skb_set_transport_header(skb(), (p + len) - data());
+	skb_set_network_header(skb(), p - data());
+	skb_set_transport_header(skb(), (p + len) - data());
 # else
-    skb()->nh.raw = const_cast<unsigned char *>(p);
-    skb()->h.raw = const_cast<unsigned char *>(p) + len;
+	skb()->nh.raw = const_cast<unsigned char *>(p);
+	skb()->h.raw = const_cast<unsigned char *>(p) + len;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.nh = const_cast<unsigned char *>(p);
-    _aa.h = const_cast<unsigned char *>(p) + len;
+	_aa.nh = const_cast<unsigned char *>(p);
+	_aa.h = const_cast<unsigned char *>(p) + len;
 #endif
 }
 
@@ -1976,15 +1976,15 @@ Packet::set_network_header(const unsigned char *p, uint32_t len)
 inline void
 Packet::set_network_header_length(uint32_t len)
 {
-    assert(network_header() + len <= end_buffer());
+	assert(network_header() + len <= end_buffer());
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb_set_transport_header(skb(), (network_header() + len) - data());
+	skb_set_transport_header(skb(), (network_header() + len) - data());
 # else
-    skb()->h.raw = skb()->nh.raw + len;
+	skb()->h.raw = skb()->nh.raw + len;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.h = _aa.nh + len;
+	_aa.h = _aa.nh + len;
 #endif
 }
 
@@ -1998,7 +1998,7 @@ Packet::set_network_header_length(uint32_t len)
 inline void
 Packet::set_xia_header(const click_xia *xiah, uint32_t len)
 {
-    set_network_header(reinterpret_cast<const unsigned char *>(xiah), len);
+	set_network_header(reinterpret_cast<const unsigned char *>(xiah), len);
 }
 #endif
 
@@ -2011,7 +2011,7 @@ Packet::set_xia_header(const click_xia *xiah, uint32_t len)
 inline void
 Packet::set_ip_header(const click_ip *iph, uint32_t len)
 {
-    set_network_header(reinterpret_cast<const unsigned char *>(iph), len);
+	set_network_header(reinterpret_cast<const unsigned char *>(iph), len);
 }
 
 /** @brief Set the network header pointer to an IPv6 header.
@@ -2023,7 +2023,7 @@ Packet::set_ip_header(const click_ip *iph, uint32_t len)
 inline void
 Packet::set_ip6_header(const click_ip6 *ip6h, uint32_t len)
 {
-    set_network_header(reinterpret_cast<const unsigned char *>(ip6h), len);
+	set_network_header(reinterpret_cast<const unsigned char *>(ip6h), len);
 }
 
 /** @brief Set the network header pointer to an IPv6 header.
@@ -2034,7 +2034,7 @@ Packet::set_ip6_header(const click_ip6 *ip6h, uint32_t len)
 inline void
 Packet::set_ip6_header(const click_ip6 *ip6h)
 {
-    set_ip6_header(ip6h, 40);
+	set_ip6_header(ip6h, 40);
 }
 
 /** @brief Unset the network header pointer.
@@ -2045,14 +2045,14 @@ Packet::clear_network_header()
 {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET
-    skb()->network_header = (network_header_type) ~0U;
+	skb()->network_header = (network_header_type) ~0U;
 # elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb()->network_header = 0;
+	skb()->network_header = 0;
 # else
-    skb()->nh.raw = 0;
+	skb()->nh.raw = 0;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.nh = 0;
+	_aa.nh = 0;
 #endif
 }
 
@@ -2062,7 +2062,7 @@ Packet::clear_network_header()
 inline int
 Packet::mac_header_offset() const
 {
-    return mac_header() - data();
+	return mac_header() - data();
 }
 
 /** @brief Return the MAC header length.
@@ -2074,7 +2074,7 @@ Packet::mac_header_offset() const
 inline uint32_t
 Packet::mac_header_length() const
 {
-    return network_header() - mac_header();
+	return network_header() - mac_header();
 }
 
 /** @brief Return the offset from the packet data to the network header.
@@ -2083,7 +2083,7 @@ Packet::mac_header_length() const
 inline int
 Packet::network_header_offset() const
 {
-    return network_header() - data();
+	return network_header() - data();
 }
 
 /** @brief Return the network header length.
@@ -2095,7 +2095,7 @@ Packet::network_header_offset() const
 inline uint32_t
 Packet::network_header_length() const
 {
-    return transport_header() - network_header();
+	return transport_header() - network_header();
 }
 
 /** @brief Return the offset from the packet data to the IP header.
@@ -2105,7 +2105,7 @@ Packet::network_header_length() const
 inline int
 Packet::ip_header_offset() const
 {
-    return network_header_offset();
+	return network_header_offset();
 }
 
 /** @brief Return the IP header length.
@@ -2118,7 +2118,7 @@ Packet::ip_header_offset() const
 inline uint32_t
 Packet::ip_header_length() const
 {
-    return network_header_length();
+	return network_header_length();
 }
 
 /** @brief Return the offset from the packet data to the IPv6 header.
@@ -2128,7 +2128,7 @@ Packet::ip_header_length() const
 inline int
 Packet::ip6_header_offset() const
 {
-    return network_header_offset();
+	return network_header_offset();
 }
 
 /** @brief Return the IPv6 header length.
@@ -2141,7 +2141,7 @@ Packet::ip6_header_offset() const
 inline uint32_t
 Packet::ip6_header_length() const
 {
-    return network_header_length();
+	return network_header_length();
 }
 
 /** @brief Return the offset from the packet data to the transport header.
@@ -2150,7 +2150,7 @@ Packet::ip6_header_length() const
 inline int
 Packet::transport_header_offset() const
 {
-    return transport_header() - data();
+	return transport_header() - data();
 }
 
 /** @brief Unset the transport header pointer.
@@ -2161,14 +2161,14 @@ Packet::clear_transport_header()
 {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET
-    skb()->transport_header = (transport_header_type) ~0U;
+	skb()->transport_header = (transport_header_type) ~0U;
 # elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb()->transport_header = 0;
+	skb()->transport_header = 0;
 # else
-    skb()->h.raw = 0;
+	skb()->h.raw = 0;
 # endif
 #else				/* User-space and BSD kernel module */
-    _aa.h = 0;
+	_aa.h = 0;
 #endif
 }
 
@@ -2177,32 +2177,32 @@ Packet::shift_header_annotations(const unsigned char *old_head,
 				 int32_t extra_headroom)
 {
 #if CLICK_LINUXMODULE
-    struct sk_buff *mskb = skb();
-    /* From Linux 2.6.24 - 3.10, the header offsets are integers if
-     * NET_SKBUFF_DATA_USES_OFFSET is 1.  From 3.11 onward, they're
-     * always integers. */
+	struct sk_buff *mskb = skb();
+	/* From Linux 2.6.24 - 3.10, the header offsets are integers if
+	 * NET_SKBUFF_DATA_USES_OFFSET is 1.  From 3.11 onward, they're
+	 * always integers. */
 # if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET) || \
-     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
-    (void) old_head;
-    mskb->mac_header += (mskb->mac_header == (mac_header_type) ~0U ? 0 : extra_headroom);
-    mskb->network_header += (mskb->network_header == (network_header_type) ~0U ? 0 : extra_headroom);
-    mskb->transport_header += (mskb->transport_header == (transport_header_type) ~0U ? 0 : extra_headroom);
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+	(void) old_head;
+	mskb->mac_header += (mskb->mac_header == (mac_header_type) ~0U ? 0 : extra_headroom);
+	mskb->network_header += (mskb->network_header == (network_header_type) ~0U ? 0 : extra_headroom);
+	mskb->transport_header += (mskb->transport_header == (transport_header_type) ~0U ? 0 : extra_headroom);
 # elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    ptrdiff_t shift = (mskb->head - old_head) + extra_headroom;
-    mskb->mac_header += (mskb->mac_header ? shift : 0);
-    mskb->network_header += (mskb->network_header ? shift : 0);
-    mskb->transport_header += (mskb->transport_header ? shift : 0);
+	ptrdiff_t shift = (mskb->head - old_head) + extra_headroom;
+	mskb->mac_header += (mskb->mac_header ? shift : 0);
+	mskb->network_header += (mskb->network_header ? shift : 0);
+	mskb->transport_header += (mskb->transport_header ? shift : 0);
 # else
-    ptrdiff_t shift = (mskb->head - old_head) + extra_headroom;
-    mskb->mac.raw += (mskb->mac.raw ? shift : 0);
-    mskb->nh.raw += (mskb->nh.raw ? shift : 0);
-    mskb->h.raw += (mskb->h.raw ? shift : 0);
+	ptrdiff_t shift = (mskb->head - old_head) + extra_headroom;
+	mskb->mac.raw += (mskb->mac.raw ? shift : 0);
+	mskb->nh.raw += (mskb->nh.raw ? shift : 0);
+	mskb->h.raw += (mskb->h.raw ? shift : 0);
 # endif
 #else
-    ptrdiff_t shift = (_head - old_head) + extra_headroom;
-    _aa.mac += (_aa.mac ? shift : 0);
-    _aa.nh += (_aa.nh ? shift : 0);
-    _aa.h += (_aa.h ? shift : 0);
+	ptrdiff_t shift = (_head - old_head) + extra_headroom;
+	_aa.mac += (_aa.mac ? shift : 0);
+	_aa.nh += (_aa.nh ? shift : 0);
+	_aa.h += (_aa.h ? shift : 0);
 #endif
 }
 
@@ -2213,9 +2213,9 @@ inline const unsigned char *
 Packet::buffer_data() const
 {
 #if CLICK_LINUXMODULE
-    return skb()->head;
+	return skb()->head;
 #else
-    return _head;
+	return _head;
 #endif
 }
 
@@ -2224,12 +2224,12 @@ Packet::buffer_data() const
  *
  * The area is ADDR_ANNO_SIZE bytes long. */
 inline void *Packet::addr_anno() {
-    return anno_u8() + addr_anno_offset;
+	return anno_u8() + addr_anno_offset;
 }
 
 /** @overload */
 inline const void *Packet::addr_anno() const {
-    return anno_u8() + addr_anno_offset;
+	return anno_u8() + addr_anno_offset;
 }
 
 /** @brief Return a pointer to the user annotation area.
@@ -2237,34 +2237,34 @@ inline const void *Packet::addr_anno() const {
  *
  * The area is USER_ANNO_SIZE bytes long. */
 inline void *Packet::user_anno() {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @overload */
 inline const void *Packet::user_anno() const {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @brief Return a pointer to the user annotation area as uint8_ts.
  * @deprecated Use Packet::anno_u8() instead. */
 inline uint8_t *Packet::user_anno_u8() {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @brief overload */
 inline const uint8_t *Packet::user_anno_u8() const {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @brief Return a pointer to the user annotation area as uint32_ts.
  * @deprecated Use Packet::anno_u32() instead. */
 inline uint32_t *Packet::user_anno_u32() {
-    return anno_u32() + user_anno_offset / 4;
+	return anno_u32() + user_anno_offset / 4;
 }
 
 /** @brief overload */
 inline const uint32_t *Packet::user_anno_u32() const {
-    return anno_u32() + user_anno_offset / 4;
+	return anno_u32() + user_anno_offset / 4;
 }
 
 /** @brief Return user annotation byte @a i.
@@ -2272,7 +2272,7 @@ inline const uint32_t *Packet::user_anno_u32() const {
  * @pre 0 <= @a i < USER_ANNO_SIZE
  * @deprecated Use Packet::anno_u8(@a i) instead. */
 inline uint8_t Packet::user_anno_u8(int i) const {
-    return anno_u8(user_anno_offset + i);
+	return anno_u8(user_anno_offset + i);
 }
 
 /** @brief Set user annotation byte @a i.
@@ -2281,7 +2281,7 @@ inline uint8_t Packet::user_anno_u8(int i) const {
  * @pre 0 <= @a i < USER_ANNO_SIZE
  * @deprecated Use Packet::set_anno_u8(@a i, @a v) instead. */
 inline void Packet::set_user_anno_u8(int i, uint8_t v) {
-    set_anno_u8(user_anno_offset + i, v);
+	set_anno_u8(user_anno_offset + i, v);
 }
 
 /** @brief Return 16-bit user annotation @a i.
@@ -2291,7 +2291,7 @@ inline void Packet::set_user_anno_u8(int i, uint8_t v) {
  *
  * Affects user annotation bytes [2*@a i, 2*@a i+1]. */
 inline uint16_t Packet::user_anno_u16(int i) const {
-    return anno_u16(user_anno_offset + i * 2);
+	return anno_u16(user_anno_offset + i * 2);
 }
 
 /** @brief Set 16-bit user annotation @a i.
@@ -2302,7 +2302,7 @@ inline uint16_t Packet::user_anno_u16(int i) const {
  *
  * Affects user annotation bytes [2*@a i, 2*@a i+1]. */
 inline void Packet::set_user_anno_u16(int i, uint16_t v) {
-    set_anno_u16(user_anno_offset + i * 2, v);
+	set_anno_u16(user_anno_offset + i * 2, v);
 }
 
 /** @brief Return 32-bit user annotation @a i.
@@ -2312,7 +2312,7 @@ inline void Packet::set_user_anno_u16(int i, uint16_t v) {
  *
  * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
 inline uint32_t Packet::user_anno_u32(int i) const {
-    return anno_u32(user_anno_offset + i * 4);
+	return anno_u32(user_anno_offset + i * 4);
 }
 
 /** @brief Set 32-bit user annotation @a i.
@@ -2323,7 +2323,7 @@ inline uint32_t Packet::user_anno_u32(int i) const {
  *
  * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
 inline void Packet::set_user_anno_u32(int i, uint32_t v) {
-    set_anno_u32(user_anno_offset + i * 4, v);
+	set_anno_u32(user_anno_offset + i * 4, v);
 }
 
 /** @brief Return 32-bit user annotation @a i.
@@ -2333,7 +2333,7 @@ inline void Packet::set_user_anno_u32(int i, uint32_t v) {
  *
  * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
 inline int32_t Packet::user_anno_s32(int i) const {
-    return anno_s32(user_anno_offset + i * 4);
+	return anno_s32(user_anno_offset + i * 4);
 }
 
 /** @brief Set 32-bit user annotation @a i.
@@ -2344,7 +2344,7 @@ inline int32_t Packet::user_anno_s32(int i) const {
  *
  * Affects user annotation bytes [4*@a i, 4*@a i+3]. */
 inline void Packet::set_user_anno_s32(int i, int32_t v) {
-    set_anno_s32(user_anno_offset + i * 4, v);
+	set_anno_s32(user_anno_offset + i * 4, v);
 }
 
 #if HAVE_INT64_TYPES
@@ -2355,7 +2355,7 @@ inline void Packet::set_user_anno_s32(int i, int32_t v) {
  *
  * Affects user annotation bytes [8*@a i, 8*@a i+7]. */
 inline uint64_t Packet::user_anno_u64(int i) const {
-    return anno_u64(user_anno_offset + i * 8);
+	return anno_u64(user_anno_offset + i * 8);
 }
 
 /** @brief Set 64-bit user annotation @a i.
@@ -2366,186 +2366,186 @@ inline uint64_t Packet::user_anno_u64(int i) const {
  *
  * Affects user annotation bytes [8*@a i, 8*@a i+7]. */
 inline void Packet::set_user_anno_u64(int i, uint64_t v) {
-    set_anno_u64(user_anno_offset + i * 8, v);
+	set_anno_u64(user_anno_offset + i * 8, v);
 }
 #endif
 
 /** @brief Return a pointer to the user annotation area.
  * @deprecated Use anno() instead. */
 inline const uint8_t *Packet::all_user_anno() const {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @overload
  * @deprecated Use anno() instead. */
 inline uint8_t *Packet::all_user_anno() {
-    return anno_u8() + user_anno_offset;
+	return anno_u8() + user_anno_offset;
 }
 
 /** @brief Return a pointer to the user annotation area as uint32_ts.
  * @deprecated Use anno_u32() instead. */
 inline const uint32_t *Packet::all_user_anno_u() const {
-    return anno_u32() + user_anno_offset / 4;
+	return anno_u32() + user_anno_offset / 4;
 }
 
 /** @overload
  * @deprecated Use anno_u32() instead. */
 inline uint32_t *Packet::all_user_anno_u() {
-    return anno_u32() + user_anno_offset / 4;
+	return anno_u32() + user_anno_offset / 4;
 }
 
 /** @brief Return user annotation byte @a i.
  * @deprecated Use anno_u8() instead. */
 inline uint8_t Packet::user_anno_c(int i) const {
-    return anno_u8(user_anno_offset + i);
+	return anno_u8(user_anno_offset + i);
 }
 
 /** @brief Set user annotation byte @a i.
  * @deprecated Use set_anno_u8() instead. */
 inline void Packet::set_user_anno_c(int i, uint8_t v) {
-    set_anno_u8(user_anno_offset + i, v);
+	set_anno_u8(user_anno_offset + i, v);
 }
 
 /** @brief Return 16-bit user annotation @a i.
  * @deprecated Use anno_u16() instead. */
 inline uint16_t Packet::user_anno_us(int i) const {
-    return anno_u16(user_anno_offset + i * 2);
+	return anno_u16(user_anno_offset + i * 2);
 }
 
 /** @brief Set 16-bit user annotation @a i.
  * @deprecated Use set_anno_u16() instead. */
 inline void Packet::set_user_anno_us(int i, uint16_t v) {
-    set_anno_u16(user_anno_offset + i * 2, v);
+	set_anno_u16(user_anno_offset + i * 2, v);
 }
 
 /** @brief Return 16-bit user annotation @a i.
  * @deprecated Use anno_u16() instead. */
 inline int16_t Packet::user_anno_s(int i) const {
-    return (int16_t) anno_u16(user_anno_offset + i * 2);
+	return (int16_t) anno_u16(user_anno_offset + i * 2);
 }
 
 /** @brief Set 16-bit user annotation @a i.
  * @deprecated Use set_anno_u16() instead. */
 inline void Packet::set_user_anno_s(int i, int16_t v) {
-    set_anno_u16(user_anno_offset + i * 2, v);
+	set_anno_u16(user_anno_offset + i * 2, v);
 }
 
 /** @brief Return 32-bit user annotation @a i.
  * @deprecated Use anno_u32() instead. */
 inline uint32_t Packet::user_anno_u(int i) const {
-    return anno_u32(user_anno_offset + i * 4);
+	return anno_u32(user_anno_offset + i * 4);
 }
 
 /** @brief Set 32-bit user annotation @a i.
  * @deprecated Use set_anno_u32() instead. */
 inline void Packet::set_user_anno_u(int i, uint32_t v) {
-    set_anno_u32(user_anno_offset + i * 4, v);
+	set_anno_u32(user_anno_offset + i * 4, v);
 }
 
 /** @brief Return 32-bit user annotation @a i.
  * @deprecated Use anno_s32() instead. */
 inline int32_t Packet::user_anno_i(int i) const {
-    return anno_s32(user_anno_offset + i * 4);
+	return anno_s32(user_anno_offset + i * 4);
 }
 
 /** @brief Set 32-bit user annotation @a i.
  * @deprecated Use set_anno_s32() instead. */
 inline void Packet::set_user_anno_i(int i, int32_t v) {
-    set_anno_s32(user_anno_offset + i * 4, v);
+	set_anno_s32(user_anno_offset + i * 4, v);
 }
 /** @endcond never */
 
 inline unsigned char *
 WritablePacket::data() const
 {
-    return const_cast<unsigned char *>(Packet::data());
+	return const_cast<unsigned char *>(Packet::data());
 }
 
 inline unsigned char *
 WritablePacket::end_data() const
 {
-    return const_cast<unsigned char *>(Packet::end_data());
+	return const_cast<unsigned char *>(Packet::end_data());
 }
 
 inline unsigned char *
 WritablePacket::buffer() const
 {
-    return const_cast<unsigned char *>(Packet::buffer());
+	return const_cast<unsigned char *>(Packet::buffer());
 }
 
 inline unsigned char *
 WritablePacket::end_buffer() const
 {
-    return const_cast<unsigned char *>(Packet::end_buffer());
+	return const_cast<unsigned char *>(Packet::end_buffer());
 }
 
 inline unsigned char *
 WritablePacket::mac_header() const
 {
-    return const_cast<unsigned char *>(Packet::mac_header());
+	return const_cast<unsigned char *>(Packet::mac_header());
 }
 
 inline unsigned char *
 WritablePacket::network_header() const
 {
-    return const_cast<unsigned char *>(Packet::network_header());
+	return const_cast<unsigned char *>(Packet::network_header());
 }
 
 inline unsigned char *
 WritablePacket::transport_header() const
 {
-    return const_cast<unsigned char *>(Packet::transport_header());
+	return const_cast<unsigned char *>(Packet::transport_header());
 }
 
 inline click_ether *
 WritablePacket::ether_header() const
 {
-    return const_cast<click_ether *>(Packet::ether_header());
+	return const_cast<click_ether *>(Packet::ether_header());
 }
 
 inline click_ip *
 WritablePacket::ip_header() const
 {
-    return const_cast<click_ip *>(Packet::ip_header());
+	return const_cast<click_ip *>(Packet::ip_header());
 }
 
 inline click_ip6 *
 WritablePacket::ip6_header() const
 {
-    return const_cast<click_ip6 *>(Packet::ip6_header());
+	return const_cast<click_ip6 *>(Packet::ip6_header());
 }
 
 #if HAVE_XIA
 inline click_xia *
 WritablePacket::xia_header() const
 {
-    return const_cast<click_xia *>(Packet::xia_header());
+	return const_cast<click_xia *>(Packet::xia_header());
 }
 #endif
 
 inline click_icmp *
 WritablePacket::icmp_header() const
 {
-    return const_cast<click_icmp *>(Packet::icmp_header());
+	return const_cast<click_icmp *>(Packet::icmp_header());
 }
 
 inline click_tcp *
 WritablePacket::tcp_header() const
 {
-    return const_cast<click_tcp *>(Packet::tcp_header());
+	return const_cast<click_tcp *>(Packet::tcp_header());
 }
 
 inline click_udp *
 WritablePacket::udp_header() const
 {
-    return const_cast<click_udp *>(Packet::udp_header());
+	return const_cast<click_udp *>(Packet::udp_header());
 }
 
 /** @cond never */
 inline unsigned char *
 WritablePacket::buffer_data() const
 {
-    return const_cast<unsigned char *>(Packet::buffer());
+	return const_cast<unsigned char *>(Packet::buffer());
 }
 /** @endcond never */
 

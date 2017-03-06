@@ -14,6 +14,25 @@ elementclass XIAToHost {
 	input -> Socket("UDP", 0.0.0.0, 0, SNAPLEN 65536);
 };
 
+elementclass FromAPI {
+	Socket("UNIX_DGRAM", "/tmp/api-click.sock", VERBOSE true, SNAPLEN 65536) -> output;
+}
+
+elementclass ToAPI {
+	input -> Socket("UNIX_DGRAM", "/tmp/api2-click.sock", VERBOSE true, SNAPLEN 65536);
+
+}
+
+
+
+elementclass APISocket {
+	$click_port |
+	//input -> Socket("UDP", 127.0.0.1, $click_port, SNAPLEN 65536) -> output;
+
+	input -> Socket("UNIX_DGRAM", "/tmp/api-click.sock", SNAPLEN 65536) -> output;
+};
+
+
 elementclass CacheFilter {
 	// Filter packets coming in from the network and if they contain
 	//  CID data, tee the data off to the Xcache daemon as well as
@@ -299,14 +318,15 @@ elementclass XIARoutingCore {
 	// input[0]: packet to route
 	// output[0]: packet to be forwarded out a given port based on paint value
 
-	n :: RouteEngine($num_ports);
+	n::RouteEngine($num_ports);
 
 	xtransport::XTRANSPORT($hostname, IP:$external_ip, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
 
+	api::APISocket($click_port);
+	api  -> [0]xtransport[0] -> api;
 
-	XIAFromHost($click_port) -> xtransport;
+	//FromAPI  -> [0]xtransport[0] -> ToAPI;
 	Idle -> [1]xtransport;
-	xtransport[0] -> XIAToHost($click_port);
 
 	xtransport[1] -> Discard; // Port 1 is unused for now.
 

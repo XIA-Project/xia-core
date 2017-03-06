@@ -26,6 +26,7 @@
 #include "dagaddr.hpp"
 #include <iostream>
 #include <stdio.h>
+#include <sys/un.h>
 
 static unsigned hop_count = -1;
 
@@ -84,6 +85,27 @@ static int _Xaccept(int sockfd, struct sockaddr *self_addr, socklen_t *self_addr
 
 	// Tell click what the new socket's port is (but we'll tell click over the old socket)
 	x_accept_msg->set_new_port(getPort(new_sockfd));
+
+
+	struct sockaddr_un su;
+	socklen_t len = sizeof(su);
+
+	bzero(&su, len);
+	getsockname(sockfd, (struct sockaddr*)&su, &len);
+
+
+	x_accept_msg->set_new_descriptor(*(uint64_t*)su.sun_path);
+
+printf("selected: domain path = %x:%x:%x:%x:%x:%x\n",
+	su.sun_path[0],
+	su.sun_path[1],
+	su.sun_path[2],
+	su.sun_path[3],
+	su.sun_path[4],
+	su.sun_path[5]
+	);
+
+printf("from pbuf: %lx\n", x_accept_msg->new_descriptor());
 
 	if (self_addr) {
 		x_accept_msg->set_sendmypath(true);

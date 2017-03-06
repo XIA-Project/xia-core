@@ -38,6 +38,10 @@ using namespace xia;
 
 #endif
 
+
+typedef uint64_t un_abstract;
+
+
 // FIXME: put these in a std location that can be found by click and the API
 // XIA Specific commands for [get|set]sockopt
 #define XOPT_HLIM	    0x07001
@@ -96,17 +100,17 @@ typedef struct {
 #define TCP_GLOBALS
 struct tcp_globals
 {
-        int     tcp_keepidle;
-        int     tcp_keepintvl;
-        int     tcp_maxidle;
-        int     tcp_mssdflt;
-        int     tcp_rttdflt;
-        int     so_flags;
-        int     so_idletime;
-        int     window_scale;
-        bool    use_timestamp;
-        uint32_t tcp_now;
-        tcp_seq_t so_recv_buffer_size;
+		int     tcp_keepidle;
+		int     tcp_keepintvl;
+		int     tcp_maxidle;
+		int     tcp_mssdflt;
+		int     tcp_rttdflt;
+		int     so_flags;
+		int     so_idletime;
+		int     window_scale;
+		bool    use_timestamp;
+		uint32_t tcp_now;
+		tcp_seq_t so_recv_buffer_size;
 };
 #endif
 
@@ -149,25 +153,25 @@ private:
 	XIAPath _nameserver_addr;
 	uint32_t _next_id;
 
-	Packet* UDPIPPrep(Packet *, int);
-    bool migratable_sock(sock *, int);
-    bool update_src_path(sock *, XIAPath&);
+	Packet* UDPIPPrep(Packet *, uint64_t);
+	bool migratable_sock(sock *, int);
+	bool update_src_path(sock *, XIAPath&);
 
 public:
 	/* TCP related fields */
-    tcp_globals *globals()  { return &_tcp_globals; }
-    uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
-    int verbosity()             { return _verbosity; }
-    // Element Handler Methods
-    static String read_verb(Element*, void*);
-    static int write_verb(const String&, Element*, void*, ErrorHandler*);
-    tcpstat         _tcpstat;
-    Timer           *_fast_ticks;
-    Timer           *_slow_ticks;
-    Timer           *_reaper;
-    int         _verbosity;
+	tcp_globals *globals()  { return &_tcp_globals; }
+	uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
+	int verbosity()             { return _verbosity; }
+	// Element Handler Methods
+	static String read_verb(Element*, void*);
+	static int write_verb(const String&, Element*, void*, ErrorHandler*);
+	tcpstat         _tcpstat;
+	Timer           *_fast_ticks;
+	Timer           *_slow_ticks;
+	Timer           *_reaper;
+	int         _verbosity;
 
-    tcp_globals     _tcp_globals;
+	tcp_globals     _tcp_globals;
 	ErrorHandler    *_errhandler;
 
 public:
@@ -178,7 +182,7 @@ public:
 	list <uint32_t> notify_listeners;
 
 	// outstanding poll/selects indexed by control socket port #
-	HashTable<unsigned short, PollEvent> poll_events;
+	HashTable<un_abstract, PollEvent> poll_events;
 
 	// For Content Push APIs
 	HashTable<XID, unsigned short> XIDtoPushPort;
@@ -199,7 +203,7 @@ public:
 	 * Xtransport Methods
 	* ========================= */
 public:
-	void ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
+	void ReturnResult(un_abstract sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
 	char *random_xid(const char *type, char *buf);
 
@@ -210,42 +214,42 @@ public:
 	void ProcessXhcpPacket(WritablePacket *p_in);
 
 	void ProcessPollEvent(uint32_t id, unsigned int);
-	void CreatePollEvent(unsigned short _sport, xia::X_Poll_Msg *msg);
-	void CancelPollEvent(unsigned short _sport);
+	void CreatePollEvent(un_abstract _sport, xia::X_Poll_Msg *msg);
+	void CancelPollEvent(un_abstract _sport);
 	/*
 	** Xsockets API handlers
 	*/
-	void Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xsetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xgetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xlisten(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void XreadyToAccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xaccept(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xgethostname(unsigned short _sport, uint32_t id,  xia::XSocketMsg *xia_socket_msg);
-	void Xgetifaddrs(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xreadnameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xgetpeername(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xgetsockname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xisdualstackrouter(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	void Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
-	void Xrecv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
-	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xsocket(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xsetsockopt(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockopt(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xbind(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xclose(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xconnect(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xlisten(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XreadyToAccept(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xaccept(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedag(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreadlocalhostaddr(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XsetXcacheSid(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatenameserverdag(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgethostname(un_abstract _sport, uint32_t id,  xia::XSocketMsg *xia_socket_msg);
+	void Xgetifaddrs(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreadnameserverdag(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetpeername(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xgetsockname(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xisdualstackrouter(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xsend(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xsendto(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg, WritablePacket *p_in);
+	void Xrecv(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xrecvfrom(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xpoll(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdaterv(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xfork(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xreplay(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xnotify(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XmanageFID(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedefiface(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xdefaultiface(un_abstract _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -295,51 +299,51 @@ class sock : public Element {
 	public:
 		const char *class_name() const      { return "sock"; }
 
-    virtual bool run_task(Task*) { return false; };
+	virtual bool run_task(Task*) { return false; };
 
-    using Element::push;
-    void push(WritablePacket *){};
-    // virtual Packet *pull(const int port) = 0;
-    int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
-    // virtual ~XGenericTransport();
-    unsigned short get_port() {return port;}
-    int get_type() { return sock_type; }
-    void set_state(const HandlerState s) {hstate = s;}
-    HandlerState get_state() { return hstate; }
-    XIAPath get_src_path() {return src_path;}
-    void set_src_path(XIAPath p) {src_path = p;}
-    XIAPath get_dst_path() {return dst_path;}
-    void set_dst_path(XIAPath p) {dst_path = p;}
-    uint8_t get_hlim() {return hlim;}
-    void set_hlim(uint8_t n) {hlim = n;}
-    uint8_t get_hop_count() {return hop_count;}
-    void set_hop_count(uint8_t n) {hop_count = n;}
-    bool is_full_src_dag() {return full_src_dag;}
-    void set_full_src_dag(bool f) {full_src_dag = f;}
-    String get_sdag() {return sdag;}
-    void set_sdag(String s) {sdag = s;}
-    String get_ddag() {return ddag;}
-    void set_ddag(String s) {ddag = s;}
-    bool is_did_poll() {return did_poll;}
-    void set_did_poll(bool d) {did_poll = d;}
-    unsigned get_polling() {return polling;}
-    void increase_polling() {polling++;}
-    void decrease_polling() {polling--;}
-    bool is_recv_pending() {return recv_pending;}
-    void set_recv_pending(bool r) {recv_pending = r;}
-    void set_pending_recv_msg(XSocketMsg *msg) {pending_recv_msg = msg;}
-    XIDpair get_key() {return key;}
-    void set_key(XIDpair k) {key = k;}
+	using Element::push;
+	void push(WritablePacket *){};
+	// virtual Packet *pull(const int port) = 0;
+	int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
+	// virtual ~XGenericTransport();
+//	unsigned short get_port() {return port;}
+	int get_type() { return sock_type; }
+	void set_state(const HandlerState s) {hstate = s;}
+	HandlerState get_state() { return hstate; }
+	XIAPath get_src_path() {return src_path;}
+	void set_src_path(XIAPath p) {src_path = p;}
+	XIAPath get_dst_path() {return dst_path;}
+	void set_dst_path(XIAPath p) {dst_path = p;}
+	uint8_t get_hlim() {return hlim;}
+	void set_hlim(uint8_t n) {hlim = n;}
+	uint8_t get_hop_count() {return hop_count;}
+	void set_hop_count(uint8_t n) {hop_count = n;}
+	bool is_full_src_dag() {return full_src_dag;}
+	void set_full_src_dag(bool f) {full_src_dag = f;}
+	String get_sdag() {return sdag;}
+	void set_sdag(String s) {sdag = s;}
+	String get_ddag() {return ddag;}
+	void set_ddag(String s) {ddag = s;}
+	bool is_did_poll() {return did_poll;}
+	void set_did_poll(bool d) {did_poll = d;}
+	unsigned get_polling() {return polling;}
+	void increase_polling() {polling++;}
+	void decrease_polling() {polling--;}
+	bool is_recv_pending() {return recv_pending;}
+	void set_recv_pending(bool r) {recv_pending = r;}
+	void set_pending_recv_msg(XSocketMsg *msg) {pending_recv_msg = msg;}
+	XIDpair get_key() {return key;}
+	void set_key(XIDpair k) {key = k;}
 	uint32_t get_id() { return id; }
 	void set_id(uint32_t new_id) { id = new_id; }
 
-    XTRANSPORT *get_transport() { return transport; }
-	sock(XTRANSPORT *transport, unsigned short port, uint32_t id, int type);
+	XTRANSPORT *get_transport() { return transport; }
+	sock(XTRANSPORT *transport, un_abstract port, uint32_t id, int type);
 	sock();
 	/* =========================
 	 * Common Socket states
 	 * ========================= */
-	unsigned short port;		// API Port
+	un_abstract port;		// API Port
 	int sock_type;				// STREAM, DGRAM, RAW, CHUNK
 	SocketState state;			// Socket state (Mainly for STREAM)
 	bool isBlocking;			// true if socket is blocking (default)
@@ -420,17 +424,17 @@ class sock : public Element {
 
 	bool reap;
 protected:
-    XTRANSPORT *transport;
-    HandlerState hstate;
-    XIDpair key;
+	XTRANSPORT *transport;
+	HandlerState hstate;
+	XIDpair key;
 
 	uint32_t id;
 
-    String sdag;
-    String ddag;
+	String sdag;
+	String ddag;
 
-    bool did_poll;
-    ErrorHandler    *_errh;
+	bool did_poll;
+	ErrorHandler    *_errh;
 	} ;
 
 

@@ -1,158 +1,160 @@
 package xia;
 
 enum XSocketCallType {
-  XSOCKET = 1;
-  XBIND = 2;
-  XCLOSE = 3;
-  XCONNECT = 4;
-  XACCEPT = 5;
-  XSENDTO = 6;
-  XSEND = 7;
-  XRECV = 8;
-  XRECVFROM = 9;
-  XSETSOCKOPT = 10;
-  XGETSOCKOPT = 11;
-  XREQUESTFAILED = 17;
-  XRESULT = 18;
-  XUPDATEDAG = 19;
-  XREADLOCALHOSTADDR = 20;
-  XUPDATENAMESERVERDAG = 21;
-  XREADNAMESERVERDAG = 22;
-  XISDUALSTACKROUTER = 23;
-  XGETPEERNAME = 24;
-  XGETSOCKNAME = 25;
-  XGETMSG = 26;
-  XREADYTOACCEPT = 27;
-  XPOLL = 30;
-  XLISTEN = 32;
-  XUPDATERV = 33;
-  XSETXCACHESID = 34;
-  XFORK = 35;
-  XREPLAY = 36;
-  XNOTIFY = 37;
+	XSOCKET = 1;
+	XBIND = 2;
+	XCLOSE = 3;
+	XCONNECT = 4;
+	XACCEPT = 5;
+	XSENDTO = 6;
+	XSEND = 7;
+	XRECV = 8;
+	XRECVFROM = 9;
+	XSETSOCKOPT = 10;
+	XGETSOCKOPT = 11;
+	XREQUESTFAILED = 17;
+	XRESULT = 18;
+	XUPDATEDAG = 19;
+	XREADLOCALHOSTADDR = 20;
+	XUPDATENAMESERVERDAG = 21;
+	XREADNAMESERVERDAG = 22;
+	XISDUALSTACKROUTER = 23;
+	XGETPEERNAME = 24;
+	XGETSOCKNAME = 25;
+	XGETMSG = 26;
+	XREADYTOACCEPT = 27;
+	XPOLL = 30;
+	XLISTEN = 32;
+	XUPDATERV = 33;
+	XSETXCACHESID = 34;
+	XFORK = 35;
+	XREPLAY = 36;
+	XNOTIFY = 37;
 
-  XGETIFADDRS = 38;
-  XGETHOSTNAME = 39;
+	XGETIFADDRS = 38;
+	XGETHOSTNAME = 39;
 
-  XMANAGEFID = 40;
-  XUPDATEDEFIFACE = 41;
-  XDEFIFACE = 42;
+	XMANAGEFID = 40;
+	XUPDATEDEFIFACE = 41;
+	XDEFIFACE = 42;
 }
 
 message XSocketMsg {
-  required XSocketCallType type = 1; // XIA Socket call type
-  required uint32 id = 2;
-  optional int32 sequence = 3;
-  optional bool blocking = 4;
-  optional uint32 port = 5;
+	required XSocketCallType type = 1; // XIA Socket call type
+	required uint32 id = 2;
+	optional int32 sequence = 3;
+	optional bool blocking = 4;
+	optional uint32 port = 5;
+	optional uint64 desc = 46;
 
-  optional X_Socket_Msg x_socket = 6;
-  optional X_Bind_Msg x_bind = 7;
-  optional X_Close_Msg x_close = 8;
-  optional X_Connect_Msg x_connect = 9;
-  optional X_Accept_Msg x_accept = 10;
-  optional X_Sendto_Msg x_sendto = 11;
-  optional X_Send_Msg x_send = 12;
-  optional X_Recv_Msg x_recv = 13;
-  optional X_Recvfrom_Msg x_recvfrom = 14;
-  optional X_Setsockopt_Msg x_setsockopt = 15;
-  optional X_Getsockopt_Msg x_getsockopt = 16;
+	optional X_Socket_Msg x_socket = 6;
+	optional X_Bind_Msg x_bind = 7;
+	optional X_Close_Msg x_close = 8;
+	optional X_Connect_Msg x_connect = 9;
+	optional X_Accept_Msg x_accept = 10;
+	optional X_Sendto_Msg x_sendto = 11;
+	optional X_Send_Msg x_send = 12;
+	optional X_Recv_Msg x_recv = 13;
+	optional X_Recvfrom_Msg x_recvfrom = 14;
+	optional X_Setsockopt_Msg x_setsockopt = 15;
+	optional X_Getsockopt_Msg x_getsockopt = 16;
 
-  optional X_Requestfailed_Msg x_requestfailed= 22;
-  optional X_Result_Msg x_result = 23;
+	optional X_Requestfailed_Msg x_requestfailed= 22;
+	optional X_Result_Msg x_result = 23;
 
-  optional X_Updatedag_Msg x_updatedag = 24;
-  optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 25;
-  optional X_Updatenameserverdag_Msg x_updatenameserverdag = 26;
-  optional X_ReadNameServerDag_Msg x_readnameserverdag = 27;
+	optional X_Updatedag_Msg x_updatedag = 24;
+	optional X_ReadLocalHostAddr_Msg x_readlocalhostaddr = 25;
+	optional X_Updatenameserverdag_Msg x_updatenameserverdag = 26;
+	optional X_ReadNameServerDag_Msg x_readnameserverdag = 27;
 
-  optional X_IsDualStackRouter_Msg x_isdualstackrouter = 28;
-  optional X_GetPeername_Msg x_getpeername = 29;
-  optional X_GetSockname_Msg x_getsockname = 30;
+	optional X_IsDualStackRouter_Msg x_isdualstackrouter = 28;
+	optional X_GetPeername_Msg x_getpeername = 29;
+	optional X_GetSockname_Msg x_getsockname = 30;
 
-  optional X_Poll_Msg x_poll = 31;
+	optional X_Poll_Msg x_poll = 31;
 
-  optional X_Updaterv_Msg x_updaterv = 35;
-  optional X_Listen_Msg x_listen = 36;
-  optional X_SetXcacheSid_Msg x_setxcachesid = 37;
-  optional X_Fork_Msg x_fork = 38;
-  optional X_Replay_Msg x_replay = 39;
-  optional X_Notify_Msg x_notify = 40;
+	optional X_Updaterv_Msg x_updaterv = 35;
+	optional X_Listen_Msg x_listen = 36;
+	optional X_SetXcacheSid_Msg x_setxcachesid = 37;
+	optional X_Fork_Msg x_fork = 38;
+	optional X_Replay_Msg x_replay = 39;
+	optional X_Notify_Msg x_notify = 40;
 
-  optional X_GetIfAddrs_Msg x_getifaddrs = 41;
-  optional X_GetHostName_Msg x_gethostname = 42;
+	optional X_GetIfAddrs_Msg x_getifaddrs = 41;
+	optional X_GetHostName_Msg x_gethostname = 42;
 
-  optional X_ManageFID_Msg x_manage_fid = 43;
+	optional X_ManageFID_Msg x_manage_fid = 43;
 
-  optional X_UpdateDefIface_Msg x_updatedefiface = 44;
-  optional X_DefIface_Msg x_defiface = 45;
+	optional X_UpdateDefIface_Msg x_updatedefiface = 44;
+	optional X_DefIface_Msg x_defiface = 45;
 }
 
 message X_Socket_Msg {
-  required int32 type = 1; // Indicating the type of tranport (0: Reliable transport, 1: Unreliable transport)
-  optional string temp = 2; // currently not used
+	required int32 type = 1; // Indicating the type of tranport (0: Reliable transport, 1: Unreliable transport)
+	optional string temp = 2; // currently not used
 }
 
 message X_Bind_Msg {
-  required string sdag = 1; // bind to src dag
+	required string sdag = 1; // bind to src dag
 }
 
 message X_Close_Msg {
-  required uint32 id = 1; // id of actual socket to close
-  optional uint32 refcount = 2;// # of processes holding this socket open
-  optional bool delkeys = 3;   // false if the socket was created by accept and
-                               //   we should leave the keys intact
+	required uint32 id = 1; // id of actual socket to close
+	optional uint32 refcount = 2;// # of processes holding this socket open
+	optional bool delkeys = 3;   // false if the socket was created by accept and
+															 //   we should leave the keys intact
 }
 
 message X_Connect_Msg {
-  enum ConnectStatus {
-    XCONNECTING = 0;
+	enum ConnectStatus {
+		XCONNECTING = 0;
 	XCONNECTED = 1;
 	XFAILED = 2;
-  }
+	}
 
-  required string ddag = 1; // connect to destination dag
-  optional ConnectStatus status = 2;
-  optional string sdag = 3; // source DAG, from bind or autogenerated
+	required string ddag = 1; // connect to destination dag
+	optional ConnectStatus status = 2;
+	optional string sdag = 3; // source DAG, from bind or autogenerated
 }
 
 message X_Listen_Msg {
-  required uint32 backlog = 1;
+	required uint32 backlog = 1;
 }
 
 message X_Accept_Msg {
-  optional string dag = 1; // peer's dag
-  required uint32 new_port = 2; // the UDP port for the new API socket
-  optional string remote_dag = 3;
-  optional bool sendmypath = 4;
-  optional string self_dag = 5;
-  optional uint32 new_id = 6;
-  optional uint32 hop_count = 7;
+	optional string dag = 1; // peer's dag
+	required uint32 new_port = 2; // the UDP port for the new API socket
+	optional string remote_dag = 3;
+	optional bool sendmypath = 4;
+	optional string self_dag = 5;
+	optional uint32 new_id = 6;
+	optional uint32 hop_count = 7;
+	optional uint64 new_descriptor = 8;
 }
 
 message X_Sendto_Msg {
-  required string ddag = 1; // dest dag
-  optional bytes payload = 2; // data
+	required string ddag = 1; // dest dag
+	optional bytes payload = 2; // data
 }
 
 message X_Send_Msg {
-  optional bytes payload = 1; // data
+	optional bytes payload = 1; // data
 }
 
 message X_Recv_Msg {
-  optional int32 flags = 1;
-  optional bytes payload = 2;
-  optional int32 bytes_requested = 3;
-  optional int32 bytes_returned = 4; // necessary? this will be the result return code as well
+	optional int32 flags = 1;
+	optional bytes payload = 2;
+	optional int32 bytes_requested = 3;
+	optional int32 bytes_returned = 4; // necessary? this will be the result return code as well
 }
 
 message X_Recvfrom_Msg {
-  optional int32 flags = 1;
-  optional int32 interface_id = 2;
-  optional string sender_dag = 3;
-  optional bytes payload = 4;
-  optional int32 bytes_requested = 5;
-  optional int32 bytes_returned = 6; // necessary? this will be the result return code as well
+	optional int32 flags = 1;
+	optional int32 interface_id = 2;
+	optional string sender_dag = 3;
+	optional bytes payload = 4;
+	optional int32 bytes_requested = 5;
+	optional int32 bytes_returned = 6; // necessary? this will be the result return code as well
 }
 
 message X_Setsockopt_Msg {
@@ -173,77 +175,77 @@ message X_Result_Msg {
 }
 
 message X_Requestfailed_Msg {
-  optional int32 type = 1; // Indicating the type of error (to be defined)
-  optional string temp = 2; // currently not used
+	optional int32 type = 1; // Indicating the type of error (to be defined)
+	optional string temp = 2; // currently not used
 }
 
 message X_Updatedag_Msg {
-  required int32 interface = 1;
-  required string dag = 2;
-  optional string ip4id = 3;
+	required int32 interface = 1;
+	required string dag = 2;
+	optional string ip4id = 3;
 }
 
 message X_ReadLocalHostAddr_Msg {
-  optional string dag = 1;
-  optional string ip4id = 2;
+	optional string dag = 1;
+	optional string ip4id = 2;
 }
 
 message X_GetIfAddrs_Msg {
 
-  message IfAddr {
-    optional string iface_name = 1;
-    optional uint32 flags = 2;
-    optional string src_addr_str = 3;
-    optional string dst_addr_str = 4;
-    optional bool is_rv_dag = 5;
-  }
+	message IfAddr {
+		optional string iface_name = 1;
+		optional uint32 flags = 2;
+		optional string src_addr_str = 3;
+		optional string dst_addr_str = 4;
+		optional bool is_rv_dag = 5;
+	}
 
-  repeated IfAddr ifaddrs = 1;
+	repeated IfAddr ifaddrs = 1;
 }
 
 message X_GetHostName_Msg {
-  required string hostname = 1;
+	required string hostname = 1;
 }
 
 message X_Updatenameserverdag_Msg {
-  required string dag = 1;
+	required string dag = 1;
 }
 
 message X_ReadNameServerDag_Msg {
-  optional string dag = 1;
+	optional string dag = 1;
 }
 
 message X_IsDualStackRouter_Msg {
-  optional int32 flag = 1; // Indicating if this node is an XIA-IPv4 dual-stack router
+	optional int32 flag = 1; // Indicating if this node is an XIA-IPv4 dual-stack router
 }
 
 
 message X_GetPeername_Msg {
-  optional string dag = 1; // Full DAG of the remote socket
+	optional string dag = 1; // Full DAG of the remote socket
 }
 
 message X_GetSockname_Msg {
-  optional string dag = 1; // Full DAG of the this socket
+	optional string dag = 1; // Full DAG of the this socket
 }
 
 message X_Poll_Msg {
 
-  message PollFD {
-    required int32 id = 1;
-    required uint32 flags = 2;
-  }
-  enum MsgType {
-    DOPOLL = 1;
-    CANCEL = 2;
-    RESULT = 3;
-  };
-  required MsgType type = 1;
-  required int32 nfds = 2;
-  repeated PollFD pfds = 3;
+	message PollFD {
+		required int32 id = 1;
+		required uint32 flags = 2;
+	}
+	enum MsgType {
+		DOPOLL = 1;
+		CANCEL = 2;
+		RESULT = 3;
+	};
+	required MsgType type = 1;
+	required int32 nfds = 2;
+	repeated PollFD pfds = 3;
 }
 
 message X_Updaterv_Msg {
-  required int32 interface = 1;
+	required int32 interface = 1;
 }
 
 message X_ManageFID_Msg {
@@ -262,46 +264,46 @@ message X_DefIface_Msg {
 /**************************************************/
 
 message msg {
-  optional int32 appid = 1;  // port number?
-  optional bytes xid = 2;
-  optional string xiapath_src = 5;
-  optional string xiapath_dst = 6;
-  optional bytes payload = 3;
-  enum MsgType {
-    GETLOCALHID = 0;
-    GETCID = 1;
-    CONNECTSID = 2;
-    PUTCID = 3;
-    SERVESID = 4;
+	optional int32 appid = 1;  // port number?
+	optional bytes xid = 2;
+	optional string xiapath_src = 5;
+	optional string xiapath_dst = 6;
+	optional bytes payload = 3;
+	enum MsgType {
+		GETLOCALHID = 0;
+		GETCID = 1;
+		CONNECTSID = 2;
+		PUTCID = 3;
+		SERVESID = 4;
 /*** IS THIS NECESSARY? ***/
-    PUSHTOCID = 5;
-  }
-  optional MsgType type = 4;
+		PUSHTOCID = 5;
+	}
+	optional MsgType type = 4;
 
 }
 
 message msg_response {
-  required int32 appid = 1;
-  repeated bytes xid = 2;   // can be a list of CID's
-  optional string payload = 3;  // bytes or string?
+	required int32 appid = 1;
+	repeated bytes xid = 2;   // can be a list of CID's
+	optional string payload = 3;  // bytes or string?
 }
 
 
 message X_Fork_Msg {
-  optional bool increment = 1;
-  optional uint32 count = 2;
-  repeated uint32 ids = 3;
+	optional bool increment = 1;
+	optional uint32 count = 2;
+	repeated uint32 ids = 3;
 }
 
 message X_SetXcacheSid_Msg {
-  optional string sid = 1;
+	optional string sid = 1;
 }
 
 message X_Replay_Msg {
-  required XSocketCallType type = 1; // type of message we are replaying
-  optional int32 sequence = 2;
+	required XSocketCallType type = 1; // type of message we are replaying
+	optional int32 sequence = 2;
 }
 
 message X_Notify_Msg {
-  optional int32 status = 1; // placeholder for now
+	optional int32 status = 1; // placeholder for now
 }

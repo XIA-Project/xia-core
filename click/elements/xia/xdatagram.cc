@@ -6,14 +6,14 @@
 #include <click/packet_anno.hh>
 #include <click/packet.hh>
 #include <click/vector.hh>
-#include "xdatagram.hh"
 #include "xtransport.hh"
+#include "xdatagram.hh"
 #include "xlog.hh"
 
 
 CLICK_DECLS
 
-XDatagram::XDatagram(XTRANSPORT *transport, unsigned short port, uint32_t id, int type)
+XDatagram::XDatagram(XTRANSPORT *transport, un_abstract port, uint32_t id, int type)
 	: sock(transport, port, id, type) {
 	memset(send_buffer, 0, MAX_SEND_WIN_SIZE * sizeof(WritablePacket*));
 	memset(recv_buffer, 0, MAX_RECV_WIN_SIZE * sizeof(WritablePacket*));

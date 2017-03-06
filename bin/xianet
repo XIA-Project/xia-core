@@ -48,6 +48,7 @@ VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
 L2_TYPE="ethernet"      # "dsrc" is the only other supported
+APISOCK="/tmp/api-click.sock"
 
 # On Arada boxes, don't use -s because /etc/hosts has no entry for hostname
 MACHINE=`uname -m`
@@ -515,6 +516,7 @@ start_click()
 
 	[ "$VALGRIND" != "" ] && echo Logging valgrind output to $VGLOG
 
+	rm -rf $APISOCK
 	$VALGRIND $CLICK -R $CONFPATH/$SCRIPT &
 
     sleep 2
@@ -657,7 +659,7 @@ case $1 in
 		;;
 	stop)
 		process_nodes "stop"
-		[ $NO_CLICK != 1 ] && kill_service "click"
+		[ $NO_CLICK != 1 ] && kill_service "click" && rm -rf $APISOCK
 		visualizer "stop"
 		check_all_services
 		rm -f /tmp/xcache*

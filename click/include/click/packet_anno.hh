@@ -174,6 +174,12 @@
 #define XIA_TAIL_ANNO_SIZE		2
 #define XIA_TAIL_ANNO(p)		((p)->anno_u16(XIA_TAIL_ANNO_OFFSET))
 #define SET_XIA_TAIL_ANNO(p, v)	((p)->set_anno_u16(XIA_TAIL_ANNO_OFFSET, (v)))
+
+// domain socket abstraqct address for the API client
+#define XIA_SRC_PATHNAME_ANNO_OFFSET    92
+#define XIA_SRC_PATHNAME_ANNO_SIZE      8
+#define XIA_SRC_PATHNAME_ANNO(p)        ((p)->anno_u64(XIA_SRC_PATHNAME_ANNO_OFFSET))
+#define SET_XIA_SRC_PATHNAME_ANNO(p, v)	((p)->set_anno_u64(XIA_SRC_PATHNAME_ANNO_OFFSET, (v)))
 #endif
 
 #endif

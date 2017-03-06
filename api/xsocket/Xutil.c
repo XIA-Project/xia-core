@@ -22,6 +22,7 @@
 #include "Xutil.h"
 #include <errno.h>
 #include <strings.h>
+#include <sys/un.h>
 
 // for printfing param values
 #include <fcntl.h>
@@ -199,7 +200,7 @@ idrec opt_values[] = {
 * @param sock
 */
 void debug(int sock) {
-	printf("[ sock %d/%d, thread %p ]\t", sock, getPort(sock), (void*)pthread_self());
+//	printf("[ sock %d/%d, thread %p ]\t", sock, getPort(sock), (void*)pthread_self());
 }
 
 /*!
@@ -233,12 +234,12 @@ char *XrootDir(char *buf, unsigned len) {
 
 const char *XnetworkDAGIntentAD(const char *network_dag)
 {
-    // The last entry in the network_dag must be an AD
-    const char *last_ad = rindex(network_dag, ':') - 2;
-    if(strncmp("AD:", last_ad, 3) == 0) {
-        return last_ad;
-    }
-    return NULL;
+	// The last entry in the network_dag must be an AD
+	const char *last_ad = rindex(network_dag, ':') - 2;
+	if(strncmp("AD:", last_ad, 3) == 0) {
+		return last_ad;
+	}
+	return NULL;
 }
 
 int validateSocket(int sock, int stype, int err)
@@ -258,16 +259,20 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 {
 	int rc = 0;
 	static int initialized = 0;
-	static struct sockaddr_in sa;
+//	static struct sockaddr_in sa;
+	static struct sockaddr_un su, suu;
 
 	assert(xsm);
 
 	// FIXME: have I created a race condition here?
 	if (!initialized) {
 
-		sa.sin_family = PF_INET;
-		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-		sa.sin_port = htons(atoi(CLICKPORT));
+//		sa.sin_family = PF_INET;
+//		sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+//		sa.sin_port = htons(atoi(CLICKPORT));
+
+		su.sun_family = AF_UNIX;
+		strcpy(su.sun_path, "/tmp/api-click.sock");
 
 		initialized = 1;
 	}
@@ -276,6 +281,11 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 		// make sure click know if it should reply immediately or not
 		xsm->set_blocking(true);
 	}
+
+	socklen_t len = sizeof(suu);
+	bzero(&suu, len);
+	getsockname(sockfd, (struct sockaddr*)&suu, &len);
+	xsm->set_desc(*(uint64_t*)suu.sun_path);
 
 	xsm->set_port(getPort(sockfd));
 	xsm->set_id(getID(sockfd));
@@ -288,11 +298,11 @@ int click_send(int sockfd, xia::XSocketMsg *xsm)
 
 	while (remaining > 0) {
 
-		//LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
-		rc = (_f_sendto)(sockfd, p, remaining, 0, (struct sockaddr *)&sa, sizeof(sa));
+//		LOGF("sending to click: seq: %d type: %d", xsm->sequence(), xsm->type());
+		rc = (_f_sendto)(sockfd, p, remaining, 0, (struct sockaddr *)&su, sizeof(su));
 
 		if (rc == -1) {
-			LOGF("click socket failure: errno = %d", errno);
+			LOGF("click socket failure: %s", strerror(errno));
 			break;
 		} else {
 			remaining -= rc;
@@ -319,6 +329,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 {
 	int rc;
 
+//LOG("receiving from click\n");
 	if (isBlocking(sock)) {
 		// make sure click knows if it should reply immediately or not
 		msg->set_blocking(true);
@@ -429,34 +440,43 @@ int click_status(int sock, unsigned seq)
 
 int MakeApiSocket(int transport_type)
 {
-	struct sockaddr_in sa;
+//	struct sockaddr_in sa;
+	struct sockaddr_un su;
 	int sock;
-	unsigned short port;
+	unsigned short port = 0;
 
-	socklen_t len = sizeof(sa);
+//	socklen_t len = sizeof(sa);
+	socklen_t len = sizeof(su);
 
-	if ((sock = (_f_socket)(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	if ((sock = (_f_socket)(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
 		LOGF("Error creating socket: %s", strerror(errno));
 		return sock;
 	}
 
 	// bind to an unused random port number
-	sa.sin_family = PF_INET;
-	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sa.sin_port = 0;
+//	sa.sin_family = PF_INET;
+//	sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+//	sa.sin_port = 0;
 
-	if ((_f_bind)(sock, (const struct sockaddr *)&sa, sizeof(sa)) < 0) {
+	// don't specify a path so we autobind
+	su.sun_family = AF_UNIX;
+	su.sun_path[0] = 0;
+
+//	if ((_f_bind)(sock, (const struct sockaddr *)&sa, sizeof(sa)) < 0) {
+	if ((_f_bind)(sock, (const struct sockaddr *)&su, sizeof(sa_family_t)) < 0) {
 		(_f_close)(sock);
 
 		LOGF("Error binding new socket to local port: %s", strerror(errno));
 		return -1;
 	}
 
-	if((_f_getsockname)(sock, (struct sockaddr *)&sa, &len) < 0) {
+	bzero(&su, len);
+//	if((_f_getsockname)(sock, (struct sockaddr *)&sa, &len) < 0) {
+	if((_f_getsockname)(sock, (struct sockaddr *)&su, &len) < 0) {
 		LOGF("Error retrieving socket's UDP port: %s", strerror(errno));
-		port = 0;
+//		port = 0;
 	} else {
-		port = ((struct sockaddr_in)sa).sin_port;
+//		port = ((struct sockaddr_in)sa).sin_port;
 	}
 
 	allocSocketState(sock, transport_type, port);

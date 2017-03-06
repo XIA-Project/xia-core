@@ -180,8 +180,8 @@ private:
 class XStream  : public sock {
 
 public:
-	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
-	XStream() : _outputTask(NULL, 0) {}; 
+	XStream(XTRANSPORT *transport, un_abstract port, uint32_t id);
+	XStream() : _outputTask(NULL, 0) {};
 	~XStream() {};
 
 	const char *class_name() const  { return "XStream"; }

@@ -14,8 +14,8 @@
 #include <cstdint> // uint32_t
 #include <cassert>
 
-#include "xstream.hh"
 #include "xtransport.hh"
+#include "xstream.hh"
 
 #define TCPTIMERS
 #define TCPOUTFLAGS
@@ -304,7 +304,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* 438 TCP "Slow Path" processing begins here */
 	WritablePacket *copy = NULL;
 	if (ti.ti_len){
-    copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+	copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
 	}
 
 	int win = so_recv_buffer_space();
@@ -397,6 +397,17 @@ XStream::tcp_input(WritablePacket *p)
 				connect_msg->set_ddag(src_path.unparse().c_str());
 				connect_msg->set_status(X_Connect_Msg::XCONNECTED);
 
+printf("connect rr 1\n");
+printf("connect rr 1 port = %lx\n", port);
+char * ls = (char *)&port;
+printf("rr2 listening_sock = %x:%x:%x:%x:%x:%x\n",
+ls[0],
+ls[1],
+ls[2],
+ls[3],
+ls[4],
+ls[5]
+);
 				get_transport()->ReturnResult(port, &xsm);
 				if (polling){
 					// tell API we are writble now
@@ -640,6 +651,17 @@ XStream::tcp_input(WritablePacket *p)
 		// If the app is ready for a new connection, alert it
 		if (!listening_sock->pendingAccepts.empty()) {
 			xia::XSocketMsg *acceptXSM = listening_sock->pendingAccepts.front();
+printf("connect rr 2 listening->sock =%lx\n", listening_sock->port);
+char * ls = (char *)&listening_sock->port;
+printf("rr2 listening_sock = %x:%x:%x:%x:%x:%x\n",
+ls[0],
+ls[1],
+ls[2],
+ls[3],
+ls[4],
+ls[5]
+);
+
 			get_transport() -> ReturnResult(listening_sock->port, acceptXSM);
 			listening_sock->pendingAccepts.pop();
 			delete acceptXSM;
@@ -948,6 +970,8 @@ step6:
 		if (isBlocking){
 			if (recv_pending){
 				// The api is blocking on a recv, return 0 bytes available
+printf("connect rr 3\n");
+
 				get_transport() -> ReturnResult(port, pending_recv_msg, 0, 0);
 				recv_pending = false;
 				delete pending_recv_msg;
@@ -1625,7 +1649,7 @@ XStream::tcp_timers (int timer) {
 		  }
 		  rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 		  TCPT_RANGESET(tp->t_rxtcur, rexmt,
-		  		tp->t_rttmin, TCPTV_REXMTMAX);
+				tp->t_rttmin, TCPTV_REXMTMAX);
 		  tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
 
 		  if (tp->t_rxtshift == 5){ // meaning this is the sixth retransmission
@@ -1778,6 +1802,8 @@ XStream::tcp_drop(int err)
 	xia::X_Connect_Msg *connect_msg = xsm.mutable_x_connect();
 	connect_msg->set_status(xia::X_Connect_Msg::XFAILED);
 	connect_msg->set_ddag(dst_path.unparse().c_str());
+printf("connect rr 4\n");
+
 	get_transport()->ReturnResult(port, &xsm);
 
 	if (polling){
@@ -1949,7 +1975,7 @@ XStream::initialize(const int port)
 	dispatcher()->//debug_output(VERB_STATES,"[%s] initialize for port <%d>\n",
 		dispatcher()->name().c_str(), port);
 	if ( port == 1 )
-   	usropen();
+	usropen();
 } */
 
 
@@ -2180,6 +2206,8 @@ void XStream::check_for_and_handle_pending_recv() {
 
 	if (recv_pending){
 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
+printf("connect rr 5\n");
+
 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
 		recv_pending = false;
 		delete pending_recv_msg;
@@ -2299,7 +2327,7 @@ XStream::tcp_newtcpcb()
 }
 
 
-XStream::XStream(XTRANSPORT *transport, const unsigned short port, uint32_t id)
+XStream::XStream(XTRANSPORT *transport, const un_abstract port, uint32_t id)
 	: sock(transport, port, id, SOCK_STREAM), _q_recv(this),
 		_q_usr_input(this), _outputTask(transport, id) {
 
@@ -2372,6 +2400,7 @@ WritablePacket *XStream::unstage_data()
 		xsm.set_type(xia::XRESULT);
 		xsm.set_sequence(_staged_seq);
 		xsm.set_id(get_id());
+printf("connect rr 6\n");
 
 		get_transport()->ReturnResult(port, &xsm, p->length());
 
