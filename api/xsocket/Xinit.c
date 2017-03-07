@@ -40,9 +40,9 @@
 #include "state.h"
 
 #ifdef __mips__
-    #define LIBNAME "libc.so.0"
+	#define LIBNAME "libc.so.0"
 #else
-    #define LIBNAME	"libc.so.6"
+	#define LIBNAME	"libc.so.6"
 #endif
 
 using namespace std;
@@ -61,9 +61,12 @@ sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
 fork_t _f_fork;
 
+// each thread will use a single socket to talk to click from select/poll
+__thread int _select_fd = -1;
+
+
 size_t mtu_internal = 0;
 size_t mtu_wire = 1500;
-
 
 size_t api_mtu()
 {
@@ -156,7 +159,7 @@ void __attribute__ ((constructor)) api_init()
 	if(!(_f_fork = (fork_t)dlsym(handle, "fork")))
 		printf("can't find fork!\n");
 
-    api_mtu();
+	api_mtu();
 
 #if 0
 	memset (&sa_new, 0, sizeof (struct sigaction));
@@ -173,7 +176,7 @@ void __attribute__ ((constructor)) api_init()
 		sigaction(SIGTERM, &sa_new, &sa_term);
 	}
 #endif
-    // force creation of the socket map
+	// force creation of the socket map
 	SocketMap::getMap();
 }
 

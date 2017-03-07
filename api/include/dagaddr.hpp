@@ -50,6 +50,7 @@ public:
 	std::string type_string() const;
 	std::string id_string() const;
 	std::string to_string() const;
+	bool has_valid_xid() const;
 
 	Node& operator=(const Node& r);
 	bool operator==(const Node& r) const { return ptr_ == r.ptr_; }
@@ -111,6 +112,7 @@ public:
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
+	bool is_valid() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
 	Graph next_hop(const Node& n);
@@ -168,7 +170,7 @@ private:
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
 
-	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
+	bool depth_first_walk(int node, std::vector<Node> &paths) const;
 	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
 	void dump_stack_trace() const;

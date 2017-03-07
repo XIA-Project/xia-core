@@ -428,6 +428,41 @@ Node::to_string() const
 	return type_string() + ":" + id_string();
 }
 
+
+/**
+ * @brief Check if the XID represented by this node is valid
+ *
+ * @return true if node has a valid XID, false otherwise
+ */
+bool
+Node::has_valid_xid() const
+{
+	bool valid = false;
+
+	// Check that the type is not dummy
+	switch (this->type()) {
+		case XID_TYPE_UNKNOWN:
+		case XID_TYPE_DUMMY_SOURCE:
+			valid = false;
+			break;
+		case XID_TYPE_AD:
+		case XID_TYPE_IP:
+		case XID_TYPE_CID:
+		case XID_TYPE_FID:
+		case XID_TYPE_HID:
+		case XID_TYPE_SID:
+			valid = true;
+		default:
+			std::string s = xids[this->type()];
+			if (!s.empty()) {
+				valid = true;
+			}
+	}
+
+	return valid;
+}
+
+
 /**
 * @brief Create an empty graph
 *
@@ -498,8 +533,7 @@ Graph::Graph(std::string dag_string)
 	}
 	else
 	{
-		printf("WARNING: dag_string must be in either DAG or RE format. Returning empty Graph.\n");
-		add_node(Node());
+		throw std::range_error("Improperly formatted string");
 	}
 }
 
@@ -970,24 +1004,33 @@ Graph::replace_intent_HID(std::string new_hid_str)
 int
 Graph::compare_except_intent_AD(Graph other) const
 {
+	// Copy the other graph so we can modify the copy
+	Graph them(other);
+
 	// Find our and their intent AD
 	size_t intent_ad = intent_AD_index();
 	if (intent_ad == INVALID_GRAPH_INDEX) {
+		printf("Graph::compare_except_intent_AD ERROR No intent AD\n");
 		return -1;
 	}
-	size_t their_intent_ad = other.intent_AD_index();
+	size_t their_intent_ad = them.intent_AD_index();
 	if (their_intent_ad == INVALID_GRAPH_INDEX) {
+		printf("Graph::compare_except_intent_AD ERROR: No other intent AD\n");
 		return -1;
 	}
 
 	// Replace their intent AD with ours
-	other.nodes_[their_intent_ad] = nodes_[intent_ad];
+	them.nodes_[their_intent_ad] = nodes_[intent_ad];
 
 	// Compare them with us
-	if (*this == other) {
+	Graph us(*this);
+	if (us == them) {
 		return 0;
 	}
 
+	printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
+	printf("this: %s\n", this->dag_string().c_str());
+	printf("them: %s\n", them.dag_string().c_str());
 	return -1;
 }
 
@@ -1186,6 +1229,37 @@ Graph::xid_str_from_index(std::size_t node) const
 		return "";
 	}
 	return nodes_[node].to_string();
+}
+
+/**
+ * @brief Check if this is a valid graph
+ *
+ * Make sure this Graph represents a valid XIA DAG. For now we just do
+ * a bunch of simple checks like making sure there's at least one node
+ * and that the intent node has a valid XID type.
+ *
+ * @return true if the graph is valid, false otherwise
+ */
+
+bool
+Graph::is_valid() const
+{
+	// A series of checks to make sure this is a valid graph
+
+	// Should have at least one node
+	if (num_nodes() < 1) {
+		return false;
+	}
+
+	// Ensure that the Node at intent index has a valid XID type
+	std::size_t intent = final_intent_index();
+	Node intent_node = nodes_[intent];
+	if (!intent_node.has_valid_xid()) {
+		return false;
+	}
+
+	// All checked out fine
+	return true;
 }
 
 /**
@@ -1775,7 +1849,6 @@ Graph::from_wire_format(uint8_t num_nodes, const node_t *buf)
 void
 Graph::from_sockaddr(const sockaddr_x *s)
 {
-	// FIXME: This function should return an error instead of empty Graph
 	if(s->sx_family != AF_XIA) {
 		printf("Graph::from_sockaddr: Error: sockaddr_x family is not XIA\n");
 		throw std::range_error("sockaddr_x family is not XIA");
@@ -1911,7 +1984,7 @@ Graph::flatten()
   *
   */
 bool
-Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
+Graph::depth_first_walk(int node, std::vector<Node> &paths) const
 {
 	// Break out with error if we are headed to infinite recursion
 	if(paths.size() > Graph::MAX_XIDS_IN_ALL_PATHS) {
@@ -1920,7 +1993,7 @@ Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
 	}
 
 	// Add current node to 'paths'
-	paths.push_back(nodes_[node]);
+	paths.push_back(get_node(node));
 
 	// Follow all outgoing edges; sink will have none
 	std::vector<std::size_t> out_edges = get_out_edges(node);
@@ -1955,7 +2028,8 @@ bool
 Graph::ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const
 {
 	paths_to_sink.clear();
-	return depth_first_walk(source_index(), paths_to_sink);
+	// Walk starting at the dummy source node
+	return depth_first_walk(-1, paths_to_sink);
 }
 
 /**
@@ -1978,10 +2052,12 @@ Graph::operator==(const Graph &g) const
 	std::vector<Node> their_paths;
 
 	if(ordered_paths_to_sink(my_paths) == false) {
+		printf("Graph::== ERROR getting my paths to sink\n");
 		return false;
 	}
 
 	if(g.ordered_paths_to_sink(their_paths) == false) {
+		printf("Graph::== ERROR getting their paths to sink\n");
 		return false;
 	}
 

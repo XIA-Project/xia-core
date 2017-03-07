@@ -120,12 +120,12 @@ int sendLSA() {
 
 	map<std::string, NeighborEntry>::iterator it;
 
-  	for ( it=route_state.neighborTable.begin() ; it != route_state.neighborTable.end(); it++ ) {
+	for ( it=route_state.neighborTable.begin() ; it != route_state.neighborTable.end(); it++ ) {
 		lsa.append( it->second.AD );
 		lsa.append("^");
 		lsa.append( it->second.HID );
 		lsa.append("^");
-  	}
+	}
 	strcpy (buffer, lsa.c_str());
 	// increase the LSA seq
 	route_state.lsa_seq++;
@@ -152,18 +152,18 @@ void processHostRegister(const char* host_register_msg) {
 	start = 0;
 	printf("xrouted: Registering: %s.\n", host_register_msg);
 	msg = host_register_msg;
- 	// read message-type
+	// read message-type
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		start = found+1;   // message-type was previously read
-  	}
+	if (found!=string::npos) {
+		start = found+1;   // message-type was previously read
+	}
 
 	// read hostHID
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		hostHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
+	if (found!=string::npos) {
+		hostHID = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
 
 	// read interface number - provided by xnetjd
 	found=msg.find("^", start);
@@ -204,25 +204,25 @@ int processHello(const char* hello_msg, int interface) {
 	start = 0;
 	msg = hello_msg;
 
- 	// read message-type
+	// read message-type
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		start = found+1;   // message-type was previously read
-  	}
+	if (found!=string::npos) {
+		start = found+1;   // message-type was previously read
+	}
 
 	// read neighborAD
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		neighborAD = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
+	if (found!=string::npos) {
+		neighborAD = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
 
- 	// read neighborHID
+	// read neighborHID
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		neighborHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
+	if (found!=string::npos) {
+		neighborHID = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
 
 	// fill in the table
 	map<std::string, NeighborEntry>::iterator it;
@@ -255,21 +255,21 @@ int processHello(const char* hello_msg, int interface) {
 
 	if(it2 != route_state.networkTable.end()) {
 
-  		// For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
-  		route_state.networkTable.erase (it2);
-  	}
+		// For now, delete my entry in networkTable (... we will re-insert the updated entry shortly)
+		route_state.networkTable.erase (it2);
+	}
 
 	NodeStateEntry entry;
 	entry.dest = myAD;
 	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
-  	map<std::string, NeighborEntry>::iterator it3;
-  	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
+	map<std::string, NeighborEntry>::iterator it3;
+	for ( it3=route_state.neighborTable.begin() ; it3 != route_state.neighborTable.end(); it3++ ) {
 
- 		// fill my neighbors into my entry in the networkTable
- 		entry.neighbor_list.push_back(it3->second.AD);
-  	}
+		// fill my neighbors into my entry in the networkTable
+		entry.neighbor_list.push_back(it3->second.AD);
+	}
 
 	route_state.networkTable[myAD] = entry;
 
@@ -294,75 +294,75 @@ int processLSA(const char* lsa_msg) {
 	start = 0;
 	msg = lsa_msg;
 
- 	// read message-type
+	// read message-type
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		start = found+1;   // message-type was previously read
-  	}
+	if (found!=string::npos) {
+		start = found+1;   // message-type was previously read
+	}
 
 	// read routerType
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		routerType = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int is_dual_router = atoi(routerType.c_str());
+	if (found!=string::npos) {
+		routerType = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
+	int is_dual_router = atoi(routerType.c_str());
 
 	// read destAD
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		destAD = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
+	if (found!=string::npos) {
+		destAD = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
 
- 	// read destHID
+	// read destHID
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		destHID = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
+	if (found!=string::npos) {
+		destHID = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
 
 	// read LSA-seq-num
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		lsa_seq = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int lsaSeq = atoi(lsa_seq.c_str());
+	if (found!=string::npos) {
+		lsa_seq = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
+	int lsaSeq = atoi(lsa_seq.c_str());
 
- 	// read num_neighbors
+	// read num_neighbors
 	found=msg.find("^", start);
-  	if (found!=string::npos) {
-  		num_neighbors = msg.substr(start, found-start);
-  		start = found+1;  // forward the search point
-  	}
-  	int numNeighbors = atoi(num_neighbors.c_str());
+	if (found!=string::npos) {
+		num_neighbors = msg.substr(start, found-start);
+		start = found+1;  // forward the search point
+	}
+	int numNeighbors = atoi(num_neighbors.c_str());
 
-  	// See if this LSA comes from AD with dualRouter
-  	if (is_dual_router == 1) {
-  		route_state.dual_router_AD = destAD;
-  	}
+	// See if this LSA comes from AD with dualRouter
+	if (is_dual_router == 1) {
+		route_state.dual_router_AD = destAD;
+	}
 
-  	// First, filter out the LSA originating from myself
-  	string myAD = route_state.myAD;
-  	if (myAD.compare(destAD) == 0) {
-  		return 1;
-  	}
+	// First, filter out the LSA originating from myself
+	string myAD = route_state.myAD;
+	if (myAD.compare(destAD) == 0) {
+		return 1;
+	}
 
-  	// 1. Filter out the already seen LSA
+	// 1. Filter out the already seen LSA
 	map<std::string, NodeStateEntry>::iterator it;
 	it=route_state.networkTable.find(destAD);
 
 	if(it != route_state.networkTable.end()) {
-  		// If this originating AD has been known (i.e., already in the networkTable)
+		// If this originating AD has been known (i.e., already in the networkTable)
 
-  	  	if (lsaSeq <= it->second.seq  &&  it->second.seq - lsaSeq < 10000) {
-  	  		// If this LSA already seen, ignore this LSA; do nothing
-  			return 1;
-  		}
-  		// For now, delete this dest AD entry in networkTable (... we will re-insert the updated entry shortly)
-  		route_state.networkTable.erase (it);
-  	}
+		if (lsaSeq <= it->second.seq  &&  it->second.seq - lsaSeq < 10000) {
+			// If this LSA already seen, ignore this LSA; do nothing
+			return 1;
+		}
+		// For now, delete this dest AD entry in networkTable (... we will re-insert the updated entry shortly)
+		route_state.networkTable.erase (it);
+	}
 
 	// 2. Update the network table
 	NodeStateEntry entry;
@@ -370,27 +370,27 @@ int processLSA(const char* lsa_msg) {
 	entry.seq = lsaSeq;
 	entry.num_neighbors = numNeighbors;
 
-  	int i;
- 	for (i = 0; i < numNeighbors; i++) {
+	int i;
+	for (i = 0; i < numNeighbors; i++) {
 
- 		// read neighborAD
+		// read neighborAD
 		found=msg.find("^", start);
-  		if (found!=string::npos) {
-  			neighborAD = msg.substr(start, found-start);
-  			start = found+1;  // forward the search point
-  		}
+		if (found!=string::npos) {
+			neighborAD = msg.substr(start, found-start);
+			start = found+1;  // forward the search point
+		}
 
- 		// read neighborHID
+		// read neighborHID
 		found=msg.find("^", start);
-  		if (found!=string::npos) {
-  			neighborHID = msg.substr(start, found-start);
-  			start = found+1;  // forward the search point
-  		}
+		if (found!=string::npos) {
+			neighborHID = msg.substr(start, found-start);
+			start = found+1;  // forward the search point
+		}
 
- 		// fill the neighbors into the corresponding networkTable entry
- 		entry.neighbor_list.push_back(neighborAD);
+		// fill the neighbors into the corresponding networkTable entry
+		entry.neighbor_list.push_back(neighborAD);
 
- 	}
+	}
 
 	route_state.networkTable[destAD] = entry;
 	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destAD].dest).c_str(), route_state.networkTable[destAD].seq, route_state.networkTable[destAD].num_neighbors );
@@ -419,23 +419,25 @@ void calcShortestPath() {
 	// first, clear the current routing table
 	route_state.ADrouteTable.clear();
 
- 	map<std::string, NodeStateEntry>::iterator it1;
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
+	map<std::string, NodeStateEntry>::iterator it1;
+	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end();) {
 
- 		// filter out an abnormal case
- 		if(it1->second.num_neighbors == 0 || (it1->second.dest).empty() ) {
- 			route_state.networkTable.erase (it1);
- 		}
-  	}
+		// filter out an abnormal case
+		if(it1->second.num_neighbors == 0 || (it1->second.dest).empty() ) {
+			route_state.networkTable.erase (it1++);
+		} else {
+			++it1;
+		}
+	}
 
- 	map<std::string, NodeStateEntry> table;
+	map<std::string, NodeStateEntry> table;
 	table = route_state.networkTable;
 
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
- 		// initialize the checking variable
- 		it1->second.checked = false;
- 		it1->second.cost = 10000000;
-  	}
+	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
+		// initialize the checking variable
+		it1->second.checked = false;
+		it1->second.cost = 10000000;
+	}
 
 	// compute shortest path
 	// initialization
@@ -463,15 +465,15 @@ void calcShortestPath() {
 				minCost = route_state.networkTable[tmpAD].cost;
 				selectedAD = tmpAD;
 			}
-  		}
+		}
 		if(selectedAD.empty()) {
 			return;
 		}
 
-  		table.erase(selectedAD);
-  		route_state.networkTable[selectedAD].checked = true;
+		table.erase(selectedAD);
+		route_state.networkTable[selectedAD].checked = true;
 
- 		for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
+		for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
 			tempAD = (*it2).c_str();
 			if (route_state.networkTable[tempAD].checked != true) {
 				if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
@@ -485,23 +487,23 @@ void calcShortestPath() {
 	string tempAD1, tempAD2;
 	int hop_count;
 	// set up the nexthop
-  	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
+	for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
 
-  		tempAD1 = it1->second.dest;
-  		if ( myAD.compare(tempAD1) != 0 ) {
-  			tempAD2 = tempAD1;
-  			hop_count = 0;
-  			while (route_state.networkTable[tempAD2].prevNode.compare(myAD)!=0 && hop_count < MAX_HOP_COUNT) {
-  				tempAD2 = route_state.networkTable[tempAD2].prevNode;
-  				hop_count++;
-  			}
-  			if(hop_count < MAX_HOP_COUNT) {
-  				route_state.ADrouteTable[tempAD1].dest = tempAD1;
-  				route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2].HID;
-  				route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2].port;
-  			}
-  		}
-  	}
+		tempAD1 = it1->second.dest;
+		if ( myAD.compare(tempAD1) != 0 ) {
+			tempAD2 = tempAD1;
+			hop_count = 0;
+			while (route_state.networkTable[tempAD2].prevNode.compare(myAD)!=0 && hop_count < MAX_HOP_COUNT) {
+				tempAD2 = route_state.networkTable[tempAD2].prevNode;
+				hop_count++;
+			}
+			if(hop_count < MAX_HOP_COUNT) {
+				route_state.ADrouteTable[tempAD1].dest = tempAD1;
+				route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2].HID;
+				route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2].port;
+			}
+		}
+	}
 	printRoutingTable();
 }
 
@@ -509,11 +511,11 @@ void calcShortestPath() {
 void printRoutingTable() {
 
 	syslog(LOG_DEBUG, "AD Routing table at %s", route_state.myAD);
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
+	map<std::string, RouteEntry>::iterator it1;
+	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
 		syslog(LOG_DEBUG, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 
-  	}
+	}
 }
 
 
@@ -523,10 +525,10 @@ void updateClickRoutingTable() {
 	string destXID, nexthopXID;
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 
-  	map<std::string, RouteEntry>::iterator it1;
-  	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
- 		destXID = it1->second.dest;
- 		nexthopXID = it1->second.nextHop;
+	map<std::string, RouteEntry>::iterator it1;
+	for ( it1=route_state.ADrouteTable.begin() ; it1 != route_state.ADrouteTable.end(); it1++ ) {
+		destXID = it1->second.dest;
+		nexthopXID = it1->second.nextHop;
 		port =  it1->second.port;
 
 		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0)
@@ -537,8 +539,8 @@ void updateClickRoutingTable() {
 			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, 0xffff)) != 0)
 				syslog(LOG_ERR, "error setting route %d", rc);
 		}
-  	}
-  	listRoutes("AD");
+	}
+	listRoutes("AD");
 	listRoutes("HID");
 }
 
@@ -640,18 +642,15 @@ void config(int argc, char** argv)
 
 int main(int argc, char *argv[])
 {
-	int rc, selectRetVal;
-    size_t found, start;
-    char recv_message[1024];
-    sockaddr_x theirDAG;
-    fd_set socks;
-    struct timeval timeoutval;
-	vector<string> routers;
+	int rc;
+	size_t found, start;
+	char recv_message[2048];
+	sockaddr_x theirDAG;
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
-    // connect to the click route engine
+	// connect to the click route engine
 	if ((rc = xr.connect()) != 0) {
 		syslog(LOG_ALERT, "unable to connect to click (%d)", rc);
 		return -1;
@@ -660,37 +659,37 @@ int main(int argc, char *argv[])
 	xr.setRouter(hostname);
 	listRoutes("AD");
 
-   	// open socket for route process
-   	route_state.sock=Xsocket(AF_XIA, SOCK_DGRAM, 0);
-   	if (route_state.sock < 0) {
-   		syslog(LOG_ALERT, "Unable to create a socket");
-   		exit(-1);
-   	}
+	// open socket for route process
+	route_state.sock=Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (route_state.sock < 0) {
+		syslog(LOG_ALERT, "Unable to create a socket");
+		exit(-1);
+	}
 
-   	// initialize the route states (e.g., set HELLO/LSA timer, etc)
-   	initRouteState();
+	// initialize the route states (e.g., set HELLO/LSA timer, etc)
+	initRouteState();
 
-   	// bind to the src DAG
-   	if (Xbind(route_state.sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
-   		Graph g(&route_state.sdag);
-   		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+	// bind to the src DAG
+	if (Xbind(route_state.sock, (struct sockaddr*)&route_state.sdag, sizeof(sockaddr_x)) < 0) {
+		Graph g(&route_state.sdag);
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
 		Xclose(route_state.sock);
-   		exit(-1);
-   	}
+		exit(-1);
+	}
 
+	struct pollfd pfd;
+
+	pfd.fd = route_state.sock;
+	pfd.events = POLLIN;
 
 	time_t last_purge = time(NULL);
 	int iteration = 0;
 	while (1) {
 		iteration++;
-		FD_ZERO(&socks);
-		FD_SET(route_state.sock, &socks);
-		timeoutval.tv_sec = 0;
-		timeoutval.tv_usec = MAIN_LOOP_USEC *2; // Main loop runs every 1000 usec
 
-		// every 0.001 sec, check if any received packets
-		selectRetVal = Xselect(route_state.sock+1, &socks, NULL, NULL, &timeoutval);
-		if (selectRetVal > 0) {
+		pfd.revents = 0;
+		rc = Xpoll(&pfd, 1, MAIN_LOOP_MSEC);
+		if (rc > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 
@@ -755,9 +754,9 @@ int main(int argc, char *argv[])
 						break;
 				}
 			}
-		} else if (selectRetVal < 0) {
+		} else if (rc < 0) {
 			perror("Xselect failed");
-			syslog(LOG_WARNING, "ERROR: Xselect returned %d", selectRetVal);
+			syslog(LOG_WARNING, "ERROR: Xselect returned %d", rc);
 		}
 		// Send HELLO every 100 ms
 		if((iteration % HELLO_ITERS) == 0) {
@@ -805,7 +804,7 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
-    }
+	}
 
 
 	return 0;

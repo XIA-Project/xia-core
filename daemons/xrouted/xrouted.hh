@@ -21,9 +21,10 @@ using namespace std;
 
 // Main loop iterates every 1000 usec = 1 ms = 0.001 sec
 #define MAIN_LOOP_USEC 1000
+#define MAIN_LOOP_MSEC 50 // .05 sec
 #define RECV_ITERS 2
-#define HELLO_ITERS 100
-#define LSA_ITERS 400
+#define HELLO_ITERS 2
+#define LSA_ITERS 8
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
 #define MAX_SEQNUM 100000

@@ -244,6 +244,8 @@ public:
 	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -412,8 +414,12 @@ class sock : public Element {
 	bool migrating;
 	bool migrateacking;
 	String last_migrate_ts;			// timestamp of last migrate/migrateack seen
-	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
-	WritablePacket *migrate_pkt;
+
+	/*
+	 * =========================
+	 * rendezvous state
+	 * ========================= */
+	bool rv_modified_dag;
 
 	/* =========================
 	 * Chunk States

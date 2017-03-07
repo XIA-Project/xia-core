@@ -78,8 +78,8 @@ sock::sock(
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	port = apiport;
 	transport = trans;
@@ -129,8 +129,8 @@ sock::sock() {
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	refcount = 1;
 	xcacheSock = false;
@@ -153,7 +153,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	XID local_4id;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
-    char xidString[50];
+	char xidString[50];
 
 	/* Configure tcp relevant information */
 	memset(&_tcpstat, 0, sizeof(_tcpstat));
@@ -209,9 +209,9 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 		_tcp_globals.window_scale = TCP_MAX_WINSHIFT;
 
 
-    // temporary value, will be reset by the cache daemon
-    random_xid("SID", xidString);
-    _xcache_sid.parse(xidString);
+	// temporary value, will be reset by the cache daemon
+	random_xid("SID", xidString);
+	_xcache_sid.parse(xidString);
 
 	_local_4id = local_4id;
 	_hostname = hostname;
@@ -984,6 +984,14 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
+				// Check if this new request was modified by rendezvous service
+				bool rv_modified_dag = false;
+
+				XIAPath bound_dag = sk->get_src_path();
+				XIAPath pkt_dag = dst_path; // Our address that client sent
+				if (usingRendezvousDAG(bound_dag, pkt_dag)) {
+					rv_modified_dag = true;
+				}
 
 				uint8_t hop_count = -1;
 				// we have received a syn for CID,
@@ -1022,6 +1030,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
+				new_sk->rv_modified_dag = rv_modified_dag;
 				int iface;
 				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 					new_sk->outgoing_iface = iface;
@@ -1279,6 +1288,11 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XMANAGEFID:
 		XmanageFID(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XUPDATEDEFIFACE:
+		Xupdatedefiface(_sport, id, &xia_socket_msg);
+		break;
+	case xia::XDEFIFACE:
+		Xdefaultiface(_sport, id, &xia_socket_msg);
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -1841,7 +1855,7 @@ Xaccept_done:
 void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 {
 	// loop thru all the polls that are registered looking for the socket associated with id
-	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end(); it++) {
+	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end();) {
 		uint32_t pollport = it->first;
 		PollEvent pe = it->second;
 
@@ -1849,6 +1863,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 
 		// socket isn't in this poll instance, keep looking
 		if (sevent == pe.events.end()) {
+			++it;
 			continue;
 		}
 
@@ -1857,6 +1872,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 
 		// if flags_out isn't an error and doesn't match the event mask keep looking
 		if (!(flags_out & mask) && !(flags_out & (POLLHUP | POLLERR | POLLNVAL))) {
+			++it;
 			continue;
 		}
 
@@ -1878,7 +1894,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		ReturnResult(pollport, &xsm, 1, 0);
 
 		// found the socket, decrement the polling count for all the sockets in the poll instance
-		for (HashTable<uint32_t, unsigned int>::iterator pit = pe.events.begin(); pit != pe.events.end(); pit++) {
+		for (HashTable<uint32_t, unsigned int>::iterator pit = pe.events.begin(); pit != pe.events.end(); ++pit) {
 			pid = pit->first;
 
 			sock *sk = idToSock.get(pid);
@@ -1888,7 +1904,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		}
 
 		// get rid of this poll event
-		poll_events.erase(it);
+		it = poll_events.erase(it);
 	}
 }
 
@@ -1901,7 +1917,7 @@ void XTRANSPORT::CancelPollEvent(unsigned short _sport)
 	HashTable<unsigned short, PollEvent>::iterator it;
 
 	// loop thru all the polls that are registered looking for the socket associated with _sport
-	for (it = poll_events.begin(); it != poll_events.end(); it++) {
+	for (it = poll_events.begin(); it != poll_events.end(); ++it) {
 		pollport = it->first;
 		pe = it->second;
 
@@ -2070,50 +2086,50 @@ void XTRANSPORT::Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
 {
 
-    // Skip non-stream connections
-    if (sk->sock_type != SOCK_STREAM) {
-        return false;
-    }
-    // Skip inactive ports
-    if (!(sk->state == SYN_RCVD
+	// Skip non-stream connections
+	if (sk->sock_type != SOCK_STREAM) {
+		return false;
+	}
+	// Skip inactive ports
+	if (!(sk->state == SYN_RCVD
 				|| sk->state == SYN_SENT
 				|| sk->state == CONNECTED)) {
-        INFO("skipping migration for inactive/listening port");
-        INFO("src_path:%s:", sk->src_path.unparse().c_str());
-        return false;
-    }
+		INFO("skipping migration for inactive/listening port");
+		INFO("src_path:%s:", sk->src_path.unparse().c_str());
+		return false;
+	}
 	INFO("migrating socket in state %d", sk->state);
-    // Skip sockets not using the interface whose dag changed
-    if(sk->outgoing_iface != changed_iface) {
-        INFO("skipping migration for unchanged interface");
-        INFO("src_path:%s:", sk->src_path.unparse().c_str());
-        INFO("out_iface:%d:", sk->outgoing_iface);
-        INFO("changed_iface:%d", changed_iface);
-        return false;
-    }
-    return true;
+	// Skip sockets not using the interface whose dag changed
+	if(sk->outgoing_iface != changed_iface) {
+		INFO("skipping migration for unchanged interface");
+		INFO("src_path:%s:", sk->src_path.unparse().c_str());
+		INFO("out_iface:%d:", sk->outgoing_iface);
+		INFO("changed_iface:%d", changed_iface);
+		return false;
+	}
+	return true;
 }
 
 bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
 {
-    // Retrieve dest XID from old src_path
-    XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
+	// Retrieve dest XID from old src_path
+	XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-    // Append XID to the new host dag
-    XIAPath new_dag = new_host_dag;
-    INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
-    INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
+	// Append XID to the new host dag
+	XIAPath new_dag = new_host_dag;
+	INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
+	INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
 	new_dag.append_node(dest_xid);
 	/*
-    XIAPath::handle_t hid_handle = new_dag.destination_node();
-    XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
-    new_dag.add_edge(hid_handle, xid_handle);
-    new_dag.set_destination_node(xid_handle);
+	XIAPath::handle_t hid_handle = new_dag.destination_node();
+	XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
+	new_dag.add_edge(hid_handle, xid_handle);
+	new_dag.set_destination_node(xid_handle);
 	*/
-    INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
-    INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
-    sk->src_path = new_dag;
-    return true;
+	INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
+	INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
+	sk->src_path = new_dag;
+	return true;
 }
 
 void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
@@ -2332,14 +2348,14 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
 		uint32_t _migrateid = iter->first;
 		sock *sk = idToSock.get(_migrateid);
-        if (! migratable_sock(sk, interface)) {
-            continue;
-        }
+		if (! migratable_sock(sk, interface)) {
+			continue;
+		}
 
-        if (! update_src_path(sk, new_dag)) {
-            click_chatter("Migration skipped. Failed updating src path");
-            continue;
-        }
+		if (! update_src_path(sk, new_dag)) {
+			click_chatter("Migration skipped. Failed updating src path");
+			continue;
+		}
 
 		sk->migrating = true;
 		XStream *st = dynamic_cast<XStream *>(sk);
@@ -2401,7 +2417,7 @@ void XTRANSPORT::XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketM
 
 void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-    UNUSED(id);
+	UNUSED(id);
 	xia::X_GetHostName_Msg *_msg = xia_socket_msg->mutable_x_gethostname();
 	_msg->set_hostname(_hostname.c_str());
 	ReturnResult(_sport, xia_socket_msg);
@@ -2434,9 +2450,9 @@ void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 }
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
-        xia::XSocketMsg *xia_socket_msg)
+		xia::XSocketMsg *xia_socket_msg)
 {
-    UNUSED(id);
+	UNUSED(id);
 	xia::X_GetIfAddrs_Msg *_msg = xia_socket_msg->mutable_x_getifaddrs();
 
 	// Add the default interface first
@@ -2451,7 +2467,30 @@ void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
 	ReturnResult(_sport, xia_socket_msg);
 }
 
+void XTRANSPORT::Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg * xia_socket_msg)
+{
+	UNUSED(id);
+	UNUSED(_sport);
 
+	xia::X_UpdateDefIface_Msg *x_updatedefiface_msg =
+		xia_socket_msg->mutable_x_updatedefiface();
+	int interface = x_updatedefiface_msg->interface();
+	if (interface < 0 || interface > 4) {
+		click_chatter("ERROR: invalid default interface %d", interface);
+		return;
+	}
+	_interfaces.set_default(interface);
+}
+
+void XTRANSPORT::Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(id);
+
+	xia::X_DefIface_Msg *_msg = xia_socket_msg->mutable_x_defiface();
+	_msg->set_interface(_interfaces.default_interface());
+
+	ReturnResult(_sport, xia_socket_msg);
+}
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
