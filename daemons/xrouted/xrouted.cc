@@ -18,6 +18,7 @@
 #include "Xsocket.h"
 #include "xrouted.hh"
 #include "dagaddr.hpp"
+#include "xroute.pb.h"
 
 #define DEFAULT_NAME "router0"
 #define APPNAME "xrouted"
@@ -51,178 +52,146 @@ void listRoutes(std::string xidType)
 }
 
 
-// send Hello message (1-hop broadcast)
-int sendHello(){
-	// Send my AD and my HID to the directly connected neighbors
-	int rc;
-	char buffer[1024];
-	int buflen;
-	bzero(buffer, 1024);
+// Send Hello message containing my AD and HID to my directly connected peers
+int sendHello()
+{
+	int buflen, rc;
+	string message;
 
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		source-AD
-		source-HID
-	*/
-	string hello;
-	hello.append("0^");
-	hello.append(route_state.myAD);
-	hello.append("^");
-	hello.append(route_state.myHID);
-	hello.append("^");
-	strcpy (buffer, hello.c_str());
-	buflen = strlen(buffer);
-	rc = Xsendto(route_state.sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-	if(rc != buflen) {
+	Node n_ad(route_state.myAD);
+	Node n_hid(route_state.myHID);
+	Node n_sid(SID_XROUTE);
+
+	Xroute::XrouteMsg msg;
+	Xroute::HelloMsg *hello = msg.mutable_hello();
+	Xroute::Node     *node  = hello->mutable_node();
+	Xroute::XID      *ad    = node->mutable_ad();
+	Xroute::XID      *hid   = node->mutable_hid();
+	Xroute::XID      *sid   = node->mutable_sid();
+
+	msg.set_type(Xroute::HELLO_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+	ad ->set_type(n_ad.type());
+	ad ->set_id(n_ad.id(), XID_SIZE);
+	hid->set_type(n_hid.type());
+	hid->set_id(n_hid.id(), XID_SIZE);
+	sid->set_type(n_sid.type());
+	sid->set_id(n_sid.id(), XID_SIZE);
+
+//	printf("sending %s\n", msg.DebugString().c_str());
+
+	msg.SerializeToString(&message);
+	buflen = message.length();
+
+	rc = Xsendto(route_state.sock, message.c_str(), buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	if (rc < 0) {
+		// error!
+		syslog(LOG_WARNING, "unable to send hello msg: %s", strerror(errno));
+
+	} else if (rc != (int)message.length()) {
 		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
-		return -1;
+		rc = -1;
 	}
-	return 0;
+
+	return rc;
 }
 
 // send LinkStateAdvertisement message (flooding)
-int sendLSA() {
-	int rc;
-	char buffer[1024];
-	int buflen;
-	bzero(buffer, 1024);
-	/* Message format (delimiter=^)
-		message-type{Hello=0 or LSA=1}
-		router-type{XIA=0 or XIA-IPv4-Dual=1}
-		source-AD
-		source-HID
-		LSA-seq-num
-		num_neighbors
-		neighbor1-AD
-		neighbor1-HID
-		neighbor2-AD
-		neighbor2-HID
-		...
-	*/
-	string lsa;
-	char lsa_seq[10], num_neighbors[10], is_dual_router[10];
+int sendLSA()
+{
+	int buflen, rc;
+	string message;
 
-	sprintf(lsa_seq, "%d", route_state.lsa_seq);
-	sprintf(num_neighbors, "%d", route_state.num_neighbors);
-	sprintf(is_dual_router, "%d", route_state.dual_router);
+	Node n_ad(route_state.myAD);
+	Node n_hid(route_state.myHID);
 
-	lsa.append("1^");
-	lsa.append(is_dual_router);
-	lsa.append("^");
-	lsa.append(route_state.myAD);
-	lsa.append("^");
-	lsa.append(route_state.myHID);
-	lsa.append("^");
-	lsa.append(lsa_seq);
-	lsa.append("^");
-	lsa.append(num_neighbors);
-	lsa.append("^");
+	Xroute::XrouteMsg msg;
+	Xroute::LSAMsg    *lsa  = msg.mutable_lsa();
+	Xroute::Node      *node = lsa->mutable_node();
+	Xroute::XID       *ad   = node->mutable_ad();
+	Xroute::XID       *hid  = node->mutable_hid();
+
+	msg.set_type(Xroute::LSA_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+
+	lsa->set_kind(route_state.dual_router ? Xroute::DUAL_ROUTER : Xroute::EDGE_ROUTER);
+	ad ->set_type(n_ad.type());
+	ad ->set_id(n_ad.id(), XID_SIZE);
+	hid->set_type(n_hid.type());
+	hid->set_id(n_hid.id(), XID_SIZE);
 
 	map<std::string, NeighborEntry>::iterator it;
-
 	for ( it=route_state.neighborTable.begin() ; it != route_state.neighborTable.end(); it++ ) {
-		lsa.append( it->second.AD );
-		lsa.append("^");
-		lsa.append( it->second.HID );
-		lsa.append("^");
+		Node p_ad(it->second.AD);
+		Node p_hid(it->second.HID);
+
+		node = lsa->add_peers();
+		ad   = node->mutable_ad();
+		hid  = node->mutable_hid();
+
+		ad ->set_type(p_ad.type());
+		ad ->set_id(p_ad.id(), XID_SIZE);
+		hid->set_type(p_hid.type());
+		hid->set_id(p_hid.id(), XID_SIZE);
 	}
-	strcpy (buffer, lsa.c_str());
-	// increase the LSA seq
-	route_state.lsa_seq++;
-	route_state.lsa_seq = route_state.lsa_seq % MAX_SEQNUM;
-	buflen = strlen(buffer);
-	rc = Xsendto(route_state.sock, buffer, buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
-	if(rc != buflen) {
-		syslog(LOG_WARNING, "ERROR sending LSA. Tried sending %d bytes but rc=%d", buflen, rc);
-		return -1;
+
+//	printf("sending %s\n", msg.DebugString().c_str());
+
+	msg.SerializeToString(&message);
+	buflen = message.length();
+
+	rc = Xsendto(route_state.sock, message.c_str(), buflen, 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	if (rc < 0) {
+		// error!
+		syslog(LOG_WARNING, "unable to send lsa msg: %s", strerror(errno));
+
+	} else if (rc != (int)message.length()) {
+		syslog(LOG_WARNING, "ERROR sending lsa. Tried sending %d bytes but rc=%d", buflen, rc);
+		rc = -1;
 	}
-	return 0;
+
+	return rc;
 }
 
 // process a Host Register message
-void processHostRegister(const char* host_register_msg) {
-	/* Procedure:
-		1. update this host entry in (click-side) HID table:
-			(hostHID, interface#, hostHID, -)
-	*/
-	int interface = -1;
+void processHostRegister(Xroute::HostJoinMsg msg)
+{
 	int rc;
-	size_t found, start;
-	string msg, hostHID;
-	start = 0;
-	printf("xrouted: Registering: %s.\n", host_register_msg);
-	msg = host_register_msg;
-	// read message-type
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		start = found+1;   // message-type was previously read
-	}
+	uint8_t interface = msg.interface();
+	string hid = msg.hid();
 
-	// read hostHID
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		hostHID = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-
-	// read interface number - provided by xnetjd
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		interface = atoi(msg.substr(start, found-start).c_str());
-		assert(interface >= 0 && interface <= 3); // no more than 4 interfaces
-		start = found+1;	// forward the search point
-	}
-
-	// Make sure xnetjd sent us a valid interface to register
-	if (interface == -1) {
-		printf("xrouted: ERROR: processHostRegister: Invalid interface.\n");
-		return;
-	}
-
+//	printf("register iface:%u hid:%s\n", interface, hid.c_str());
 
 	// FIXME: only do this if we haven't seen the HID before
 	// should HIDs go into neighbor table?
 
-	printf("xrouted: Routing table entry: interface=%d, host=%s\n", interface, hostHID.c_str());
+	syslog(LOG_INFO, "Routing table entry: interface=%d, host=%s\n", interface, hid.c_str());
 	// update the host entry in (click-side) HID table
-	if ((rc = xr.setRoute(hostHID, interface, hostHID, 0xffff)) != 0)
+	if ((rc = xr.setRoute(hid, interface, hid, 0xffff)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
 
-	timeStamp[hostHID] = time(NULL);
+	timeStamp[hid] = time(NULL);
 }
 
 // process an incoming Hello message
-int processHello(const char* hello_msg, int interface) {
+int processHello(const Xroute::HelloMsg &msg, int interface)
+{
+	string neighborAD, neighborHID, myAD;
+
+	Xroute::XID xad  = msg.node().ad();
+	Xroute::XID xhid = msg.node().hid();
+
+	Node  ad(xad.type(),  xad.id().c_str(), 0);
+	Node hid(xhid.type(), xhid.id().c_str(), 0);
+
+	neighborAD  = ad. to_string();
+	neighborHID = hid.to_string();
+
 	/* Procedure:
 		1. fill in the neighbor table
 		2. update my entry in the networkTable
 	*/
 	// 1. fill in the neighbor table
-	size_t found, start;
-	string msg, neighborAD, neighborHID, myAD;
-
-	start = 0;
-	msg = hello_msg;
-
-	// read message-type
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		start = found+1;   // message-type was previously read
-	}
-
-	// read neighborAD
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		neighborAD = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-
-	// read neighborHID
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		neighborHID = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
 
 	// fill in the table
 	map<std::string, NeighborEntry>::iterator it;
@@ -261,7 +230,6 @@ int processHello(const char* hello_msg, int interface) {
 
 	NodeStateEntry entry;
 	entry.dest = myAD;
-	entry.seq = route_state.lsa_seq;
 	entry.num_neighbors = route_state.num_neighbors;
 
 	map<std::string, NeighborEntry>::iterator it3;
@@ -277,123 +245,74 @@ int processHello(const char* hello_msg, int interface) {
 }
 
 // process a LinkStateAdvertisement message
-int processLSA(const char* lsa_msg) {
+int processLSA(const Xroute::XrouteMsg& msg)
+{
+	string neighborAD, neighborHID, myAD;
+	string destAD, destHID;
 
-	char buffer[1024];
-	bzero(buffer, 1024);
-	/* Procedure:
-		0. scan this LSA (mark AD with a DualRouter if there)
-		1. filter out the already seen LSA (via LSA-seq for this dest)
-		2. update the network table
-		3. rebroadcast this LSA
-	*/
-	// 0. Read this LSA
-	size_t found, start;
-	string msg, routerType, destAD, destHID, lsa_seq, num_neighbors, neighborAD, neighborHID;
+//	printf("processLSA: %s\n", lsa.DebugString().c_str());
 
-	start = 0;
-	msg = lsa_msg;
+	// fix me once we don't need to rebroadcast the lsa
+	const Xroute::LSAMsg& lsa = msg.lsa();
 
-	// read message-type
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		start = found+1;   // message-type was previously read
-	}
+	Xroute::XID a = lsa.node().ad();
+	Xroute::XID h = lsa.node().hid();
 
-	// read routerType
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		routerType = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-	int is_dual_router = atoi(routerType.c_str());
+	Node  ad(a.type(), a.id().c_str(), 0);
+	Node hid(h.type(), h.id().c_str(), 0);
 
-	// read destAD
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		destAD = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
+	destAD  = ad.to_string();
+	destHID = hid.to_string();
 
-	// read destHID
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		destHID = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-
-	// read LSA-seq-num
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		lsa_seq = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-	int lsaSeq = atoi(lsa_seq.c_str());
-
-	// read num_neighbors
-	found=msg.find("^", start);
-	if (found!=string::npos) {
-		num_neighbors = msg.substr(start, found-start);
-		start = found+1;  // forward the search point
-	}
-	int numNeighbors = atoi(num_neighbors.c_str());
-
-	// See if this LSA comes from AD with dualRouter
-	if (is_dual_router == 1) {
+	if (lsa.kind() == Xroute::DUAL_ROUTER) {
 		route_state.dual_router_AD = destAD;
 	}
 
-	// First, filter out the LSA originating from myself
-	string myAD = route_state.myAD;
-	if (myAD.compare(destAD) == 0) {
+	if (destHID.compare(route_state.myHID) == 0) {
+		// skip if from me
 		return 1;
 	}
 
-	// 1. Filter out the already seen LSA
-	map<std::string, NodeStateEntry>::iterator it;
-	it=route_state.networkTable.find(destAD);
 
+
+	map<std::string, NodeStateEntry>::iterator it = route_state.networkTable.find(destAD);
 	if(it != route_state.networkTable.end()) {
-		// If this originating AD has been known (i.e., already in the networkTable)
-
-		if (lsaSeq <= it->second.seq  &&  it->second.seq - lsaSeq < 10000) {
-			// If this LSA already seen, ignore this LSA; do nothing
-			return 1;
-		}
-		// For now, delete this dest AD entry in networkTable (... we will re-insert the updated entry shortly)
+		// For now, delete this dest AD entry in networkTable
+		// (... we will re-insert the updated entry shortly)
 		route_state.networkTable.erase (it);
 	}
+
+	// don't bother if there's nothing there???
+	if (lsa.peers_size() == 0) {
+		return 1;
+	}
+
 
 	// 2. Update the network table
 	NodeStateEntry entry;
 	entry.dest = destAD;
-	entry.seq = lsaSeq;
-	entry.num_neighbors = numNeighbors;
+	entry.num_neighbors = lsa.peers_size();
 
-	int i;
-	for (i = 0; i < numNeighbors; i++) {
+	for (int i = 0; i < lsa.peers_size(); i++) {
 
-		// read neighborAD
-		found=msg.find("^", start);
-		if (found!=string::npos) {
-			neighborAD = msg.substr(start, found-start);
-			start = found+1;  // forward the search point
-		}
+		Node a(lsa.peers(i).ad().type(),  lsa.peers(i).ad().id().c_str(), 0);
+//		Node h(lsa.peers(i).hid().type(), lsa.peers(i).hid().id().c_str(), 0);
 
-		// read neighborHID
-		found=msg.find("^", start);
-		if (found!=string::npos) {
-			neighborHID = msg.substr(start, found-start);
-			start = found+1;  // forward the search point
-		}
+		neighborAD  = a.to_string();
+//		neighborHID = h.to_string();
 
 		// fill the neighbors into the corresponding networkTable entry
 		entry.neighbor_list.push_back(neighborAD);
-
 	}
 
 	route_state.networkTable[destAD] = entry;
-	//printf("LSA received: src=%s, seq=%d, num_neighbors=%d \n", (route_state.networkTable[destAD].dest).c_str(), route_state.networkTable[destAD].seq, route_state.networkTable[destAD].num_neighbors );
+
+
+	// printf("LSA received src=%s, num_neighbors=%d \n",
+	// 	(route_state.networkTable[destAD].dest).c_str(),
+	// 	route_state.networkTable[destAD].num_neighbors );
+
+
 	route_state.calc_dijstra_ticks++;
 
 	if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
@@ -407,8 +326,9 @@ int processLSA(const char* lsa_msg) {
 	}
 
 	// 5. rebroadcast this LSA
-	strcpy (buffer, lsa_msg);
-	Xsendto(route_state.sock, buffer, strlen(buffer), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
+	string message;
+	msg.SerializeToString(&message);
+	Xsendto(route_state.sock, message.c_str(), message.length(), 0, (struct sockaddr*)&route_state.ddag, sizeof(sockaddr_x));
 
 	return 1;
 }
@@ -430,6 +350,8 @@ void calcShortestPath() {
 		}
 	}
 
+
+	// work on a copy of the table
 	map<std::string, NodeStateEntry> table;
 	table = route_state.networkTable;
 
@@ -566,6 +488,16 @@ void initRouteState()
 
 	// Retrieve AD and HID from highest priority path to intent
 	Graph g_localhost(dag);
+
+	// try {
+	// 	route_state._myAD  = g_localhost.intent_AD();
+	// 	route_state._myHID = g_localhost.intent_HID();
+
+	// } catch (const std::exception& e) {
+	// 	syslog(LOG_ALERT, "invalid source DAG: %s", e.what());
+	// 	exit(-1);
+	// }
+
 	strcpy(route_state.myAD, g_localhost.intent_AD_str().c_str());
 	strcpy(route_state.myHID, g_localhost.intent_HID_str().c_str());
 
@@ -578,8 +510,6 @@ void initRouteState()
 	memcpy(&route_state.sdag, ai->ai_addr, sizeof(sockaddr_x));
 
 	route_state.num_neighbors = 0; // number of neighbor routers
-	route_state.lsa_seq = 0;	// LSA sequence number of this router
-	route_state.hello_seq = 0;  // hello seq number of this router
 	route_state.calc_dijstra_ticks = 0;
 
 	route_state.dual_router_AD = "NULL";
@@ -643,10 +573,10 @@ void config(int argc, char** argv)
 int main(int argc, char *argv[])
 {
 	int rc;
-	size_t found, start;
 	char recv_message[2048];
 	sockaddr_x theirDAG;
 
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
 
@@ -718,7 +648,7 @@ int main(int argc, char *argv[])
 
 			mh.msg_controllen = cmsg->cmsg_len;
 
-			if (Xrecvmsg(route_state.sock, &mh, 0) < 0) {
+			if ((rc = Xrecvmsg(route_state.sock, &mh, 0)) < 0) {
 				perror("recvfrom");
 				continue;
 			}
@@ -730,48 +660,53 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			string msg = recv_message;
-			start = 0;
-			found=msg.find("^");
-			if (found!=string::npos) {
-				string msg_type = msg.substr(start, found-start);
-				int type = atoi(msg_type.c_str());
-				switch (type) {
-					case HELLO:
-						// process the incoming Hello message
-						processHello(msg.c_str(), iface);
-						break;
-					case LSA:
-						// process the incoming LSA message
-						processLSA(msg.c_str());
-						break;
-					case HOST_REGISTER:
-						// process the incoming host-register message
-						processHostRegister(msg.c_str());
-						break;
-					default:
-						perror("unknown routing message");
-						break;
-				}
+
+			Xroute::XrouteMsg msg;
+			string smsg(recv_message, rc);
+
+			if (!msg.ParseFromString(string(recv_message, rc))) {
+				syslog(LOG_WARNING, "illegal packet received");
+				continue;
+			} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
+				syslog(LOG_WARNING, "invalid version # received");
+				continue;
 			}
+
+			switch (msg.type()) {
+				case Xroute::HELLO_MSG:
+					// process the incoming Hello message
+					processHello(msg.hello(), iface);
+					break;
+				case Xroute::LSA_MSG:
+					// process the incoming LSA message
+					//processLSA(msg.lsa());
+					processLSA(msg);
+					break;
+				case Xroute::HOST_JOIN_MSG:
+					// process the incoming host-register message
+					processHostRegister(msg.host_join());
+					break;
+				default:
+					perror("unknown routing message");
+					break;
+			}
+
 		} else if (rc < 0) {
 			perror("Xselect failed");
 			syslog(LOG_WARNING, "ERROR: Xselect returned %d", rc);
 		}
 		// Send HELLO every 100 ms
-		if((iteration % HELLO_ITERS) == 0) {
+		if ((iteration % HELLO_ITERS) == 0) {
 			// Except when we are sending an LSA
-			if((iteration % LSA_ITERS) != 0) {
-				route_state.hello_seq++;
-				if(sendHello()) {
+			if ((iteration % LSA_ITERS) != 0) {
+				if (sendHello() < 0) {
 					syslog(LOG_WARNING, "ERROR: Failed sending hello");
 				}
 			}
 		}
 		// Send an LSA every 400 ms
-		if((iteration % LSA_ITERS) == 0) {
-			route_state.hello_seq = 0;
-			if(sendLSA()) {
+		if ((iteration % LSA_ITERS) == 0) {
+			if (sendLSA() < 0) {
 				syslog(LOG_WARNING, "ERROR: Failed sending LSA");
 			}
 		}
@@ -783,7 +718,7 @@ int main(int argc, char *argv[])
 			map<string, time_t>::iterator iter;
 
 			iter = timeStamp.begin();
-			while(iter != timeStamp.end())
+			while (iter != timeStamp.end())
 			{
 				if (now - iter->second >= EXPIRE_TIME){
 					//TODO: Re-enable route purges after xrouted
@@ -806,6 +741,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
+	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }

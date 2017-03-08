@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "../common/XIARouter.hh"
+#include "dagaddr.hpp"
 
 #include <sys/types.h>
 #include <netdb.h>
@@ -27,7 +28,6 @@ using namespace std;
 #define LSA_ITERS 8
 #define CALC_DIJKSTRA_INTERVAL 4
 #define MAX_HOP_COUNT 50
-#define MAX_SEQNUM 100000
 #define MAX_XID_SIZE 64
 #define MAX_DAG_SIZE 512
 
@@ -58,7 +58,6 @@ typedef struct {
 
 typedef struct {
 	std::string dest;	// destination AD or HID
-	int32_t seq; 		// LSA seq of dest (for filtering purpose)
 	int32_t num_neighbors;	// number of neighbors of dest AD
 	vector<std::string> neighbor_list; // neighbor AD list
 
@@ -75,8 +74,6 @@ typedef struct RouteState {
 	sockaddr_x sdag;
 	sockaddr_x ddag;
 
-//	char * sdag; // src DAG: this router
-//	char * ddag; // dest DAG: broadcast HELLO/LSA to other routers
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
@@ -84,8 +81,6 @@ typedef struct RouteState {
 	int32_t dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
 	std::string dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
 	int32_t num_neighbors; // number of neighbor routers
-	int32_t lsa_seq;	// LSA sequence number of this router
-	int32_t hello_seq;  // hello seq number of this router
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)
 	int32_t calc_dijstra_ticks;
 
