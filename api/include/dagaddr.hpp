@@ -109,6 +109,9 @@ public:
 	void print_graph() const;
 	std::string http_url_string() const;
 	std::string dag_string() const;
+	const Node& intent_AD() const;
+	const Node& intent_HID() const;
+	const Node& intent_SID() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
