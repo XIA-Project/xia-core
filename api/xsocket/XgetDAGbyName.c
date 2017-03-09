@@ -108,15 +108,14 @@ int xia_pton(int af, const char *src, sockaddr_x *dst)
 		return -1;
 	}
 
-	Graph g(src);
+	try {
+		Graph g(src);
+		g.fill_sockaddr(dst);
+		return 1;
 
-	if (g.num_nodes() == 0)  {
-		// the dag didn't parse correctly
+	} catch (std::exception e) {
 		return 0;
 	}
-
-	g.fill_sockaddr(dst);
-	return 1;
 }
 
 
