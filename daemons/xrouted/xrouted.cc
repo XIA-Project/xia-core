@@ -171,7 +171,6 @@ void processHostRegister(Xroute::HostJoinMsg msg)
 		flags = F_HOST;
 	}
 
-printf("flags = \n\n\nzzzzzzzzzzzzzzzzzzz %08x\n\n\n", flags);
 	// FIXME: only do this if we haven't seen the HID before
 	// should HIDs go into neighbor table?
 
