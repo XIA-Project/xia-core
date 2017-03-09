@@ -15,36 +15,33 @@ message XID {
 }
 
 message Node {
-	required XID ad  = 1;
-	required XID hid = 2;
-	optional XID sid = 3;
+	required XID    ad    = 1;
+	required XID    hid   = 2;
+	optional XID    sid   = 3;
+	optional uint32 flags = 4;
 }
 
 message TableEntry {
 	required Node   node      = 1;
 	required uint32 interface = 2;
+	optional uint32 flags     = 3;
 }
 
 message HelloMsg {
-	required Node node = 1;
-}
-
-enum NodeType {
-	HOST        = 1;
-	EDGE_ROUTER = 2;
-	CORE_ROUTER = 3;
-	DUAL_ROUTER = 4;
+	required Node   node  = 1;
+	optional uint32 flags = 2;
 }
 
 message LSAMsg {
-	required Node     node  = 1;
-	optional NodeType kind  = 2;
-	repeated Node     peers = 3;
+	required Node   node  = 1;
+	optional uint32 flags = 2;
+	repeated Node   peers = 3;
 }
 
 message HostJoinMsg {
 	required string hid       = 1;
 	required uint32 interface = 2;
+	optional uint32 flags     = 3;
 }
 
 // FIXME: make this use the XID type at some point

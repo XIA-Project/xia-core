@@ -351,6 +351,7 @@ class NetjoinSession(threading.Thread):
             xrmsg = xroute_pb2.XrouteMsg()
             xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
             xrmsg.type = xroute_pb2.HOST_JOIN_MSG
+            xrmsg.host_join.flags = 0x0001
             xrmsg.host_join.hid = client_hid
             xrmsg.host_join.interface = interface
             register_packet = xrmsg.SerializeToString()

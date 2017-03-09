@@ -20,6 +20,16 @@
 #include <fcntl.h>
 using namespace std;
 
+// routing table flag values
+#define F_HOST         0x0001 // node is a host
+#define F_CORE_ROUTER  0x0002 // node is an internal router
+#define F_EDGE_ROUTER  0x0004 // node is an edge router
+#define F_CONTROLLER   0x0008 // node is a controller
+#define F_IP_GATEWAY   0x0010 // router is a dual stack router
+#define F_STATIC_ROUTE 0x0100 // route entry was added manually and should not expire
+
+
+
 // Main loop iterates every 1000 usec = 1 ms = 0.001 sec
 #define MAIN_LOOP_USEC 1000
 #define MAIN_LOOP_MSEC 50 // .05 sec
@@ -31,9 +41,8 @@ using namespace std;
 #define MAX_XID_SIZE 64
 #define MAX_DAG_SIZE 512
 
-#define HELLO 0
-#define LSA 1
-#define HOST_REGISTER 2
+
+
 
 
 #define BFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -78,7 +87,7 @@ typedef struct RouteState {
 	char myHID[MAX_XID_SIZE]; // this router HID
 	char my4ID[MAX_XID_SIZE]; // not used
 
-	int32_t dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
+	uint32_t flags;
 	std::string dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
 	int32_t num_neighbors; // number of neighbor routers
 	int32_t hello_lsa_ratio; // frequency ratio of hello:lsa (for timer purpose)

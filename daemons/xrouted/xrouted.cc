@@ -71,12 +71,14 @@ int sendHello()
 
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+	hello->set_flags(route_state.flags);
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 	sid->set_type(n_sid.type());
 	sid->set_id(n_sid.id(), XID_SIZE);
+
 
 //	printf("sending %s\n", msg.DebugString().c_str());
 
@@ -114,7 +116,7 @@ int sendLSA()
 	msg.set_type(Xroute::LSA_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 
-	lsa->set_kind(route_state.dual_router ? Xroute::DUAL_ROUTER : Xroute::EDGE_ROUTER);
+	lsa->set_flags(route_state.flags);
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -157,17 +159,25 @@ int sendLSA()
 void processHostRegister(Xroute::HostJoinMsg msg)
 {
 	int rc;
+	uint32_t flags;
 	uint8_t interface = msg.interface();
 	string hid = msg.hid();
 
 //	printf("register iface:%u hid:%s\n", interface, hid.c_str());
 
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	} else {
+		flags = F_HOST;
+	}
+
+printf("flags = \n\n\nzzzzzzzzzzzzzzzzzzz %08x\n\n\n", flags);
 	// FIXME: only do this if we haven't seen the HID before
 	// should HIDs go into neighbor table?
 
 	syslog(LOG_INFO, "Routing table entry: interface=%d, host=%s\n", interface, hid.c_str());
 	// update the host entry in (click-side) HID table
-	if ((rc = xr.setRoute(hid, interface, hid, 0xffff)) != 0)
+	if ((rc = xr.setRoute(hid, interface, hid, flags)) != 0)
 		syslog(LOG_ERR, "unable to set route %d", rc);
 
 	timeStamp[hid] = time(NULL);
@@ -177,6 +187,7 @@ void processHostRegister(Xroute::HostJoinMsg msg)
 int processHello(const Xroute::HelloMsg &msg, int interface)
 {
 	string neighborAD, neighborHID, myAD;
+	uint32_t flags = 0;
 
 	Xroute::XID xad  = msg.node().ad();
 	Xroute::XID xhid = msg.node().hid();
@@ -186,6 +197,10 @@ int processHello(const Xroute::HelloMsg &msg, int interface)
 
 	neighborAD  = ad. to_string();
 	neighborHID = hid.to_string();
+
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	}
 
 	/* Procedure:
 		1. fill in the neighbor table
@@ -213,7 +228,7 @@ int processHello(const Xroute::HelloMsg &msg, int interface)
 		// FIXME: HACK until we get new routing daemon implemented
 		// we haven't seen this AD before, so just go ahead and add a route for it's HID
 		// the AD route will be set later when tables are processed
-		xr.setRoute(neighborHID, interface, neighborHID, 0xffff);
+		xr.setRoute(neighborHID, interface, neighborHID, flags);
 	}
 
 	// 2. update my entry in the networkTable
@@ -264,7 +279,8 @@ int processLSA(const Xroute::XrouteMsg& msg)
 	destAD  = ad.to_string();
 	destHID = hid.to_string();
 
-	if (lsa.kind() == Xroute::DUAL_ROUTER) {
+	// FIXME: this only allows for a single dual stack router in the network
+	if (lsa.flags() & F_IP_GATEWAY) {
 		route_state.dual_router_AD = destAD;
 	}
 
@@ -444,6 +460,7 @@ void printRoutingTable() {
 void updateClickRoutingTable() {
 
 	int rc, port;
+	uint32_t flags;
 	string destXID, nexthopXID;
 	string default_AD("AD:-"), default_HID("HID:-"), default_4ID("IP:-");
 
@@ -452,13 +469,14 @@ void updateClickRoutingTable() {
 		destXID = it1->second.dest;
 		nexthopXID = it1->second.nextHop;
 		port =  it1->second.port;
+		flags = it1->second.flags;
 
-		if ((rc = xr.setRoute(destXID, port, nexthopXID, 0xffff)) != 0)
+		if ((rc = xr.setRoute(destXID, port, nexthopXID, flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
 		// set default AD for 4ID traffic
-		if (route_state.dual_router==0 && destXID.compare(route_state.dual_router_AD)==0) {
-			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, 0xffff)) != 0)
+		if (!(route_state.flags & F_IP_GATEWAY) && destXID.compare(route_state.dual_router_AD) == 0) {
+			if ((rc = xr.setRoute(default_4ID, port, nexthopXID, flags)) != 0)
 				syslog(LOG_ERR, "error setting route %d", rc);
 		}
 	}
@@ -512,13 +530,13 @@ void initRouteState()
 	route_state.num_neighbors = 0; // number of neighbor routers
 	route_state.calc_dijstra_ticks = 0;
 
+	route_state.flags = F_EDGE_ROUTER;
+
 	route_state.dual_router_AD = "NULL";
 	// mark if this is a dual XIA-IPv4 router
 	if( XisDualStackRouter(route_state.sock) == 1 ) {
-		route_state.dual_router = 1;
+		route_state.flags |= F_IP_GATEWAY;
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
-	} else {
-		route_state.dual_router = 0;
 	}
 }
 

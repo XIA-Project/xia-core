@@ -34,6 +34,14 @@ PORT=7777
 MAJOR=1
 MINOR=3
 
+# route table flags
+F_HOST         = 0x0001 # node is a host
+F_CORE_ROUTER  = 0x0002 # node is an internal router
+F_EDGE_ROUTER  = 0x0004 # node is an edge router
+F_CONTROLLER   = 0x0008 # node is a controller
+F_IP_GATEWAY   = 0x0010 # router is a dual stack router
+F_STATIC_ROUTE = 0x0100 #route entry was added manually and should not expire
+
 KNOWN_XIDS = [ "AD", "HID", "FID", "SID", "CID", "IP" ]
 #
 # class for managing command line configuration options
@@ -548,9 +556,10 @@ class XrouteApp:
 			nexthop = ""
 
 		if len(parts) == 5:
-			flags = parts[4]
+			flags = int(parts[4])
 		else:
 			flags = 0
+                flags |= F_STATIC_ROUTE
 
 		if table not in (KNOWN_XIDS):
 			print "attempting to add a route for a non-standard XID: %s" % table
