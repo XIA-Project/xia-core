@@ -64,16 +64,14 @@ while getopts "ahovwx" opt; do
 done
 
 
-if  hash lynx ; then
+if xset q &>/dev/null ; then
+	BROWSER=xdg-open
+elif  hash lynx ; then
 	BROWSER=lynx
 elif hash elinks; then
 	BROWSER=elinks
 elif  hash links; then
 	BROWSER=links
-fi
-
-if xset q &>/dev/null ; then
-	BROWSER=xdg-open
 fi
 
 if [ $BROWSER ]; then
