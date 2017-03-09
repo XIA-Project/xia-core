@@ -20,6 +20,8 @@
 #  so XIADIR would be /xia-core assuming the script were /xia-core/bin/xianet
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
+VERSION=2.0
+
 # click parameters
 CLICKPATH=$XIADIR/click
 CONFPATH=$XIADIR/etc/click/
@@ -67,40 +69,45 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
-             [-f <filter_str>] [-I <interface>] [-P <socket-ports>]
-             [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
-             [-s <script>] [-N <host>] [-z <statserver>] [start|stop|restart|check|kill]
-where:
-  -c only start click
-  -C start everything except click
+usage: $NAME [-cCvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+			 [-f <filter_str>] [-P <socket-ports>]
+			 [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
+			 [-s <script>] [-z <statserver>] start|stop|check|kill|restart
+
+Commands:
+ start    starts the XIA network processes if not already running
+ stop     stops the XIA processes
+ check    print service status
+ kill     kill all XIA services including orphaned services
+ restart  stop then start the XIA network processes
+
+Configure:
+  -t generate and use a generic host click script
+  -r generate and use a generic router click script
+  -n this node will be the name server
+  -R this node will provide rendezvous service
+  -i use the supplied name as the click element name and HID shortcut
+  -f don't use interfaces matching the supplied string
+	 (to ignore multiple interfaces, use a comma-separated list)
+  -W connect via waveserver (ipaddr:port) on Arada box. MAC of DSRC Iface to use
+
+Logging:
   -l syslog level (0=LOG_EMERG through 7=LOG_DEBUG) default=3 (LOG_ERR)
-  -s run click using the specified script in the $CONFPATH directory.
   -v prints click debug messages to stdout
   -V prints all daemon debug messages to stdout
-  -4 generate and use a dual stack click script
-  -r generate and use a generic router click script
-  -t generate and use a generic host click script
-  -i use the supplied name as the click element name and HID shortcut
-  -m manually set the node's 4ID IP address
-  -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
-  -n if generating a click script, this node will be the name server
-  -R if generating a click script, this node will provide rendezvous service
-  -f if generating a click script, don't use interfaces matching the supplied string
-     (to ignore multiple interfaces, use a comma-separated list)
-  -I if generating a click script, use this interface (i.e., pick which interface a host uses)
-  -N start the nameserver on the specified host
-  -W connect via waveserver (ipaddr:port) on Arada box. MAC of DSRC Iface to use
+
+Debugging:
+  -c only start click
+  -C start everything except click
+  -g run click inside of valgrind
   -z start the visualizer client daemon, using the supplied address for the statserver
   -Z make this the visualizer server (runs statserver and xstats)
 
-  -g run click inside of valgrind
-
-  start   - starts the xia network processes if not already running
-  stop    - stops the xia processes
-  restart - stops then starts the xia processes
-  check   - print service status
-  kill    - kill all XIA services including orphaned services
+Advanced:
+  -4 generate and use a dual stack click script
+  -m manually set the node's 4ID IP address
+  -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
+  -s run click using the specified script in the $CONFPATH directory.
 
 EOH
 	exit 0
@@ -119,7 +126,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rRthi:m:f:I:z:ZP:gW:H" opt; do
+	while getopts "cCl:s:qvV4nN:rRthi:m:f:z:ZP:gW:H" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -162,9 +169,6 @@ setup()
 				;;
 			f)
 				CONFFLAGS="$CONFFLAGS -f $OPTARG"
-				;;
-			I)
-				CONFFLAGS="$CONFFLAGS -I $OPTARG"
 				;;
 			m)
 				CONFFLAGS="$CONFFLAGS -m $OPTARG"
@@ -517,7 +521,7 @@ start_click()
 
 	$VALGRIND $CLICK -R $CONFPATH/$SCRIPT &
 
-    sleep 2
+	sleep 2
 
 	get_pid "click"
 	[ "$XPID" == "" ] && printf "Click is not running, aborting...\n" && exit 1
@@ -638,6 +642,12 @@ create_click_config()
 #
 # SCRIPT STARTS HERE
 #
+#
+if [ "$1" == "--version" ]; then
+	echo xianet $VERSION
+	exit 0
+fi
+
 setup $@
 shift $((OPTIND-1))
 

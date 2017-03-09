@@ -25,7 +25,7 @@ from socket import *
 #try:
 sock = socket(AF_INET, SOCK_DGRAM)
 
-sock.bind(("10.0.0.10", 8888))
+sock.bind(("0.0.0.0", 8888))
 
 while (1):
 	print "waiting for data"

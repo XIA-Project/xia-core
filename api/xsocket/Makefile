@@ -39,8 +39,7 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
-doc: Xdoc.h $(SOURCES)
-	doxygen XsocketsAPI.cfg
+doc:
 	make -C python doc
 
 unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
@@ -53,6 +52,5 @@ clean:
 	-rm -f $(LIB)
 	-rm -f $(STATICLIB)
 	-rm -f *.o xia.pb.*
-	-rm -rf doc
 	-rm -f unittest
 	make -C python clean

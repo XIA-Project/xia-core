@@ -23,8 +23,8 @@ import telnetlib
 import socket
 import xiapyutils
 
-APP_VERSION="1.0"
-TITLE="XIA Route version %s"
+APP="xroute"
+APP_VERSION="1.5"
 
 # default Click host and port (can be changed on cmd line)
 HOST="localhost"
@@ -65,11 +65,12 @@ class Options:
 	# parse the command line so we can do stuff
 	#
 	def getOptions(self):
+
 		try:
 			# FIXME: make the option names more meaningful
 			shortopt = "hpnvif:d:a:r:"
 			opts, args = getopt.getopt(sys.argv[1:], shortopt,
-				["help", "print", "names", "verbose",
+				["help", "print", "names", "verbose", "version",
 				"host=", "port=", "file=", "dump=", "add=", "remove=",
 				"type="])
 		except getopt.GetoptError, err:
@@ -79,6 +80,7 @@ class Options:
 			sys.exit(2)
 
 		for o, a in opts:
+
 			if o in ("-h", "--help"):
 				self.help()
 			elif o in ("-p", "--print"):
@@ -106,8 +108,11 @@ class Options:
 				self._port = a
 			elif o in ("--type"):
 				self._types.append(a)
+			elif o in ("--version"):
+				print "%s %s" % (APP, APP_VERSION)
+				sys.exit(0)
 			else:
-			 	assert False, "unhandled option"
+				assert False, "unhandled option"
 
 	#
 	# display helpful information
@@ -116,42 +121,33 @@ class Options:
 		print """
 usage: xroute [-hpnvif:d:a:r:] [commands]
 where:
-  -h <host>        : specify the click host address
-  --host=<host>
+  -h <host>,--host=<host>      specify the click host address
+  --port=<port>                specify the click control port
+  --type=<xid>                 only output information for the specified XID type
+                               can be specified multile times on the command line
+  -p, --print                  print the route tables to stdout (default action)
+  -n, --names                  print the known alias:xid mappings to stdout
+  -v, --verbose                always print the full XID even if an alias exists
+  -f <file>, --file=<file>     read add/delete commands from a config file
 
-  --port=<port>    : specify the click control port
+  commands are in the form of:
+    add/update:
+      cmd type,xid,port[,nexthop,flags]
+      add AD,AD0,1
+      add HID,-,0,HID1,0
+    delete:
+      del CID,CID:0000000000000000000000000000000000000000
 
-  --type=<xid>     : only output information for the specified XID type
-                     can be specified multile times on the command line
+  -d <file> , --dump=<file>    dump a command file contining the current route tables
+                               the file format will be the same as the above command
 
-  -p               : print the route tables to stdout (default action)
-  --print
+  -a <entry>, --add=<entry>    add a route, can be specified multipe times
+                               format of entry is the same as above except the add/del
+                               prefix is not used
 
-  -n               : print the known alias:xid mappings to stdout
-  --names
-
-  -v               : always print the full XID even if an alias exists
-  --verbose
-
-  -f <file>        : read add/delete commands from a config file
-  --file=<file>      commands are in the form of:
-                     add/update:
-                       cmd type,xid,port[,nexthop,flags]
-                       add AD,AD0,1
-                       add HID,-,0,HID1,0
-                     delete:
-                       del CID,CID:0000000000000000000000000000000000000000
-
-  -d <file>        : dump a command file contining the current route tables
-  --dump=<file>      the file format will be the same as the above command
-
-  -a <entry>       : add a route, can be specified multipe times
-  --add=<entry>      format of entry is the same as above except the add/del
-                     prefix is not used
-
-  -r <entry>       : remove a route, can be specified multipe times
-  --remove=<entry>   format of entry is the same as above except the add/del
-                     prefix is not used
+  -r <entry>, --remove=<entry> remove a route, can be specified multipe times
+                               format of entry is the same as above except the add/del
+                               prefix is not used
 """
 		sys.exit()
 	#
@@ -660,10 +656,8 @@ class XrouteApp:
 # let's do this thing
 #
 def main():
-	print TITLE % (APP_VERSION)
-
 	xroute = XrouteApp()
 	xroute.run()
 
 if __name__ == "__main__":
-    main()
+	main()

@@ -1,18 +1,19 @@
-include ../../../xia.mk 
+include ../../../xia.mk
 
 .PHONY: all test
 
 PRELOAD=$(XLIB)/xwrap.so $(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so
 
-TARGET=xwtest
+TARGETS=xwtest nametest
 
-all: $(TARGET)
+all: $(TARGETS)
 
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(XLIB)/libdagaddr.so
 
-test: $(TARGET)
-	LD_PRELOAD="$(LIBS)"; ./$(TARGET)
+test: $(TARGETS)
+	@$(BINDIR)/xwrap ./nametest
+	@#LD_PRELOAD="$(LIBS)"; ./xwtest
 
 clean:
-	-rm $(TARGET)
+	@-rm -f $(TARGETS)

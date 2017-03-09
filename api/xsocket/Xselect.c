@@ -15,12 +15,13 @@
 */
 /*!
 ** @file Xselect.c
-** @brief implements Xselect() and Xpoll()
+** @brief Xselect(), Xpoll() - synchronous I/O multiplexing
 */
+#include "Xsocket.h"
+/*! \cond */
 #include <sys/select.h>
 #include <sys/poll.h>
 #include <errno.h>
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 
@@ -28,6 +29,7 @@ typedef struct {
 	int fd;
 	unsigned id;
 } Sock2ID;
+/*! \endcond */
 
 
 static void setNBConnState(int fd)
@@ -46,14 +48,12 @@ static void setNBConnState(int fd)
 }
 
 /*!
-** @brief waits for one of a set of Xsockets to become ready to perform I/O.
+** @brief waits for one of a set of Xsockets or file descriptors to become ready to perform I/O.
 **
 ** Xsocket specific version of poll. See the poll man page for more detailed information.
 ** This function is compatible with Xsockets as well as regular sockets and fds. Xsockets
 ** are polled via click, and regular sockets and fds are handled through the normal poll
 ** API.
-**
-** #include <sys/poll.h>
 **
 ** @param ufds array of pollfds indicating sockets and states to check for
 ** @param nfds number of entries in ufds
@@ -64,7 +64,7 @@ static void setNBConnState(int fd)
 **
 ** @returns 0 if timeout occured
 ** @returns a positive integer indicating the number of sockets with return events
-** @retuns -1 with errno set if an error occured
+** @returns -1 with errno set if an error occured
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
@@ -253,7 +253,7 @@ done:
 	return rc;
 }
 
-void XselectCancel(int sock)
+static void XselectCancel(int sock)
 {
 	xia::XSocketMsg xsm;
 	xia::X_Poll_Msg *pollMsg = xsm.mutable_x_poll();
@@ -274,7 +274,7 @@ void XselectCancel(int sock)
 ** are handled with the Xpoll APIs via click, and regular sockets and fds are handled
 ** through the normal select API.
 **
-** @param ndfs The highest socket number contained in the fd_sets plus 1
+** @param nfds The highest socket number contained in the fd_sets plus 1
 ** @param readfds fd_set containing sockets to check for readability
 ** @param writefds fd_set containing sockets to check for writability
 ** @param errorfds fd_set containing sockets to check for errors

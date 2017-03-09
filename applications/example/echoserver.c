@@ -208,6 +208,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
+	char buf[256];
 	int acceptor, sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
@@ -258,11 +259,10 @@ void echo_stream()
 		}
 	}
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nStream DAG\n%s\n", buf);
 
 	if (XregisterName(STREAM_NAME, sa) < 0 )
 		die(-1, "error registering name: %s\n", STREAM_NAME);
@@ -286,9 +286,9 @@ void echo_stream()
 			continue;
 		}
 
-		Graph g(&sa);
+		xia_ntop(AF_XIA, &sa, buf, sizeof(buf));
 		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str());
+		say("peer:%s\n", buf);
 
 		pid_t pid = Xfork();
 
@@ -330,8 +330,8 @@ void echo_dgram()
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nDatagram DAG\n%s\n", buf);
 
 	if (XregisterName(DGRAM_NAME, sa) < 0 )
 		die(-1, "error registering name: %s\n", DGRAM_NAME);

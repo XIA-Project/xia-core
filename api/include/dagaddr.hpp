@@ -13,7 +13,7 @@
 #include <string>
 #include <map>
 
-#ifdef CLICK_USERLEVEL
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
 #include <clicknet/xia.h>
 #else
 #include "xia.h"

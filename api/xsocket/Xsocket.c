@@ -16,13 +16,13 @@
 */
 /*!
  @file Xsocket.c
- @brief Implements Xsocket()
+ @brief Xsocket() - create a socket
 */
-
+#include "Xsocket.h"
+/*! \cond */
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include <stdlib.h>
@@ -30,6 +30,7 @@
 #include <limits.h>
 #include <pthread.h>
 #include <errno.h>
+/*! \endcond */
 
 /*!
 ** @brief Create an XIA socket
@@ -43,16 +44,16 @@
 **	unguranteed delivery (SID)
 **	\n SOCK_RAW for a raw socket that can have direct edits made to the header
 **	\n SOCK_NONBLOCK may be or'd into the transport_type to create the socket in nonblocking mode
-** @param for posix compatibility, currently ignored
+** @param protocol for posix compatibility, currently ignored
 **
 ** @returns socket id on success.
 ** @returns -1 on failure with errno set to an error compatible with those
 ** from the standard socket call.
 **
-** @warning In the current implementation, the returned socket is
-** a normal UDP socket that is used to communicate with the click
-** transport layer. Using this socket with normal unix socket
-** calls (aside from select and poll) will cause unexpected behaviors.
+** @warning The returned socket is actually a normal UDP socket on localhost
+** that is used to communicate with the click
+** XIA implementation. Using this socket with normal unix socket
+** calls will cause unexpected behaviors.
 ** Attempting to pass a socket created with the the standard socket function
 ** to the Xsocket API will have similar results.
 **

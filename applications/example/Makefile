@@ -18,8 +18,8 @@ all: $(TARGETS)
 %: %.cpp
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
-clean: 
-	-rm $(TARGETS)
+clean:
+	@-rm -f $(TARGETS)
 	make -C dag_manipulation clean
 	make -C xssl clean
 	make -C speedtest clean

@@ -41,7 +41,9 @@ extern "C" {
 #define NS_TYPE_ANYCAST_RESPONSE_QUERY  	0x0B
 #define NS_TYPE_ANYCAST_RESPONSE_ERROR  	0x0C
 
-#define NS_FLAGS_MIGRATE 0x01
+#define NS_FLAGS_MIGRATE  0x01
+#define NS_FLAGS_HOST_MAP 0x02
+#define NS_FLAGS_ADDR_MAP 0x04
 
 #define SID_NS "SID:1110000000000000000000000000000000001113"
 
@@ -56,6 +58,16 @@ typedef struct ns_pkt {
 extern int XregisterHost(const char *name, sockaddr_x *addr);
 extern int make_ns_packet(ns_pkt *np, char *pkt, int pkt_sz);
 extern void get_ns_packet(char *pkt, int sz, ns_pkt *np);
+
+extern int XgetHostIDbyDAG(char *name, int namelen, const sockaddr_x *addr);
+extern int XgetAddrIDbyDAG(char *name, int namelen, const sockaddr_x *addr);
+
+extern int XgetDAGbyHostID(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+extern int XgetDAGbyAddrID(const char *name, sockaddr_x *addr, socklen_t *addrlen);
+
+extern int XregisterAddrID(const char *name, sockaddr_x *DAG);
+extern int XregisterHostID(const char *name, sockaddr_x *DAG);
+
 
 #ifdef __cplusplus
 }
