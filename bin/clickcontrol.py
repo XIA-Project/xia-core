@@ -21,7 +21,7 @@ import socket
 import xiapyutils
 
 # Number of interfaces for each host type
-numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
+numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter8Port':8, 'XIARouter2Port':2}
 
 # Principal types
 principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
