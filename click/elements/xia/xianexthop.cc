@@ -28,8 +28,8 @@ XIANextHop::push(int, Packet *p_in)
     // skip error checking assuming it has beein already done by StaticXIDLookup
 
     int last = hdr->last;
-    if (last < 0)
-        last += hdr->dnode;
+    if (last == LAST_NODE_DEFAULT)
+        last = hdr->dnode - 1;
 
     struct click_xia_xid_edge* edge = hdr->node[last].edge;
     struct click_xia_xid_edge& current_edge = edge[XIA_NEXT_PATH_ANNO(p_in)];

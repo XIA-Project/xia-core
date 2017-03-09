@@ -59,7 +59,7 @@ int XCMP::write_param(const String &conf, Element *e, void *vparam, ErrorHandler
 	case DAG:
 	{
 		XIAPath dag;
-		if (cp_va_kparse(conf, f, errh, "DAG", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
+		if (cp_va_kparse(conf, f, errh, "ADDR", cpkP + cpkM, cpXIAPath, &dag, cpEnd) < 0) {
 			return -1;
 		}
 		f->_src_path = dag;
@@ -133,6 +133,7 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 			// copy the data from the ping (ie. we need the seq num and ID,
 			// so the sender can figure out what ping our pong refers to)
+			assert(xlen <= MAX_PACKET);
 			memcpy(msg, hdr.payload(), xlen);
 			break;
 
@@ -143,10 +144,13 @@ XCMP::sendXCMPPacket(const Packet *p_in, int type, int code, XIAPath *src) {
 
 			memset(msg + xlen, 0, NUM_EMPTY_BYTES);	// first 4 bytes after xcmp header are 0
 			xlen += NUM_EMPTY_BYTES;
+
+			assert(hdr.hdr_size() <= (MAX_PACKET-xlen));
 			memcpy(msg + xlen, hdr.hdr(), hdr.hdr_size());
 			xlen += hdr.hdr_size();
 
 			// copy 1st 8 bytes of payload as is done in ICMP
+			assert(NUM_ORIG_BYTES <= (MAX_PACKET-xlen));
 			memcpy(msg + xlen, hdr.payload(), NUM_ORIG_BYTES);
 			xlen += NUM_ORIG_BYTES;
 			break;
@@ -195,21 +199,22 @@ XCMP::processUnreachable(Packet *p_in)
 		return;
 	}
 
-	XIAPath dst_path = hdr.dst_path();
-	String broadcast_xid(BHID);
+	XIAPath dst_path;
+	try {
+		dst_path = hdr.dst_path();
+	} catch (std::range_error &e) {
+		WARN("XCMP::processUnreachable ERROR Invalid dst path in pkt.\n");
+		return;
+	}
+	String broadcast_xid(BFID);
 	XID bcast_xid;
 	bcast_xid.parse(broadcast_xid);
 
 	if (!dst_path.is_valid()) {
-		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse_re().c_str());
+		INFO("xcmp: discarding invalid path. %s\n", dst_path.unparse().c_str());
 		INFO("Sending Unreachable from %s\n   to %s\n   for %s\n",
 			 _src_path.unparse().c_str(),
 			hdr.src_path().unparse().c_str(), hdr.dst_path().unparse().c_str());
-		return;
-	}
-
-	// don't send undeliverables back to broadcast packets
-	if (dst_path.xid(dst_path.hid_node_for_destination_node()) == bcast_xid) {
 		return;
 	}
 
@@ -221,12 +226,24 @@ XCMP::processUnreachable(Packet *p_in)
 	const struct click_xia_xid_node *n = &h->node[0];
 	int bad_node = -1;
 
-	if (last == -1) {
+	// get the current valid XID
+	if (last == LAST_NODE_DEFAULT) {
+		// last is the default value, so we we haven't progressed
+		// yet and want the node pointed to by the final xid in the dag
 		n += (dnodes - 1);
 	} else {
 		n += last;
 	}
 
+	// return if the current node in the path is a FID
+	//  - we don't send undeliverables in response to flooded packets
+	// FIXME: is this the correct behavior if it's not the broadcast fid?
+	if (ntohl(n->xid.type) == CLICK_XIA_XID_TYPE_FID) {
+		return;
+	}
+
+	// find the node that triggered the undeliverable
+	// it will be the first unvisited edge
 	for (int i = 0; i < CLICK_XIA_XID_EDGE_NUM; i++) {
 		if (!n->edge[i].visited) {
 			bad_node = n->edge[i].idx;
@@ -242,6 +259,10 @@ XCMP::processUnreachable(Packet *p_in)
 				break;
 			case CLICK_XIA_XID_TYPE_HID:
 				code = XCMP_UNREACH_HOST;
+				break;
+			case CLICK_XIA_XID_TYPE_FID:
+				// FIXME: what should this do?
+				INFO("Unreachable for a FID!");
 				break;
 			default:
 				code = XCMP_UNREACH_INTENT;
@@ -294,10 +315,11 @@ XCMP::processPacket(Packet *p_in) {
 // got an xcmp packet, need to either send up or respond with a different xcmp message
 void
 XCMP::gotXCMPPacket(Packet *p_in) {
-	char pload[1500];
+	char pload[MAX_PACKET];
 	XIAHeader hdr(p_in);
 
 	// have to work around const qualifiers
+	assert(hdr.plen() <= MAX_PACKET);
 	memcpy(pload, hdr.payload(), hdr.plen());
 
 	struct click_xia_xcmp *xcmph = reinterpret_cast<struct click_xia_xcmp *>(pload);

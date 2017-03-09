@@ -42,7 +42,7 @@ XARPResponder::~XARPResponder()
 }
 
 int
-XARPResponder::add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const
+XARPResponder::add(Vector<Entry> &, const String &arg, ErrorHandler *errh) const
 {
     Vector<String> words;
     cp_spacevec(arg, words);

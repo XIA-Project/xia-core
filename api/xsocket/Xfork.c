@@ -14,17 +14,20 @@
 ** limitations under the License.
 */
 /*!
-** @file Xselect.c
-** @brief implements Xselect() and Xpoll()
+** @file Xfork.c
+** @brief Xfork() - create a child process
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <sys/select.h>
 #include <sys/poll.h>
 #include <errno.h>
 #include <unistd.h>
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "state.h"
+/*! \endcond */
 
 static int makeList(bool increment)
 {
@@ -84,7 +87,23 @@ done:
 }
 
 
-
+/*!
+** @brief Creates a new process by duplicating the calling process.
+**
+** This function must be used rather than the standard fork()
+** call when uisng Xsockets. Because all of the XIA code resides in user
+** space, we don't get the correct behavior from systems calls that affect
+** the kernel. Xfork() wraps the system fork() call so that correct internal
+** socket state is maintained. This prevents issues such as calling Xclose()
+** in a child process also closing the same socket in the parent process.
+**
+** @note See the man page for the standard fork() call for more details.
+*
+** @returns On success, the PID of the child process is returned in the
+** parent, and 0 is returned in the child.
+** @returns -1 on failure to the parent. No child process is created,
+** and errno is set appropriately.
+*/
 int Xfork(void)
 {
 	int rc = -1;
@@ -101,6 +120,10 @@ int Xfork(void)
 			// fork failed, so don't bother to check return value here
 			makeList(false);
 			errno = e;
+
+		} else if (rc == 0) {
+			// reset the select socket id so the child generates a new one
+			_select_fd = -1;
 		}
 
 	} else {

@@ -18,6 +18,7 @@
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
+#include <click/task.hh> /* Task */
 
 #include "clicknet/tcp_timer.h"
 #include "clicknet/tcp_var.h"
@@ -48,8 +49,6 @@ using namespace xia;
 #define ACK_DELAY			300
 #define MIGRATEACK_DELAY	3000
 #define TEARDOWN_DELAY		240000
-#define HLIM_DEFAULT		250
-#define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
@@ -138,7 +137,6 @@ public:
 private:
 	Timer _timer;
 
-	uint32_t _cid_type, _sid_type;
 	XIAPath _local_addr;
 	String _hostname;
 	XID _hid;
@@ -173,8 +171,6 @@ public:
 	ErrorHandler    *_errhandler;
 
 public:
-	XIAXIDRouteTable *_routeTable;
-
 	// list of ids wanting xcmp notifications
 	list<uint32_t> xcmp_listeners;
 
@@ -247,6 +243,9 @@ public:
 	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -272,17 +271,19 @@ public:
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	// modify routing table
-	void addRoute(const XID &sid) {
-		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-		HandlerCall::call_write(_routeTable, "add", cmd);
+	void manageRoute(const XID &xid, bool create);
+	void addRoute(const XID &xid) {
+		manageRoute(xid, true);
 	}
-
-	void delRoute(const XID &sid) {
-		String cmd = sid.unparse();
-		HandlerCall::call_write(_routeTable, "remove", cmd);
+	void delRoute(const XID &xid) {
+		manageRoute(xid, false);
 	}
 
 	uint32_t NewID();
+
+	uint32_t NextFIDSeqNo(sock *sk, XIAPath &dst);
+	bool run_task(Task*);
+
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -292,7 +293,11 @@ public:
 class sock : public Element {
 	friend class XTRANSPORT;
 	public:
-		const char *class_name() const      { return "GENERIC_TRANSPORT"; }
+		const char *class_name() const      { return "sock"; }
+
+    virtual bool run_task(Task*) { return false; };
+
+    using Element::push;
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
@@ -305,10 +310,6 @@ class sock : public Element {
     void set_src_path(XIAPath p) {src_path = p;}
     XIAPath get_dst_path() {return dst_path;}
     void set_dst_path(XIAPath p) {dst_path = p;}
-    int get_nxt() {return nxt;}
-    void set_nxt(int n) {nxt = n;}
-    int get_last() {return last;}
-    void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
     uint8_t get_hop_count() {return hop_count;}
@@ -364,6 +365,11 @@ class sock : public Element {
 	int refcount;				// # of processes that have this socket open
 
 	/* =========================
+	 * Flooding state
+	 * ========================= */
+	 HashTable<XIDpair, uint32_t> flood_sequence_numbers;
+
+	/* =========================
 	 * "TCP" state
 	 * ========================= */
 	unsigned backlog;			// max # of outstanding connections
@@ -404,8 +410,12 @@ class sock : public Element {
 	bool migrating;
 	bool migrateacking;
 	String last_migrate_ts;			// timestamp of last migrate/migrateack seen
-	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
-	WritablePacket *migrate_pkt;
+
+	/*
+	 * =========================
+	 * rendezvous state
+	 * ========================= */
+	bool rv_modified_dag;
 
 	/* =========================
 	 * Chunk States
@@ -417,9 +427,6 @@ protected:
     XTRANSPORT *transport;
     HandlerState hstate;
     XIDpair key;
-
-    int nxt;
-    int last;
 
 	uint32_t id;
 

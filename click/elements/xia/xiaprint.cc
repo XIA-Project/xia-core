@@ -187,7 +187,7 @@ XIAPrint::should_print(Packet *p)
     	    strcmp(ss, "SID:1110000000000000000000000000000000001112") == 0 ||
     		strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
     		strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
-    		strcmp(ds, BHID) == 0) {
+            strcmp(ds, BFID) == 0) {
     		return 0;
     	}
 		else

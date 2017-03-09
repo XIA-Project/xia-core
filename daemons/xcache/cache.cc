@@ -80,9 +80,10 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	xip_size = sizeof(struct click_xia) + (total_nodes * sizeof(struct click_xia_xid_node));
 	x = (struct xtcp *)(pkt + xip_size);
 
+	uint16_t flags = ntohs(x->th_flags);
 	// we only see the flow from server to client, so we'll never see a plain SYN here
 	// FIXME: we should probably be smart enough to deal with other flags like RST here eventually
-	if (x->th_flags == XTH_ACK) {
+	if (flags == XTH_ACK) {
 		ushort hlen = (ushort)(x->th_off) << 2;
 
 		if (hlen == ntohs(xiah->plen)) {
@@ -90,18 +91,32 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 			// so we can ignore it
 			return PACKET_NO_DATA;
 		}
+	} else if (flags == (XTH_SYN|XTH_ACK)) {
+		// packet is OK, keep going
+
+	} else if (!(flags & XTH_FIN)) {
+		// if it's not a FIN*, we don't want it
+		return PACKET_NO_DATA;
 	}
 
+	// FIXME: this should use the std libraries for managing DAGs instead of going in direct
 	 // get the associated client SID and destination CID
-	for (unsigned i = 0; i < total_nodes; i++) {
+	for (unsigned i = 0; i < xiah->dnode; i++) {
+		unsigned type = htonl(xiah->node[i].xid.type);
+
+		if (type == CLICK_XIA_XID_TYPE_SID) {
+			unparse_xid(&xiah->node[i], sid);
+		}
+	}
+
+	for (unsigned i = xiah->dnode; i < total_nodes; i++) {
 		unsigned type = htonl(xiah->node[i].xid.type);
 
 		if (type == CLICK_XIA_XID_TYPE_CID) {
 			unparse_xid(&xiah->node[i], cid);
-		} else if (type == CLICK_XIA_XID_TYPE_SID) {
-			unparse_xid(&xiah->node[i], sid);
 		}
 	}
+
 
 	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
@@ -109,12 +124,15 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	}
 
 	// syslog(LOG_INFO, "XIA version = %d\n", xiah->ver);
-	// syslog(LOG_INFO, "XIA plen = %d len = %d\n", htons(xiah->plen), len);
+	// syslog(LOG_INFO, "XIA plen = %d len = %lu\n", htons(xiah->plen), len);
 	// syslog(LOG_INFO, "XIA nxt = %d\n", xiah->nxt);
 	// syslog(LOG_INFO, "tcp->th_ack = %u\n", ntohl(x->th_ack));
 	// syslog(LOG_INFO, "tcp->th_seq = %u\n", ntohl(x->th_seq));
 	// syslog(LOG_INFO, "tcp->th_flags = %08x\n", ntohs(x->th_flags));
 	// syslog(LOG_INFO, "tcp->th_off = %d\n", x->th_off);
+	// syslog(LOG_INFO, "CID = %s\n", cid.c_str());
+	// syslog(LOG_INFO, "SID = %s\n", sid.c_str());
+
 
 	*xtcp = x;
 	return PACKET_OK;
@@ -132,7 +150,7 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 	struct cache_download *download;
 	xcache_meta *meta = new xcache_meta(cid);
 
-	meta->set_state(OVERHEARING);
+	meta->set_state(CACHING);
 	meta->set_seq(ntohl(tcp->th_seq));
 	meta->set_dest_sid(sid);
 
@@ -164,7 +182,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	case PACKET_NO_DATA:
 		// it's a pure ACK, we can ignore it
-		syslog(LOG_INFO, "data packet is empty!");
+		// syslog(LOG_INFO, "data packet is empty!");
 		return;
 
 	case PACKET_INVALID:
@@ -181,29 +199,27 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	if (!(meta = ctrl->acquire_meta(cid))) {
 		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
-		ctrl->add_meta(start_new_meta(tcp, cid, sid));
+
+		xcache_meta *new_meta = start_new_meta(tcp, cid, sid);
+
+		if (new_meta != NULL) {
+			ctrl->add_meta(new_meta);
+		}
 
 		// it's a syn-ack so there's no data to handle yet
 		return;
 	}
 
 	switch (meta->state()) {
-		case OVERHEARING:
+		case CACHING:
 			// drop into the code below the switch
 			break;
 
 		case AVAILABLE:
-			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
-			return;
-
+		case READY_TO_SAVE:
 		case FETCHING:
-			// FIXME: this probably should not be a state, but rather a count of
-			// number of concurrent accessors of this chunk.
-			// fetching should never be an issue here, but only when deleting
-			// content to be sure it is safe to remove.
 			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "Already fetching this CID: %s", cid.c_str());
+			//syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
 			return;
 
 		case EVICTING:
@@ -221,7 +237,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		// Another stream is already getting this chunk.
 		//  so we can ignore this stream's data
 		//  otherwise we'll have memory overrun issues due to different sequence #s
-		syslog(LOG_INFO, "don't cross the streams!");
+		// syslog(LOG_INFO, "don't cross the streams!");
 		ctrl->release_meta(meta);
 		return;
 	}
@@ -287,6 +303,9 @@ skip_data:
 
 			meta->set_ttl(ntohl(download->header.ttl));
 			meta->set_created();
+			meta->set_length(ntohl(download->header.length));
+			meta->set_state(READY_TO_SAVE);
+			// printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;
@@ -301,6 +320,10 @@ skip_data:
 		} else {
 			// FIXME: leave this open in case more data is on the wire
 			// and let garbage collection handle it eventually? or nuke it now?
+
+			// FIXME: we're currently leaving this open. Maybe it should be marked
+			// as broken so that if a new copy of the same chunk comes through we throw
+			// the old one away and start over.
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
 		}
 	}

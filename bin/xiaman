@@ -1,0 +1,47 @@
+#!/bin/bash
+VERSION="xiaman 1.0"
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+XMANPATH=$XIADIR/doc/man
+
+help() {
+cat << EOH
+xiaman page
+
+view XIA manpage
+
+options:
+  -h display this help
+  -v display the version number
+
+Environment:
+  Add $XMANPATH to your MANPATH environment variable to make the XIA pages work with the normal man command.
+EOH
+exit 0
+}
+
+
+[ "$1" == "--version" ] && echo $VERSION && exit 0
+
+while getopts "ahovwx" opt; do
+	case $opt in
+		v)
+			echo $VERSION
+			exit 0
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+
+if [ ! -d $XMANPATH/man3 ]; then
+	echo XIA man pages not found
+	echo run make doc to create them
+	exit
+fi
+
+man -M $XMANPATH $*

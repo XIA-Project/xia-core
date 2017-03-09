@@ -22,7 +22,12 @@ using namespace std;
 #define DEFAULT_NAME "host0"
 #define APPNAME "xnameservice"
 
-map<std::string, std::string> name_to_dag_db_table; // map name to dag
+typedef struct {
+	char flags;
+	std::string dag;
+} dbreq;
+
+map<std::string, dbreq> name_to_dag_db_table; // map name to dag
 
 map<std::string, std::vector<std::string> > name_to_dags_db_table; // map name to dags
 map<std::string, unsigned> name_to_rr_pointer;
@@ -107,14 +112,14 @@ int check_pair(Graph &g, int ad, int hid)
 //  instead.
 void migrate(const char *name, const char *dag)
 {
-	map<std::string, std::string>::iterator it;
+	map<std::string, dbreq>::iterator it;
 
 	it = name_to_dag_db_table.find(name);
 	if (it != name_to_dag_db_table.end()) {
 
 		// name is already registered, we may need to migrate it
 
-		string dag_str = it->second;
+		string dag_str = it->second.dag;
 
 		Graph new_dag(dag);
 		Graph old_dag(dag_str);
@@ -129,11 +134,11 @@ void migrate(const char *name, const char *dag)
 		for (int i = 0; i < new_dag.num_nodes(); i++) {
 			Node n = new_dag.get_node(i);
 
-			if (n.type() == Node::XID_TYPE_AD) {
+			if (n.type() == XID_TYPE_AD) {
 				ad_index = i;
 				new_ad = new Node(n);
 
-			} else if (n.type() == Node::XID_TYPE_HID) {
+			} else if (n.type() == XID_TYPE_HID) {
 				hid_index = i;
 				new_hid = new Node(n);
 			}
@@ -151,11 +156,11 @@ void migrate(const char *name, const char *dag)
 			for (int i = 0; i < old_dag.num_nodes(); i++) {
 
 				Node n = old_dag.get_node(i);
-				if (n.type() == Node::XID_TYPE_AD) {
+				if (n.type() == XID_TYPE_AD) {
 					ad_index = i;
 					old_ad = new Node(n);
 				}
-				else if (n.type() == Node::XID_TYPE_HID && new_hid->equal_to(n)) {
+				else if (n.type() == XID_TYPE_HID && new_hid->equal_to(n)) {
 					// we found an HID that matches the one in the new dag
 					hid_index = i;
 				}
@@ -168,7 +173,8 @@ void migrate(const char *name, const char *dag)
 				// this dag has migrated, put new record in table
 				syslog(LOG_INFO, "migrated host record %s to %s:%s", name,
 						new_ad->type_string().c_str(), new_ad->id_string().c_str());
-				name_to_dag_db_table[name] = dag;
+				name_to_dag_db_table[name].dag = dag;
+				name_to_dag_db_table[name].flags = 0;
 
 				// now walk the list of registered dags and update those that should migrate
 				/*
@@ -207,7 +213,8 @@ void migrate(const char *name, const char *dag)
 	} else {
 		syslog(LOG_DEBUG, "%s is new, no migration needed", name);
 		syslog(LOG_INFO, "registered %s", name);
-		name_to_dag_db_table[name] = dag;
+		name_to_dag_db_table[name].dag = dag;
+		name_to_dag_db_table[name].flags = 0;
 	}
 }
 
@@ -215,10 +222,12 @@ void migrate(const char *name, const char *dag)
 int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
 	int rtype = NS_TYPE_RESPONSE_ERROR;
+	char flags;
 
 	char pkt_out[NS_MAX_PACKET_SIZE];
 	char pkt_in[NS_MAX_PACKET_SIZE];
 	string response_str;
+	char response_flags;
 
 	config(argc, argv);
 	syslog(LOG_NOTICE, "%s started on %s", APPNAME, hostname);
@@ -226,22 +235,22 @@ int main(int argc, char *argv[]) {
 	// Xsocket init
 	int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (sock < 0) {
-   		syslog(LOG_ALERT, "Unable to create a socket");
-   		exit(-1);
+		syslog(LOG_ALERT, "Unable to create a socket");
+		exit(-1);
 	}
 
 	struct addrinfo *ai;
 	if (Xgetaddrinfo(NULL, SID_NS, NULL, &ai) != 0) {
-   		syslog(LOG_ALERT, "unable to get local address");
+		syslog(LOG_ALERT, "unable to get local address");
 		exit(-1);
 	}
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
 	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-   		Graph g(sa);
-   		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-   		exit(-1);
+		Graph g(sa);
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		exit(-1);
 	}
 
 	// main looping
@@ -254,10 +263,11 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
-   		ns_pkt req_pkt;
-   		get_ns_packet(pkt_in, rc, &req_pkt);
+		ns_pkt req_pkt;
+		get_ns_packet(pkt_in, rc, &req_pkt);
+		flags = req_pkt.flags;
 
-    	switch (req_pkt.type) {
+		switch (req_pkt.type) {
 		case NS_TYPE_REGISTER:
 			// insert a new entry
 
@@ -270,8 +280,14 @@ int main(int argc, char *argv[]) {
 				migrate(req_pkt.name, req_pkt.dag);
 			} else {
 				// just add the new name record
-				syslog(LOG_INFO, "new entry: %s = %s", req_pkt.name, req_pkt.dag);
-				name_to_dag_db_table[req_pkt.name] = req_pkt.dag;
+				dbreq d;
+
+				d.dag = req_pkt.dag;
+				d.flags = flags;
+
+				syslog(LOG_INFO, "new entry: %02x %s = %s", flags, req_pkt.name, req_pkt.dag);
+
+				name_to_dag_db_table[req_pkt.name] = d;
 			}
 			rtype = NS_TYPE_RESPONSE_REGISTER;
 			break;
@@ -297,13 +313,21 @@ int main(int argc, char *argv[]) {
 		}
 		case NS_TYPE_QUERY:
 		{
-			map<std::string, std::string>::iterator it;
+			map<std::string, dbreq>::iterator it;
 			it = name_to_dag_db_table.find(req_pkt.name);
 
 			if(it != name_to_dag_db_table.end()) {
-				response_str = it->second;
+				response_str = it->second.dag;
+				response_flags = it->second.flags;
+
 				rtype = NS_TYPE_RESPONSE_QUERY;
-				syslog(LOG_DEBUG, "Successful name lookup for %s", req_pkt.name);
+				if (response_flags == flags) {
+				syslog(LOG_DEBUG, "Successful name lookup for (%02x) %s", flags, req_pkt.name);
+
+				} else {
+				syslog(LOG_DEBUG, "Semi-successful name lookup for (%0xx != %02x) %s", flags, response_flags, req_pkt.name);
+
+				}
 			} else {
 				rtype = NS_TYPE_RESPONSE_ERROR;
 				syslog(LOG_DEBUG, "DAG for %s not found", req_pkt.name);
@@ -332,13 +356,14 @@ int main(int argc, char *argv[]) {
 		}
 		case NS_TYPE_RQUERY:
 		{
-			map<std::string, std::string>::iterator it;
+			map<std::string, dbreq>::iterator it;
 			// Walk the table and look for a matching DAG
 			for(it=name_to_dag_db_table.begin(); it!=name_to_dag_db_table.end(); it++) {
-				if(strcmp(it->second.c_str(), req_pkt.dag) != 0) {
+				if(it->second.flags != flags || strcmp(it->second.dag.c_str(), req_pkt.dag) != 0) {
 					continue;
 				}
 				response_str = it->first;
+				response_flags = flags;
 				rtype = NS_TYPE_RESPONSE_RQUERY;
 				syslog(LOG_DEBUG, "Successful DAG lookup for %s", req_pkt.dag);
 			}
@@ -355,7 +380,7 @@ int main(int argc, char *argv[]) {
 		ns_pkt response_pkt;
 
 		response_pkt.type = rtype;
-		response_pkt.flags = 0;
+		response_pkt.flags = flags;
 		response_pkt.name = (rtype == NS_TYPE_RESPONSE_RQUERY) ? response_str.c_str(): NULL;
 		response_pkt.dag = (rtype == NS_TYPE_RESPONSE_QUERY || rtype == NS_TYPE_ANYCAST_RESPONSE_QUERY) ? response_str.c_str() : NULL;		// pack it up to go on the wire
 		int len = make_ns_packet(&response_pkt, pkt_out, sizeof(pkt_out));

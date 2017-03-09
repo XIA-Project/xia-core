@@ -19,6 +19,12 @@
   @brief Common XIA structures and constants
 */
 
+#ifdef CLICK_USERLEVEL
+#include <clicknet/xia.h>
+#else
+#include "clicknetxia.h"
+#endif // CLICK_USERLEVEL
+
 #ifndef XIA_H
 #define XIA_H
 
@@ -30,21 +36,29 @@
 
 #define EDGES_MAX	4
 #define EDGE_UNUSED 127u
-#define XID_SIZE	20
-#define NODES_MAX	20
-#define MAX_XID_TYPE_STR 8
-#define XIA_XID_STR_SIZE (XID_SIZE*2)+MAX_XID_TYPE_STR
-#define XIA_MAX_DAG_STR_SIZE XIA_XID_STR_SIZE*NODES_MAX
 
+// Moved to clicknet/xia.h. Here for backwards compatibility
+#define XID_SIZE	CLICK_XIA_XID_ID_LEN
+#define NODES_MAX	CLICK_XIA_ADDR_MAX_NODES
+
+#define XID_TYPE_UNKNOWN CLICK_XIA_XID_TYPE_UNDEF
+#define XID_TYPE_AD CLICK_XIA_XID_TYPE_AD
+#define XID_TYPE_HID CLICK_XIA_XID_TYPE_HID
+#define XID_TYPE_CID CLICK_XIA_XID_TYPE_CID
+#define XID_TYPE_SID CLICK_XIA_XID_TYPE_SID
+#define XID_TYPE_FID CLICK_XIA_XID_TYPE_FID
+#define XID_TYPE_IP CLICK_XIA_XID_TYPE_IP
+#define XID_TYPE_DUMMY_SOURCE CLICK_XIA_XID_TYPE_DUMMY
+/*
 enum XID_TYPE {
 	XID_TYPE_AD = 0x10,  // TODO: why does swig complain when these are uint32_t?
 	XID_TYPE_HID = 0x11,
 	XID_TYPE_CID = 0x12,
 	XID_TYPE_SID = 0x13,
 	XID_TYPE_IP = 0x14,
+	XID_TYPE_FID = 0x30,
 	XID_TYPE_DUMMY_SOURCE = 0xff,
 };
-
 typedef struct {
 	unsigned int  s_type;
 	unsigned char s_id[XID_SIZE];
@@ -55,10 +69,15 @@ typedef struct {
 	unsigned char s_edge[EDGES_MAX];
 } node_t;
 
+typedef struct click_xia_xid xid_t;
+
+typedef struct click_xia_xid_node node_t;
+
 typedef struct {
 	unsigned char s_count;
 	node_t        s_addr[NODES_MAX];
 } x_addr_t;
+
 
 
 typedef struct {
@@ -74,5 +93,5 @@ typedef struct {
 	x_addr_t      sx_addr;
 } sockaddr_x;
 
+*/
 #endif // XIA_H
-

@@ -10,6 +10,7 @@ import uuid
 import nacl.encoding
 import nacl.signing
 import nacl.utils
+from netjoin_l2_handler import NetjoinL2Handler
 from netjoin_authsession import NetjoinAuthsession
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
@@ -18,13 +19,14 @@ class NetjoinBeacon(object):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
         self.xip_netid = None
+        self.xip_hid = None
         self.raw_verify_key = None
 
     def beacon_str(self):
         return protobuf_text_format.MessageToString(self.net_descriptor)
 
     def print_beacon(self):
-        print self.beacon_str()
+        logging.debug(self.beacon_str())
 
     def get_ID(self):
         # Copy net_descriptor without nonce and hash it
@@ -49,9 +51,11 @@ class NetjoinBeacon(object):
         self._update_object_from_net_descriptor()
 
     # For now we just build a beacon with a dummy AuthCapStruct
-    def initialize(self, raw_verify_key, guid=None, xip_netid=None):
+    def initialize(self, raw_verify_key, l2_type, guid=None, xip_netid=None,
+            xip_hid=None):
         self.guid = guid
         self.xip_netid = xip_netid
+        self.xip_hid = xip_hid
         self.raw_verify_key = raw_verify_key
 
         if self.guid == None:
@@ -62,13 +66,18 @@ class NetjoinBeacon(object):
             self.xip_netid = uuid.uuid4().bytes
             logging.warning("XIP NID not given. Assigning a temporary one")
 
+        # If l2 type is not known throw an exception and end
+        if l2_type not in NetjoinL2Handler.l2_type_info:
+            logging.error("Invalid layer two specified")
+            raise KeyError(l2_type)
+
         # Hard-code the cipher suite we are using
         pubkey = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey
         pubkey.cipher_suite = ndap_pb2.AuthCapSharedInfo.JoinAuthExtraInfo.PublicKey.NACL_curve25519xsalsa20poly1305
 
         # Our network descriptor message
         self.net_descriptor.GUID = self.guid
-        self.net_descriptor.l2_id.l2_type = ndap_pb2.LayerTwoIdentifier.ETHERNET
+        self.net_descriptor.l2_id.l2_type = l2_type
 
         # Build AuthCapStruct showing network authorization and capabilities
         auth_cap = self.net_descriptor.auth_cap
@@ -91,6 +100,8 @@ class NetjoinBeacon(object):
         # The network provides XIP with NID xip_netid
         node3.xip.is_global = True
         node3.xip.NetworkId = self.xip_netid
+        if self.xip_hid != None:
+            node3.xip.HostId = self.xip_hid
 
         # 4 edges total
         edge1 = auth_cap.edges.add()

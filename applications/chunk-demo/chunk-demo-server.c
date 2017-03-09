@@ -7,7 +7,6 @@
 #include "xcache.h"
 #include "Xsocket.h"
 #include "dagaddr.hpp"
-#include "dagaddr.h"
 #include <assert.h>
 #include "chunk-demo.h"
 #include "Xkeys.h"
@@ -101,7 +100,10 @@ void *recvCmd(void *socketid)
 			if (make_random_chunk(&xcache, &addr) < 0) {
 				die(-1, "Could not make random chunk\n");
 			}
-			dag_to_url(url, 256, &addr);
+
+			Graph g(&addr);
+			g.fill_sockaddr(&addr);
+			strncpy(url, g.http_url_string().c_str(), 256);
 
 			// Return the addr
 			if (Xsend(sock, url, strlen(url), 0) < 0) {

@@ -59,6 +59,7 @@ message JoinAuthNode {
 message XIPNode {
         required bool is_global = 1;
         optional bytes NetworkId = 2;
+        optional bytes HostId = 3;
 }
 
 // XIP:1 ends here

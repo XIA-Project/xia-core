@@ -1,10 +1,24 @@
 #!/bin/bash
 #
 # simple script to attach gdb to a running click process
-#
-echo xdebug [process name]
-echo attach gdb to a running click process
-echo defaults to click
+
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+xdebug [name]
+
+attach gdb to a running process (default=click)"
+
+options:
+  name          name of process to attach to
+  -h, --help    display this help
+  -v, --version display the version number
+EOH
+	exit 0
+elif [ "$1" == "-v" ] || [ "$1" == "--version" ]; then
+	echo "xdebug 1.0"
+	exit 0
+fi
 
 name=click
 [ "$1" != "" ] && name=$1
@@ -12,4 +26,4 @@ name=click
 xpid=$(pgrep $name)
 [ "$xpid" == "" ] && echo "$name process not found" && exit
 
-sudo gdb $name $xpid
+gdb $name $xpid

@@ -1,3 +1,7 @@
+/*!
+ @file XcacheApis.c
+ @brief - content specific APIs
+*/
 #include "xcache.h"
 #include <iostream>
 #include <unistd.h>
@@ -26,10 +30,12 @@ static int get_connected_socket(void)
 	char sock_name[512];
 
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
-	if(sock < 0)
+	if(sock < 0) {
 		return -1;
+	}
 
 	if(get_xcache_sock_name(sock_name, 512) < 0) {
+		Xclose(sock);
 		return -1;
 	}
 
@@ -39,9 +45,11 @@ static int get_connected_socket(void)
 
 	if(connect(sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0) {
 		printf("%s:%d error:%s\n", __FILE__, __LINE__, strerror(errno));
+		Xclose(sock);
 		return -1;
 	}
 
+	Xclose(sock);
 	return sock;
 }
 
@@ -469,7 +477,7 @@ int XgetPrevFetchHopCount(){
 	return hopCount;
 }
 
-int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x *addr, socklen_t len)
+int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t len)
 {
 	xcache_cmd cmd;
 
@@ -500,9 +508,9 @@ int XfetchChunk(XcacheHandle *h, void *buf, size_t buflen, int flags, sockaddr_x
 			return -1;
 		}
 
-		to_copy = MIN(cmd.data().length(), buflen);
-		memcpy(buf, cmd.data().c_str(), to_copy);
-		fprintf(stderr, "Fetch: Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
+		to_copy = cmd.data().length();
+		*buf = malloc(to_copy);
+		memcpy(*buf, cmd.data().c_str(), to_copy);
 		hopCount = cmd.hop_count();
 
 		return to_copy;

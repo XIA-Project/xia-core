@@ -14,4 +14,4 @@ FromDevice($IFACE) -> [$NUM]${HNAME}[$NUM] -> ToDevice($IFACE);
 Idle -> [$NUM]${HNAME}[$NUM] -> Discard;
 ######
 
-	ControlSocket(tcp, 7777);
+ControlSocket(tcp, 7777);

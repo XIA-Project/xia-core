@@ -146,7 +146,7 @@ int IntraDomainRouter::init()
 	}
 
 	// make the broadcast dag we'll use to send to the other routers
-	Graph g = Node() * Node(broadcast_hid) * Node(intradomain_sid);
+	Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
 	g.fill_sockaddr(&_ddag);
 	syslog(LOG_INFO, "Router broadcast DAG: %s", g.dag_string().c_str());
 
@@ -208,7 +208,7 @@ int IntraDomainRouter::init()
 int IntraDomainRouter::sendHello()
 {
 	ControlMessage msg(CTL_HELLO, _myAD, _myHID);
-	syslog(LOG_INFO, "Send-Hello");
+	//syslog(LOG_INFO, "Send-Hello");
 
 	return msg.send(_sock, &_ddag);
 }
@@ -232,7 +232,7 @@ int IntraDomainRouter::sendLSA()
 
 	_lsa_seq = (_lsa_seq + 1) % MAX_SEQNUM;
 
-	syslog(LOG_INFO, "Send-LSA[%d]", _lsa_seq);
+	//syslog(LOG_INFO, "Send-LSA[%d]", _lsa_seq);
 	return msg.send(_sock, &_ddag);
 }
 
@@ -269,82 +269,82 @@ int IntraDomainRouter::processMsg(std::string msg)
 int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
 {
 	int rc = 1;
-    int ad_count = 0;
-    int sid_count = 0;
-    int weight = 0;
-    int ctlSeq;
-    string srcAD, srcHID, destAD, destHID;
+	int ad_count = 0;
+	int sid_count = 0;
+	int weight = 0;
+	int ctlSeq;
+	string srcAD, srcHID, destAD, destHID;
 
-    string AD;
-    string SID;
+	string AD;
+	string SID;
 
-    msg.read(srcAD);
-    msg.read(srcHID);
+	msg.read(srcAD);
+	msg.read(srcHID);
 
-    if (srcAD != _myAD)
-        return 1;
+	if (srcAD != _myAD)
+		return 1;
 
-    msg.read(destAD);
-    msg.read(destHID);
-    msg.read(ctlSeq);
+	msg.read(destAD);
+	msg.read(destHID);
+	msg.read(ctlSeq);
 
-    // Check if intended for me
-    if (destAD != _myAD) {
-        return 1;
-    }
+	// Check if intended for me
+	if (destAD != _myAD) {
+		return 1;
+	}
 
-    if (destHID != _myHID) {
-        // only broadcast one time for each
-        int his_ctl_seq = _sid_ctl_seqs[destHID]; // NOTE: default value of int is 0
-        if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
+	if (destHID != _myHID) {
+		// only broadcast one time for each
+		int his_ctl_seq = _sid_ctl_seqs[destHID]; // NOTE: default value of int is 0
+		if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
 			// seen it before
-            return 1;
-        } else {
-            _sid_ctl_seqs[destHID] = ctlSeq;
-            return msg.send(_sock, &_ddag);
-        }
-    }
+			return 1;
+		} else {
+			_sid_ctl_seqs[destHID] = ctlSeq;
+			return msg.send(_sock, &_ddag);
+		}
+	}
 
-    if (ctlSeq <= _sid_ctl_seq && _sid_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
-        return 1;
-    }
-    _sid_ctl_seq = ctlSeq;
+	if (ctlSeq <= _sid_ctl_seq && _sid_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
+		return 1;
+	}
+	_sid_ctl_seq = ctlSeq;
 
-    std::map<std::string, XIARouteEntry> xrt;
-    _xr.getRoutes("AD", xrt);
+	std::map<std::string, XIARouteEntry> xrt;
+	_xr.getRoutes("AD", xrt);
 
-    // change vector to map AD:RouteEntry for faster lookup
-    std::map<std::string, XIARouteEntry> ADlookup;
-    map<std::string, XIARouteEntry>::iterator ir;
-    for (ir = xrt.begin(); ir != xrt.end(); ++ir) {
-        ADlookup[ir->second.xid] = ir->second;
-    }
+	// change vector to map AD:RouteEntry for faster lookup
+	std::map<std::string, XIARouteEntry> ADlookup;
+	map<std::string, XIARouteEntry>::iterator ir;
+	for (ir = xrt.begin(); ir != xrt.end(); ++ir) {
+		ADlookup[ir->second.xid] = ir->second;
+	}
 
-    msg.read(ad_count);
-    for ( int i = 0; i < ad_count; ++i) {
-        msg.read(sid_count);
-        msg.read(AD);
-        XIARouteEntry entry = ADlookup[AD];
-        for ( int j = 0; j < sid_count; ++j) {
-            msg.read(SID);
-            msg.read(weight);
-            //syslog(LOG_INFO, "add route %s, %d, %s, %lu to %s", SID.c_str(), entry.port, entry.nextHop.c_str(), entry.flags, AD.c_str());
-            //rc = _xr.delRoute(SID);
-            if (weight <= 0) {
-                //syslog(LOG_DEBUG, "Removing routing entry: %s@%s", SID.c_str(), entry.xid.c_str());
-            }
-            if (entry.xid == _myAD) {
-                rc = _xr.seletiveSetRoute(SID, -2,  entry.nextHop, entry.flags, weight, AD); // use AD as index
-                //SID to local AD, NOTE: no actual server to handle sid here, just put -2 instead, TODO: should point it to a server instance
-            } else {
-                rc = _xr.seletiveSetRoute(SID, entry.port, entry.nextHop, entry.flags, weight, AD);
-            }
-            if (rc < 0 ) {
-                syslog(LOG_ERR, "error setting sid route %d", rc);
-            }
-        }
-    }
-    return rc;
+	msg.read(ad_count);
+	for ( int i = 0; i < ad_count; ++i) {
+		msg.read(sid_count);
+		msg.read(AD);
+		XIARouteEntry entry = ADlookup[AD];
+		for ( int j = 0; j < sid_count; ++j) {
+			msg.read(SID);
+			msg.read(weight);
+			//syslog(LOG_INFO, "add route %s, %d, %s, %lu to %s", SID.c_str(), entry.port, entry.nextHop.c_str(), entry.flags, AD.c_str());
+			//rc = _xr.delRoute(SID);
+			if (weight <= 0) {
+				//syslog(LOG_DEBUG, "Removing routing entry: %s@%s", SID.c_str(), entry.xid.c_str());
+			}
+			if (entry.xid == _myAD) {
+				rc = _xr.seletiveSetRoute(SID, -2,  entry.nextHop, entry.flags, weight, AD); // use AD as index
+				//SID to local AD, NOTE: no actual server to handle sid here, just put -2 instead, TODO: should point it to a server instance
+			} else {
+				rc = _xr.seletiveSetRoute(SID, entry.port, entry.nextHop, entry.flags, weight, AD);
+			}
+			if (rc < 0 ) {
+				syslog(LOG_ERR, "error setting sid route %d", rc);
+			}
+		}
+	}
+	return rc;
 }
 
 

@@ -51,6 +51,7 @@ XDatagram::add_packet_to_recv_buf(WritablePacket *p) {
 
 void
 XDatagram::check_for_and_handle_pending_recv() {
+
 	if (recv_pending) {
 		int bytes_returned = read_from_recv_buf(pending_recv_msg);
 		get_transport()->ReturnResult(port, pending_recv_msg, bytes_returned);
@@ -63,7 +64,6 @@ XDatagram::check_for_and_handle_pending_recv() {
 
 int
 XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
-	// printf("read_from_recv_buf in datagram\n");
 
 	X_Recvfrom_Msg *x_recvfrom_msg = xia_socket_msg->mutable_x_recvfrom();
 
@@ -86,7 +86,8 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 			case SOCK_DGRAM:
 			{
 				DatagramHeader dhdr(p);
-				data_size = xiah.plen() - dhdr.hlen();
+				data_size = dhdr.plen();
+
 				payload = String((const char*)dhdr.payload(), data_size);
 				break;
 			}
@@ -115,7 +116,6 @@ XDatagram::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 		x_recvfrom_msg->set_payload(payload.c_str(), payload.length());
 		x_recvfrom_msg->set_sender_dag(src_path.c_str());
 		x_recvfrom_msg->set_bytes_returned(data_size);
-
 
 		if (!peek) {
 			// NOTE: bytes beyond what the app asked for will be discarded,

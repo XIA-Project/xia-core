@@ -11,7 +11,7 @@
 #define MAX_DAG_SIZE 512
 #define MAX_XID_SIZE 64
 
-const std::string broadcast_hid  ("HID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+const std::string broadcast_fid  ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 const std::string intradomain_sid("SID:1110000000000000000000000000000000001112");
 const std::string controller_sid ("SID:1110000000000000000000000000000000001114");
 

@@ -29,7 +29,6 @@
 #include <libgen.h>
 #endif
 #include "Xsocket.h"
-#include "dagaddr.hpp"
 
 #define VERSION "v1.0"
 #define TITLE "XIA Echo Client"
@@ -209,7 +208,7 @@ int process(int sock)
 	else
 		size = pktSize;
 	randomString(buf1, size);
-	printf("%d\n", (int)size);
+
 	int count = size;
 
 	sent = Xsend(sock, buf1, count, 0);
@@ -337,10 +336,13 @@ void quithandler(int)
 */
 int main(int argc, char **argv)
 {
+	char buf[256];
+
 	srand(time(NULL));
 	getConfig(argc, argv);
 
 //	signal(SIGINT, quithandler);
+
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
@@ -348,8 +350,8 @@ int main(int argc, char **argv)
 		die(-1, "unable to lookup name %s\n", STREAM_NAME);
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	Graph g(sa);
-	printf("\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\n%s\n", buf);
 
 	if (threads == 1)
 		// just do it
