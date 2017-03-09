@@ -1004,24 +1004,33 @@ Graph::replace_intent_HID(std::string new_hid_str)
 int
 Graph::compare_except_intent_AD(Graph other) const
 {
+	// Copy the other graph so we can modify the copy
+	Graph them(other);
+
 	// Find our and their intent AD
 	size_t intent_ad = intent_AD_index();
 	if (intent_ad == INVALID_GRAPH_INDEX) {
+		printf("Graph::compare_except_intent_AD ERROR No intent AD\n");
 		return -1;
 	}
-	size_t their_intent_ad = other.intent_AD_index();
+	size_t their_intent_ad = them.intent_AD_index();
 	if (their_intent_ad == INVALID_GRAPH_INDEX) {
+		printf("Graph::compare_except_intent_AD ERROR: No other intent AD\n");
 		return -1;
 	}
 
 	// Replace their intent AD with ours
-	other.nodes_[their_intent_ad] = nodes_[intent_ad];
+	them.nodes_[their_intent_ad] = nodes_[intent_ad];
 
 	// Compare them with us
-	if (*this == other) {
+	Graph us(*this);
+	if (us == them) {
 		return 0;
 	}
 
+	printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
+	printf("this: %s\n", this->dag_string().c_str());
+	printf("them: %s\n", them.dag_string().c_str());
 	return -1;
 }
 
@@ -2008,7 +2017,7 @@ Graph::flatten()
   *
   */
 bool
-Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
+Graph::depth_first_walk(int node, std::vector<Node> &paths) const
 {
 	// Break out with error if we are headed to infinite recursion
 	if(paths.size() > Graph::MAX_XIDS_IN_ALL_PATHS) {
@@ -2017,7 +2026,7 @@ Graph::depth_first_walk(std::size_t node, std::vector<Node> &paths) const
 	}
 
 	// Add current node to 'paths'
-	paths.push_back(nodes_[node]);
+	paths.push_back(get_node(node));
 
 	// Follow all outgoing edges; sink will have none
 	std::vector<std::size_t> out_edges = get_out_edges(node);
@@ -2052,7 +2061,8 @@ bool
 Graph::ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const
 {
 	paths_to_sink.clear();
-	return depth_first_walk(source_index(), paths_to_sink);
+	// Walk starting at the dummy source node
+	return depth_first_walk(-1, paths_to_sink);
 }
 
 /**
@@ -2075,10 +2085,12 @@ Graph::operator==(const Graph &g) const
 	std::vector<Node> their_paths;
 
 	if(ordered_paths_to_sink(my_paths) == false) {
+		printf("Graph::== ERROR getting my paths to sink\n");
 		return false;
 	}
 
 	if(g.ordered_paths_to_sink(their_paths) == false) {
+		printf("Graph::== ERROR getting their paths to sink\n");
 		return false;
 	}
 

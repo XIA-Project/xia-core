@@ -350,6 +350,12 @@ XStream::tcp_input(WritablePacket *p)
 			tp->t_timer[TCPT_KEEP] = TCPTV_KEEP_INIT;
 			get_transport()->_tcpstat.tcps_accepts++;
 
+			// If SYN received via RV service, send migrate option to client
+			// so client has our new address.
+			if (rv_modified_dag) {
+				migrating = true;
+			}
+
 			// // If the app is ready for a new connection, alert it
 			// XSocketMsg *acceptXSM = sk->pendingAccepts.front();
 			// get_transport()->ReturnResult(_dport, acceptXSM);

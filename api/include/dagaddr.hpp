@@ -173,7 +173,7 @@ private:
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
 
-	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
+	bool depth_first_walk(int node, std::vector<Node> &paths) const;
 	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
 	void dump_stack_trace() const;
