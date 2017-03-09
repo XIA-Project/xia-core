@@ -14,11 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import socket
 import argparse
 import clicksock
 import xiapyutils
 
+APP="xnetstat"
 APP_VERSION="1.0"
 
 SOCKET_TYPES = [ "STREAM", "DGRAM", "RAW" ]
@@ -41,12 +43,17 @@ def main():
 	hostname = xiapyutils.getxiaclickhostname()
 	types = []
 
-	parser = argparse.ArgumentParser(description = 'XIA netstat %s' % APP_VERSION)
+	parser = argparse.ArgumentParser()
 	parser.add_argument("-f", "--flush", action="store_true", help='purge all STREAM sockets in TIME_WAIT state')
 	parser.add_argument("-p", "--purge", action='store_true', help='purge *ALL* STREAM sockets')
-	parser.add_argument("-t", "--type", nargs="*", help='only output information for the specified Socket type(s) STREAM|DGRAM|CHUNK')
+	parser.add_argument("-t", "--type", help='only output information for the specified Socket type STREAM|DGRAM|RAW')
 	parser.add_argument("-s", "--sort", help='sort output on (p)ort, (t)ype, (s)tate, or (x)id', default='p')
+	parser.add_argument("-v", "--version", action='store_true', help='display version number')
 	args = parser.parse_args()
+
+	if args.version:
+		print "%s %s" %(APP, APP_VERSION)
+		sys.exit(0)
 
 	# make list of socket types to display
 	makeTypeList()
@@ -119,17 +126,14 @@ def makeTypeList():
 	global types
 
 	# if specified by the user, only get info for the specified Socket types (STREAM, DGRAM,...)
-	if (args.type != None):
-		if len(args.type) == 0:
-			errorExit("error: No types specified")
-		types = args.type
+	if args.type != None:
+		if args.type.upper() not in SOCKET_TYPES:
+			errorExit("Invalid socket type specified (%s)" % type)
 
-		for type in types:
-			if type.upper() not in SOCKET_TYPES:
-				errorExit("Invalid socket type specified (%s)" % type)
+		types = [ args.type ]
 	else:
 		types = SOCKET_TYPES
 
 
 if __name__ == "__main__":
-    main()
+	main()

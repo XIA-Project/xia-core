@@ -21,6 +21,7 @@ from netjoin_handshake_one import NetjoinHandshakeOne
 from netjoin_handshake_two import NetjoinHandshakeTwo
 from netjoin_handshake_three import NetjoinHandshakeThree
 from netjoin_handshake_four import NetjoinHandshakeFour
+import xroute_pb2
 
 # A client session reperesenting a client joining a network
 class NetjoinSession(threading.Thread):
@@ -361,10 +362,17 @@ class NetjoinSession(threading.Thread):
             else:
                 logging.info("Route set up for {}".format(client_hid))
             # Inform local xrouted about this HID registration
-            router_register_msg = "2^{}^{}^".format(client_hid, interface)
+            xrmsg = xroute_pb2.XrouteMsg()
+            xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
+            xrmsg.type = xroute_pb2.HOST_JOIN_MSG
+            xrmsg.host_join.flags = 0x0001
+            xrmsg.host_join.hid = client_hid
+            xrmsg.host_join.interface = interface
+            register_packet = xrmsg.SerializeToString()
+
             rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
             router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
-            c_xsocket.Xsendto(rsockfd, router_register_msg, 0, router_dag_str)
+            c_xsocket.Xsendto(rsockfd, register_packet, 0, router_dag_str)
             c_xsocket.Xclose(rsockfd)
 
         # Tell client that gateway side configuration is now complete

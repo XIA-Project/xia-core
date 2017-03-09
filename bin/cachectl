@@ -14,21 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import socket
 import argparse
 import clicksock
 import xiapyutils
 
+APP="cachectl"
 APP_VERSION="1.0"
 CACHE_ELEMENT="/cf/cidFilter"
 
-parser = argparse.ArgumentParser(description = 'xcache controller %s' % APP_VERSION)
+parser = argparse.ArgumentParser()
 parser.add_argument("caching", nargs='?', help='enable caching', choices=['on', 'off'])
+parser.add_argument("-v", "--version", action="store_true", help='display version number')
 args = parser.parse_args()
 
 hostname = xiapyutils.getxiaclickhostname()
 status = hostname + CACHE_ELEMENT + ".status"
 enable = hostname + CACHE_ELEMENT + ".enable"
+
+if args.version:
+	print  "%s %s" % (APP, APP_VERSION)
+	sys.exit(0)
 
 with clicksock.clicksock() as click:
 	if args.caching == 'on':

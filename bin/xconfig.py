@@ -71,6 +71,7 @@ dsrc_mac_addr = None
 waveserver_ip = None
 waveserver_port = None
 socket_ips_ports = None
+num_router_ports = 4
 
 #
 # create a globally unique HID based off of our mac address
@@ -319,7 +320,7 @@ def makeRouterConfigToFile(template, outfile):
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
     print "Socket ip port list contains:", socket_ip_port_list
 
-    makeGenericRouterConfig(4, socket_ip_port_list, interfaces, [], template, outfile)
+    makeGenericRouterConfig(num_router_ports, socket_ip_port_list, interfaces, [], template, outfile)
 
 
 # makeRouterConfig and makeDualRouterConfig call this
@@ -389,6 +390,9 @@ def makeGenericRouterConfig(num_ports, socket_ip_port_list, xia_interfaces, ip_i
     tpl = Template(header)
 
     xchg = {}
+
+    xchg['PORTS'] = num_ports
+
     xchg['HNAME'] = getHostname()
     if remoteexec:
         xchg['RIPADDR'] = waveserver_ip
@@ -401,15 +405,18 @@ def makeGenericRouterConfig(num_ports, socket_ip_port_list, xia_interfaces, ip_i
     else:
         xchg['EXTERNAL_IP'] = ip_override_addr
 
-    # create $MAC0 thru $MAC3 replacements
+    # create $MAC0 thru $MACn replacements
     # create $IP_ACTIVE, $IPADDR, and $GWADDR replacements also,
     # though if this isn't a dual stack router, the strings we're
     # trying to replace won't exist in the template, but that's OK
+    mac_list = ""
     for i in range(0, num_ports):
-        xchg['MAC' + str(i)] = interfaces[i][1]
+        mac_list = mac_list + interfaces[i][1] + ", "
+        # xchg['MAC' + str(i)] = interfaces[i][1]
         xchg['IP_ACTIVE' + str(i)] = str(1) if i in ip_ports else str(0)
         xchg['IPADDR' + str(i)] = interfaces[i][2]
         xchg['GWADDR' + str(i)] = interfaces[i][3]
+    xchg['MACS'] = mac_list[:-2]
 
     newtext = tpl.substitute(xchg)
 
@@ -668,8 +675,9 @@ def getOptions():
     global hosttemplate
     global routertemplate
     global socket_ips_ports
+    global num_router_ports
     try:
-        shortopt = "hr4ni:a:m:f:I:W:tP:"
+        shortopt = "hr48ni:a:m:f:I:W:tP:"
         opts, args = getopt.getopt(sys.argv[1:], shortopt,
             ["help", "router", "host", "dual-stack", "nameserver", "manual-address=", "interface-filter=", "host-interface=", "waveserver=", "socket-ports="])
     except getopt.GetoptError, err:
@@ -689,6 +697,8 @@ def getOptions():
             nodetype = "host"
         elif o in ("-4", "--dual-stack"):
             dual_stack = True
+        elif o in ("-8"):
+            num_router_ports = 8
         elif o in ("-m", "--manual-address"):
             ip_override_addr = a
         elif o in ("-f", "--interface-filter"):
@@ -714,7 +724,7 @@ def getOptions():
 #
 def help():
     print """
-usage: xconfig [-h] [-rt] [-4] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface] [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
+usage: xconfig [-h] [-rt] [-4] [-8] [-n] [-i hostname] [-m ipaddr] [-f if_filter] [-P socket-ports] [-I host-interface] [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
 where:
   -h            : get help
   --help
@@ -730,6 +740,8 @@ where:
 
   -4            : do a dual-stack config
   --dual-stack
+
+  -8            : create an 8 port router (with -r)
 
   -m            : manually provide IP address
   --manual-address

@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import argparse
 import clicksock
 
+APP="xlog"
 APP_VERSION="1.0"
 
 levels = ['LOG_EMERG', 'LOG_ALERT', 'LOG_CRIT', 'LOG_ERR', 'LOG_WARNING', 'LOG_NOTICE', 'LOG_INFO', 'LOG_DEBUG']
@@ -26,25 +28,30 @@ status = ['disabled', 'enabled']
 # custom argparse handler to chose syslog levels
 #
 def loglevel(arg):
-    try:
-        value = int(arg)
-    except ValueError as err:
-       raise argparse.ArgumentTypeError(str(err))
+	try:
+		value = int(arg)
+	except ValueError as err:
+	   raise argparse.ArgumentTypeError(str(err))
 
-    if value < 0 or value > 7:
-        message = "Expected a value in 0..7, got {}".format(value)
-        raise argparse.ArgumentTypeError(message)
+	if value < 0 or value > 7:
+		message = "Expected a value in 0..7, got {}".format(value)
+		raise argparse.ArgumentTypeError(message)
 
-    return value
+	return value
 
 #
 # let's do this thing!
 #
-parser = argparse.ArgumentParser(description = 'XIA Log Controller %s' % APP_VERSION)
+parser = argparse.ArgumentParser()
+parser.add_argument("--version", action='store_true', help='display version number')
 parser.add_argument("-v", "--verbose", action="store_true", help='enable console logging')
 parser.add_argument("-q", "--quiet", action='store_true', help='disable console logging')
-parser.add_argument("-l", "--level", type=loglevel, help='syslog level (0=LOG_EMERG through 7=LOG_DEBUG)')
+parser.add_argument("-l", "--level", type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
 args = parser.parse_args()
+
+if args.version:
+	print "%s %s" % (APP, APP_VERSION)
+	sys.exit(0)
 
 with clicksock.clicksock() as click:
 	if args.verbose:
@@ -53,7 +60,7 @@ with clicksock.clicksock() as click:
 		click.writeData("log.verbose 0")
 
 	if args.level != None:
-		click.writeData("log.level %d" % args.level)
+			click.writeData("log.level %d" % args.level)
 
 	l = int(click.readData("log.level"))
 	v = int(click.readData("log.verbose"))

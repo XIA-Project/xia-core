@@ -325,9 +325,10 @@ void FIDRouteEngine::push(int in_ether_port, Packet *p)
 
 	} else if (port == DESTINED_FOR_FLOOD_ALL) {
 		// reflood the packet
+
+		// FIXME: treat the FID as a broadcast until the router is fixed to work correctly
 		// for (int i = 0; i <= _num_ports; i++) {
 		// 	if (i != in_ether_port) {
-		// 		printf("reflooding\n");
 		// 		Packet *q = p->clone();
 		// 		SET_XIA_PAINT_ANNO(q, i);
 		// 		output(0).push(q);
@@ -474,6 +475,7 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		// FIXME: is this a temporary case?
 
 		// we want to handle this locally and also reflood it
+		p->set_nexthop_neighbor_xid_anno(fid);
 		return DESTINED_FOR_FLOOD_ALL;
 	}
 

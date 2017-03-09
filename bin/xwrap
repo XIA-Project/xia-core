@@ -14,15 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+VERSION=1.0
+
 help ()
 {
 	cat << EOH
 
-Start or stop the XIA network services.
+Run a standard socket application on an XIA network
 
-usage: xwrap [-h host] [-tixwdv] [-o <logfile>] cmd
-where:
-  -h <host> run on the specified host (when using local topology file)
+xwrap [-n <name>] [-tixwdv] [-o <logfile>] cmd [args...]
+
+cmd is the application followed by any command line arguments it requires
+
+options:
+  -n <name> use host as the local hostname
   -t log at entry of every wrapped API call
   -i log informative messages
   -x log XIA related messages
@@ -31,23 +36,26 @@ where:
   -v log everything in the wrapper
   -o <logfile> log to the specified file instead of stderr
 
-  cmd is the application and any command line arguments it requires
 
 EOH
 	exit 0
 }
 
+XWRAP_HOST=$(hostname)
 
-[[ "$#" == "0" ]] && help
+if [ "$1" == "--version" ]; then
+	echo "xwrap $VERSION"
+	exit 0
+fi
 
-while getopts "o:h:tivwxd" opt; do
+while getopts "o:n:tivwxdh" opt; do
+
 	case $opt in
-		h)
-			export XSOCKCONF_SECTION=$OPTARG
+		n)
+			export XWRAP_HOST=$OPTARG
 			;;
 		o)
 			LOGFILE=$OPTARG
-			# export XWRAP_LOGFILE=$OPTARG
 			;;
 		v)
 			export XWRAP_VERBOSE=1
@@ -60,7 +68,7 @@ while getopts "o:h:tivwxd" opt; do
 			;;
 		i)
 			export XWRAP_INFO=1
-			;;	 
+			;;
 		w)
 			export XWRAP_WARNING=1
 			;;
@@ -73,6 +81,9 @@ while getopts "o:h:tivwxd" opt; do
 	esac
 done
 shift $((OPTIND-1))
+
+# there's no app to run
+[[ "$#" == "0" ]] && help
 
 export XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 XLIB=$XIADIR/api/lib

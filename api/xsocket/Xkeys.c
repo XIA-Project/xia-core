@@ -1,6 +1,28 @@
 // COMPILE: gcc -o genkeypair genkeypair.c -lcrypto -lssl
-#include <string.h>
+/*
+** Copyright 2012 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+/*!
+ @file Xkeys.c
+ @brief XmakeNewSID(), XremoveSID(), XcreateFID(), XremoveFID() -- create/delete cryptographic SIDs & FIDs
+\todo write docs
+*/
+
 #include "Xsocket.h"
+/*! \cond */
+#include <string.h>
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
@@ -9,17 +31,19 @@
 #define XIA_KEYDIR "key"
 #define MAX_KEYDIR_PATH_LEN 1024
 #define FID_PREFIX "FID:"
+/*! \endcond */
+
 
 // Convert a SHA1 hash to a hex string
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
 {
-    int i;
+	int i;
 	assert(digest_len == SHA_DIGEST_LENGTH);
 	assert(hex_string_len == (2*SHA_DIGEST_LENGTH) + 1);
-    for(i=0;i<digest_len;i++) {
-        sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
-    }
-    hex_string[hex_string_len-1] = '\0';
+	for(i=0;i<digest_len;i++) {
+		sprintf(&hex_string[2*i], "%02x", (unsigned int)digest[i]);
+	}
+	hex_string[hex_string_len-1] = '\0';
 }
 
 // Calculate SHA1 hash of a public key in PEM format
@@ -230,13 +254,13 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 {
 	int retval = -1;
 	int state = 0;
-    int keylen;
-    RSA *r = NULL;
-    BIGNUM *bne = NULL;
+	int keylen;
+	RSA *r = NULL;
+	BIGNUM *bne = NULL;
 	BIO *pubkeybuf = NULL;
 	char *pubkeystr = NULL;
 	unsigned char pubkeyhash[SHA_DIGEST_LENGTH];
-    unsigned long e = RSA_F4;
+	unsigned long e = RSA_F4;
 
 	// Get location of key directory
 	const char *keydir = get_keydir();
@@ -258,25 +282,25 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 		goto cleanup_generate_keypair;
 	}
 
-    // Create BIGNUM argument for key generation
-    bne = BN_new();
+	// Create BIGNUM argument for key generation
+	bne = BN_new();
 	if(bne == NULL) {
 		LOG("generate_keypair: ERROR creating BIGNUM object");
 		goto cleanup_generate_keypair;
 	}
 	state = 1;
 
-    if(BN_set_word(bne, e) != 1) {
+	if(BN_set_word(bne, e) != 1) {
 		LOG("generate_keypair: ERROR setting BIGNUM to RSA_F4");
-        goto cleanup_generate_keypair;
-    }
+		goto cleanup_generate_keypair;
+	}
 
 	// Create a new RSA key pair
-    r = RSA_new();
-    if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
+	r = RSA_new();
+	if(RSA_generate_key_ex(r, KEY_BITS, bne, NULL) != 1) {
 		LOG("generate_keypair: ERROR: RSA_generate_key_ex");
-        goto cleanup_generate_keypair;
-    }
+		goto cleanup_generate_keypair;
+	}
 	state = 2;
 
 	// Convert public key into a string
@@ -332,7 +356,7 @@ cleanup_generate_keypair:
 		case 1: BN_free(bne);
 	};
 
-    return retval;
+	return retval;
 }
 
 int XmakeNewSID(char *randomSID, int randomSIDlen)
@@ -378,6 +402,21 @@ static int manageFID(const char *fid, bool create)
 	return rc;
 }
 
+/*!
+** @brief create and register an FID
+**
+** Returns a text string containing a FID made from the a 160 bit cryptographic hash
+** from a newly created public/private keypair in the form of <code>FID:nnnnn....</code>.
+**
+** The new FID is also registered in the local routing table so that destination
+** DAGs using the FID will be handled locally.
+**
+** @param fid  a buffer to receive the newly created FID.
+** @param len  the length of fid. If less then 45 characters an error will be returned.
+**
+** @returns 0 on success
+** @returns -1 on error with errno set
+*/
 int XcreateFID(char *fid, int len)
 {
 	int tlen = strlen(FID_PREFIX);
@@ -394,6 +433,17 @@ int XcreateFID(char *fid, int len)
 	return manageFID(fid, true);
 }
 
+/*!
+** @brief delete and un-register an FID
+**
+** Remove the FID from the local routing table and delete
+** the associated keypair.
+**
+** @param fid  the FID to remove
+**
+** @returns 0 on success
+** @returns -1 on error
+*/
 int XremoveFID(const char *fid)
 {
 	int tlen = strlen(FID_PREFIX);
@@ -469,7 +519,7 @@ int XexistsSID(const char *sid)
 int main(int argc, char* argv[])
 {
 	char pubkeyhexdigest[SHA_DIGEST_LENGTH*2+1];
-    int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));
+	int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));
 	if(!retval) {
 		printf("Generated key:%s:\n", pubkeyhexdigest);
 	}

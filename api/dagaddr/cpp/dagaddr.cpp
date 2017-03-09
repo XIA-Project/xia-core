@@ -64,7 +64,7 @@ Node::XidMap Node::load_xids()
 	if (f) {
 		while (!feof(f)) {
 			if (fgets(text, sizeof(text), f)) {
- 				if (sscanf(text, "%hi %s", &id, name) == 2) {
+				if (sscanf(text, "%hi %s", &id, name) == 2) {
 					ids[id] = name;
 				}
 			}
@@ -268,7 +268,7 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 {
 	ptr_ = new container;
 	ptr_->ref_count = 1;
-    memset(ptr_->id,0,Node::ID_LEN); // zero the ID
+	memset(ptr_->id,0,Node::ID_LEN); // zero the ID
 
 	std::string typestr = type_str;
 
@@ -318,10 +318,10 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 	uint32_t ip = inet_addr(id_str.c_str());
 	if (ptr_->type == XID_TYPE_IP && ip != INADDR_NONE)
 	{
-        ptr_->id[0] = 0x45;  // set some special "4ID" values
-        ptr_->id[5] = 0x01;
-        ptr_->id[8] = 0xFA;
-        ptr_->id[9] = 0xFA;
+		ptr_->id[0] = 0x45;  // set some special "4ID" values
+		ptr_->id[5] = 0x01;
+		ptr_->id[8] = 0xFA;
+		ptr_->id[9] = 0xFA;
 
 		ptr_->id[16] = *(((unsigned char*)&ip)+0);
 		ptr_->id[17] = *(((unsigned char*)&ip)+1);
@@ -346,9 +346,9 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 				throw std::range_error("Error parsing XID string");
 			}
 			else {
-                const uint8_t byte = (uint8_t) num;
+				const uint8_t byte = (uint8_t) num;
 				memcpy(&(ptr_->id[i]), &byte, 1);
-            }
+			}
 		}
 	}
 }
@@ -1053,6 +1053,17 @@ Graph::intent_AD_str() const
 	return nodes_[ad_index].to_string();
 }
 
+const Node&
+Graph::intent_AD() const
+{
+	std::size_t ad_index = intent_AD_index();
+	if (ad_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_AD: AD index not found\n");
+		throw std::range_error("AD not found");
+	}
+	return nodes_[ad_index];
+}
+
 /*
  * @brief Return the HID for the Graph's intent node
  *
@@ -1073,6 +1084,17 @@ Graph::intent_HID_str() const
 	return nodes_[hid_index].to_string();
 }
 
+const Node&
+Graph::intent_HID() const
+{
+	std::size_t hid_index = intent_HID_index();
+	if (hid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_HID: HID index not found\n");
+		throw std::range_error("HID not found");
+	}
+	return nodes_[hid_index];
+}
+
 /*
  * @brief Return the SID for the Graph's intent node
  *
@@ -1090,6 +1112,17 @@ Graph::intent_SID_str() const
 		return "";
 	}
 	return nodes_[sid_index].to_string();
+}
+
+const Node&
+Graph::intent_SID() const
+{
+	std::size_t sid_index = intent_SID_index();
+	if (sid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_SID: SID index not found\n");
+		throw std::range_error("SID not found");
+	}
+	return nodes_[sid_index];
 }
 
 
@@ -1299,7 +1332,7 @@ Graph::is_final_intent(const std::string xid_string)
 	// if the string includes the "<type>:", cut it off
 	if (xid_string.find(":") != std::string::npos)
 	{
-	    xid_str = split(xid_string, ':')[1];
+		xid_str = split(xid_string, ':')[1];
 	}
 
 	for (std::size_t i = 0; i < nodes_.size(); i++)
@@ -1431,7 +1464,7 @@ Graph::next_hop(const std::string xid_string)
 	// if the string includes the "<type>:", cut it off
 	if (xid_string.find(":") != std::string::npos)
 	{
-	    xid_str = split(xid_string, ':')[1];
+		xid_str = split(xid_string, ':')[1];
 	}
 
 	for (std::size_t i = 0; i < nodes_.size(); i++)
@@ -1725,29 +1758,29 @@ Graph::fill_wire_buffer(node_t *buf) const
 	{
 		node_t* node = buf + i; // check this
 
-	    // Set the node's XID and type
-	    node->xid.type = htonl(get_node(i).type());
-	    memcpy(&(node->xid.id), get_node(i).id(), Node::ID_LEN);
+		// Set the node's XID and type
+		node->xid.type = htonl(get_node(i).type());
+		memcpy(&(node->xid.id), get_node(i).id(), Node::ID_LEN);
 
-	    // Get the node's out edge list
-	    std::vector<std::size_t> out_edges;
-	    if (i == num_nodes()-1) {
-	        out_edges = get_out_edges(-1); // put the source node's edges here
-	    } else {
-	        out_edges = get_out_edges(i);
-	    }
+		// Get the node's out edge list
+		std::vector<std::size_t> out_edges;
+		if (i == num_nodes()-1) {
+			out_edges = get_out_edges(-1); // put the source node's edges here
+		} else {
+			out_edges = get_out_edges(i);
+		}
 
-	    // Set the out edges in the header
-	    for (uint8_t j = 0; j < EDGES_MAX; j++)
-	    {
-	        if (j < out_edges.size())
-	            node->edge[j].idx = out_edges[j];
-	        else
-	            node->edge[j].idx = EDGE_UNUSED;
+		// Set the out edges in the header
+		for (uint8_t j = 0; j < EDGES_MAX; j++)
+		{
+			if (j < out_edges.size())
+				node->edge[j].idx = out_edges[j];
+			else
+				node->edge[j].idx = EDGE_UNUSED;
 
-	        // On creation, none of the edges have been visited
-	        node->edge[j].visited = 0;
-	    }
+			// On creation, none of the edges have been visited
+			node->edge[j].visited = 0;
+		}
 	}
 	return num_nodes();
 }
