@@ -69,7 +69,7 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cCvV4rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+usage: $NAME [-cCvV48rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
 			 [-f <filter_str>] [-P <socket-ports>]
 			 [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
 			 [-s <script>] [-z <statserver>] start|stop|check|kill|restart
@@ -82,6 +82,7 @@ Commands:
  restart  stop then start the XIA network processes
 
 Configure:
+  -8 create an 8 port router (with -r)
   -t generate and use a generic host click script
   -r generate and use a generic router click script
   -n this node will be the name server
@@ -126,7 +127,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV4nN:rRthi:m:f:z:ZP:gW:H" opt; do
+	while getopts "cCl:s:qvV48nN:rRthi:m:f:z:ZP:gW:H" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -153,6 +154,9 @@ setup()
 			4)
 				MAKECONF="dual$MAKECONF"
 				CONFFLAGS="$CONFFLAGS -4"
+				;;
+			8)
+				CONFFLAGS="$CONFFLAGS -8"
 				;;
 			r)
 				MAKECONF=$MAKECONF"router"
@@ -302,7 +306,9 @@ kill_all_services()
 	for p in $ALL_PROCESSES
 	do
 		echo $p
-		killall -9 $p &> /dev/null
+
+		get_pid $p
+		kill $XPID 2&> /dev/null
 	done
 	check_all_services 1
 }
