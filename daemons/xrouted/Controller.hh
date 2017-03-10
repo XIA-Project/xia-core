@@ -41,55 +41,55 @@
 
 typedef struct DecisionIO // the struct for decision input and output
 {
-    int capacity;
-    int latency;
-    int percentage;
+	int capacity;
+	int latency;
+	int percentage;
 
 } DecisionIO;
 
 typedef struct ServiceState
 {
-    // public information
-    int seq;
-    int priority; // to be moved to controller-only
-    int capacity; // should be a controller-only info, but we still announce it
-    int capacity_factor; // to be moved to controller-only
-    int link_factor; // to be moved to controller-only
-    int isLeader; // whether this instance is also a service controller, 0 for no
-    std::string leaderAddr; // the address of the service controller
-    int archType; // the architecture of the controllers
-    int internal_delay; // the internal delay of this service
-    std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
+	// public information
+	int seq;
+	int priority; // to be moved to controller-only
+	int capacity; // should be a controller-only info, but we still announce it
+	int capacity_factor; // to be moved to controller-only
+	int link_factor; // to be moved to controller-only
+	int isLeader; // whether this instance is also a service controller, 0 for no
+	std::string leaderAddr; // the address of the service controller
+	int archType; // the architecture of the controllers
+	int internal_delay; // the internal delay of this service
+	std::map<std::string, int> delays; // the delays from ADs to the instance {AD:delay}
 
-    // SID-controller-only info
-    // the decision function pointer: SID, srcAD, rate, *decisionPut
-    int (*decision)(std::string, std::string, int, std::map<std::string, DecisionIO>*);
+	// SID-controller-only info
+	// the decision function pointer: SID, srcAD, rate, *decisionPut
+	int (*decision)(std::string, std::string, int, std::map<std::string, DecisionIO>*);
 
-    // local information used for store decision, no re-broadcast
-    double weight; // calculated weight
-    bool valid; // is this candidate abandoned by local decision
-    int percentage; // what is the percent of
+	// local information used for store decision, no re-broadcast
+	double weight; // calculated weight
+	bool valid; // is this candidate abandoned by local decision
+	int percentage; // what is the percent of
 } ServiceState;
 
 typedef struct ClientLatency
 {
-    std::string AD;
-    int latency;
+	std::string AD;
+	int latency;
 } ClientLatency;
 
 
 typedef struct ServiceLeader
 {
-    std::map<std::string, ServiceState> instances; // the states for each service instances, AD : state pair
-    std::map<std::string, int> rates; // the global view of reported rates from the client domains
-    std::map<std::string, std::map<std::string, int> > latencies; // the global view of reported latencies domains, <replica: <client: latency> >
+	std::map<std::string, ServiceState> instances; // the states for each service instances, AD : state pair
+	std::map<std::string, int> rates; // the global view of reported rates from the client domains
+	std::map<std::string, std::map<std::string, int> > latencies; // the global view of reported latencies domains, <replica: <client: latency> >
 } ServiceLeader;
 
 typedef struct ADPathState// The path state to an AD, network 'weather' report
 {
-    int delay; //in milliseconds (ms);
+	int delay; //in milliseconds (ms);
 
-    int hop_count;
+	int hop_count;
 } ADPathState;
 
 class Controller : public RouteModule {
@@ -122,16 +122,16 @@ protected:
 	int32_t _ctl_seq;	// LSA sequence number of this router
 	int32_t _ctl_seq_recv;	// LSA sequence number of this router
 
-    int32_t _sid_ctl_seq;    // LSA sequence number of this router
+	int32_t _sid_ctl_seq;    // LSA sequence number of this router
 
-    std::map<std::string, RouteEntry> _ADrouteTable; // map DestAD to route entry
-    std::map<std::string, RouteEntry> _HIDrouteTable; // map DestHID to route entry
+	std::map<std::string, RouteEntry> _ADrouteTable; // map DestAD to route entry
+	std::map<std::string, RouteEntry> _HIDrouteTable; // map DestHID to route entry
 
-    std::map<std::string, NeighborEntry> _neighborTable; // map neighborHID to neighbor entry
-    std::map<std::string, NeighborEntry> _ADNeighborTable; // map neighborHID to neighbor entry for ADs
+	std::map<std::string, NeighborEntry> _neighborTable; // map neighborHID to neighbor entry
+	std::map<std::string, NeighborEntry> _ADNeighborTable; // map neighborHID to neighbor entry for ADs
 
-    std::map<std::string, NodeStateEntry> _networkTable; // map DestAD to NodeState entry
-    std::map<std::string, NodeStateEntry> _ADNetworkTable; // map DestAD to NodeState entry for ADs
+	std::map<std::string, NodeStateEntry> _networkTable; // map DestAD to NodeState entry
+	std::map<std::string, NodeStateEntry> _ADNetworkTable; // map DestAD to NodeState entry for ADs
 	std::map<std::string, int32_t> _lastSeqTable; // router-HID to their last-seq number
 	std::map<std::string, int32_t> _ADLastSeqTable; // router-HID to their last-seq number for ADs
 
@@ -139,10 +139,10 @@ protected:
 	std::map<std::string, NodeStateEntry> _ADNetworkTable_temp;
 
 	std::map<std::string, ADPathState> _ADPathStates; // network 'weather' report service
-    std::map<std::string, ServiceState> _LocalSidList; // services provided by this AD
-    std::map<std::string, ServiceLeader> _LocalServiceLeaders; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
-    std::map<std::string, std::map<std::string, ServiceState> > _SIDADsTable; //discovery plane: what the controller discovered
-    std::map<std::string, int> _SIDRateTable; //record the traffic rate from local domain for each SID
+	std::map<std::string, ServiceState> _LocalSidList; // services provided by this AD
+	std::map<std::string, ServiceLeader> _LocalServiceLeaders; // AD controller acts as service controllers for local SIDs that need to be the master node (runs controller) for now TODO: an independent service controller daemon
+	std::map<std::string, std::map<std::string, ServiceState> > _SIDADsTable; //discovery plane: what the controller discovered
+	std::map<std::string, int> _SIDRateTable; //record the traffic rate from local domain for each SID
 
 	// FIXME: need to replace this, it doesn't do anything right now
 	bool _send_sid_decision;
@@ -164,16 +164,19 @@ protected:
 	int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
 	int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
-	int processMsg(std::string msg);
-	int processInterdomainLSA(ControlMessage msg);
+	int processMsg(std::string msg, uint32_t iface);
+	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
+	int processLSA(const Xroute::XrouteMsg& msg);
+	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
+
+
+
 	int processSidDecisionQuery(ControlMessage msg);
 	int querySidDecision();
 	int processSidDiscovery(ControlMessage msg);
 	int processServiceKeepAlive(ControlMessage msg);
 	int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
-	int processHello(ControlMessage msg);
 	int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
-	int processLSA(ControlMessage msg);
 
 	int Latency_first(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision);
 	int Load_balance(std::string, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision);

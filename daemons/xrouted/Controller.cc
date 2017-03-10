@@ -23,21 +23,16 @@ int ENABLE_SID_CTL = ENABLE_SID_CTL_D;
 
 void *Controller::handler()
 {
-	int sock;
-	int selectRetVal, n;
-	socklen_t dlen;
+	int rc;
 	char recv_message[10240];
 	sockaddr_x theirDAG;
-	fd_set socks;
-	struct timeval timeoutval;
+	struct timespec tspec;
 	vector<string> routers;
 	time_t last_purge = time(NULL);
 	time_t last_update_config = last_purge;
 	time_t last_update_latency = last_purge;
 
 	struct timeval now;
-	timeoutval.tv_sec = 0;
-	timeoutval.tv_usec = 50000; // every 0.05 sec, check if any received packets
 
 	gettimeofday(&now, NULL);
 	if (timercmp(&now, &h_fire, >=)) {
@@ -58,30 +53,69 @@ void *Controller::handler()
 		}
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
-	FD_ZERO(&socks);
-	FD_SET(_rsock, &socks);
-	FD_SET(_csock, &socks);
 
-	int32_t highSock = max(_rsock, _csock);
-	selectRetVal = Xselect(highSock+1, &socks, NULL, NULL, &timeoutval);
-	if (selectRetVal > 0) {
+	struct pollfd pfd[2];
+
+	pfd[0].fd = _rsock;
+	pfd[0].events = POLLIN;
+	pfd[1].fd = _csock;
+	pfd[1].events = POLLIN;
+
+	tspec.tv_sec = 0;
+	tspec.tv_nsec = 500000000;
+
+	rc = Xppoll(pfd, 2, &tspec, NULL);
+	if (rc > 0) {
+		int sock;
+
+		if (pfd[0].revents & POLLIN) {
+			sock = pfd[0].fd;
+		} else if (pfd[1].revents & POLLIN) {
+			sock = pfd[1].fd;
+		} else {
+			// something bad may have happened
+		}
+
 		// receiving a Hello or LSA packet
 		memset(&recv_message[0], 0, sizeof(recv_message));
-		dlen = sizeof(sockaddr_x);
-		if (FD_ISSET(_rsock, &socks)) {
-			sock = _rsock;
-		} else if (FD_ISSET(_csock, &socks)) {
-			sock = _csock;
-		} else {
-			return NULL;
-		}
-		n = Xrecvfrom(sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
-		if (n < 0) {
-			perror("recvfrom");
-		}
 
-		string msg = recv_message;
-		processMsg(msg);
+		int iface;
+		struct msghdr mh;
+		struct iovec iov;
+		struct in_pktinfo pi;
+		struct cmsghdr *cmsg;
+		struct in_pktinfo *pinfo;
+		char cbuf[CMSG_SPACE(sizeof pi)];
+
+		iov.iov_base = recv_message;
+		iov.iov_len = sizeof(recv_message);
+
+		mh.msg_name = &theirDAG;
+		mh.msg_namelen = sizeof(theirDAG);
+		mh.msg_iov = &iov;
+		mh.msg_iovlen = 1;
+		mh.msg_control = cbuf;
+		mh.msg_controllen = sizeof(cbuf);
+
+		cmsg = CMSG_FIRSTHDR(&mh);
+		cmsg->cmsg_level = IPPROTO_IP;
+		cmsg->cmsg_type = IP_PKTINFO;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+		mh.msg_controllen = cmsg->cmsg_len;
+
+		if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
+			perror("recvfrom");
+
+		} else {
+			for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
+				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+					iface = pinfo->ipi_ifindex;
+				}
+			}
+			processMsg(string(recv_message, rc), iface);
+		}
 	}
 
 	time_t nowt = time(NULL);
@@ -447,7 +481,7 @@ int Controller::sendSidDiscovery()
 }
 
 
-int Controller::processInterdomainLSA(ControlMessage msg)
+int Controller::processInterdomainLSA(const Xroute::XrouteMsg& msg)
 {
 	// 0. Read this LSA
 	int32_t isDualRouter, numNeighbors, lastSeq;
@@ -1555,14 +1589,39 @@ int Controller::interfaceNumber(std::string xidType, std::string xid)
 	return -1;
 }
 
-int Controller::processHello(ControlMessage msg)
+int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
+	string neighborAD, neighborHID, neighborSID;
+	uint32_t flags = F_HOST;
+	bool has_sid = msg.node().has_sid() ? true : false;
+
+	Xroute::XID xad  = msg.node().ad();
+	Xroute::XID xhid = msg.node().hid();
+
+	Node  ad(xad.type(),  xad.id().c_str(), 0);
+	Node hid(xhid.type(), xhid.id().c_str(), 0);
+	Node sid;
+
+	if (has_sid) {
+		Xroute::XID xsid = msg.node().sid();
+		sid = Node(xsid.type(), xsid.id());
+		neighborSID = sid.to_string();
+	}
+
+	neighborAD  = ad. to_string();
+	neighborHID = hid.to_string();
+
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	}
+
 	// Update neighbor table
 	NeighborEntry neighbor;
-	msg.read(neighbor.AD);
-	msg.read(neighbor.HID);
-	neighbor.port = interfaceNumber("HID", neighbor.HID);
-	neighbor.cost = 1; // for now, same cost
+	neighbor.AD        = neighborAD;
+	neighbor.HID       = neighborHID;
+	neighbor.port      = iface;
+	neighbor.flags     = flags;
+	neighbor.cost      = 1; // for now, same cost
 	neighbor.timestamp = time(NULL);
 
 	// Index by HID if neighbor in same domain or by AD otherwise
@@ -1583,6 +1642,7 @@ int Controller::processHello(ControlMessage msg)
 		entry.neighbor_list.push_back(it->second);
 
 	_networkTable[myHID] = entry;
+	syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
 	return 1;
 }
@@ -1614,7 +1674,7 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
    2. update the network table
    3. rebroadcast this LSA
 */
-int Controller::processLSA(ControlMessage msg)
+int Controller::processLSA(const Xroute::XrouteMsg& msg)
 {
 	// 0. Read this LSA
 	int32_t isDualRouter, numNeighbors, lastSeq;
@@ -2150,47 +2210,75 @@ void Controller::set_sid_conf(const char* myhostname)
 #endif
 }
 
-int Controller::processMsg(std::string msg)
+int Controller::processMsg(std::string msg_str, uint32_t iface)
 {
-	int type, rc = 0;
-	ControlMessage m(msg);
+	int rc = 0;
+	Xroute::XrouteMsg msg;
 
-	m.read(type);
+	if (!msg.ParseFromString(msg_str)) {
+		syslog(LOG_WARNING, "illegal packet received");
+		return -1;
+	} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
+		syslog(LOG_WARNING, "invalid version # received");
+		return -1;
+	}
 
-	switch (type)
-	{
-		case CTL_HOST_REGISTER:
-			// Ignore. Controller does not register hosts.
+	switch (msg.type()) {
+		case Xroute::HELLO_MSG:
+			// do we still need this in the controller?
+			rc = processHello(msg.hello(), iface);
 			break;
-		case CTL_HELLO:
-			rc = processHello(m);
+
+		case Xroute::LSA_MSG:
+			rc = processLSA(msg);
 			break;
-		case CTL_LSA:
-			rc = processLSA(m);
+
+		case Xroute::GLOBAL_LSA_MSG:
+			rc = processInterdomainLSA(msg);
 			break;
-		case CTL_ROUTING_TABLE:
-			// rc = processRoutingTable(m);
+
+		//////////////////////////////////////////////////////////////////////
+		// ignore
+		case Xroute::CONFIG_MSG:
+		case Xroute::HOST_JOIN_MSG:
+			syslog(LOG_INFO, "controller received a config message");
 			break;
-		case CTL_XBGP:
-			rc = processInterdomainLSA(m);
+
+		case Xroute::SID_TABLE_UPDATE_MSG:
+		case Xroute::TABLE_UPDATE_MSG:
+		case Xroute::HOST_LEAVE_MSG:
+			syslog(LOG_INFO, "controller received a router message");
 			break;
-		case CTL_SID_DISCOVERY:
+
+		//////////////////////////////////////////////////////////////////////
+		// not sure if these should be running again
+		case Xroute::SID_DISCOVERY_MSG:
+			// did I just turn this one off for now?
 			//rc = processSidDiscovery(m);
 			break;
-		case CTL_SID_ROUTING_TABLE:
-			//the table msg reflects back, ingore
-			break;
-		case CTL_SID_MANAGE_KA:
+
+		case Xroute::SID_MANAGE_KA_MSG:
 			//rc = processServiceKeepAlive(m);
 			break;
-		case CTL_SID_DECISION_QUERY:
+
+		case Xroute::SID_DECISION_QUERY_MSG:
 			//rc = processSidDecisionQuery(m);
 			break;
-		case CTL_SID_DECISION_ANSWER:
+
+		case Xroute::SID_DECISION_ANSWER_MSG:
 			//rc = processSidDecisionAnswer(m);
 			break;
+
+		//////////////////////////////////////////////////////////////////////
+		// not sure these even exist
+		case Xroute::SID_RE_DISCOVERY_MSG:
+		case Xroute::AD_PATH_STATE_PING_MSG:
+		case Xroute::AD_PATH_STATE_PONG_MSG:
+			syslog(LOG_INFO, "controller received a limbo message");
+			break;
+
 		default:
-			syslog(LOG_INFO, "process unknown\n");
+			syslog(LOG_INFO, "controller received an unknown message type");
 			break;
 	}
 
