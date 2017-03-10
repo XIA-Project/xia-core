@@ -509,7 +509,7 @@ int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
-	string neighborAD, neighborHID, neighborSID, myAD;
+	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
 	bool has_sid = msg.node().has_sid() ? true : false;
 
@@ -573,7 +573,7 @@ int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 {
 	// FIXME: we still need to reflood until the FID logic is switched out of broadcast mode
 
-	string neighborAD, neighborHID, myAD;
+	string neighborAD, neighborHID;
 	string srcAD, srcHID;
 	int rc;
 
