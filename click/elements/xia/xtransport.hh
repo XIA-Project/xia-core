@@ -152,6 +152,8 @@ private:
 	Packet* UDPIPPrep(Packet *, int);
     bool migratable_sock(sock *, int);
     bool update_src_path(sock *, XIAPath&);
+	void update_route(String xid, String table, int iface, String next);
+	void update_default_route(String table_str, int interface, String next_xid);
 
 public:
 	/* TCP related fields */
