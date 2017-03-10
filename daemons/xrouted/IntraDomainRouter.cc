@@ -341,26 +341,47 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 			// process the incoming Hello message
 			rc = processHello(msg.hello(), iface);
 			break;
-		case Xroute::LSA_MSG:
-			// process the incoming LSA message
-			//processLSA(msg.lsa());
-			rc = processLSA(msg);
-			break;
-
-		// FIXME: move to the control interface
-		case Xroute::HOST_JOIN_MSG:
-			// process the incoming host-register message
-			rc = processHostRegister(msg.host_join());
-			break;
 
 		case Xroute::TABLE_UPDATE_MSG:
 			rc = processRoutingTable(msg.table_update());
 			break;
 
-		// FIXME: add???
-		// HOST_LEAVE_MSG
-		// CONFIG_MSG
-		// CTL_SID_ROUTING_TABLE:
+		case Xroute::HOST_LEAVE_MSG:
+			// FIXME: should this move to the controller?
+			break;
+
+		case Xroute::SID_TABLE_UPDATE_MSG:
+			processSidRoutingTable(msg.sid_table_update());
+			break;
+
+		//////////////////////////////////////////////////////////////////////
+		// FIXME: move these to the control interface
+		case Xroute::HOST_JOIN_MSG:
+			// process the incoming host-register message
+			rc = processHostRegister(msg.host_join());
+			break;
+
+		case Xroute::CONFIG_MSG:
+			break;
+
+		//////////////////////////////////////////////////////////////////////
+		// We should never see these as they are meant for the controller!
+		case Xroute::LSA_MSG:
+			// FIXME: this can be no-op'd once flooding is turned on
+			rc = processLSA(msg);
+			break;
+
+		// not sure all of these below were ever implemented
+		case Xroute::GLOBAL_LSA_MSG:
+		case Xroute::SID_DISCOVERY_MSG:
+		case Xroute::SID_MANAGE_KA_MSG:
+		case Xroute::SID_RE_DISCOVERY_MSG:
+		case Xroute::AD_PATH_STATE_PING_MSG:
+		case Xroute::AD_PATH_STATE_PONG_MSG:
+		case Xroute::SID_DECISION_QUERY_MSG:
+		case Xroute::SID_DECISION_ANSWER_MSG:
+			syslog(LOG_INFO, "this is a controller message");
+			break;
 
 		default:
 			syslog(LOG_INFO, "unknown routing message type");
@@ -370,50 +391,31 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 	return rc;
 }
 
-#if 0
-int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
+int IntraDomainRouter::processSidRoutingTable(const Xroute::SIDTableUpdateMsg& msg)
 {
-	int rc = 1;
-	int ad_count = 0;
-	int sid_count = 0;
-	int weight = 0;
-	int ctlSeq;
-	string srcAD, srcHID, destAD, destHID;
+	Xroute::XID fa = msg.from().ad();
+	Xroute::XID fh = msg.from().hid();
+	Xroute::XID ta = msg.to().ad();
+	Xroute::XID th = msg.to().hid();
 
-	string AD;
-	string SID;
+	string srcAD  = Node(fa.type(), fa.id().c_str(), 0).to_string();
+	string srcHID = Node(fh.type(), fh.id().c_str(), 0).to_string();
+	string dstAD  = Node(ta.type(), ta.id().c_str(), 0).to_string();
+	string dstHID = Node(th.type(), th.id().c_str(), 0).to_string();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
-
-	if (srcAD != _myAD)
-		return 1;
-
-	msg.read(destAD);
-	msg.read(destHID);
-	msg.read(ctlSeq);
-
-	// Check if intended for me
-	if (destAD != _myAD) {
+	if (srcAD != _myAD || dstAD != _myAD) {
+		// FIXME: we shouldn't need this once we have edge detection
 		return 1;
 	}
 
-	if (destHID != _myHID) {
-		// only broadcast one time for each
-		int his_ctl_seq = _sid_ctl_seqs[destHID]; // NOTE: default value of int is 0
-		if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
-			// seen it before
-			return 1;
-		} else {
-			_sid_ctl_seqs[destHID] = ctlSeq;
-			return msg.send(_sock, &_ddag);
-		}
-	}
 
-	if (ctlSeq <= _sid_ctl_seq && _sid_ctl_seq - ctlSeq < SEQNUM_WINDOW) {
-		return 1;
+	// FIXME: we shoudn't need this once flooding is turned on
+	if (dstHID != _myHID) {
+		std::string message;
+		msg.SerializeToString(&message);
+		uint32_t buflen = message.length();
+		return Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
 	}
-	_sid_ctl_seq = ctlSeq;
 
 	std::map<std::string, XIARouteEntry> xrt;
 	_xr.getRoutes("AD", xrt);
@@ -425,14 +427,22 @@ int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
 		ADlookup[ir->second.xid] = ir->second;
 	}
 
-	msg.read(ad_count);
-	for ( int i = 0; i < ad_count; ++i) {
-		msg.read(sid_count);
-		msg.read(AD);
+	int rc = 1;
+	uint32_t ad_count = msg.ads_size();
+
+	for (uint32_t i = 0; i < ad_count; ++i) {
+
+		Xroute::SIDTableEntry ad_table = msg.ads(i);
+		string AD  = Node(ad_table.ad().type(), ad_table.ad().id().c_str(), 0).to_string();
+		uint32_t sid_count = ad_table.sids_size();
+
 		XIARouteEntry entry = ADlookup[AD];
-		for ( int j = 0; j < sid_count; ++j) {
-			msg.read(SID);
-			msg.read(weight);
+		for (uint32_t j = 0; j < sid_count; ++j) {
+
+			Xroute::SIDTableItem item = ad_table.sids(i);
+			string SID  = Node(item.sid().type(), item.sid().id().c_str(), 0).to_string();
+			uint32_t weight = item.weight();
+
 			//syslog(LOG_INFO, "add route %s, %d, %s, %lu to %s", SID.c_str(), entry.port, entry.nextHop.c_str(), entry.flags, AD.c_str());
 			//rc = _xr.delRoute(SID);
 			if (weight <= 0) {
@@ -451,7 +461,6 @@ int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
 	}
 	return rc;
 }
-#endif
 
 int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
 {

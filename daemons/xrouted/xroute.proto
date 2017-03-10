@@ -29,6 +29,21 @@ message TableEntry {
 	optional uint32 flags     = 5;
 }
 
+message SIDTableItem {
+	required XID    sid = 1;
+	required uint32 weight = 2;
+}
+
+message SIDTableEntry {
+	required XID          ad   = 1;
+	repeated SIDTableItem sids = 2;
+}
+
+message ConfigMsg {
+	required string ad             = 1;
+	required string controller_dag = 2;
+}
+
 message HelloMsg {
 	required Node   node  = 1;
 	optional uint32 flags = 2;
@@ -57,31 +72,46 @@ message TableUpdateMsg {
 	repeated TableEntry routes = 3;
 }
 
+message SIDTableUpdateMsg {
+	required Node          from = 1;
+	required Node          to   = 2;
+	repeated SIDTableEntry ads  = 3;
+}
+
 message GlobalLSAMsg {
 	required Node from = 1;
 }
 
-message ConfigMsg {
-	required string ad             = 1;
-	required string controller_dag = 2;
-}
 
 enum msg_type {
-	CONFIG_MSG              = 1; // router configuration info from xnetjd
-	HELLO_MSG               = 2; // local router hello msg. still needed?
-	LSA_MSG                 = 3; // router announcement -> controller
-	HOST_JOIN_MSG           = 4; // add host route from xnetjd
-	HOST_LEAVE_MSG          = 5; // host leaving network
-	TABLE_UPDATE_MSG        = 6; // new tables from controller -> router
-	GLOBAL_LSA_MSG          = 7; // lsa between controllers in different ADs
-	SID_DISCOVERY_MSG       = 8;
-	SID_ROUTING_TABLE_MSG   = 9;
+	// local machine messages from xnetjd
+	CONFIG_MSG              = 1;
+	HOST_JOIN_MSG           = 2;
+
+	// router -> router messages
+	HELLO_MSG               = 3; // still needed?
+
+	// router -> controller messages
+	LSA_MSG                 = 4;
+
+	// controller -> router messages
+	TABLE_UPDATE_MSG        = 5;
+	SID_TABLE_UPDATE_MSG    = 6;
+
+	// controller -> controller messages
+	GLOBAL_LSA_MSG          = 7;
+
+	// host -> router messages
+	HOST_LEAVE_MSG          = 8;
+
+	// unknown messages
+	SID_DISCOVERY_MSG       = 9;
 	SID_MANAGE_KA_MSG       = 10; // keep alive msg to service controller
 	SID_RE_DISCOVERY_MSG    = 11; // send to service controller
-	AD_PATH_STATE_PING_MSG  = 12;
-	AD_PATH_STATE_PONG_MSG  = 13;
-	SID_DECISION_QUERY_MSG  = 14;
-	SID_DECISION_ANSWER_MSG = 15;
+	SID_DECISION_QUERY_MSG  = 12;
+	SID_DECISION_ANSWER_MSG = 13;
+	AD_PATH_STATE_PING_MSG  = 14;
+	AD_PATH_STATE_PONG_MSG  = 15;
 }
 
 message XrouteMsg {
@@ -89,12 +119,13 @@ message XrouteMsg {
 	required msg_type type    = 2;
 
 	oneof payload {
-		HelloMsg       hello        = 3;
-		LSAMsg         lsa          = 4;
-		TableUpdateMsg table_update = 5;
-		GlobalLSAMsg   global_lsa   = 6;
-		HostJoinMsg    host_join    = 7;
-		HostLeaveMsg   host_leave   = 8;
-		ConfigMsg      config       = 9;
+		ConfigMsg         config           = 3;
+		HostJoinMsg       host_join        = 4;
+		HelloMsg          hello            = 5;
+		LSAMsg            lsa              = 6;
+		TableUpdateMsg    table_update     = 7;
+		SIDTableUpdateMsg sid_table_update = 8;
+		GlobalLSAMsg      global_lsa       = 9;
+		HostLeaveMsg      host_leave       = 10;
 	}
 }
