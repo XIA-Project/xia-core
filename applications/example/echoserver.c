@@ -208,7 +208,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
-	char buf[256];
+	char buf[512];
 	int acceptor, sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
@@ -250,6 +250,7 @@ void echo_stream()
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_XIA;
 	if (rvdagstr.size() > XIA_XID_STR_SIZE) {
+		hints.ai_flags |= XAI_DAGHOST;
 		if(Xgetaddrinfo(rvdagstr.c_str(), sid_string, &hints, &ai)) {
 			die(-1, "getaddrinfo with rvdag failed\n");
 		}
