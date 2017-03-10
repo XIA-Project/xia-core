@@ -45,7 +45,15 @@ int main(int argc, char *argv[])
 	// struct sigaction action;
 	// memset(&action, 0, sizeof(struct sigaction));
 	// action.sa_handler = term;
+	// sigemptyset(&action.sa_mask);
 	// sigaction(SIGTERM, &action, NULL);
+
+	// // Block SIGTERM, we'll only see it when in
+	// sigset_t sigset, oldset;
+	// sigemptyset(&sigset);
+	// sigaddset(&sigset, SIGTERM);
+	// sigprocmask(SIG_BLOCK, &sigset, &oldset);
+
 
 	if (config.routers() & LOCAL_ROUTER) {
 		IntraDomainRouter *r = new IntraDomainRouter(config.hostname());

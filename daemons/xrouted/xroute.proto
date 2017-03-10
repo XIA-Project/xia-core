@@ -22,9 +22,11 @@ message Node {
 }
 
 message TableEntry {
-	required Node   node      = 1;
-	required uint32 interface = 2;
-	optional uint32 flags     = 3;
+	required XID    xid       = 1;
+	required XID    next_hop  = 2;
+	required uint32 interface = 3;
+	required uint32 port      = 4;
+	optional uint32 flags     = 5;
 }
 
 message HelloMsg {
@@ -50,9 +52,9 @@ message HostLeaveMsg {
 }
 
 message TableUpdateMsg {
-	required Node       from  = 1;
-	required Node       to    = 2;
-	repeated TableEntry route = 3;
+	required Node       from   = 1;
+	required Node       to     = 2;
+	repeated TableEntry routes = 3;
 }
 
 message GlobalLSAMsg {
@@ -65,13 +67,21 @@ message ConfigMsg {
 }
 
 enum msg_type {
-	HELLO_MSG        = 1; // local router hello msg. still needed?
-	LSA_MSG          = 2; // router announcement -> controller
-	HOST_JOIN_MSG    = 3; // add host route from xnetjd
-	HOST_LEAVE_MSG   = 4; // host leaving network
-	TABLE_UPDATE_MSG = 5; // new tables from controller -> router
-	GLOBAL_LSA_MSG   = 6; // lsa between controllers in different ADs
-	CONFIG_MSG       = 7; // router configuration info from xnetjd
+	CONFIG_MSG              = 1; // router configuration info from xnetjd
+	HELLO_MSG               = 2; // local router hello msg. still needed?
+	LSA_MSG                 = 3; // router announcement -> controller
+	HOST_JOIN_MSG           = 4; // add host route from xnetjd
+	HOST_LEAVE_MSG          = 5; // host leaving network
+	TABLE_UPDATE_MSG        = 6; // new tables from controller -> router
+	GLOBAL_LSA_MSG          = 7; // lsa between controllers in different ADs
+	SID_DISCOVERY_MSG       = 8;
+	SID_ROUTING_TABLE_MSG   = 9;
+	SID_MANAGE_KA_MSG       = 10; // keep alive msg to service controller
+	SID_RE_DISCOVERY_MSG    = 11; // send to service controller
+	AD_PATH_STATE_PING_MSG  = 12;
+	AD_PATH_STATE_PONG_MSG  = 13;
+	SID_DECISION_QUERY_MSG  = 14;
+	SID_DECISION_ANSWER_MSG = 15;
 }
 
 message XrouteMsg {

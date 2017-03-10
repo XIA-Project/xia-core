@@ -43,8 +43,7 @@ protected:
 
 	map<string,time_t> _timeStamp;	// FIXME: which timestamp is this?
 
-	// FIXME: can we eliminate these?
-	int32_t _dual_router;	// if 1, this is a dual stack router
+	uint32_t _flags;
 
 	// for new style local routers
 	int32_t _ctl_seq;	// LSA sequence number of this router
@@ -53,18 +52,17 @@ protected:
 	void *handler();
 	int init();
 
-	int processMsg(std::string msg);
+	int processMsg(std::string msg, uint32_t iface);
 
 	// Intradomain Message Handlers
 	int sendHello();
 	int sendLSA();
-	int processHello(ControlMessage msg);
-	int processLSA(ControlMessage msg);
-	int processHostRegister(ControlMessage msg);
-	int processRoutingTable(ControlMessage msg);
-	int processSidRoutingTable(ControlMessage);
+	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
+	int processLSA(const Xroute::XrouteMsg& msg);
 
-	int interfaceNumber(std::string xidType, std::string xid);
+	int processHostRegister(const Xroute::HostJoinMsg& msg);
+	int processRoutingTable(const Xroute::TableUpdateMsg& msg);
+//	int processSidRoutingTable(ControlMessage);
 
 	// FIXME: improve these guys
 	struct timeval h_freq, h_fire;

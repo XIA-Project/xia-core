@@ -6,14 +6,23 @@
 #include <pthread.h>
 #include "RouterConfig.hh"
 #include "../common/XIARouter.hh"
+#include "xroute.pb.h"
 
-
-#define MAX_DAG_SIZE 512
+// can i eliminate these?
+#define MAX_DAG_SIZE 1024
 #define MAX_XID_SIZE 64
 
 const std::string broadcast_fid  ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 const std::string intradomain_sid("SID:1110000000000000000000000000000000001112");
 const std::string controller_sid ("SID:1110000000000000000000000000000000001114");
+
+// routing table flag values
+#define F_HOST         0x0001 // node is a host
+#define F_CORE_ROUTER  0x0002 // node is an internal router
+#define F_EDGE_ROUTER  0x0004 // node is an edge router
+#define F_CONTROLLER   0x0008 // node is a controller
+#define F_IP_GATEWAY   0x0010 // router is a dual stack router
+#define F_STATIC_ROUTE 0x0100 // route entry was added manually and should not expire
 
 class RouteModule {
 public:

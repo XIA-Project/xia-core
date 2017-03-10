@@ -23,18 +23,14 @@
 
 void *IntraDomainRouter::handler()
 {
-	int selectRetVal, n;
-	socklen_t dlen;
+	int rc;
 	char recv_message[10240];
 	sockaddr_x theirDAG;
-	fd_set socks;
-	struct timeval timeoutval;
+	struct timespec tspec;
 	vector<string> routers;
 	time_t last_purge, hello_last_purge;
 
 	struct timeval now;
-	timeoutval.tv_sec = 0;
-	timeoutval.tv_usec = 50000; // every 0.05 sec, check if any received packets
 
 	last_purge = hello_last_purge = time(NULL);
 	{
@@ -49,21 +45,56 @@ void *IntraDomainRouter::handler()
 			timeradd(&now, &l_freq, &l_fire);
 		}
 
-		FD_ZERO(&socks);
-		FD_SET(_sock, &socks);
+		struct pollfd pfd;
 
-		selectRetVal = Xselect(_sock+1, &socks, NULL, NULL, &timeoutval);
-		if (selectRetVal > 0) {
+		pfd.fd = _sock;
+		pfd.events = POLLIN;
+
+		tspec.tv_sec = 0;
+		tspec.tv_nsec = 500000000;
+
+		rc = Xppoll(&pfd, 1, &tspec, NULL);
+		if (rc > 0) {
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
-			dlen = sizeof(sockaddr_x);
-			n = Xrecvfrom(_sock, recv_message, 10240, 0, (struct sockaddr*)&theirDAG, &dlen);
-			if (n < 0) {
-				perror("recvfrom");
-			}
 
-			std::string msg = recv_message;
-			processMsg(msg);
+			int iface;
+			struct msghdr mh;
+			struct iovec iov;
+			struct in_pktinfo pi;
+			struct cmsghdr *cmsg;
+			struct in_pktinfo *pinfo;
+			char cbuf[CMSG_SPACE(sizeof pi)];
+
+			iov.iov_base = recv_message;
+			iov.iov_len = sizeof(recv_message);
+
+			mh.msg_name = &theirDAG;
+			mh.msg_namelen = sizeof(theirDAG);
+			mh.msg_iov = &iov;
+			mh.msg_iovlen = 1;
+			mh.msg_control = cbuf;
+			mh.msg_controllen = sizeof(cbuf);
+
+			cmsg = CMSG_FIRSTHDR(&mh);
+			cmsg->cmsg_level = IPPROTO_IP;
+			cmsg->cmsg_type = IP_PKTINFO;
+			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+			mh.msg_controllen = cmsg->cmsg_len;
+
+			if ((rc = Xrecvmsg(_sock, &mh, 0)) < 0) {
+				perror("recvfrom");
+
+			} else {
+				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
+					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+						iface = pinfo->ipi_ifindex;
+					}
+				}
+				processMsg(string(recv_message, rc), iface);
+			}
 		}
 
 		time_t nowt = time(NULL);
@@ -118,21 +149,6 @@ void *IntraDomainRouter::handler()
 	return 0;
 }
 
-int IntraDomainRouter::interfaceNumber(std::string xidType, std::string xid)
-{
-	int rc;
-	map<std::string, XIARouteEntry> routes;
-	map<std::string, XIARouteEntry>::iterator it;
-
-	if ((rc = _xr.getRoutes(xidType, routes)) > 0) {
-		it = routes.find(xid);
-
-		if (it != routes.end()) {
-			return it->second.port;
-		}
-	}
-	return -1;
-}
 
 int IntraDomainRouter::init()
 {
@@ -183,12 +199,12 @@ int IntraDomainRouter::init()
 
 	_ctl_seq = 0;	// LSA sequence number of this router
 
-	// mark if this is a dual XIA-IPv4 router
+	// FIXME: figure out what the correct type of router we are
+	_flags = F_EDGE_ROUTER;
+
 	if( XisDualStackRouter(_sock) == 1 ) {
-		_dual_router = 1;
+		_flags |= F_IP_GATEWAY;
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
-	} else {
-		_dual_router = 0;
 	}
 
 	struct timeval now;
@@ -207,65 +223,154 @@ int IntraDomainRouter::init()
 
 int IntraDomainRouter::sendHello()
 {
-	ControlMessage msg(CTL_HELLO, _myAD, _myHID);
-	//syslog(LOG_INFO, "Send-Hello");
+	int buflen, rc;
+	string message;
 
-	return msg.send(_sock, &_ddag);
+	Node n_ad(_myAD);
+	Node n_hid(_myHID);
+	Node n_sid(intradomain_sid);
+
+	Xroute::XrouteMsg msg;
+	Xroute::HelloMsg *hello = msg.mutable_hello();
+	Xroute::Node     *node  = hello->mutable_node();
+	Xroute::XID      *ad    = node->mutable_ad();
+	Xroute::XID      *hid   = node->mutable_hid();
+	Xroute::XID      *sid   = node->mutable_sid();
+
+	msg.set_type(Xroute::HELLO_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+	hello->set_flags(_flags);
+	ad ->set_type(n_ad.type());
+	ad ->set_id(n_ad.id(), XID_SIZE);
+	hid->set_type(n_hid.type());
+	hid->set_id(n_hid.id(), XID_SIZE);
+	sid->set_type(n_sid.type());
+	sid->set_id(n_sid.id(), XID_SIZE);
+
+
+//	printf("sending %s\n", msg.DebugString().c_str());
+
+	msg.SerializeToString(&message);
+	buflen = message.length();
+
+	rc = Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+	if (rc < 0) {
+		// error!
+		syslog(LOG_WARNING, "unable to send hello msg: %s", strerror(errno));
+
+	} else if (rc != (int)message.length()) {
+		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
+		rc = -1;
+	}
+
+	return rc;
 }
 
 // send LinkStateAdvertisement message (flooding)
 int IntraDomainRouter::sendLSA()
 {
-	ControlMessage msg(CTL_LSA, _myAD, _myHID);
+	int buflen, rc;
+	string message;
 
-	msg.append(_dual_router);
-	msg.append(_lsa_seq);
-	msg.append(_num_neighbors);
+	Node n_ad(_myAD);
+	Node n_hid(_myHID);
 
-	std::map<std::string, NeighborEntry>::iterator it;
-	for (it = _neighborTable.begin(); it != _neighborTable.end(); ++it) {
-		msg.append(it->second.AD);
-		msg.append(it->second.HID);
-		msg.append(it->second.port);
-		msg.append(it->second.cost);
+	Xroute::XrouteMsg msg;
+	Xroute::LSAMsg    *lsa  = msg.mutable_lsa();
+	Xroute::Node      *node = lsa->mutable_node();
+	Xroute::XID       *ad   = node->mutable_ad();
+	Xroute::XID       *hid  = node->mutable_hid();
+
+	msg.set_type(Xroute::LSA_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+
+	lsa->set_flags(_flags);
+	ad ->set_type(n_ad.type());
+	ad ->set_id(n_ad.id(), XID_SIZE);
+	hid->set_type(n_hid.type());
+	hid->set_id(n_hid.id(), XID_SIZE);
+
+	map<std::string, NeighborEntry>::iterator it;
+	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
+		Node p_ad(it->second.AD);
+		Node p_hid(it->second.HID);
+
+		node = lsa->add_peers();
+		ad   = node->mutable_ad();
+		hid  = node->mutable_hid();
+
+		ad ->set_type(p_ad.type());
+		ad ->set_id(p_ad.id(), XID_SIZE);
+		hid->set_type(p_hid.type());
+		hid->set_id(p_hid.id(), XID_SIZE);
 	}
 
-	_lsa_seq = (_lsa_seq + 1) % MAX_SEQNUM;
+//	printf("sending %s\n", msg.DebugString().c_str());
 
-	//syslog(LOG_INFO, "Send-LSA[%d]", _lsa_seq);
-	return msg.send(_sock, &_ddag);
+	msg.SerializeToString(&message);
+	buflen = message.length();
+
+	rc = Xsendto(_sock, message.c_str(), buflen, 0, (struct sockaddr*)&_ddag, sizeof(sockaddr_x));
+	if (rc < 0) {
+		// error!
+		syslog(LOG_WARNING, "unable to send lsa msg: %s", strerror(errno));
+
+	} else if (rc != (int)message.length()) {
+		syslog(LOG_WARNING, "ERROR sending lsa. Tried sending %d bytes but rc=%d", buflen, rc);
+		rc = -1;
+	}
+
+	return rc;
 }
 
-int IntraDomainRouter::processMsg(std::string msg)
+int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 {
-	int type, rc = 0;
-	ControlMessage m(msg);
+	int rc = 0;
+	Xroute::XrouteMsg msg;
 
-	m.read(type);
-	switch (type) {
-		case CTL_HOST_REGISTER:
-			rc = processHostRegister(m);
+	if (!msg.ParseFromString(msg_str)) {
+		syslog(LOG_WARNING, "illegal packet received");
+		return -1;
+	} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
+		syslog(LOG_WARNING, "invalid version # received");
+		return -1;
+	}
+
+	switch (msg.type()) {
+		case Xroute::HELLO_MSG:
+			// process the incoming Hello message
+			rc = processHello(msg.hello(), iface);
 			break;
-		case CTL_HELLO:
-			rc = processHello(m);
+		case Xroute::LSA_MSG:
+			// process the incoming LSA message
+			//processLSA(msg.lsa());
+			rc = processLSA(msg);
 			break;
-		case CTL_LSA:
-			rc = processLSA(m);
+
+		// FIXME: move to the control interface
+		case Xroute::HOST_JOIN_MSG:
+			// process the incoming host-register message
+			rc = processHostRegister(msg.host_join());
 			break;
-		case CTL_ROUTING_TABLE:
-			rc = processRoutingTable(m);
+
+		case Xroute::TABLE_UPDATE_MSG:
+			rc = processRoutingTable(msg.table_update());
 			break;
-		case CTL_SID_ROUTING_TABLE:
-			rc = processSidRoutingTable(m);
-			break;
+
+		// FIXME: add???
+		// HOST_LEAVE_MSG
+		// CONFIG_MSG
+		// CTL_SID_ROUTING_TABLE:
+
 		default:
-			perror("unknown routing message");
+			syslog(LOG_INFO, "unknown routing message type");
 			break;
 	}
 
 	return rc;
 }
 
+#if 0
 int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
 {
 	int rc = 1;
@@ -346,16 +451,25 @@ int IntraDomainRouter::processSidRoutingTable(ControlMessage msg)
 	}
 	return rc;
 }
+#endif
 
-
-int IntraDomainRouter::processHostRegister(ControlMessage msg)
+int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
 {
 	int rc;
+	uint32_t flags;
+
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	} else {
+		flags = F_HOST;
+	}
+
 	NeighborEntry neighbor;
 	neighbor.AD = _myAD;
-	msg.read(neighbor.HID);
-	neighbor.port = interfaceNumber("HID", neighbor.HID);
+	neighbor.HID = msg.hid();
+	neighbor.port = msg.interface();
 	neighbor.cost = 1; // for now, same cost
+	neighbor.flags = flags;
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
@@ -374,7 +488,8 @@ int IntraDomainRouter::processHostRegister(ControlMessage msg)
 	_networkTable[_myHID] = entry;
 
 	// update the host entry in (click-side) HID table
-	if ((rc = _xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, 0)) != 0) {
+	//syslog(LOG_INFO, "Routing table entry: interface=%d, host=%s\n", msg.interface(), hid.c_str());
+	if ((rc = _xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, flags)) != 0) {
 		syslog(LOG_ERR, "unable to set host route: %s (%d)", neighbor.HID.c_str(), rc);
 	}
 
@@ -383,21 +498,42 @@ int IntraDomainRouter::processHostRegister(ControlMessage msg)
 	return 1;
 }
 
-int IntraDomainRouter::processHello(ControlMessage msg)
+int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
-	string HID;
-	string SID;
+	string neighborAD, neighborHID, neighborSID, myAD;
+	uint32_t flags = F_HOST;
+	bool has_sid = msg.node().has_sid() ? true : false;
+
+	Xroute::XID xad  = msg.node().ad();
+	Xroute::XID xhid = msg.node().hid();
+
+	Node  ad(xad.type(),  xad.id().c_str(), 0);
+	Node hid(xhid.type(), xhid.id().c_str(), 0);
+	Node sid;
+
+	if (has_sid) {
+		Xroute::XID xsid = msg.node().sid();
+		sid = Node(xsid.type(), xsid.id());
+		neighborSID = sid.to_string();
+	}
+
+	neighborAD  = ad. to_string();
+	neighborHID = hid.to_string();
+
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	}
 
 	// Update neighbor table
 	NeighborEntry neighbor;
-	msg.read(neighbor.AD);
-	msg.read(HID);
-	if (msg.read(SID) < 0) {
-		neighbor.HID = HID;
+	neighbor.AD = neighborAD;
+	if (!has_sid) {
+		neighbor.HID = neighborHID;
 	} else {
-		neighbor.HID = SID;
+		neighbor.HID = neighborSID;
 	}
-	neighbor.port = interfaceNumber("HID", HID);
+	neighbor.port = iface;
+	neighbor.flags = flags;
 	neighbor.cost = 1; // for now, same cost
 
 	// Index by HID if neighbor in same domain or by AD otherwise
@@ -424,92 +560,91 @@ int IntraDomainRouter::processHello(ControlMessage msg)
 	return 1;
 }
 
-int IntraDomainRouter::processLSA(ControlMessage msg)
+int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 {
-	std::string srcAD;
-	std::string srcHID;
-	int32_t dualRouter;
-	int32_t lastSeq;
+	// FIXME: we still need to reflood until the FID logic is switched out of broadcast mode
 
-	msg.read(srcAD);
-	msg.read(srcHID);
-	msg.read(dualRouter);
-	msg.read(lastSeq);
+	string neighborAD, neighborHID, myAD;
+	string srcAD, srcHID;
+	int rc;
 
-	syslog(LOG_INFO, "Process-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
+//	printf("processLSA: %s\n", lsa.DebugString().c_str());
 
-	if (srcAD != _myAD)
+	const Xroute::LSAMsg& lsa = msg.lsa();
+
+	Xroute::XID a = lsa.node().ad();
+	Xroute::XID h = lsa.node().hid();
+
+	Node  ad(a.type(), a.id().c_str(), 0);
+	Node hid(h.type(), h.id().c_str(), 0);
+
+	srcAD  = ad.to_string();
+	srcHID = hid.to_string();
+
+//	syslog(LOG_INFO, "Process-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
+
+	if (srcHID.compare(_myHID) == 0) {
+		// skip if from me
 		return 1;
-
-	if (_lastSeqTable.find(srcHID) != _lastSeqTable.end()) {
-		int32_t old = _lastSeqTable[srcHID];
-		if (lastSeq <= old && (old - lastSeq) < SEQNUM_WINDOW) {
-			// drop the old LSA update.
-			syslog(LOG_INFO, "Drop-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
-			return 1;
-		}
 	}
 
-	syslog(LOG_INFO, "Forward-LSA: [%d] %s %s", lastSeq, srcAD.c_str(), srcHID.c_str());
-	_lastSeqTable[srcHID] = lastSeq;
+	syslog(LOG_INFO, "Forward-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
 
-	// 5. rebroadcast this LSA
-	return msg.send(_sock, &_ddag);
+	std::string message;
+	msg.SerializeToString(&message);
+	uint32_t buflen = message.length();
+	rc = Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+
+	return rc;
 }
 
+
 // process a control message
-int IntraDomainRouter::processRoutingTable(ControlMessage msg)
+int IntraDomainRouter::processRoutingTable(const Xroute::TableUpdateMsg& msg)
 {
-	// 0. Read this LSA
-	string srcAD, srcHID, destAD, destHID, hid, nextHop;
-	int ctlSeq, numEntries, port, flags, rc;
+	Xroute::XID fa = msg.from().ad();
+	Xroute::XID fh = msg.from().hid();
+	Xroute::XID ta = msg.to().ad();
+	Xroute::XID th = msg.to().hid();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
+	string srcAD  = Node(fa.type(), fa.id().c_str(), 0).to_string();
+	string srcHID = Node(fh.type(), fh.id().c_str(), 0).to_string();
+	string dstAD  = Node(ta.type(), ta.id().c_str(), 0).to_string();
+	string dstHID = Node(th.type(), th.id().c_str(), 0).to_string();
 
-	// Check if this came from our controller
-	if (srcAD != _myAD)
+	if (srcAD != _myAD) {
+		// FIXME: we shouldn't need this once we have edge detection
 		return 1;
+	}
 
-	msg.read(destAD);
-	msg.read(destHID);
-	msg.read(ctlSeq);
+	// FIXME: we shoudn't need this once flooding is turned on
+	if ((dstAD != _myAD) || (dstHID != _myHID)) {
+		std::string message;
+		msg.SerializeToString(&message);
+		uint32_t buflen = message.length();
+		return Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+	}
 
-	// 1. Filter out the already seen LSA
-	// If this LSA already seen, ignore this LSA; do nothing
+	uint32_t numEntries = msg.routes_size();
 
-	// Check if intended for me
-	if ((destAD != _myAD) || (destHID != _myHID)) {
-		// only broadcast one time for each
-		int his_ctl_seq = _ctl_seqs[destHID]; // NOTE: default value of int is 0
-		if (ctlSeq <= his_ctl_seq && his_ctl_seq - ctlSeq < 10000) {
-			// seen it before
-			return 1;
-		} else {
-			_ctl_seqs[destHID] = ctlSeq;
-			return msg.send(_sock, &_ddag);
+
+	for (uint i = 0; i < numEntries; i++) {
+
+		Xroute::TableEntry e = msg.routes(i);
+		string xid     = Node(e.xid().type(),      e.xid().id().c_str(),      0).to_string();
+		string nextHop = Node(e.next_hop().type(), e.next_hop().id().c_str(), 0).to_string();
+		uint32_t port  = e.interface();
+		uint32_t flags = 0;
+
+		if (e.has_flags()) {
+			flags = e.flags();
 		}
+
+		int rc;
+		if ((rc = _xr.setRoute(xid, port, nextHop, flags)) != 0)
+			syslog(LOG_ERR, "error setting route %d: %s, nextHop: %s, port: %d, flags %d", rc, xid.c_str(), nextHop.c_str(), port, flags);
+
+		_timeStamp[xid] = time(NULL);
 	}
-
-	if (ctlSeq <= _ctl_seq && _ctl_seq - ctlSeq < 10000) {
-		return 1;
-	}
-	_ctl_seq = ctlSeq;
-
-	msg.read(numEntries);
-
-	int i;
-	for (i = 0; i < numEntries; i++) {
-		msg.read(hid);
-		msg.read(nextHop);
-		msg.read(port);
-		msg.read(flags);
-
-		if ((rc = _xr.setRoute(hid, port, nextHop, flags)) != 0)
-			syslog(LOG_ERR, "error setting route %d: %s, nextHop: %s, port: %d, flags %d", rc, hid.c_str(), nextHop.c_str(), port, flags);
-
-		_timeStamp[hid] = time(NULL);
-	}
-
 	return 1;
 }
