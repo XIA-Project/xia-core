@@ -2162,9 +2162,10 @@ void XTRANSPORT::update_route(String xid, String table,
 	// TODO: Add checks to ensure table is valid, e.g. rt_*
 	// TODO: Add check to ensure iface is between 0 and max interfaces
 	// TODO: Add check to ensure next is a valid XID
+	uint32_t flags = 0xeeeeeeee;	// e's make this code easy to find when it's time to change!
 	String cmd = table + ".set4";
 	String cmdargs = xid + "," + String(iface) + ","
-		+ next + "," + String(0xffff);
+		+ next + "," + String(flags);
 	click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 
 	// <host>/xrc/n/proc/rt_<table>.set4, "<xid>, <iface>, <next>, <flags>"
