@@ -513,7 +513,7 @@ class XrouteApp:
 	#
 	def deleteRoute(self, text):
 		try:
-			(table, xid) = text.split(",")
+			(table, xid) = text.upper().split(",")
 		except:
 			self.errorExit("Invalid format for delete command")
 
@@ -542,12 +542,12 @@ class XrouteApp:
 		if len(parts)  < 3 or len(parts) > 5:
 			self.errorExit("Invalid format for add route command")
 
-		table = parts[0]
-		xid = parts[1]
+		table = parts[0].upper()
+		xid = parts[1].upper()
 		port = parts[2]
 
 		if len(parts) >= 4:
-			nexthop = parts[3]
+			nexthop = parts[3].upper()
 		else:
 			nexthop = ""
 
@@ -557,7 +557,7 @@ class XrouteApp:
 			flags = 0
                 flags |= F_STATIC_ROUTE
 
-		if table not in (KNOWN_XIDS):
+		if table.upper() not in (KNOWN_XIDS):
 			print "attempting to add a route for a non-standard XID: %s" % table
 		if (xid == None or xid == ""):
 			self.errorExit("XID not specified")
