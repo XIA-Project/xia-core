@@ -19,6 +19,7 @@
 
 #include "xia.pb.h"
 #include <poll.h>
+#include <signal.h>
 
 //Click side: Control/data address/info
 #define DEFAULT_CLICKPORT "1500"
@@ -39,8 +40,11 @@ typedef int (*setsockopt_t)(int, int, int, const void*, socklen_t);
 typedef int (*close_t)(int);
 typedef int (*fcntl_t)(int, int, ...);
 typedef int (*select_t)(int, fd_set*, fd_set*, fd_set*, struct timeval*);
+typedef int (*pselect_t)(int, fd_set *, fd_set *, fd_set *, const struct timespec *, const sigset_t *);
+
 typedef ssize_t (*sendto_t)(int, const void*, size_t, int, const struct sockaddr*, socklen_t);
 typedef int (*poll_t)(struct pollfd*, nfds_t, int);
+typedef int (*ppoll_t)(struct pollfd*, nfds_t, const struct timespec *, const sigset_t *);
 typedef ssize_t (*recvfrom_t)(int, void*, size_t, int, struct sockaddr*, socklen_t*);
 typedef int (*fork_t)(void);
 
@@ -51,7 +55,9 @@ extern setsockopt_t _f_setsockopt;
 extern close_t _f_close;
 extern fcntl_t _f_fcntl;
 extern select_t _f_select;
+extern pselect_t _f_pselect;
 extern poll_t _f_poll;
+extern ppoll_t _f_ppoll;
 extern sendto_t _f_sendto;
 extern recvfrom_t _f_recvfrom;
 extern fork_t _f_fork;

@@ -56,7 +56,9 @@ setsockopt_t _f_setsockopt;
 close_t _f_close;
 fcntl_t _f_fcntl;
 select_t _f_select;
+pselect_t _f_pselect;
 poll_t _f_poll;
+ppoll_t _f_ppoll;
 sendto_t _f_sendto;
 recvfrom_t _f_recvfrom;
 fork_t _f_fork;
@@ -150,8 +152,12 @@ void __attribute__ ((constructor)) api_init()
 		printf("can't find fcntl!\n");
 	if(!(_f_select = (select_t)dlsym(handle, "select")))
 		printf("can't find select!\n");
+	if(!(_f_pselect = (pselect_t)dlsym(handle, "pselect")))
+		printf("can't find pselect!\n");
 	if(!(_f_poll = (poll_t)dlsym(handle, "poll")))
-		printf("can't find select!\n");
+		printf("can't find poll!\n");
+	if(!(_f_ppoll = (ppoll_t)dlsym(handle, "ppoll")))
+		printf("can't find ppoll!\n");
 	if(!(_f_sendto = (sendto_t)dlsym(handle, "sendto")))
 		printf("can't find sendto!\n");
 	if(!(_f_recvfrom = (recvfrom_t)dlsym(handle, "recvfrom")))

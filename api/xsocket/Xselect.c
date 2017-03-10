@@ -68,6 +68,24 @@ static void setNBConnState(int fd)
 */
 int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 {
+	struct timespec ts;
+	struct timespec *tsp;
+
+	if (timeout < 0) {
+		tsp = NULL;
+	} else {
+		tsp = &ts;
+
+		ts.tv_sec = timeout / 1000;
+		ts.tv_nsec = (timeout % 1000) * 1000000;
+	}
+
+	return Xppoll(ufds, nfds, tsp, NULL);
+}
+
+
+int Xppoll(struct pollfd *ufds, unsigned nfds, const struct timespec *tmo_p, const sigset_t *sigmask)
+{
 	int rc;
 	int sock = 0;
 	int nxfds = 0;
@@ -75,7 +93,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	if (nfds == 0) {
 		// it's just a timer
-		return 	(_f_poll)(ufds, nfds, timeout);
+		return 	(_f_ppoll)(ufds, nfds, tmo_p, sigmask);
 
 	} else if (ufds == NULL) {
 		errno = EFAULT;
@@ -131,7 +149,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 
 	if (nxfds == 0) {
 		// there are no Xsocket to poll for, just do a straight poll with the original data
-		rc = (_f_poll)(ufds, nfds, timeout);
+		rc = (_f_ppoll)(ufds, nfds, tmo_p, sigmask);
 		goto done;
 	}
 
@@ -163,7 +181,7 @@ int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout)
 	rfds[nfds].events = POLLIN;
 	rfds[nfds].revents = 0;
 
-	rc = (_f_poll)(rfds, nfds + 1, timeout);
+	rc = (_f_ppoll)(rfds, nfds + 1, tmo_p, sigmask);
 
 	if (rc > 0) {
 		// go through and update the fds in the output

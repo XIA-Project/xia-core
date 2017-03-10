@@ -34,6 +34,7 @@
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "xia.h"
 
@@ -126,6 +127,7 @@ extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int f
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout);
+extern int Xppoll(struct pollfd *ufds, unsigned nfds, const struct timespec *tmo_p, const sigset_t *sigmask);
 extern int Xlisten(int sockfd, int backlog);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
 extern ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags);
@@ -136,6 +138,8 @@ extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
 extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
+//extern int Xpselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, const struct timespec *timeout, const sigset_t *sigmask);
+
 extern int Xfork(void);
 extern int Xnotify(void);
 
