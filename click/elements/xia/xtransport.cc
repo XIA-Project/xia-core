@@ -293,16 +293,22 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	}
 }
 
+String XTRANSPORT::routeTableString(String xid)
+{
+	// get the type string of the XID
+	int i = xid.find_left(':');
+	assert (i != -1);
+	String typestr = xid.substring(0, i).upper();
+
+	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+	return table;
+}
+
 void XTRANSPORT::manageRoute(const XID &xid, bool create)
 {
 	String xidstr = xid.unparse();
 
-	// get the type string of the XID
-	int i = xidstr.find_left(':');
-	assert (i != -1);
-	String typestr = xidstr.substring(0, i).upper();
-
-	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+	String table = routeTableString(xidstr);
 
 	if (create) {
 		HandlerCall::call_write(table + ".add", xidstr + " " + String(DESTINED_FOR_LOCALHOST), this);
@@ -1538,7 +1544,7 @@ void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /
 	UNUSED(_sport);
 	notify_listeners.push_back(id);
 
-	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
+	// we just go away and wait for Xupdatedag to be called which will trigger a response on this client socket
 }
 
 
@@ -2177,6 +2183,13 @@ void XTRANSPORT::update_default_route(String table_str,
 	update_route("-", table_str, interface, next_xid);
 }
 
+void XTRANSPORT::remove_route(String xidstr)
+{
+	String cmd = routeTableString(xidstr) + ".remove";
+	String cmdargs = xidstr;
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+}
+
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
@@ -2211,15 +2224,13 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	// Delete route to the old AD
 	std::string old_ad = old_dag.intent_ad_str();
 	if (old_ad.length() > CLICK_XIA_XID_ID_LEN) {    // 20 bytes
-		cmd = ad_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_ad.c_str(), this);
+		remove_route(old_ad.c_str());
 	}
 
 	// Delete route for the old RHID
 	if(_interfaces.has_rhid(interface)) {
 		String old_rhid = _interfaces.getRHID(interface);
-		cmd = hid_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_rhid.c_str(), this);
+		remove_route(old_rhid);
 	}
 
 	// Retrieve new AD from router_dag
