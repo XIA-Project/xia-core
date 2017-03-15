@@ -292,17 +292,22 @@ int IntraDomainRouter::sendLSA()
 
 	map<std::string, NeighborEntry>::iterator it;
 	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
+		Xroute::NeighborEntry *n;
+
 		Node p_ad(it->second.AD);
 		Node p_hid(it->second.HID);
 
-		node = lsa->add_peers();
-		ad   = node->mutable_ad();
-		hid  = node->mutable_hid();
+		n   = lsa->add_peers();
+		ad  = n->mutable_ad();
+		hid = n->mutable_hid();
 
 		ad ->set_type(p_ad.type());
 		ad ->set_id(p_ad.id(), XID_SIZE);
 		hid->set_type(p_hid.type());
 		hid->set_id(p_hid.id(), XID_SIZE);
+
+		n->set_cost(it->second.cost);
+		n->set_port(it->second.port);
 	}
 
 //	printf("sending %s\n", msg.DebugString().c_str());

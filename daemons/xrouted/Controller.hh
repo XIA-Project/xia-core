@@ -8,7 +8,6 @@
 
 #include "RouteModule.hh"
 #include "Topology.hh"
-#include "ControlMessage.hh"
 
 #define WAKEUP_INTERVAL 0.1
 #define EXPIRE_TIME_D 60
@@ -101,6 +100,8 @@ protected:
 	int32_t _rsock; // socket for talking to routers
 	int32_t _csock; // socket for talking to controllers
 
+	uint32_t _flags;
+
 	std::string _myAD;
 	std::string _myHID;
 
@@ -166,15 +167,16 @@ protected:
 
 	int processMsg(std::string msg, uint32_t iface);
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
-	int processLSA(const Xroute::XrouteMsg& msg);
-	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
+	int processLSA(const Xroute::LSAMsg& msg);
+	int processServiceKeepAlive(const Xroute::KeepAliveMsg& msg);
+	int processInterdomainLSA(const Xroute::GlobalLSAMsg& msg);
+	int processSidDecisionQuery(const Xroute::DecisionQueryMsg& msg);
+	int processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg);
+	int processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg);
 
 
 
-	int processSidDecisionQuery(ControlMessage msg);
 	int querySidDecision();
-	int processSidDiscovery(ControlMessage msg);
-	int processServiceKeepAlive(ControlMessage msg);
 	int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 	int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
 
@@ -183,7 +185,6 @@ protected:
 	static bool compareCL(const ClientLatency &a, const ClientLatency &b);
 
 	int Rate_load_balance(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision);
-	int processSidDecisionAnswer(ControlMessage msg);
 	int processSidDecision(void); // to be deleted
 	int sendSidRoutingDecision(void);
 	int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);

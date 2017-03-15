@@ -4,9 +4,10 @@
 #include <string>
 #include <vector>
 #include <pthread.h>
+#include "Xsocket.h"
+#include "xroute.pb.h"
 #include "RouterConfig.hh"
 #include "../common/XIARouter.hh"
-#include "xroute.pb.h"
 
 // can i eliminate these?
 #define MAX_DAG_SIZE 1024

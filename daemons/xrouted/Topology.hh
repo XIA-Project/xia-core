@@ -6,8 +6,6 @@
 #include <map>
 #include <algorithm>
 
-#include "ControlMessage.hh"
-
 typedef struct {
 	std::string dest;	// destination AD or HID
 	std::string nextHop;	// nexthop HID
@@ -31,7 +29,7 @@ struct NeighborEntry{
 typedef struct {
 	std::string ad;
 	std::string hid;
-	int32_t num_neighbors;	// number of neighbors of dest AD //TODO: remove
+	uint32_t num_neighbors;	// number of neighbors of dest AD //TODO: remove
 	std::vector<NeighborEntry> neighbor_list; // neighbor list
 
 	bool checked;	// used for calculating the shortest path

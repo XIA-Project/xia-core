@@ -8,7 +8,6 @@
 
 #include "RouteModule.hh"
 #include "Topology.hh"
-#include "ControlMessage.hh"
 
 
 #define MAX_SEQNUM        1000000

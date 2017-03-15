@@ -44,12 +44,12 @@ void *Controller::handler()
 		timeradd(&now, &l_freq, &l_fire);
 	}
 	if (timercmp(&now, &sd_fire, >=)) {
-		//sendSidDiscovery();
+		sendSidDiscovery();
 		timeradd(&now, &sd_freq, &sd_fire);
 	}
 	if (timercmp(&now, &sq_fire, >=)) {
 		if (ENABLE_SID_CTL) {
-			//querySidDecision();
+			querySidDecision();
 		}
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
@@ -208,6 +208,8 @@ int Controller::init()
 
 	srand (time(NULL));
 
+	_flags = F_CONTROLLER; // FIXME: set any other useful flags at this time
+
 	// open socket for route process
 	_rsock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (_rsock < 0) {
@@ -305,56 +307,117 @@ int Controller::init()
 	return 0;
 }
 
+// FIXME: this did 2 sends in the original SDN code, will this change work?
 int Controller::sendHello()
 {
-	//syslog(LOG_INFO, "Controller::Send-Hello");
+	int buflen, rc;
+	string message;
 
-	ControlMessage msg1(CTL_HELLO, _myAD, _myHID);
-	int rc1 = msg1.send(_rsock, &_ddag);
+	Node n_ad(_myAD);
+	Node n_hid(_myHID);
+	Node n_sid(controller_sid);
 
-	// Advertize controller service
-	ControlMessage msg2(CTL_HELLO, _myAD, _myHID);
-	msg2.append(controller_sid);
-	int rc2 = msg2.send(_rsock, &_ddag);
+	Xroute::XrouteMsg msg;
+	Xroute::HelloMsg *hello = msg.mutable_hello();
+	Xroute::Node     *node  = hello->mutable_node();
+	Xroute::XID      *ad    = node->mutable_ad();
+	Xroute::XID      *hid   = node->mutable_hid();
+	Xroute::XID      *sid   = node->mutable_sid();
 
-	return (rc1 < rc2)? rc1 : rc2;
+	msg.set_type(Xroute::HELLO_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+	hello->set_flags(F_CONTROLLER);
+	ad ->set_type(n_ad.type());
+	ad ->set_id(n_ad.id(), XID_SIZE);
+	hid->set_type(n_hid.type());
+	hid->set_id(n_hid.id(), XID_SIZE);
+	sid->set_type(n_sid.type());
+	sid->set_id(n_sid.id(), XID_SIZE);
+
+
+//	printf("sending %s\n", msg.DebugString().c_str());
+
+	msg.SerializeToString(&message);
+	buflen = message.length();
+
+	rc = Xsendto(_rsock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+	if (rc < 0) {
+		// error!
+		syslog(LOG_WARNING, "unable to send hello msg: %s", strerror(errno));
+
+	} else if (rc != (int)message.length()) {
+		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
+		rc = -1;
+	}
+
+	return rc;
 }
 
 int Controller::sendInterDomainLSA()
 {
 	int rc = 1;
 	//syslog(LOG_INFO, "Controller::Send-LSA[%d]", _lsa_seq);
-	ControlMessage msg(CTL_XBGP, _myAD, _myAD);
 
-	msg.append(_dual_router);
-	msg.append(_lsa_seq);
-	msg.append(_ADNeighborTable.size());
+	Node a(_myAD);
+	Node h(_myHID);	// FIXME: the original code uses the AD here
+					// and never does anything with it. Making it HID for nwo
+
+	Xroute::XrouteMsg msg;
+	Xroute::GlobalLSAMsg *lsa  = msg.mutable_global_lsa();
+	Xroute::Node         *from = lsa->mutable_from();
+	Xroute::XID          *ad   = from->mutable_ad();
+	Xroute::XID          *hid  = from->mutable_hid();
+
+	msg.set_type(Xroute::GLOBAL_LSA_MSG);
+	ad ->set_type(a.type());
+	ad ->set_id(a.id(), XID_SIZE);
+	hid->set_type(h.type());
+	hid->set_id(h.id(), XID_SIZE);
+	lsa->set_flags(_flags);
 
 	std::map<std::string, NeighborEntry>::iterator it;
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
-		msg.append(it->second.AD);
-		msg.append(it->second.HID);
-		msg.append(it->second.port);
-		msg.append(it->second.cost);
+		Node aa(it->second.AD);
+		Node hh(it->second.HID);
+
+		Xroute::NeighborEntry *n = lsa->add_neighbors();
+		ad  = n->mutable_ad();
+		hid = n->mutable_hid();
+
+		ad ->set_type(aa.type());
+		ad ->set_id(aa.id(), XID_SIZE);
+		hid->set_type(hh.type());
+		hid->set_id(hh.id(), XID_SIZE);
+
+		n->set_port(it->second.port);
+		n->set_cost(it->second.cost);
 	}
 
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
+		string message;
 		sockaddr_x ddag;
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
-		int temprc = msg.send(_csock, &ddag);
+
+		msg.SerializeToString(&message);
+
+		int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
 		if (temprc < 0) {
+			// error!
 			syslog(LOG_ERR, "error sending inter-AD LSA to %s", it->second.AD.c_str());
+
+		} else if (temprc != (int)message.length()) {
+			syslog(LOG_WARNING, "ERROR sending inter-AD LSA. Tried sending %lu bytes but rc=%d", message.length(), temprc);
+			temprc = -1;
 		}
 		rc = (temprc < rc)? temprc : rc;
 	}
 
-	_lsa_seq = (_lsa_seq + 1) % MAX_SEQNUM;
 	return rc;
 }
 
@@ -367,36 +430,88 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 		return processRoutingTable(routingTable);
 	} else {
 		// If destHID is not SID, send to relevant router
-		ControlMessage msg(CTL_ROUTING_TABLE, _myAD, _myHID);
+		Node fad(_myAD);
+		Node fhid(_myHID);
+		Node tad(_myAD);
+		Node thid(destHID);
 
-		msg.append(_myAD);
-		msg.append(destHID);
+		Xroute::XrouteMsg msg;
+		Xroute::TableUpdateMsg *t    = msg  .mutable_table_update();
+		Xroute::Node           *from = t   ->mutable_from();
+		Xroute::Node           *to   = t   ->mutable_from();
+		Xroute::XID            *fa   = from->mutable_ad();
+		Xroute::XID            *fh   = from->mutable_hid();
+		Xroute::XID            *ta   = to  ->mutable_ad();
+		Xroute::XID            *th   = to  ->mutable_hid();
 
-		msg.append(_ctl_seq);
-
-		msg.append((int)routingTable.size());
+		msg.set_type(Xroute::TABLE_UPDATE_MSG);
+		fa ->set_type(fad.type());
+		fa ->set_id(fad.id(), XID_SIZE);
+		fh ->set_type(fhid.type());
+		fh ->set_id(fhid.id(), XID_SIZE);
+		ta ->set_type(tad.type());
+		ta ->set_id(tad.id(), XID_SIZE);
+		th ->set_type(thid.type());
+		th ->set_id(thid.id(), XID_SIZE);
 
 		map<string, RouteEntry>::iterator it;
 		for (it = routingTable.begin(); it != routingTable.end(); it++)
 		{
-			msg.append(it->second.dest);
-			msg.append(it->second.nextHop);
-			msg.append(it->second.port);
-			msg.append(it->second.flags);
+			Xroute::TableEntry *e = t->add_routes();
+			Node dest(it->second.dest);
+			Node nexthop(it->second.nextHop);
+			Xroute::XID *x = e->mutable_xid();
+
+			x->set_type(dest.type());
+			x->set_id(dest.id(), XID_SIZE);
+
+			x = e->mutable_next_hop();
+			x->set_type(nexthop.type());
+			x->set_id(nexthop.id(), XID_SIZE);
+
+			e->set_port(it->second.port);
+			e->set_flags(it->second.flags);
 		}
 
-		_ctl_seq = (_ctl_seq + 1) % MAX_SEQNUM;
+		// FIXME: use the FID and SID from the router
+		string message;
+		sockaddr_x ddag;
+		Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
+		g.fill_sockaddr(&ddag);
 
-		return msg.send(_rsock, &_ddag);
+		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
+		//syslog(LOG_INFO, "msg: %s", msg.c_str());
+
+		msg.SerializeToString(&message);
+
+		int rc = Xsendto(_rsock, message.c_str(), message.length(), 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+		if (rc < 0) {
+			// error!
+			syslog(LOG_ERR, "error sending Table Update Msg to %s", it->second.dest.c_str());
+		}
+
+		return rc;
 	}
 }
 
 int Controller::sendSidDiscovery()
 {
+	int rc = 1;
+
 	syslog(LOG_INFO, "Controller::Send-SID Disc");
 
-	int rc = 1;
-	ControlMessage msg(CTL_SID_DISCOVERY, _myAD, _myAD);
+	Node ad(_myAD);
+	Node hid(_myHID);
+
+	Xroute::XrouteMsg msg;
+	Xroute::SIDDiscoveryMsg *d = msg.mutable_sid_discovery();
+	Xroute::XID             *a = d  ->mutable_ad();
+	Xroute::XID             *h = d  ->mutable_hid();
+
+	a->set_type(ad.type());
+	a->set_id(ad.id(), XID_SIZE);
+	h->set_type(hid.type());		// FIXME: original code used the ad over again
+	h->set_id(hid.id(), XID_SIZE);	//  and once again doesn't use the hid field at all
 
 	//broadcast local services
 	if (_LocalSidList.empty() && _SIDADsTable.empty())
@@ -408,43 +523,61 @@ int Controller::sendSidDiscovery()
 	else // prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
 	{
 		sendKeepAliveToServiceControllerLeader(); // temporally put it here
-		// DOTO: the format of this packet could be reduced much
+		// TODO: the format of this packet could be reduced much
 		// local info
-		msg.append(_LocalSidList.size());
 		std::map<std::string, ServiceState>::iterator it;
 		for (it = _LocalSidList.begin(); it != _LocalSidList.end(); ++it)
 		{
-			msg.append(_myAD); //unified form : AD SID pairs TODO: make it compact
-			msg.append(it->first);
+			Node s(it->first);
+
+			Xroute::DiscoveryEntry *e = d->add_entries();
+
+			Xroute::XID *x = e->mutable_ad();
+			x->set_type(ad.type());
+			x->set_id(ad.id(), XID_SIZE);
+
+			x = e->mutable_sid();
+			x->set_type(s.type());
+			x->set_id(s.id(), XID_SIZE);
+
 			// TODO: append more attributes/parameters
-			msg.append(it->second.capacity);
-			msg.append(it->second.capacity_factor);
-			msg.append(it->second.link_factor);
-			msg.append(it->second.priority);
-			msg.append(it->second.leaderAddr);
-			msg.append(it->second.archType);
-			msg.append(it->second.seq);
+			e->set_capacity(it->second.capacity);
+			e->set_capacity_factor(it->second.capacity_factor);
+			e->set_link_factor(it->second.link_factor);
+			e->set_priority(it->second.priority);
+			e->set_leader_addr(it->second.leaderAddr);
+			e->set_arch_type(it->second.archType);
+			e->set_seq(it->second.seq);
 		}
 
 		// rebroadcast services learnt from others
-		msg.append(_SIDADsTable.size());
 		std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
 		for (it_sid = _SIDADsTable.begin(); it_sid != _SIDADsTable.end(); ++it_sid)
 		{
-			msg.append(it_sid->second.size());
 			std::map<std::string, ServiceState>::iterator it_ad;
 			for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
 			{
-				msg.append(it_ad->first);
-				msg.append(it_sid->first);
+				Node aa(it_ad->first);
+				Node ss(it_sid->first);
+
+				Xroute::DiscoveryEntry *e = d->add_entries();
+
+				Xroute::XID *x = e->mutable_ad();
+				x->set_type(aa.type());
+				x->set_id(aa.id(), XID_SIZE);
+
+				x = e->mutable_sid();
+				x->set_type(ss.type());
+				x->set_id(ss.id(), XID_SIZE);
+
 				// TODO: put information from service_state inside
-				msg.append(it_ad->second.capacity);
-				msg.append(it_ad->second.capacity_factor);
-				msg.append(it_ad->second.link_factor);
-				msg.append(it_ad->second.priority);
-				msg.append(it_ad->second.leaderAddr);
-				msg.append(it_ad->second.archType);
-				msg.append(it_ad->second.seq);
+				e->set_capacity(it_ad->second.capacity);
+				e->set_capacity_factor(it_ad->second.capacity_factor);
+				e->set_link_factor(it_ad->second.link_factor);
+				e->set_priority(it_ad->second.priority);
+				e->set_leader_addr(it_ad->second.leaderAddr);
+				e->set_arch_type(it_ad->second.archType);
+				e->set_seq(it_ad->second.seq);
 			}
 		}
 	}
@@ -453,10 +586,7 @@ int Controller::sendSidDiscovery()
 	// TODO: reuse code: broadcastToADNeighbors(msg)?
 
 	// locallly process first
-	ControlMessage msg1 = msg;
-	int type;
-	msg1.read(type); //offset
-	processSidDiscovery(msg1);
+	processSidDiscovery(msg.sid_discovery());
 
 	std::map<std::string, NeighborEntry>::iterator it;
 
@@ -466,77 +596,69 @@ int Controller::sendSidDiscovery()
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
 
+		string message;
+		msg.	SerializeToString(&message);
+
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
-		int temprc = msg.send(_csock, &ddag);
+		int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
 		if (temprc < 0) {
 			syslog(LOG_ERR, "error sending inter-AD SID discovery to %s", it->second.AD.c_str());
 		}
 		rc = (temprc < rc)? temprc : rc;
 	}
 
-	// increase seq everytime when we send the local entries or when we locally read them?
-	//_sid_discovery_seq = (_sid_discovery_seq + 1) % MAX_SEQNUM;
 	return rc;
 }
 
 
-int Controller::processInterdomainLSA(const Xroute::XrouteMsg& msg)
+int Controller::processInterdomainLSA(const Xroute::GlobalLSAMsg& msg)
 {
-	// 0. Read this LSA
-	int32_t isDualRouter, numNeighbors, lastSeq;
-	string srcAD, srcHID;
+	NodeStateEntry entry;
 
-	msg.read(srcAD);
-	msg.read(srcHID);
-	msg.read(isDualRouter);
+	Xroute::XID xad  = msg.from().ad();
+	Xroute::XID xhid = msg.from().hid();
+	//Xroute::XID xsid = msg.node().sid();
 
-
-	// See if this LSA comes from AD with dualRouter
-	if (isDualRouter == 1)
-		_dual_router_AD = srcAD;
+	entry.ad  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+	entry.hid = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	//string srcSID = Node(xsid.type(), xsid.id().c_str(), 0).to_string();
 
 	// First, filter out the LSA originating from myself
-	if (srcAD == _myAD)
+	if (entry.ad == _myAD) {
 		return 1;
-
-	msg.read(lastSeq);
-
-	// 1. Filter out the already seen LSA
-	if (_ADLastSeqTable.find(srcAD) != _ADLastSeqTable.end()) {
-		int32_t old = _ADLastSeqTable[srcAD];
-		if (lastSeq <= old && (old - lastSeq) < SEQNUM_WINDOW) {
-			// drop the old LSA update.
-			return 1;
-		}
 	}
 
-	_ADLastSeqTable[srcAD] = lastSeq;
+	entry.num_neighbors = msg.neighbors_size();
 
-	msg.read(numNeighbors);
+	// See if this LSA comes from AD with dualRouter
+	if (msg.flags() & F_IP_GATEWAY) {
+		_dual_router_AD = entry.ad;
+	}
 
-	//syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", srcAD.c_str(), numNeighbors);
-	// 2. Update the network table
-	NodeStateEntry entry;
-	entry.ad = srcAD;
-	entry.hid = srcAD;
-	entry.num_neighbors = numNeighbors;
+	//syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), numNeighbors);
 	entry.timestamp = time(NULL);
 
-	for (int i = 0; i < numNeighbors; i++)
-	{
+	for (uint32_t i = 0; i < entry.num_neighbors; i++) {
 		NeighborEntry neighbor;
-		msg.read(neighbor.AD);
-		msg.read(neighbor.HID);
-		msg.read(neighbor.port);
-		msg.read(neighbor.cost);
+
+		Xroute::NeighborEntry n = msg.neighbors(i);
+
+		xad  = n.ad();
+		xhid = n.hid();
+
+		neighbor.AD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+		neighbor.HID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+
+		neighbor.port = n.port();
+		neighbor.cost = n.cost();
 
 		//syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
 
-	_ADNetworkTable[srcAD] = entry;
+	_ADNetworkTable[entry.ad] = entry;
 
 	// Rebroadcast this LSA
 	int rc = 1;
@@ -546,7 +668,9 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& msg)
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
 
-		int temprc = msg.send(_csock, &ddag);
+		string message;
+		msg.SerializeToString(&message);
+		int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
 		rc = (temprc < rc)? temprc : rc;
 	}
 	return rc;
@@ -555,31 +679,44 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& msg)
 int Controller::sendKeepAliveToServiceControllerLeader()
 {
 	int rc = 1;
-	int type = 0;
 
 	std::map<std::string, ServiceState>::iterator it;
 	for (it = _LocalSidList.begin(); it != _LocalSidList.end(); ++it)
 	{
-		ControlMessage msg(CTL_SID_MANAGE_KA, _myAD, _myHID);
-		msg.append(it->first);
-		msg.append(it->second.capacity);
-		msg.append(it->second.internal_delay);
-		// TODO:append some more states
+		Node sid(it->first);
+		Node  ad(myAD);
+		Node hid(myHID);
 
-		if (it->second.isLeader){
-			msg.read(type); // remove it to match the correct format for the process function
-			processServiceKeepAlive(msg); // process locally
+		Xroute::XrouteMsg msg;
+		Xroute::KeepAliveMsg *ka = msg.mutable_keep_alive();
+		Xroute::Node         *n  = ka->mutable_from();
+		Xroute::XID          *a  = n ->mutable_ad();
+		Xroute::XID          *h  = n ->mutable_hid();
+		Xroute::XID          *s  = ka->mutable_sid();
+
+		msg.set_type(Xroute::SID_MANAGE_KA_MSG);
+		a->set_type(ad.type());
+		a->set_id(ad.id(), XID_SIZE);
+		h->set_type(hid.type());
+		h->set_id(hid.id(), XID_SIZE);
+		s->set_type(sid.type());
+		s->set_id(sid.id(), XID_SIZE);
+		ka->set_capacity(it->second.capacity);
+		ka->set_delay(it->second.internal_delay);
+
+		// FIXME: there is a lot more in the servicestate struct than is being used here
+
+		if (it->second.isLeader) {
+			processServiceKeepAlive(msg.keep_alive()); // process locally
 		}
 		else
 		{
 			sockaddr_x ddag;
-			Graph g(it->second.leaderAddr);
-			g.fill_sockaddr(&ddag);
-			int temprc = msg.send(_csock, &ddag);
-			if (temprc < 0) {
-				syslog(LOG_ERR, "error sending SID keep alive to %s", it->second.leaderAddr.c_str());
-			}
-			rc = (temprc < rc)? temprc : rc;
+			string message;
+
+			xia_pton(AF_XIA, it->second.leaderAddr.c_str(), &ddag);
+			msg.SerializeToString(&message);
+			rc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
 			//syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.leaderAddr.c_str());
 		}
 	}
@@ -587,112 +724,75 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 	return rc;
 }
 
-int Controller::processServiceKeepAlive(ControlMessage msg)
+int Controller::processServiceKeepAlive(const Xroute::KeepAliveMsg &msg)
 {
 	int rc = 1;
-	string srcAD, srcHID;
+	string neighborAD, neighborHID, sid;
 
-	std::string sid;
-	int capacity, delay;
+	Xroute::XID xad  = msg.from().ad();
+	Xroute::XID xhid = msg.from().hid();
+	Xroute::XID xsid = msg.sid();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
-	msg.read(sid);
-	msg.read(capacity);
-	msg.read(delay);
+	neighborAD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+	neighborHID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	sid         = Node(xsid.type(), xsid.id().c_str(), 0).to_string();
 
-	if (_LocalServiceLeaders.find(sid) != _LocalServiceLeaders.end())
-	{ // if controller is here
+	uint32_t capacity = msg.capacity();
+	uint32_t delay    = msg.delay();
+
+
+	if (_LocalServiceLeaders.find(sid) != _LocalServiceLeaders.end()) {
+		// if controller is here
 		//update attributes
-		_LocalServiceLeaders[sid].instances[srcAD].capacity = capacity;
-		_LocalServiceLeaders[sid].instances[srcAD].internal_delay = delay;
+		_LocalServiceLeaders[sid].instances[neighborAD].capacity = capacity;
+		_LocalServiceLeaders[sid].instances[neighborAD].internal_delay = delay;
 		// TODO: reply to that instance?
 		//syslog(LOG_DEBUG, "got SID %s keep alive from %s", sid.c_str(), srcAddr.c_str());
-	}
-	else
-	{
-		syslog(LOG_ERR, "got %s keep alive to its service leader from %s, but I am not its leader!", sid.c_str(), srcAD.c_str());
+
+	} else {
+		syslog(LOG_ERR, "got %s keep alive to its service leader from %s, but I am not its leader!", sid.c_str(), neighborAD.c_str());
 		rc = -1;
 	}
 
 	return rc;
 }
 
-int Controller::processSidDiscovery(ControlMessage msg)
+int Controller::processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg)
 {
 	//TODO: add version(time-stamp?) for each entry
 	int rc = 1;
-	string srcAD, srcHID;
 
-	string AD, SID;
-	int records = 0;
-	int capacity, capacity_factor, link_factor, priority, seq;
-	int archType;
-	string leaderAddr;
+	Xroute::XID a = msg.ad();
+	Xroute::XID h = msg.hid();
+	string srcAD  = Node(a.type(), a.id().c_str(), 0).to_string();
+	string srcHID = Node(h.type(), h.id().c_str(), 0).to_string();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
 	//syslog(LOG_INFO, "Get SID discovery msg from %s", srcAD.c_str());
 
 	// process the entries: AD-SID pairs
-	msg.read(records);//number of entries
 	//syslog(LOG_INFO, "Get %d origin SIDs", records);
-	for (int i = 0; i < records; ++i)
+	for (int i = 0; i < msg.entries_size(); ++i)
 	{
 		ServiceState service_state;
-		msg.read(AD);
-		msg.read(SID);
+		Xroute::DiscoveryEntry d = msg.entries(i);
+
+		Xroute::XID x = d.ad();
+		string AD = Node(x.type(), x.id().c_str(), 0).to_string();
+
+		x = d.sid();
+		string SID = Node(x.type(), x.id().c_str(), 0).to_string();
+
 		//TODO: read the parameters from msg, put them into service_state
-		msg.read(capacity);
-		msg.read(capacity_factor);
-		msg.read(link_factor);
-		msg.read(priority);
-		msg.read(leaderAddr);
-		msg.read(archType);
-		msg.read(seq);
-		service_state.capacity = capacity;
-		service_state.capacity_factor = capacity_factor;
-		service_state.link_factor = link_factor;
-		service_state.priority = priority;
+		service_state.capacity = d.capacity();
+		service_state.capacity_factor = d.capacity_factor();
+		service_state.link_factor = d.link_factor();
+		service_state.priority = d.priority();
 		//syslog(LOG_INFO, "Get broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
-		service_state.leaderAddr = leaderAddr;
-		service_state.archType = archType;
-		service_state.seq = seq;
+		service_state.leaderAddr = d.leader_addr();
+		service_state.archType = d.arch_type();
+		service_state.seq = d.seq();
 		service_state.percentage = 0;
 		updateSidAdsTable(AD, SID, service_state);
-	}
-
-	//process the re-broadcast entries SID:[ADs]
-	msg.read(records);//number of re-broadcast sids
-	//syslog(LOG_INFO, "Get %d re-broadcast SIDs", records);
-	for (int i = 0; i < records; ++i)
-	{
-		int ad_records = 0;
-		msg.read(ad_records);
-		for (int j = 0; j < ad_records; ++j)
-		{
-			ServiceState service_state;
-			msg.read(AD);
-			msg.read(SID);
-			// TODO: read the parameters from msg
-			msg.read(capacity);
-			msg.read(capacity_factor);
-			msg.read(link_factor);
-			msg.read(priority);
-			msg.read(leaderAddr);
-			msg.read(archType);
-			msg.read(seq);
-			service_state.capacity = capacity;
-			service_state.capacity_factor = capacity_factor;
-			service_state.leaderAddr = leaderAddr;
-			service_state.link_factor = link_factor;
-			service_state.priority = priority;
-			//syslog(LOG_INFO, "Get re-broadcast SID %s@%s, p= %d,s=%d",SID.c_str(), AD.c_str(), priority, seq);
-			service_state.archType = archType;
-			service_state.seq = seq;
-			service_state.percentage = 0;
-			updateSidAdsTable(AD, SID, service_state);
-		}
 	}
 
 	//syslog(LOG_INFO, "SID-ADs %lu", _SIDADsTable.size());
@@ -715,33 +815,41 @@ int Controller::querySidDecision()
 		// for each SID, generate a report packet.
 		// packet format: SID/rate/#options/optionAD1/Latency1,capacity1/optionAD2/Latency2...
 
-		//syslog(LOG_DEBUG, "Sending SID decision queries for %s", it_sid->first.c_str() );
-		ControlMessage msg(CTL_SID_DECISION_QUERY, _myAD, _myHID);
-		msg.append(it_sid->first); // SID
+		//syslmog(LOG_DEBUG, "Sending SID decision queries for %s", it_sid->first.c_str() );
+
+		Node ad(_myAD);
+		Node hid(_myHID);
+		Node sid(it_sid->first);
+
+		Xroute::XrouteMsg msg;
+		Xroute::DecisionQueryMsg *q = msg.mutable_sid_query();
+		Xroute::XID              *a  = q ->mutable_ad();
+		Xroute::XID              *h  = q ->mutable_hid();
+		Xroute::XID              *s  = q ->mutable_sid();
+
+		msg.set_type(Xroute::SID_DECISION_QUERY_MSG);
+		a->set_type(ad.type());
+		a->set_id(ad.id(), XID_SIZE);
+		h->set_type(hid.type());
+		h->set_id(hid.id(), XID_SIZE);
+		s->set_type(sid.type());
+		s->set_id(sid.id(), XID_SIZE);
+
+
 		int rate = 0;
-		if (_SIDRateTable.find(it_sid->first) != _SIDRateTable.end()){
+		if (_SIDRateTable.find(it_sid->first) != _SIDRateTable.end()) {
 			rate = _SIDRateTable[it_sid->first];
 		}
 		if (rate < 0){ // it should not happen
 			rate = 0;
 		}
 
-		msg.append(rate);
+		q->set_rate(rate);
 
 		std::map<std::string, ServiceState>::iterator it_ad;
 		std::string best_ad; // the cloest controller
 		int minimal_latency = 9999; // smallest latency
-		int num_ADs = 0; // number of available ADs
 
-		for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
-		{ // first pass, count #ADs
-			if (it_ad->second.priority < 0){ // this is the poisoned one, skip
-				continue;
-			}
-			num_ADs++;
-		}
-		//syslog(LOG_DEBUG, "Found %d replicas", num_ADs );
-		msg.append(num_ADs); // the number of ADs
 		for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
 		{ // second pass, find the cloest one, creat the message
 			if (it_ad->second.priority < 0){ // this is the poisoned one, skip
@@ -754,38 +862,42 @@ int Controller::querySidDecision()
 			minimal_latency = minimal_latency > latency?latency:minimal_latency;
 			best_ad = minimal_latency == latency?it_ad->first:best_ad; // find the cloest
 
-			msg.append(it_ad->first);// append AD
-			msg.append(latency); // latency/ms
-			msg.append(it_ad->second.capacity); //capacity
+			Node aa(it_ad->first);
+
+			Xroute::QueryEntry *e = q->add_ads();
+			a = e->mutable_ad();
+			a->set_type(aa.type());
+			a->set_id(aa.id(), XID_SIZE);
+			e->set_latency(latency);
+			e->set_capacity(it_ad->second.capacity); //capacity
 		}
 		//syslog(LOG_DEBUG, "Going to send to %s", best_ad.c_str() );
 
 		// send the msg
 		if (best_ad == _myAD){ // I'm the one
 			//syslog(LOG_DEBUG, "Sending SID decision query locally");
-			int type;
-			msg.read(type); // remove it to match the correct format for the process function
-			processSidDecisionQuery(msg); // process locally
+			processSidDecisionQuery(msg.sid_query()); // process locally
 
-		}
-		else
-		{
+		} else {
+
+			string message;
 			sockaddr_x ddag;
 			Graph g = Node() * Node(best_ad) * Node(controller_sid);
 			g.fill_sockaddr(&ddag);
-			int temprc = msg.send(_csock, &ddag);
+
+			msg.SerializeToString(&message);
+			int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
 			if (temprc < 0) {
 				syslog(LOG_ERR, "error sending SID decision query to %s", best_ad.c_str());
 			}
 			rc = (temprc < rc)? temprc : rc;
-			//syslog(LOG_DEBUG, "sent SID %s decision query to %s", it_sid->first.c_str(),
-									 //best_ad.c_str());
+			//syslog(LOG_DEBUG, "sent SID %s decision query to %s", it_sid->first.c_str(), best_ad.c_str());
 		}
 	}
 	return rc;
 }
 
-int Controller::processSidDecisionQuery(ControlMessage msg)
+int Controller::processSidDecisionQuery(const Xroute::DecisionQueryMsg& msg)
 {
 	// work out a decision for each query
 	// TODO: This could/should be async
@@ -1674,52 +1786,41 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
    2. update the network table
    3. rebroadcast this LSA
 */
-int Controller::processLSA(const Xroute::XrouteMsg& msg)
+int Controller::processLSA(const Xroute::LSAMsg& msg)
 {
-	// 0. Read this LSA
-	int32_t isDualRouter, numNeighbors, lastSeq;
-	string srcAD, srcHID;
+	Xroute::XID a = msg.node().ad();
+	Xroute::XID h = msg.node().hid();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
-	msg.read(isDualRouter);
+	string srcAD  = Node(a.type(), a.id().c_str(), 0).to_string();
+	string srcHID = Node(h.type(), h.id().c_str(), 0).to_string();
 
-	// See if this LSA comes from AD with dualRouter
-	if (isDualRouter == 1)
+	if (msg.has_flags() && msg.flags() & F_IP_GATEWAY) {
 		_dual_router_AD = srcAD;
-
-	// First, filter out the LSA originating from myself
-	if (srcHID == _myHID)
-		return 1;
-
-	msg.read(lastSeq);
-
-	// 1. Filter out the already seen LSA
-	if (_lastSeqTable.find(srcHID) != _lastSeqTable.end()) {
-		int32_t old = _lastSeqTable[srcHID];
-		if (lastSeq <= old && (old - lastSeq) < SEQNUM_WINDOW) {
-			// drop the old LSA update.
-			return 1;
-		}
 	}
 
-	_lastSeqTable[srcHID] = lastSeq;
+	if (srcHID == _myHID) {
+		return 1;
+	}
 
-	msg.read(numNeighbors);
+	uint32_t numNeighbors = msg.peers_size();
 
 	// 2. Update the network table
 	NodeStateEntry entry;
-	entry.ad = srcAD;
+	entry.ad  = srcAD;
 	entry.hid = srcHID;
 	entry.num_neighbors = numNeighbors;
 
-	for (int i = 0; i < numNeighbors; i++)
-	{
+	for (uint32_t i = 0; i < numNeighbors; i++) {
 		NeighborEntry neighbor;
-		msg.read(neighbor.AD);
-		msg.read(neighbor.HID);
-		msg.read(neighbor.port);
-		msg.read(neighbor.cost);
+		Xroute::NeighborEntry n = msg.peers(i);
+
+		a = n.ad();
+		h = n.hid();
+		neighbor.AD   = Node(a.type(), a.id().c_str(), 0).to_string();
+		neighbor.HID  = Node(h.type(), h.id().c_str(), 0).to_string();
+		neighbor.port = n.port();
+		neighbor.cost = n.cost();
+
 		if (neighbor.AD != _myAD){ // update neighbors
 			neighbor.timestamp = time(NULL);
 			_ADNeighborTable[neighbor.AD] = neighbor;
@@ -2215,12 +2316,17 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 	int rc = 0;
 	Xroute::XrouteMsg msg;
 
-	if (!msg.ParseFromString(msg_str)) {
-		syslog(LOG_WARNING, "illegal packet received");
-		return -1;
-	} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
-		syslog(LOG_WARNING, "invalid version # received");
-		return -1;
+	try {
+		if (!msg.ParseFromString(msg_str)) {
+			syslog(LOG_WARNING, "illegal packet received");
+			return -1;
+		} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
+			syslog(LOG_WARNING, "invalid version # received");
+			return -1;
+		}
+
+	} catch (std::exception e) {
+		printf("is this gonna work for bad data\n");
 	}
 
 	switch (msg.type()) {
@@ -2230,11 +2336,16 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::LSA_MSG:
-			rc = processLSA(msg);
+			rc = processLSA(msg.lsa());
 			break;
 
 		case Xroute::GLOBAL_LSA_MSG:
-			rc = processInterdomainLSA(msg);
+			rc = processInterdomainLSA(msg.global_lsa());
+			break;
+
+
+		case Xroute::SID_MANAGE_KA_MSG:
+			rc = processServiceKeepAlive(msg.keep_alive());
 			break;
 
 		//////////////////////////////////////////////////////////////////////
@@ -2253,12 +2364,7 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 		//////////////////////////////////////////////////////////////////////
 		// not sure if these should be running again
 		case Xroute::SID_DISCOVERY_MSG:
-			// did I just turn this one off for now?
-			//rc = processSidDiscovery(m);
-			break;
-
-		case Xroute::SID_MANAGE_KA_MSG:
-			//rc = processServiceKeepAlive(m);
+			rc = processSidDiscovery(msg.sid_discovery());
 			break;
 
 		case Xroute::SID_DECISION_QUERY_MSG:
