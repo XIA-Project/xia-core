@@ -128,9 +128,6 @@ public:
 	int initialize(ErrorHandler *);
 	void run_timer(Timer *timer);
 
-	XID local_hid()	  { return _hid; };
-	XIAPath local_addr() { return _local_addr; };
-	XID local_4id()	  { return _local_4id; };
 	void add_handlers();
 
 	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
@@ -202,6 +199,9 @@ private:
 	/* =========================
 	 * Xtransport Methods
 	* ========================= */
+	XID local_hid()	  { return _hid; };
+	XIAPath local_addr() { return _local_addr; };
+	XID local_4id()	  { return _local_4id; };
 	void ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
 	char *random_xid(const char *type, char *buf);
