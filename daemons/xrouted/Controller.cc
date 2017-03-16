@@ -70,6 +70,7 @@ void *Controller::handler()
 
 		if (pfd[0].revents & POLLIN) {
 			sock = pfd[0].fd;
+
 		} else if (pfd[1].revents & POLLIN) {
 			sock = pfd[1].fd;
 		} else {
@@ -307,11 +308,11 @@ int Controller::init()
 	return 0;
 }
 
+
 // FIXME: this did 2 sends in the original SDN code, will this change work?
 int Controller::sendHello()
 {
-	int buflen, rc;
-	string message;
+	int rc;
 
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
@@ -322,7 +323,6 @@ int Controller::sendHello()
 	Xroute::Node     *node  = hello->mutable_node();
 	Xroute::XID      *ad    = node->mutable_ad();
 	Xroute::XID      *hid   = node->mutable_hid();
-	Xroute::XID      *sid   = node->mutable_sid();
 
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
@@ -331,23 +331,15 @@ int Controller::sendHello()
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
-	sid->set_type(n_sid.type());
-	sid->set_id(n_sid.id(), XID_SIZE);
 
+	if ((rc = sendMessage(_rsock, &_ddag, msg)) > 0) {
 
-//	printf("sending %s\n", msg.DebugString().c_str());
+		// now do it again with the SID
+		Xroute::XID *sid = node->mutable_sid();
+		sid->set_type(n_sid.type());
+		sid->set_id(n_sid.id(), XID_SIZE);
 
-	msg.SerializeToString(&message);
-	buflen = message.length();
-
-	rc = Xsendto(_rsock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
-	if (rc < 0) {
-		// error!
-		syslog(LOG_WARNING, "unable to send hello msg: %s", strerror(errno));
-
-	} else if (rc != (int)message.length()) {
-		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
-		rc = -1;
+		rc = sendMessage(_rsock, &_ddag, msg);
 	}
 
 	return rc;
@@ -397,7 +389,6 @@ int Controller::sendInterDomainLSA()
 
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
-		string message;
 		sockaddr_x ddag;
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
@@ -405,17 +396,7 @@ int Controller::sendInterDomainLSA()
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
 
-		msg.SerializeToString(&message);
-
-		int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
-		if (temprc < 0) {
-			// error!
-			syslog(LOG_ERR, "error sending inter-AD LSA to %s", it->second.AD.c_str());
-
-		} else if (temprc != (int)message.length()) {
-			syslog(LOG_WARNING, "ERROR sending inter-AD LSA. Tried sending %lu bytes but rc=%d", message.length(), temprc);
-			temprc = -1;
-		}
+		int temprc = sendMessage(_csock, &ddag, msg);
 		rc = (temprc < rc)? temprc : rc;
 	}
 
@@ -424,7 +405,7 @@ int Controller::sendInterDomainLSA()
 
 int Controller::sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
 {
-	syslog(LOG_INFO, "Controller::Send-RT");
+	//syslog(LOG_INFO, "Controller::Send-RT");
 
 	if (destHID == _myHID) {
 		// If destHID is self, process immediately
@@ -439,7 +420,7 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 		Xroute::XrouteMsg msg;
 		Xroute::TableUpdateMsg *t    = msg  .mutable_table_update();
 		Xroute::Node           *from = t   ->mutable_from();
-		Xroute::Node           *to   = t   ->mutable_from();
+		Xroute::Node           *to   = t   ->mutable_to();
 		Xroute::XID            *fa   = from->mutable_ad();
 		Xroute::XID            *fh   = from->mutable_hid();
 		Xroute::XID            *ta   = to  ->mutable_ad();
@@ -471,28 +452,18 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 			x->set_type(nexthop.type());
 			x->set_id(nexthop.id(), XID_SIZE);
 
-			e->set_port(it->second.port);
+			e->set_interface(it->second.port);
 			e->set_flags(it->second.flags);
 		}
 
 		// FIXME: use the FID and SID from the router
-		string message;
 		sockaddr_x ddag;
 		Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
 		g.fill_sockaddr(&ddag);
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
-
-		msg.SerializeToString(&message);
-
-		int rc = Xsendto(_rsock, message.c_str(), message.length(), 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
-		if (rc < 0) {
-			// error!
-			syslog(LOG_ERR, "error sending Table Update Msg to %s", it->second.dest.c_str());
-		}
-
-		return rc;
+		return sendMessage(_rsock, &ddag, msg);
 	}
 }
 
@@ -615,8 +586,9 @@ int Controller::sendSidDiscovery()
 }
 #endif
 
-int Controller::processInterdomainLSA(const Xroute::GlobalLSAMsg& msg)
+int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 {
+	Xroute::GlobalLSAMsg msg = xmsg.global_lsa();
 	NodeStateEntry entry;
 
 	Xroute::XID xad  = msg.from().ad();
@@ -671,9 +643,7 @@ int Controller::processInterdomainLSA(const Xroute::GlobalLSAMsg& msg)
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
 
-		string message;
-		msg.SerializeToString(&message);
-		int temprc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
+		int temprc = sendMessage(_csock, &ddag, xmsg);
 		rc = (temprc < rc)? temprc : rc;
 	}
 	return rc;
@@ -715,11 +685,10 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 
 		} else {
 			sockaddr_x ddag;
-			string message;
-
 			xia_pton(AF_XIA, it->second.leaderAddr.c_str(), &ddag);
-			msg.SerializeToString(&message);
-			rc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
+
+			int temprc = sendMessage(_csock, &ddag, msg);
+			rc = (temprc < rc)? temprc : rc;
 			//syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.leaderAddr.c_str());
 		}
 	}
@@ -1694,20 +1663,12 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
 	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
-	bool has_sid = msg.node().has_sid() ? true : false;
 
 	Xroute::XID xad  = msg.node().ad();
 	Xroute::XID xhid = msg.node().hid();
 
 	Node  ad(xad.type(),  xad.id().c_str(), 0);
 	Node hid(xhid.type(), xhid.id().c_str(), 0);
-	Node sid;
-
-	if (has_sid) {
-		Xroute::XID xsid = msg.node().sid();
-		sid = Node(xsid.type(), xsid.id().c_str(), 0);
-		neighborSID = sid.to_string();
-	}
 
 	neighborAD  = ad. to_string();
 	neighborHID = hid.to_string();
@@ -1743,7 +1704,7 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		entry.neighbor_list.push_back(it->second);
 
 	_networkTable[myHID] = entry;
-	syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
+	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
 	return 1;
 }
@@ -1779,6 +1740,8 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 {
 	Xroute::XID a = msg.node().ad();
 	Xroute::XID h = msg.node().hid();
+
+	//printf("%s\n", msg.DebugString().c_str());
 
 	string srcAD  = Node(a.type(), a.id().c_str(), 0).to_string();
 	string srcHID = Node(h.type(), h.id().c_str(), 0).to_string();
@@ -2001,10 +1964,10 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 		int minCost = 10000000;
 		string selectedHID;
 		// Select unvisited node with min cost
-		for (it1=unvisited.begin(); it1 != unvisited.end(); ++it1) {
-			//syslog(LOG_DEBUG, "it1 %s, %s", it1->second.ad.c_str(), it1->second.hid.c_str());
+		for (it1 = unvisited.begin(); it1 != unvisited.end(); ++it1) {
+			//syslog(LOG_INFO, "it1 %s, %s", it1->second.ad.c_str(), it1->second.hid.c_str());
 			currXID = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
-			//syslog(LOG_DEBUG, "CurrXID is %s, cost %d", currXID.c_str(), networkTable[currXID].cost);
+			//syslog(LOG_INFO, "CurrXID is %s, cost %d", currXID.c_str(), networkTable[currXID].cost);
 			if (networkTable[currXID].cost < minCost) {
 				minCost = networkTable[currXID].cost;
 				selectedHID = currXID;
@@ -2323,7 +2286,7 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::GLOBAL_LSA_MSG:
-			rc = processInterdomainLSA(msg.global_lsa());
+			rc = processInterdomainLSA(msg);
 			break;
 
 

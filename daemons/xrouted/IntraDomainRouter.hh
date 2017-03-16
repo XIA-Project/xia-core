@@ -60,8 +60,8 @@ protected:
 	int processLSA(const Xroute::XrouteMsg& msg);
 
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
-	int processRoutingTable(const Xroute::TableUpdateMsg& msg);
-	int processSidRoutingTable(const Xroute::SIDTableUpdateMsg& msg);
+	int processRoutingTable(const Xroute::XrouteMsg& msg);
+	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
 
 	// FIXME: improve these guys
 	struct timeval h_freq, h_fire;

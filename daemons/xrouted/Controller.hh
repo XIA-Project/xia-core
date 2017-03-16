@@ -169,7 +169,7 @@ protected:
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processServiceKeepAlive(const Xroute::KeepAliveMsg& msg);
-	int processInterdomainLSA(const Xroute::GlobalLSAMsg& msg);
+	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
 	int processSidDecisionQuery(const Xroute::XrouteMsg& msg);
 	int processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg);
 	int processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg);

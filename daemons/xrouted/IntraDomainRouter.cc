@@ -223,7 +223,6 @@ int IntraDomainRouter::init()
 
 int IntraDomainRouter::sendHello()
 {
-	int buflen, rc;
 	string message;
 
 	Node n_ad(_myAD);
@@ -249,29 +248,12 @@ int IntraDomainRouter::sendHello()
 
 
 //	printf("sending %s\n", msg.DebugString().c_str());
-
-	msg.SerializeToString(&message);
-	buflen = message.length();
-
-	rc = Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
-	if (rc < 0) {
-		// error!
-		syslog(LOG_WARNING, "unable to send hello msg: %s", strerror(errno));
-
-	} else if (rc != (int)message.length()) {
-		syslog(LOG_WARNING, "ERROR sending hello. Tried sending %d bytes but rc=%d", buflen, rc);
-		rc = -1;
-	}
-
-	return rc;
+	return sendMessage(_sock, &_ddag, msg);
 }
 
 // send LinkStateAdvertisement message (flooding)
 int IntraDomainRouter::sendLSA()
 {
-	int buflen, rc;
-	string message;
-
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
 
@@ -311,21 +293,7 @@ int IntraDomainRouter::sendLSA()
 	}
 
 //	printf("sending %s\n", msg.DebugString().c_str());
-
-	msg.SerializeToString(&message);
-	buflen = message.length();
-
-	rc = Xsendto(_sock, message.c_str(), buflen, 0, (struct sockaddr*)&_ddag, sizeof(sockaddr_x));
-	if (rc < 0) {
-		// error!
-		syslog(LOG_WARNING, "unable to send lsa msg: %s", strerror(errno));
-
-	} else if (rc != (int)message.length()) {
-		syslog(LOG_WARNING, "ERROR sending lsa. Tried sending %d bytes but rc=%d", buflen, rc);
-		rc = -1;
-	}
-
-	return rc;
+	return sendMessage(_sock, &_ddag, msg);
 }
 
 int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
@@ -348,7 +316,7 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::TABLE_UPDATE_MSG:
-			rc = processRoutingTable(msg.table_update());
+			rc = processRoutingTable(msg);
 			break;
 
 		case Xroute::HOST_LEAVE_MSG:
@@ -356,7 +324,7 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::SID_TABLE_UPDATE_MSG:
-			processSidRoutingTable(msg.sid_table_update());
+			processSidRoutingTable(msg);
 			break;
 
 		//////////////////////////////////////////////////////////////////////
@@ -396,8 +364,9 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 	return rc;
 }
 
-int IntraDomainRouter::processSidRoutingTable(const Xroute::SIDTableUpdateMsg& msg)
+int IntraDomainRouter::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
+	Xroute::SIDTableUpdateMsg msg = xmsg.sid_table_update();
 	Xroute::XID fa = msg.from().ad();
 	Xroute::XID fh = msg.from().hid();
 	Xroute::XID ta = msg.to().ad();
@@ -416,10 +385,7 @@ int IntraDomainRouter::processSidRoutingTable(const Xroute::SIDTableUpdateMsg& m
 
 	// FIXME: we shoudn't need this once flooding is turned on
 	if (dstHID != _myHID) {
-		std::string message;
-		msg.SerializeToString(&message);
-		uint32_t buflen = message.length();
-		return Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+		return sendMessage(_sock, &_ddag, xmsg);
 	}
 
 	std::map<std::string, XIARouteEntry> xrt;
@@ -516,6 +482,7 @@ int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
 	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
+	NeighborEntry neighbor;
 	bool has_sid = msg.node().has_sid() ? true : false;
 
 	Xroute::XID xad  = msg.node().ad();
@@ -525,27 +492,24 @@ int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	Node hid(xhid.type(), xhid.id().c_str(), 0);
 	Node sid;
 
+	neighborAD  = ad. to_string();
+	neighborHID = hid.to_string();
+
 	if (has_sid) {
 		Xroute::XID xsid = msg.node().sid();
 		sid = Node(xsid.type(), xsid.id().c_str(), 0);
 		neighborSID = sid.to_string();
+		neighbor.HID = neighborSID;
+	} else {
+		neighbor.HID = neighborHID;
 	}
-
-	neighborAD  = ad. to_string();
-	neighborHID = hid.to_string();
 
 	if (msg.has_flags()) {
 		flags = msg.flags();
 	}
 
 	// Update neighbor table
-	NeighborEntry neighbor;
 	neighbor.AD = neighborAD;
-	if (!has_sid) {
-		neighbor.HID = neighborHID;
-	} else {
-		neighbor.HID = neighborSID;
-	}
 	neighbor.port = iface;
 	neighbor.flags = flags;
 	neighbor.cost = 1; // for now, same cost
@@ -569,7 +533,14 @@ int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	_networkTable[_myHID] = entry;
 
-	syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
+
+
+	// FIXME: hack until xnetjd deals with hid hello routes
+	_xr.setRoute(neighborHID, iface, neighborHID, flags);
+
+
+
+	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
 	return 1;
 }
@@ -580,7 +551,6 @@ int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 
 	string neighborAD, neighborHID;
 	string srcAD, srcHID;
-	int rc;
 
 //	printf("processLSA: %s\n", lsa.DebugString().c_str());
 
@@ -604,18 +574,15 @@ int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 
 	syslog(LOG_INFO, "Forward-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
 
-	std::string message;
-	msg.SerializeToString(&message);
-	uint32_t buflen = message.length();
-	rc = Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
-
-	return rc;
+	return sendMessage(_sock, &_ddag, msg);
 }
 
 
 // process a control message
-int IntraDomainRouter::processRoutingTable(const Xroute::TableUpdateMsg& msg)
+int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
+	Xroute::TableUpdateMsg msg = xmsg.table_update();
+
 	Xroute::XID fa = msg.from().ad();
 	Xroute::XID fh = msg.from().hid();
 	Xroute::XID ta = msg.to().ad();
@@ -633,14 +600,10 @@ int IntraDomainRouter::processRoutingTable(const Xroute::TableUpdateMsg& msg)
 
 	// FIXME: we shoudn't need this once flooding is turned on
 	if ((dstAD != _myAD) || (dstHID != _myHID)) {
-		std::string message;
-		msg.SerializeToString(&message);
-		uint32_t buflen = message.length();
-		return Xsendto(_sock, message.c_str(), buflen, 0, (sockaddr*)&_ddag, sizeof(sockaddr_x));
+		return sendMessage(_sock, &_ddag, xmsg);
 	}
 
 	uint32_t numEntries = msg.routes_size();
-
 
 	for (uint i = 0; i < numEntries; i++) {
 

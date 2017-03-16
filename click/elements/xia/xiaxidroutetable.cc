@@ -27,13 +27,13 @@ XIAXIDRouteTable::~XIAXIDRouteTable()
 int
 XIAXIDRouteTable::configure(Vector<String> & /*conf*/, ErrorHandler * /*errh*/)
 {
-    //click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
+	//click_chatter("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
 
 	_principal_type_enabled = 1;
 
-    _rtdata.port = -1;
-    _rtdata.flags = 0;
-    _rtdata.nexthop = NULL;
+	_rtdata.port = -1;
+	_rtdata.flags = 0;
+	_rtdata.nexthop = NULL;
 
 	return 0;
 }
@@ -70,25 +70,25 @@ String
 XIAXIDRouteTable::read_handler(Element *e, void *thunk)
 {
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return String(t->get_enabled());
 
 		default:
 			return "<error>";
-    }
+	}
 }
 
 int
 XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler * /*errh*/)
 {
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
-    switch ((intptr_t)thunk) {
+	switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
 			return t->set_enabled(atoi(str.c_str()));
 		default:
 			return -1;
-    }
+	}
 }
 
 String
@@ -156,7 +156,7 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 
 	cp_argvec(conf, args);
 
-	if (args.size() < 2 || args.size() > 4)
+	if (args.size() < 2 || args.size() > 6)
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
@@ -164,13 +164,13 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 	if (!cp_integer(args[1], &port))
 		return errh->error("invalid port: ", conf.c_str());
 
-	if (args.size() == 4) {
+	if (args.size() >= 4) {
 		if (!cp_integer(args[3], &flags))
 			return errh->error("invalid flags: ", conf.c_str());
 	}
 
 	if (args.size() >= 3 && args[2].length() > 0) {
-	    String nxthop = args[2];
+		String nxthop = args[2];
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -413,7 +413,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 void
 XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 {
-    int port;
+	int port;
 
 	//in_ether_port = XIA_PAINT_ANNO(p);
 
@@ -423,25 +423,25 @@ XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 	}
 
 	// FIXME: delete these commented lines
-    // if(in_ether_port == REDIRECT) {
-    //     // if this is an XCMP redirect packet
-    //     process_xcmp_redirect(p);
-    //     p->kill();
-    //     return;
-    // } else {
-    	port = lookup_route(p);
-    // }
+	// if(in_ether_port == REDIRECT) {
+	//     // if this is an XCMP redirect packet
+	//     process_xcmp_redirect(p);
+	//     p->kill();
+	//     return;
+	// } else {
+		port = lookup_route(p);
+	// }
 
 	//NITIN disable XCMP Redirect packets
 	/*
-    if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
+	if(port == in_ether_port && in_ether_port !=DESTINED_FOR_LOCALHOST && in_ether_port !=DESTINED_FOR_DISCARD) { // need to inform XCMP that this is a redirect
 	  // "local" and "discard" shouldn't send a redirect
 	  Packet *q = p->clone();
 	  SET_XIA_PAINT_ANNO(q, (XIA_PAINT_ANNO(q)+TOTAL_SPECIAL_CASES)*-1);
 	  output(4).push(q);
-    }
+	}
 	*/
-    if (port >= 0) {
+	if (port >= 0) {
 	  SET_XIA_PAINT_ANNO(p,port);
 	  output(0).push(p);
 	}
@@ -449,9 +449,9 @@ XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 	  output(1).push(p);
 	}
 	else {
-      // no route, feed back into the route engine
+	  // no route, feed back into the route engine
 	  output(2).push(p);
-    }
+	}
 }
 
 // int
@@ -497,12 +497,12 @@ XIAXIDRouteTable::lookup_route(Packet *p)
    if (idx == CLICK_XIA_XID_EDGE_UNUSED)
    {
 	// unused edge -- use default route
-  	return _rtdata.port;
-    }
+	return _rtdata.port;
+	}
 
-    const struct click_xia_xid_node& node = hdr->node[idx];
+	const struct click_xia_xid_node& node = hdr->node[idx];
 
-    XIAHeader xiah(p->xia_header());
+	XIAHeader xiah(p->xia_header());
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(node.xid);
 	if (it != _rts.end())

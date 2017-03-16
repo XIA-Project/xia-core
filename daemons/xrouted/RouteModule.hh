@@ -40,6 +40,8 @@ protected:
 
 	RouteModule(const char *name) {_hostname = name;}
 
+	int sendMessage(int sock, sockaddr_x *dest, const Xroute::XrouteMsg &msg);
+
 	// virtual functions to be defined by the subclasses
 	virtual int init() = 0;      // configure the route module
 	virtual void *handler() = 0; // called by the main loop
