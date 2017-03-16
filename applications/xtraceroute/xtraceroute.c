@@ -114,7 +114,7 @@ int main(int argc, char **argv)
 	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
-	char s_to[1024], s_from[1024];
+	char s_to[XIA_MAX_DAG_STR_SIZE], s_from[XIA_MAX_DAG_STR_SIZE];
 
 	datalen = 64 - 8;
 

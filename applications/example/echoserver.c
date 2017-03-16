@@ -208,7 +208,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
-	char buf[512];
+	char buf[XIA_MAX_DAG_STR_SIZE];
 	int acceptor, sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
