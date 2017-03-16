@@ -53,7 +53,7 @@ message QueryEntry {
 }
 
 message QueryAnswer {
-	required XID    sid        = 1;
+	required XID    ad         = 1;
 	required uint32 percentage = 2;
 
 	// these 2 don't seem to be used right now
@@ -134,8 +134,10 @@ message DecisionQueryMsg {
 }
 
 message DecisionAnswerMsg {
-	required XID         sid  = 1;
-	repeated QueryAnswer sids = 2;
+	required XID         ad   = 1;
+	required XID         hid  = 2;
+	required XID         sid  = 3;
+	repeated QueryAnswer sids = 4;
 }
 
 message SIDDiscoveryMsg {

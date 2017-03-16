@@ -170,7 +170,7 @@ protected:
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processServiceKeepAlive(const Xroute::KeepAliveMsg& msg);
 	int processInterdomainLSA(const Xroute::GlobalLSAMsg& msg);
-	int processSidDecisionQuery(const Xroute::DecisionQueryMsg& msg);
+	int processSidDecisionQuery(const Xroute::XrouteMsg& msg);
 	int processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg);
 	int processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg);
 
@@ -189,7 +189,6 @@ protected:
 	int sendSidRoutingDecision(void);
 	int updateSidAdsTable(std::string AD, std::string SID, ServiceState service_state);
 	int updateADPathStates(void);
-	int interfaceNumber(std::string xidType, std::string xid);
 	int extractNeighborADs(void);
 	void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::string, RouteEntry> &routingTable);
 	void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> ADRoutingTable);

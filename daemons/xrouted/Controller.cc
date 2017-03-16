@@ -44,12 +44,12 @@ void *Controller::handler()
 		timeradd(&now, &l_freq, &l_fire);
 	}
 	if (timercmp(&now, &sd_fire, >=)) {
-		sendSidDiscovery();
+//		sendSidDiscovery();
 		timeradd(&now, &sd_freq, &sd_fire);
 	}
 	if (timercmp(&now, &sq_fire, >=)) {
 		if (ENABLE_SID_CTL) {
-			querySidDecision();
+//			querySidDecision();
 		}
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
@@ -142,7 +142,7 @@ void *Controller::handler()
 
 		while (iter != _timeStamp.end())
 		{
-			if (nowt - iter->second >= expire_time*10){
+			if (nowt - iter->second >= expire_time*10) {
 				_xr.delRoute(iter->first);
 				last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
@@ -156,7 +156,7 @@ void *Controller::handler()
 
 		while (iter1 != _ADNetworkTable.end())
 		{
-			if (nowt - iter1->second.timestamp >= expire_time*10){
+			if (nowt - iter1->second.timestamp >= expire_time*10) {
 				syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
 				last_update_latency = 0; // force update latency
 				_ADNetworkTable.erase(iter1++);
@@ -169,7 +169,7 @@ void *Controller::handler()
 
 		while (iter2 != _neighborTable.end())
 		{
-			if (nowt - iter2->second.timestamp >= expire_time){
+			if (nowt - iter2->second.timestamp >= expire_time) {
 				last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
 				_neighborTable.erase(iter2++);
@@ -183,7 +183,7 @@ void *Controller::handler()
 
 		while (iter3 != _ADNeighborTable.end())
 		{
-			if (nowt - iter3->second.timestamp >= expire_time*10){
+			if (nowt - iter3->second.timestamp >= expire_time*10) {
 				last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
 
@@ -369,6 +369,7 @@ int Controller::sendInterDomainLSA()
 	Xroute::XID          *hid  = from->mutable_hid();
 
 	msg.set_type(Xroute::GLOBAL_LSA_MSG);
+	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 	ad ->set_type(a.type());
 	ad ->set_id(a.id(), XID_SIZE);
 	hid->set_type(h.type());
@@ -445,6 +446,7 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 		Xroute::XID            *th   = to  ->mutable_hid();
 
 		msg.set_type(Xroute::TABLE_UPDATE_MSG);
+		msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 		fa ->set_type(fad.type());
 		fa ->set_id(fad.id(), XID_SIZE);
 		fh ->set_type(fhid.type());
@@ -494,6 +496,7 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 	}
 }
 
+#if 0
 int Controller::sendSidDiscovery()
 {
 	int rc = 1;
@@ -519,9 +522,9 @@ int Controller::sendSidDiscovery()
 		// Nothing to send
 		// syslog(LOG_INFO, "%s LocalSidList is empty, nothing to send", _myAD);
 		return rc;
-	}
-	else // prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
-	{
+
+	} else {
+		// prepare the packet TODO: only send updated entries TODO: but don't forget to renew TTL
 		sendKeepAliveToServiceControllerLeader(); // temporally put it here
 		// TODO: the format of this packet could be reduced much
 		// local info
@@ -610,7 +613,7 @@ int Controller::sendSidDiscovery()
 
 	return rc;
 }
-
+#endif
 
 int Controller::processInterdomainLSA(const Xroute::GlobalLSAMsg& msg)
 {
@@ -695,6 +698,7 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 		Xroute::XID          *s  = ka->mutable_sid();
 
 		msg.set_type(Xroute::SID_MANAGE_KA_MSG);
+		msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 		a->set_type(ad.type());
 		a->set_id(ad.id(), XID_SIZE);
 		h->set_type(hid.type());
@@ -708,9 +712,8 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 
 		if (it->second.isLeader) {
 			processServiceKeepAlive(msg.keep_alive()); // process locally
-		}
-		else
-		{
+
+		} else {
 			sockaddr_x ddag;
 			string message;
 
@@ -757,6 +760,7 @@ int Controller::processServiceKeepAlive(const Xroute::KeepAliveMsg &msg)
 	return rc;
 }
 
+#if 0
 int Controller::processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg)
 {
 	//TODO: add version(time-stamp?) for each entry
@@ -828,6 +832,7 @@ int Controller::querySidDecision()
 		Xroute::XID              *s  = q ->mutable_sid();
 
 		msg.set_type(Xroute::SID_DECISION_QUERY_MSG);
+		msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 		a->set_type(ad.type());
 		a->set_id(ad.id(), XID_SIZE);
 		h->set_type(hid.type());
@@ -840,7 +845,7 @@ int Controller::querySidDecision()
 		if (_SIDRateTable.find(it_sid->first) != _SIDRateTable.end()) {
 			rate = _SIDRateTable[it_sid->first];
 		}
-		if (rate < 0){ // it should not happen
+		if (rate < 0) { // it should not happen
 			rate = 0;
 		}
 
@@ -852,11 +857,11 @@ int Controller::querySidDecision()
 
 		for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
 		{ // second pass, find the cloest one, creat the message
-			if (it_ad->second.priority < 0){ // this is the poisoned one, skip
+			if (it_ad->second.priority < 0) { // this is the poisoned one, skip
 				continue;
 			}
 			int latency = 9998; // default, 9999-1ms
-			if (_ADPathStates.find(it_ad->first) != _ADPathStates.end()){
+			if (_ADPathStates.find(it_ad->first) != _ADPathStates.end()) {
 				latency = _ADPathStates[it_ad->first].delay;
 			}
 			minimal_latency = minimal_latency > latency?latency:minimal_latency;
@@ -874,9 +879,9 @@ int Controller::querySidDecision()
 		//syslog(LOG_DEBUG, "Going to send to %s", best_ad.c_str() );
 
 		// send the msg
-		if (best_ad == _myAD){ // I'm the one
+		if (best_ad == _myAD) { // I'm the one
 			//syslog(LOG_DEBUG, "Sending SID decision query locally");
-			processSidDecisionQuery(msg.sid_query()); // process locally
+			processSidDecisionQuery(msg); // process locally
 
 		} else {
 
@@ -897,113 +902,121 @@ int Controller::querySidDecision()
 	return rc;
 }
 
-int Controller::processSidDecisionQuery(const Xroute::DecisionQueryMsg& msg)
+int Controller::processSidDecisionQuery(const Xroute::XrouteMsg& msg)
 {
 	// work out a decision for each query
 	// TODO: This could/should be async
 	//syslog(LOG_DEBUG, "Processing SID decision query");
 	int rc = 1;
-	string srcAD, srcHID;
 
-	string AD, SID;
-	int records = 0;
-	int latency;
-	int capacity;
-	int rate = 0;
+	Xroute::XID xad  = msg.sid_query().ad();
+	Xroute::XID xhid = msg.sid_query().hid();
+	Xroute::XID xsid = msg.sid_query().sid();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
+	string srcAD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+	string srcHID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	string SID    = Node(xsid.type(), xsid.id().c_str(), 0).to_string();
 
-	// process the entries: AD-latency pairs
-	msg.read(SID); // what sid
-	msg.read(rate);
+	uint32_t rate = msg.sid_query().rate();
+
 	//syslog(LOG_INFO, "Get %s query msg from %s, rate %d",SID.c_str(), srcAD.c_str(), rate);
 
+	// process the entries: AD-latency pairs
 	// check if I am the SID controller
 	std::map<std::string, ServiceState>::iterator it_sid;
 	it_sid = _LocalSidList.find(SID);
-	if (it_sid == _LocalSidList.end()){
+	if (it_sid == _LocalSidList.end()) {
 		// not found, I'm not the right controller to talk to
 		syslog(LOG_INFO, "I'm not the controller for %s", SID.c_str());
-		// TODO: reply error msg to the source
+		// TODO: reply error msg to the source - return???
 	}
-	msg.read(records);//number of entries
-	//syslog(LOG_INFO, "Get %d latencies for %s", records, SID.c_str());
 
-	if (it_sid->second.archType == ARCH_CENT && !it_sid->second.isLeader){ // should forward to the leader
+	if (it_sid->second.archType == ARCH_CENT && !it_sid->second.isLeader) { // should forward to the leader
 
 		// are we forging src addr?
-		// should use new control message type CTL_SID_DECISION_FORWARD?
-		ControlMessage f_msg(CTL_SID_DECISION_QUERY, srcAD, srcHID);
-		// TODO: is there a cheaper way to copy the whole message?
-		f_msg.append(SID);
-		f_msg.append(rate);
-		f_msg.append(records);
-		for (int i = 0; i < records; ++i)
-		{
-			msg.read(AD);
-			msg.read(latency);
-			msg.read(capacity);
-			f_msg.append(AD);
-			f_msg.append(latency);
-			f_msg.append(capacity);
-		}
 		sockaddr_x ddag;
+		string message;
 		//syslog(LOG_INFO, "Send forward query %s", it_sid->second.leaderAddr.c_str());
 		Graph g(it_sid->second.leaderAddr);
 		g.fill_sockaddr(&ddag);
-		int temprc = f_msg.send(_csock, &ddag);
-		if (temprc < 0) {
+
+		msg.SerializeToString(&message);
+		rc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
+		if (rc < 0) {
 			syslog(LOG_ERR, "error sending SID query forwarding to %s", it_sid->second.leaderAddr.c_str());
 		}
-		rc = (temprc < rc)? temprc : rc;
 		return rc;
 
-	}
-	else{
+	} else {
 		std::map<std::string, DecisionIO> decisions;
-		for (int i = 0; i < records; ++i)
-		{
-			msg.read(AD);
-			msg.read(latency);
-			msg.read(capacity);
+		for (int i = 0; i < msg.sid_query().ads_size(); ++i) {
 			DecisionIO dio;
-			dio.capacity = capacity;
-			dio.latency = latency;
+
+			Xroute::QueryEntry q = msg.sid_query().ads(i);
+			Xroute::XID a = q.ad();
+
+			string ad = Node(a.type(), a.id().c_str(), 0).to_string();
+
+			dio.capacity   = q.capacity();
+			dio.latency    = q.latency();
 			dio.percentage = 0;
-			decisions[AD] = dio;
+			decisions[ad] = dio;
 			//syslog(LOG_INFO, "Get %d ms for %s", latency, AD.c_str());
 		}
 		// compute the weights
 		it_sid->second.decision(SID, srcAD, rate, &decisions);
 
-		//reply the query
-		ControlMessage re_msg(CTL_SID_DECISION_ANSWER, _myAD, _myHID);
-		re_msg.append(SID); // SID
-		re_msg.append(decisions.size()); // SID
+		//reply to the query
+		Node aa(_myAD);
+		Node hh(_myHID);
+
+		Xroute::XID *x;
+		Xroute::XrouteMsg xm;
+		Xroute::DecisionAnswerMsg *dam = xm.mutable_sid_answer();
+
+		xm.set_type(Xroute::SID_DECISION_ANSWER_MSG);
+		xm.set_version(Xroute::XROUTE_PROTO_VERSION);
+
+
+		x = dam->mutable_ad();
+		x->set_type(aa.type());
+		x->set_id(aa.id(), XID_SIZE);
+
+		x = dam->mutable_hid();
+		x->set_type(hh.type());
+		x->set_id(hh.id(), XID_SIZE);
+
+		x = dam->mutable_sid();
+		x->set_type(xsid.type());
+		x->set_id(xsid.id().c_str(), XID_SIZE);
+
 		std::map<std::string, DecisionIO>::iterator it_ds;
-		for (it_ds = decisions.begin(); it_ds != decisions.end(); ++it_ds){
-			re_msg.append(it_ds->first);
-			re_msg.append(it_ds->second.percentage);
+		for (it_ds = decisions.begin(); it_ds != decisions.end(); ++it_ds) {
+			Xroute::QueryAnswer *qa = dam->add_sids();
+
+			Node xx(it_ds->first);
+			Xroute::XID *xa = qa->mutable_ad();
+			xa->set_type(xx.type());
+			xa->set_id(xx.id(), XID_SIZE);
+
+			qa->set_percentage(it_ds->second.percentage);
 		}
 
 		// send the msg
-		if (srcAD == _myAD){ // I'm the one
+		if (srcAD == _myAD) { // I'm the one
 			//syslog(LOG_DEBUG, "Sending SID decision locally");
-			int type;
-			re_msg.read(type); // remove it to match the correct format for the process function
-			processSidDecisionAnswer(re_msg); // process locally
-		}
-		else
-		{
+			processSidDecisionAnswer(xm.sid_answer()); // process locally
+		} else {
+			string message;
 			sockaddr_x ddag;
-			Graph g = Node() * Node(srcAD) * Node(controller_sid	);
+			Graph g = Node() * Node(srcAD) * Node(controller_sid);
 			g.fill_sockaddr(&ddag);
-			int temprc = re_msg.send(_csock, &ddag);
-			if (temprc < 0) {
+
+			msg.SerializeToString(&message);
+			rc = Xsendto(_csock, message.c_str(), message.length(), 0, (sockaddr*)&ddag, sizeof(sockaddr_x));
+			if (rc < 0) {
 				syslog(LOG_ERR, "error sending SID decision answer to %s", srcAD.c_str());
 			}
-			rc = (temprc < rc)? temprc : rc;
 			//syslog(LOG_DEBUG, "sent SID %s decision answer to %s", SID.c_str(), srcAD.c_str());
 		}
 
@@ -1011,11 +1024,10 @@ int Controller::processSidDecisionQuery(const Xroute::DecisionQueryMsg& msg)
 	}
 }
 
-
 int Controller::Latency_first(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 {
 	//syslog(LOG_DEBUG, "Decision function %s: Latency_first for %s", SID.c_str(), srcAD.c_str());
-	if (srcAD == "" || rate < 0){
+	if (srcAD == "" || rate < 0) {
 		syslog(LOG_INFO, "Error parameters");
 		return -1;
 	}
@@ -1027,7 +1039,7 @@ int Controller::Latency_first(std::string SID, std::string srcAD, int rate, std:
 	{ // first pass, just find the minimal latency
 		// e2e latency + internal delay
 		int delay = it_ad->second.latency;
-		if ( _LocalServiceLeaders[SID].instances.find(it_ad->first) != _LocalServiceLeaders[SID].instances.end()){
+		if ( _LocalServiceLeaders[SID].instances.find(it_ad->first) != _LocalServiceLeaders[SID].instances.end()) {
 			delay += _LocalServiceLeaders[SID].instances[it_ad->first].internal_delay;
 		}
 		minimal_latency = minimal_latency > delay?delay:minimal_latency;
@@ -1036,10 +1048,9 @@ int Controller::Latency_first(std::string SID, std::string srcAD, int rate, std:
 
 	for (it_ad = decision->begin(); it_ad != decision->end(); ++it_ad)
 	{ // second pass, assign weight
-		if (it_ad->first ==  best_ad){
+		if (it_ad->first ==  best_ad) {
 			it_ad->second.percentage = 100;
-		}
-		else{
+		} else {
 			it_ad->second.percentage = 0;
 		}
 	}
@@ -1049,11 +1060,11 @@ int Controller::Latency_first(std::string SID, std::string srcAD, int rate, std:
 int Controller::Load_balance(std::string, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 {
 	//syslog(LOG_DEBUG, "Decision function %s: load balance for %s", SID.c_str(), srcAD.c_str());
-	if (srcAD == "" || rate < 0){
+	if (srcAD == "" || rate < 0) {
 		syslog(LOG_INFO, "Error parameters");
 		return -1;
 	}
-	if (decision == NULL || decision->empty()){
+	if (decision == NULL || decision->empty()) {
 		syslog(LOG_INFO, "Get 0 entries to decide!");
 		return -1;
 	}
@@ -1080,11 +1091,11 @@ bool Controller::compareCL(const ClientLatency &a, const ClientLatency &b)
 
 int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, std::map<std::string, DecisionIO>* decision)
 { // balance the load depending on the capacity of replicas and traffic rate of client domains
-	if (srcAD == "" || rate < 0){
+	if (srcAD == "" || rate < 0) {
 		syslog(LOG_INFO, "Error parameters");
 		return -1;
 	}
-	if (decision == NULL || decision->empty()){
+	if (decision == NULL || decision->empty()) {
 		syslog(LOG_INFO, "Get 0 entries to decide!");
 		return -1;
 	}
@@ -1094,8 +1105,8 @@ int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, 
 	std::map<std::string, int>::iterator dumpit;
 
 	/*mark the 0 rate client as -1*/
-	for (dumpit = rates.begin(); dumpit != rates.end(); ++dumpit){
-		if (dumpit->second == 0){
+	for (dumpit = rates.begin(); dumpit != rates.end(); ++dumpit) {
+		if (dumpit->second == 0) {
 			dumpit->second = -1;
 		}
 	}
@@ -1116,12 +1127,12 @@ int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, 
 	//first, convert to lists sorted by latency
 	std::map<std::string, std::vector<ClientLatency> > latency_map;
 	std::map<std::string, std::map<std::string, int> >::iterator it = _LocalServiceLeaders[SID].latencies.begin();
-	for (; it != _LocalServiceLeaders[SID].latencies.end(); ++it){
+	for (; it != _LocalServiceLeaders[SID].latencies.end(); ++it) {
 		//syslog(LOG_DEBUG, "convert %s", it->first.c_str());
 
 		std::vector<ClientLatency> cls;
 		std::map<std::string, int>::iterator it2 = it->second.begin();
-		for ( ; it2 != it->second.end(); ++it2){
+		for ( ; it2 != it->second.end(); ++it2) {
 			//syslog(LOG_DEBUG, "convert2 %s %d", it2->first.c_str(), it2->second);
 			ClientLatency cl;
 			cl.AD = it2->first;
@@ -1136,90 +1147,85 @@ int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, 
 
 	std::map<std::string, std::vector<ClientLatency> >::iterator it_lp;
 	std::map<std::string, std::vector<ClientLatency> >::iterator it_best;
-	while (1){
+	while (1) {
 		/*find the pair*/
 		it_best = latency_map.end();
 		std::string AD;
-		for (it_lp = latency_map.begin(); it_lp != latency_map.end(); ++it_lp){
+		for (it_lp = latency_map.begin(); it_lp != latency_map.end(); ++it_lp) {
 			/*clean up*/
-			if (it_lp->second.empty()){ // this list is empty
+			if (it_lp->second.empty()) { // this list is empty
 				continue;
 			}
-			if (capacities[it_lp->first] <= 0){
-				while (!it_lp->second.empty()){ // no more capacity, clean up
+			if (capacities[it_lp->first] <= 0) {
+				while (!it_lp->second.empty()) { // no more capacity, clean up
 					AD = it_lp->second.back().AD;
-					if (rates[AD] >= 0){ // have demand
+					if (rates[AD] >= 0) { // have demand
 						it_lp->second.pop_back(); // remove it
-					}
-					else{
+					} else {
 						//keep the -1 item, stop cleaning
 						break;
 					}
 				}
 			}
-			while(1){ // find one that need to be allocated
-				if (it_lp->second.empty()){ // this list is empty
+			while(1) { // find one that need to be allocated
+				if (it_lp->second.empty()) { // this list is empty
 					break;
 				}
 				AD = it_lp->second.back().AD;
-				if (rates.find(AD) == rates.end() || rates[AD] == 0){ // already allocated this client
+				if (rates.find(AD) == rates.end() || rates[AD] == 0) { // already allocated this client
 					it_lp->second.pop_back();
 					continue;
-				}
-				else{
+				} else {
 					break;
 				}
 			}
-			if (it_lp->second.empty()){ // this list is empty
+			if (it_lp->second.empty()) { // this list is empty
 				continue;
 			}
 			/*find the smallest one*/
-			if (it_best == latency_map.end() || it_best->second.back().latency > it_lp->second.back().latency){
+			if (it_best == latency_map.end() || it_best->second.back().latency > it_lp->second.back().latency) {
 				it_best = it_lp;
 			}
 		}
-		if (it_best == latency_map.end()){ // nothing left
+		if (it_best == latency_map.end()) { // nothing left
 			//syslog(LOG_ERR, "allocation done");
 			break;
-		}
-		else{
+		} else {
 			//syslog(LOG_ERR, "find best %s %d", it_best->second.back().AD.c_str(), it_best->second.back().latency);
 		}
 		/*allocate max capacity of the corresponding replica to the client with the smallest latency*/
 		// we do this for all the client but only record the allocation for srcAD
 		AD = it_best->second.back().AD;
 		std::string replica = it_best->first;
-		if (rates[AD] == -1){ // this is a zero request rate one, just allocate it to the closest replica
-			if (AD == srcAD){
+		if (rates[AD] == -1) { // this is a zero request rate one, just allocate it to the closest replica
+			if (AD == srcAD) {
 				(*decision)[replica].percentage = 100; // any value
 				//syslog(LOG_ERR, "allocate0 100%%: for %s", srcAD.c_str());
 			}
 			rates[AD] = 0; //mark it done
 			it_best->second.pop_back();
-		}
-		else if (rates[AD] >= capacities[replica]){ // allocate the remaining capacity of that replica
+
+		} else if (rates[AD] >= capacities[replica]) { // allocate the remaining capacity of that replica
 			rates[AD] -= capacities[replica];
 			it_best->second.pop_back();
-			if (AD == srcAD){
+			if (AD == srcAD) {
 				(*decision)[replica].percentage = capacities[replica];
 				//syslog(LOG_ERR, "allocate1 %d: for %s", capacities[replica], srcAD.c_str());
 			}
 			capacities[replica] = 0;
-			while (!it_best->second.empty()){ // no more capacity, clean up
+			while (!it_best->second.empty()) { // no more capacity, clean up
 				AD = it_best->second.back().AD;
-				if (rates[AD] >= 0){ // have demand
+				if (rates[AD] >= 0) { // have demand
 					it_best->second.pop_back(); // remove it
-				}
-				else{
+				} else {
 					//keep the -1 item, stop cleaning
 					break;
 				}
 			}
 			//it_best->second.clear();
-		}
-		else{ // capacity > rates[AD]
+		} else { // capacity > rates[AD]
 			capacities[replica] -= rates[AD];
-			if (AD == srcAD){
+			if (AD == srcAD) {
 				(*decision)[replica].percentage = rates[AD];
 				//syslog(LOG_ERR, "allocate2 %d: for %s", rates[AD], srcAD.c_str());
 
@@ -1237,7 +1243,7 @@ int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, 
 		sum += it_ad->second.percentage;
 		//syslog(LOG_DEBUG, "record percentage %s %d", it_ad->first.c_str(), it_ad->second.percentage);
 	}
-	if (sum == 0){
+	if (sum == 0) {
 		syslog(LOG_ERR, "R_LB: sum = 0!");
 		return -1;
 	}
@@ -1249,66 +1255,70 @@ int Controller::Rate_load_balance(std::string SID, std::string srcAD, int rate, 
 	return 0;
 }
 
+int Controller::processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg)
+{
+	// When got the answer, set local weight
+	// The answer is per SID, when to update routing table?
 
-int Controller::processSidDecisionAnswer(ControlMessage msg)
-{ // When got the answer, set local weight
-  // The answer is per SID, when to update routing table?
 	//syslog(LOG_DEBUG, "Processing SID decision");
 	if (!ENABLE_SID_CTL) {
 		// if SID control plane is disabled
 		// we should not get such a ctl message
 		return 0;
 	}
-	string srcAD, srcHID;
-	string AD, SID;
 
-	int percentage = 0;
-	int records = 0;
+	Xroute::XID xad  = msg.ad();
+	Xroute::XID xhid = msg.hid();
+	Xroute::XID xsid = msg.sid();
 
-	msg.read(srcAD);
-	msg.read(srcHID);
+	string srcAD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+	string srcHID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	string SID    = Node(xsid.type(), xsid.id().c_str(), 0).to_string();
 
-	// process the entries: AD-latency pairs
-	msg.read(SID); // what sid
-	msg.read(records); // number of records
 	//syslog(LOG_INFO, "Get %s, %d answer msg from %s", SID.c_str(), records, srcAD.c_str());
 
+	// process the entries: AD-latency pairs
 	std::map<std::string, std::map<std::string, ServiceState> >::iterator it_sid;
 	it_sid = _SIDADsTable.find(SID);
-	if (it_sid == _SIDADsTable.end()){
+	if (it_sid == _SIDADsTable.end()) {
 		syslog(LOG_ERR, "No record for %s", SID.c_str());
 		return -1;
 	}
+
 	std::map<std::string, ServiceState>::iterator it_ad;
 	// check the to-be-deleted entries first
-	for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad){
-		if (it_ad->second.priority < 0){
+	for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad) {
+		if (it_ad->second.priority < 0) {
 			it_ad->second.percentage = -1;
 		}
 	}
 
-	for (int i = 0; i < records; i++){
-		msg.read(AD);
-		msg.read(percentage);
+	for (int i = 0; i < msg.sids_size(); i++) {
+		Xroute::QueryAnswer q = msg.sids(i);
+
+		xad = q.ad();
+		string AD = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+
+		uint32_t percentage = q.percentage();
+
 		//syslog(LOG_INFO, "Get %s, %d %%", AD.c_str(), percentage);
 		std::map<std::string, ServiceState>::iterator it_ad = it_sid->second.find(AD);
 
 		it_ad->second.valid = true; // valid is not implemented yet
-		if (it_ad == it_sid->second.end()){
+		if (it_ad == it_sid->second.end()) {
 			syslog(LOG_ERR, "No record for %s@%s", SID.c_str(), AD.c_str());
-		}
-		else{
+		} else {
 			it_ad->second.percentage = percentage;
-			if (percentage > 100){
+			if (percentage > 100) {
 				syslog(LOG_ERR, "Invalid weight: %d", percentage);
 			}
-			if (it_ad->second.priority < 0){
+			if (it_ad->second.priority < 0) {
 				syslog(LOG_ALERT, "To-be-deleted record received, %s@%s, it's OK", SID.c_str(), AD.c_str());
 			}
 		}
 	}
 /*
-	for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad){
+	for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad) {
 		syslog(LOG_INFO, "DEBUG: %s weight: %d",it_ad->first.c_str(), it_ad->second.percentage );
 	}
 */
@@ -1342,14 +1352,14 @@ int Controller::processSidDecision(void) // to be deleted
 		// find the total weight
 		for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
 		{
-			if (it_ad->second.priority < 0){ // this is the poisoned one, skip
+			if (it_ad->second.priority < 0) { // this is the poisoned one, skip
 				continue;
 			}
 			int latency = 9999; // default, 9999ms
-			if (_ADPathStates.find(it_ad->first) != _ADPathStates.end()){
+			if (_ADPathStates.find(it_ad->first) != _ADPathStates.end()) {
 				latency = _ADPathStates[it_ad->first].delay;
 			}
-			if (it_ad->second.capacity_factor == 0){ // only latency matters find the smallest
+			if (it_ad->second.capacity_factor == 0) { // only latency matters find the smallest
 				minimal_latency = minimal_latency > latency?latency:minimal_latency;
 				best_ad = minimal_latency == latency?it_ad->first:best_ad;
 			}
@@ -1362,20 +1372,20 @@ int Controller::processSidDecision(void) // to be deleted
 		// make local decision. map weights to 0..100
 		for (it_ad = it_sid->second.begin(); it_ad != it_sid->second.end(); ++it_ad)
 		{
-			if (it_ad->second.priority < 0){ // this is the poisoned one
+			if (it_ad->second.priority < 0) { // this is the poisoned one
 				//syslog(LOG_DEBUG, "Prepare to delete %s@%s\n", it_sid->first.c_str(), it_ad->first.c_str());
 				it_ad->second.valid = true;
 				it_ad->second.percentage = -1; //mark it to be deleted
-			}
-			else{
+
+			} else {
 				it_ad->second.valid = true;
-				if (it_ad->second.capacity_factor == 0){// only latency matters
+				if (it_ad->second.capacity_factor == 0) {// only latency matters
 					it_ad->second.percentage = best_ad == it_ad->first?100:0; // go to the closest
-				}
-				else{ // normal
+
+				} else { // normal
 					it_ad->second.percentage = (int) (100.0*it_ad->second.weight/total_weight+0.5);//round
 				}
-				if (it_ad->second.percentage > 100){
+				if (it_ad->second.percentage > 100) {
 					syslog(LOG_INFO, "Error setting weight%s @%s :cap=%d, f=%d, prio=%d, weight=%f, total weight=%f",it_sid->first.c_str(), it_ad->first.c_str(), it_ad->second.capacity, it_ad->second.capacity_factor, it_ad->second.priority, it_ad->second.weight, total_weight);
 				}
 			}
@@ -1416,9 +1426,9 @@ int Controller::sendSidRoutingDecision(void)
 				if (ADSIDsTable.count(it_ad->first) > 0) // has key AD
 				{
 					ADSIDsTable[it_ad->first][it_sid->first] = it_ad->second;
-				}
-				else // create a new map for new AD
-				{
+
+				} else {
+				// create a new map for new AD
 					std::map<std::string, ServiceState> new_map;
 					new_map[it_sid->first] = it_ad->second;
 					ADSIDsTable[it_ad->first] = new_map;
@@ -1435,9 +1445,7 @@ int Controller::sendSidRoutingDecision(void)
 		{
 			// Don't calculate routes for external ADs
 			continue;
-		}
-		else if (it_router->second.hid.find(string("SID")) != string::npos)
-		{
+		} else if (it_router->second.hid.find(string("SID")) != string::npos) {
 			// Don't calculate routes for SIDs
 			continue;
 		}
@@ -1456,10 +1464,15 @@ int Controller::sendSidRoutingTable(std::string destHID, std::map<std::string, s
 		// If destHID is self, process immediately
 		//syslog(LOG_INFO, "set local sid routes");
 		return processSidRoutingTable(ADSIDsTable);
-	}
-	else
-	{
+
+	} else {
 		// If destHID is not SID, send to relevant router
+		//
+		Xroute::XrouteMsg msg;
+
+
+
+		msg.set_type()
 		ControlMessage msg(CTL_SID_ROUTING_TABLE, _myAD, _myHID);
 
 		// for checking and resend
@@ -1483,8 +1496,6 @@ int Controller::sendSidRoutingTable(std::string destHID, std::map<std::string, s
 				msg.append(it_sid->second.percentage);
 			}
 		}
-
-		_sid_ctl_seq = (_sid_ctl_seq + 1) % MAX_SEQNUM;
 
 		return msg.send(_rsock, &_ddag);
 	}
@@ -1520,9 +1531,7 @@ int Controller::processSidRoutingTable(std::map<std::string, std::map<std::strin
 			if (entry.xid == _myAD)
 			{
 				_xr.seletiveSetRoute(it_sid->first, -2, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first); //local AD, FIXME: why is port unsigned short? port could be negative numbers!
-			}
-			else
-			{
+			} else {
 				_xr.seletiveSetRoute(it_sid->first, entry.port, entry.nextHop, entry.flags, it_sid->second.percentage, it_ad->first);
 			}
 
@@ -1540,7 +1549,7 @@ int Controller::updateSidAdsTable(std::string AD, std::string SID, ServiceState 
 	//TODO: an entry is not there maybe because it is deleted,we should avoid that an older discovery message adds it back again
 	if ( _SIDADsTable.count(SID) > 0 )
 	{
-		if (service_state.seq == 0){
+		if (service_state.seq == 0) {
 			syslog(LOG_DEBUG, "recording bad SID seq, abort");
 			return -1;
 		}
@@ -1550,7 +1559,7 @@ int Controller::updateSidAdsTable(std::string AD, std::string SID, ServiceState 
 			if (_SIDADsTable[SID][AD].seq < service_state.seq || _SIDADsTable[SID][AD].seq - service_state.seq > SEQNUM_WINDOW)
 			{
 				//syslog(LOG_DEBUG, "Got %d > %d new discovery msg %s@%s, priority%d",service_state.seq, _SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority);
-				if (_SIDADsTable[SID][AD].capacity != service_state.capacity){
+				if (_SIDADsTable[SID][AD].capacity != service_state.capacity) {
 					_send_sid_decision = true; // update decision
 				}
 				_SIDADsTable[SID][AD].capacity = service_state.capacity;
@@ -1560,20 +1569,16 @@ int Controller::updateSidAdsTable(std::string AD, std::string SID, ServiceState 
 				_SIDADsTable[SID][AD].seq = service_state.seq;
 
 			//TODO: update other parameters
-			}
-			else{
+			} else {
 				//syslog(LOG_DEBUG, "Got %d < %d old discovery msg %s@%s, priority%d",service_state.seq, _SIDADsTable[SID][AD].seq, SID.c_str(), AD.c_str(), service_state.priority);
 			}
 
-		}
-		else
-		{
+		} else {
 			// insert new entry
 			_SIDADsTable[SID][AD] = service_state;
 		}
-	}
-	else // no sid record
-	{
+	} else {
+		// no sid record
 		std::map<std::string, ServiceState> new_map;
 		new_map[AD] = service_state;
 		_SIDADsTable[SID] = new_map;
@@ -1582,6 +1587,7 @@ int Controller::updateSidAdsTable(std::string AD, std::string SID, ServiceState 
 	//syslog(LOG_INFO, "update SID:%s, capacity %d, f1 %d, f2 %d, priority %d, from %s", SID.c_str(), service_state.capacity, service_state.capacity_factor, service_state.link_factor, service_state.priority, AD.c_str());
 	return rc;
 }
+#endif
 
 void* Controller::updatePathThread(void* updating)
 {
@@ -1600,10 +1606,10 @@ void* Controller::updatePathThread(void* updating)
 
 	for (it_ad = _ADNetworkTable_temp.begin(); it_ad != _ADNetworkTable_temp.end(); ++it_ad)
 	{
-		if (it_ad->first == _myAD){
+		if (it_ad->first == _myAD) {
 			continue;
 		}
-		if (it_ad->first.length() < 3){ // abnormal entry, skip to avoid weird stuff
+		if (it_ad->first.length() < 3) { // abnormal entry, skip to avoid weird stuff
 			continue;
 		}
 
@@ -1623,25 +1629,25 @@ void* Controller::updatePathThread(void* updating)
 			_hostname,
 			XrootDir(root, BUF_SIZE),
 			it_ad->first.c_str());
-		if(!(in = popen(cmd, "r"))){
+		if(!(in = popen(cmd, "r"))) {
 			syslog(LOG_DEBUG, "Fail to execute %s", cmd);
 			continue;
 		}
-		while(fgets(buff, sizeof(buff), in) != NULL){
-			if (strlen(buff) > 0){ // avoid bad things
+		while(fgets(buff, sizeof(buff), in) != NULL) {
+			if (strlen(buff) > 0) { // avoid bad things
 				//syslog(LOG_DEBUG, "Ping %s result is %s",it_ad->first.c_str(), buff);
 				latency = atoi(buff); // FIXME: atoi cannot detect error
 			}
 		}
-		if (pclose(in) > 0){
+		if (pclose(in) > 0) {
 			syslog(LOG_DEBUG, "ping to %s timeout", it_ad->first.c_str());
 		}
-		if (latency >= 0){
+		if (latency >= 0) {
 			//syslog(LOG_DEBUG, "latency to %s is %d", it_ad->first.c_str(), latency);
 			ADPathState ADpath_state;
 			ADpath_state.delay = latency>0?latency:9999; // maybe a timeout/atoi failure
 			int delta = _ADPathStates[it_ad->first].delay - ADpath_state.delay;
-			if ( delta > 5 || delta < -5 ){
+			if ( delta > 5 || delta < -5 ) {
 				_send_sid_decision = true; // re-query the decision because latency is changed
 				//TODO: only query that SID.
 			}
@@ -1665,13 +1671,12 @@ int Controller::updateADPathStates(void)
 
 	// Create a new thread so that the daemon could receive control messages while waiting for xping
 	pthread_t newthread;
-	if (!updating){
+	if (!updating) {
 		// copy to local, avoid data hazard
 		_ADNetworkTable_temp = _ADNetworkTable;
-		if (pthread_create(&newthread , NULL, updatePathThread, &updating)!= 0){
+		if (pthread_create(&newthread , NULL, updatePathThread, &updating)!= 0) {
 			perror("pthread_create");
-		}
-		else{
+		} else {
 			pthread_detach(newthread); // leave the thread along
 		}
 	}
@@ -1683,22 +1688,6 @@ int Controller::updateADPathStates(void)
 	ADpath_state.delay = 1;
 	_ADPathStates[_myAD] = ADpath_state;
 	return rc;
-}
-
-int Controller::interfaceNumber(std::string xidType, std::string xid)
-{
-	int rc;
-	map<std::string, XIARouteEntry> routes;
-	map<std::string, XIARouteEntry>::iterator it;
-
-	if ((rc = _xr.getRoutes(xidType, routes)) > 0) {
-		it = routes.find(xid);
-
-		if (it != routes.end()) {
-			return it->second.port;
-		}
-	}
-	return -1;
 }
 
 int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
@@ -1821,7 +1810,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
-		if (neighbor.AD != _myAD){ // update neighbors
+		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
@@ -1958,8 +1947,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	while (it1 != networkTable.end()) {
 		if (it1->second.num_neighbors == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
 			networkTable.erase(it1++);
-		}
-		else{
+		} else {
 			//syslog(LOG_DEBUG, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
 			++it1;
 		}
@@ -1987,8 +1975,8 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 		if (networkTable.find(currXID) != networkTable.end()) {
 			networkTable[currXID].cost = it2->cost;
 			networkTable[currXID].prevNode = srcHID;
-		}
-		else {
+
+		} else {
 			// We have an endhost
 			NeighborEntry neighbor;
 			neighbor.AD = _myAD;
@@ -2052,7 +2040,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	int hop_count;
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
-		if (unvisited.find(it1->first) !=  unvisited.end()){ // the unreachable set
+		if (unvisited.find(it1->first) !=  unvisited.end()) { // the unreachable set
 			continue;
 		}
 		tempHID1 = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
@@ -2086,7 +2074,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
 		tempHID1 = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
-		if (unvisited.find(it1->first) !=  unvisited.end()){ // the unreachable set
+		if (unvisited.find(it1->first) !=  unvisited.end()) { // the unreachable set
 			continue;
 		}
 		if (tempHID1.find(string("SID")) == string::npos) {
@@ -2177,10 +2165,9 @@ void Controller::set_controller_conf(const char* myhostname)
 		}
 		section_index++;
 	}
-	if (mysection){
+	if (mysection) {
 		strcpy(section_name, myhostname);
-	}
-	else{
+	} else {
 		strcpy(section_name, "default");
 	}
 	// read the values
@@ -2234,15 +2221,13 @@ void Controller::set_sid_conf(const char* myhostname)
 
 		/*first read the synthetic load as a client domain*/
 		int s_load = ini_getl(section_name, "synthetic_load", 0, full_path);
-		if (s_load == 0){ // synthetic load is not set, make sure it won't overwrite the existing value
-			if (_SIDRateTable.find(service_sid) == _SIDRateTable.end()){
+		if (s_load == 0) { // synthetic load is not set, make sure it won't overwrite the existing value
+			if (_SIDRateTable.find(service_sid) == _SIDRateTable.end()) {
 				_SIDRateTable[service_sid] = 0;
-			}
-			else{
+			} else {
 				// do nothing
 			}
-		}
-		else{
+		} else {
 			_SIDRateTable[service_sid] = s_load;
 		}
 
@@ -2250,16 +2235,14 @@ void Controller::set_sid_conf(const char* myhostname)
 		if (ini_getbool(section_name, "enabled", 0, full_path) == 0)
 		{// skip this if not enabled, NOTE: enabled=True is the default one
 		 // if an entry was enabled but is disabled now, we should 'poison' other ADs by broadcasting this invalidation
-			if (old_local_list.count(service_sid) > 0){ // it was there
+			if (old_local_list.count(service_sid) > 0) { // it was there
 				old_local_list[service_sid].priority = -1; // invalid entry
 				old_local_list[service_sid].seq = _sid_discovery_seq;
 				_LocalSidList[service_sid] = old_local_list[service_sid]; // NOTE: may need deep copy someday
 				//syslog(LOG_DEBUG, "Poisoning %s\n", sid);
 			}
 			//else just ignore it
-		}
-		else
-		{
+		} else {
 			ServiceState service_state;
 			service_state.seq = _sid_discovery_seq;
 			service_state.capacity = ini_getl(section_name, "capacity", 100, full_path);
@@ -2298,7 +2281,7 @@ void Controller::set_sid_conf(const char* myhostname)
 			}
 
 			//fprintf(stderr, "read state%s, %d, %d, %s\n", sid, service_state.capacity, service_state.isLeader, service_state.leaderAddr.c_str());
-			if (_LocalSidList[service_sid].capacity != service_state.capacity){
+			if (_LocalSidList[service_sid].capacity != service_state.capacity) {
 				_send_sid_discovery = true; //update
 			}
 			_LocalSidList[service_sid] = service_state;
@@ -2364,15 +2347,15 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 		//////////////////////////////////////////////////////////////////////
 		// not sure if these should be running again
 		case Xroute::SID_DISCOVERY_MSG:
-			rc = processSidDiscovery(msg.sid_discovery());
+//			rc = processSidDiscovery(msg.sid_discovery());
 			break;
 
 		case Xroute::SID_DECISION_QUERY_MSG:
-			//rc = processSidDecisionQuery(m);
+//			rc = processSidDecisionQuery(msg.sid_query());
 			break;
 
 		case Xroute::SID_DECISION_ANSWER_MSG:
-			//rc = processSidDecisionAnswer(m);
+//			rc = processSidDecisionAnswer(msg.sid_answer());
 			break;
 
 		//////////////////////////////////////////////////////////////////////
