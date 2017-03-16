@@ -282,6 +282,9 @@ private:
 		manageRoute(xid, false);
 	}
 
+	// mobility
+	void migrateActiveSessions(int interface, XIAPath new_dag);
+
 	uint32_t NewID();
 
 	uint32_t NextFIDSeqNo(sock *sk, XIAPath &dst);

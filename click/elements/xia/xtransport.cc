@@ -2313,24 +2313,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	}
 
 	// Migrate sessions that can be migrated
-	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
-		uint32_t _migrateid = iter->first;
-		sock *sk = idToSock.get(_migrateid);
-		if (! migratable_sock(sk, interface)) {
-			continue;
-		}
+	migrateActiveSessions(interface, new_dag);
 
-		if (! update_src_path(sk, new_dag)) {
-			click_chatter("Migration skipped. Failed updating src path");
-			continue;
-		}
-
-		sk->migrating = true;
-		XStream *st = dynamic_cast<XStream *>(sk);
-
-		st->usrmigrate();
-	}
-
+	// Notify caller that the DAG has been updated
 	ReturnResult(_sport, xia_socket_msg);
 
 
@@ -2351,6 +2336,28 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 }
 
 
+void XTRANSPORT::migrateActiveSessions(int interface, XIAPath new_dag)
+{
+	// Migrate sessions that can be migrated
+	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
+		uint32_t _migrateid = iter->first;
+		sock *sk = idToSock.get(_migrateid);
+		if (! migratable_sock(sk, interface)) {
+			continue;
+		}
+
+		if (! update_src_path(sk, new_dag)) {
+			click_chatter("Migration skipped. Failed updating src path");
+			continue;
+		}
+
+		sk->migrating = true;
+		XStream *st = dynamic_cast<XStream *>(sk);
+
+		st->usrmigrate();
+	}
+
+}
 
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
