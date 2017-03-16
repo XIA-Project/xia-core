@@ -1705,7 +1705,7 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	if (has_sid) {
 		Xroute::XID xsid = msg.node().sid();
-		sid = Node(xsid.type(), xsid.id());
+		sid = Node(xsid.type(), xsid.id().c_str(), 0);
 		neighborSID = sid.to_string();
 	}
 

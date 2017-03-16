@@ -21,16 +21,16 @@ RouterConfig::~RouterConfig()
 void RouterConfig::help()
 {
 	printf("\nusage: %s [-IRSCO][-l level] [-v] [-c config] [-h hostname]\n", _appname);
-    printf("where:\n");
+	printf("where:\n");
 	printf(" -I          : loads the inter-domain controller module\n");
 	printf(" -R          : loads the intra-domain route module\n");
 	printf(" -S          : loads the SID route module\n");
 	printf(" -C          : loads the CID route module\n");
 	printf(" -O          : loads the old style route module (not compatible with the others)\n");
-    printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
-    printf(" -v          : log to the console as well as syslog\n");
-    printf(" -h hostname : click device name (default=`hostname -s`)\n");
-    printf("\n");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf(" -v          : log to the console as well as syslog\n");
+	printf(" -h hostname : click device name (default=`hostname -s`)\n");
+	printf("\n");
 }
 
 int RouterConfig::parseCmdLine(int argc, char**argv)
@@ -79,12 +79,12 @@ int RouterConfig::parseCmdLine(int argc, char**argv)
 		}
 	}
 
-	_routers = LOCAL_ROUTER;
 
 	if (_routers == 0) {
-		printf("No route modules selected\n");
-		help();
-		rc = -1;
+		_routers = LOCAL_ROUTER;
+//		printf("No route modules selected\n");
+//		help();
+//		rc = -1;
 	}
 
 	// create the syslog identifier
