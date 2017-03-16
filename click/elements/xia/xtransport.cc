@@ -2306,14 +2306,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in PacketRoute
 		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
 		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
-		// FIXME: remove this
-		// // All the XIAXIDRouteTable elements
-		// std::string routetables[5] = {"rt_AD", "rt_HID", "rt_SID", "rt_CID", "rt_IP"};
-		// for(int i=0; i<5; i++) {
-		// 	String route_table_str = _hostname + "/xrc/n/proc/" + routetables[i].c_str() + ".dag";
-		// 	click_chatter("XTRANSPORT:Xupdatedag notifying: %s", route_table_str.c_str());
-		// 	HandlerCall::call_write(route_table_str.c_str(), new_dag.unparse().c_str(), this);
-		// }
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
