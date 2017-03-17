@@ -172,7 +172,7 @@ add_ifaddr_done:
 ** The data returned by Xgetifaddrs() is dynamically allocated and should be
 ** freed using Xfreeifaddrs() when no longer needed.
 **
-** @param ifap pointer to a pointer to accecpt the returned ifaddrs structure
+** @param ifap pointer to a pointer to accept the returned ifaddrs structure
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set appropriately.
