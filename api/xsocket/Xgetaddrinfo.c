@@ -125,19 +125,34 @@ static const char *xerr_unimplemented = "This feature is not currently supported
  }
 
 
-
-// Read DAG for rendezvous server data plane from resolv.conf
+/*!
+ * Read DAG for rendezvous server data plane from resolv.conf
+ *
+ * The XreadRVServerAddr() API will read the rendezvous service address
+ * from etc/resolv.conf file. The caller must be expecting the address
+ * to be available in the config file. This API does not call into the
+ * XIA stack and is simply a way to read the config file.
+ *
+ * @param rv_dag_str a buffer to be filled in
+ * @param rvstrlen the size of the rv_dag_str buffer
+ *
+ * @returns 0 on success, -1 on failure
+ */
 int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 {
 	int ret = -1;
 	int rc;
+
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
+
 	// clear out the buffers
 	bzero(rv_dag_str, rvstrlen);
 	bzero(root, CONFIG_PATH_BUF_SIZE);
+
 	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
-	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen,
+			strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		if (rc < rvstrlen) {
 			ret = 0;
@@ -146,30 +161,45 @@ int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 			printf(" for %d byte RV DAG\n", rc);
 		}
 	} else {
-		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
+		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n",
+				rv_dag_str);
 	}
 	return ret;
 }
 
-// Read DAG for rendezvous server control plane from resolv.conf
+/*!
+ * Read DAG for rendezvous server control plane from resolv.conf
+ *
+ * The XreadRVServecControlAddr reads the control-plane address for the
+ * rendezvous service running on this system from etc/resolv.conf. The
+ * caller must be expecting the address to be available in the config
+ * file. This API does not call into the XIA stack and is simply a way
+ * to read the config file.
+ *
+ * @param rv_dag_str a buffer to return the control address in
+ * @param rvstrlen the size of rv_dag_str buffer
+ *
+ * @returns 0 on success, -1 on failure
+ */
 int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 {
 	int ret = -1;
 	int rc;
+
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
+
 	// clear out the buffers
 	bzero(rv_dag_str, rvstrlen);
 	bzero(root, CONFIG_PATH_BUF_SIZE);
+
 	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
-	//printf("XreadRVServerControlAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
-	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen,
+			strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		printf("XreadRVServerControlAddr: found server at:%s:\n", rv_dag_str);
 		ret = 0;
-	}// else {
-	//	printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
-	//}
+	}
 	return ret;
 }
 
