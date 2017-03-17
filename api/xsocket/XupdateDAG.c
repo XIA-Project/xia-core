@@ -25,6 +25,20 @@
 
 #define MAX_RV_DAG_SIZE 1024
 
+/*!
+ * @brief update the DAG for an interface
+ *
+ * Each interface has a DAG associated with it. This API allows a user
+ * space application to change the DAG for a given interface
+ *
+ * @param sockfd a previously allocated Xsocket
+ * @param interface the interface whose DAG needs to be changed
+ * @param rdag the router's DAG
+ * @param r4id the router's 4ID
+ *
+ * @returns -1 on failure
+ * @returns 0 on success
+ */
 int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   int rc;
 
@@ -73,6 +87,24 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   return 0;
 }
 
+/*!
+ * @brief update the rendezvous service of our new address
+ *
+ * When we join a new network, if there is a rendezvous service associated
+ * with the interface that migrated, we send a notification to the service
+ * of our new address.
+ *
+ * \todo require feedback response from the rendezvous service control plane
+ *
+ * This is a one time message with no feedback. So if the message is lost
+ * the rendezvous service won't be able to forward packets.
+ *
+ * @param sockfd a previously created XSocket
+ * @param interface the interface that just joined a new network or came up
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int XupdateRV(int sockfd, int interface)
 {
 	int rc;
