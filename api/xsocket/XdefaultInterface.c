@@ -21,6 +21,28 @@
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
+/*!
+ * @brief Change the default interface for this host
+ *
+ * The XupdateDefaultInterface allows an application to change the
+ * default interface used by the system. The address accociated with
+ * the default interface is used as source address in outgoing packets.
+ * The response packets from a peer would then arrive on the default
+ * interface for all applications unless they choose to bind to another
+ * interface.
+ *
+ * Note that this API changes the default interface for the system
+ * and will be a protected API in the future.
+ *
+ * If an application needs to just change the source address for itself
+ * and not the entire system, it should bind() to an address associated
+ * with the intented interface and not use this API.
+ *
+ * @param sockfd an Xsocket previously created.
+ * @param interface the new default interface.
+ *
+ * @returns 0 on success or -1 on failure.
+ */
 int XupdateDefaultInterface(int sockfd, int interface)
 {
 	int rc;
@@ -42,6 +64,16 @@ int XupdateDefaultInterface(int sockfd, int interface)
 }
 
 
+/*!
+ * @brief Identify the default interface for this system
+ *
+ * An application can call XdefaultInterface() to identify the network
+ * interface that is the default interface for this system.
+ *
+ * @param sockfd an Xsocket previously created.
+ *
+ * @returns the current default interface or -1 on error.
+ */
 int XdefaultInterface(int sockfd) {
   	int rc = -1;
 	int default_iface = -1;
