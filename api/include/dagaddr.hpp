@@ -123,7 +123,6 @@ public:
 	Graph first_hop();
 	uint8_t num_nodes() const;
 	Node get_node(int i) const;
-	std::vector<std::size_t> get_out_edges(int i) const;
 	size_t fill_wire_buffer(node_t *buf) const;
 	void fill_sockaddr(sockaddr_x *s) const;
 	void from_wire_format(uint8_t num_nodes, const node_t *buf);
@@ -155,6 +154,7 @@ private:
 
 	void replace_node_at(int i, const Node& new_node);
 
+	std::vector<std::size_t> get_out_edges(int i) const;
 
 	bool is_source(std::size_t id) const;
 	bool is_sink(std::size_t id) const;
