@@ -766,7 +766,7 @@ int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 **  when the host has moved to a new AD
 */
 int XregisterHost(const char *name, sockaddr_x *DAG) {
-	return _xregister(name, DAG, NS_FLAGS_MIGRATE);
+	return _xregister(name, DAG, 0);
 }
 
 /*!

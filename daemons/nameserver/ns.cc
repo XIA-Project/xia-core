@@ -83,141 +83,6 @@ void config(int argc, char** argv)
 	setlogmask(LOG_UPTO(level));
 }
 
-// return true if the AD has an edge that points to the HID
-int check_pair(Graph &g, int ad, int hid)
-{
-	bool found = false;
-
-	// what to do if AD has edges to multiple HIDs?
-
-	if (ad >= 0 && hid >= 0) {
-		std::vector<std::size_t> edges = g.get_out_edges(ad);
-		std::vector<std::size_t>::iterator ei;
-		for (ei = edges.begin(); ei < edges.end(); ei++) {
-			if ((int)*ei == hid) {
-				found = true;
-				break;
-			}
-		}
-	}
-
-	return found;
-}
-
-// Called when a name registration is recieved with the migrate flag set.
-// This will happen when the xhcp client registers a name for its AD:HID
-//  and will happen whenever the host finds itself in a new AD.
-// If an older host entry is found for this HID, replace the entry, and
-//  find any other names that use the old AD and update them to use the new one
-//  instead.
-void migrate(const char *name, const char *dag)
-{
-	map<std::string, dbreq>::iterator it;
-
-	it = name_to_dag_db_table.find(name);
-	if (it != name_to_dag_db_table.end()) {
-
-		// name is already registered, we may need to migrate it
-
-		string dag_str = it->second.dag;
-
-		Graph new_dag(dag);
-		Graph old_dag(dag_str);
-		Node *new_ad = NULL;
-		Node *new_hid = NULL;
-		Node *old_ad = NULL;
-
-		int ad_index = -1;
-		int hid_index = -1;
-
-		// find AD & HID in the new DAG
-		for (int i = 0; i < new_dag.num_nodes(); i++) {
-			Node n = new_dag.get_node(i);
-
-			if (n.type() == XID_TYPE_AD) {
-				ad_index = i;
-				new_ad = new Node(n);
-
-			} else if (n.type() == XID_TYPE_HID) {
-				hid_index = i;
-				new_hid = new Node(n);
-			}
-		}
-
-		if (check_pair(new_dag, ad_index, hid_index)) {
-
-			// we found the new AD/HID and AD has an out edge to HID
-
-			ad_index = -1;
-			hid_index = -1;
-
-			// this assumes the old DAG only has a single AD and HID in it
-			// and will only reliably work for and dag like AD->HID or IP->(AD->HID)
-			for (int i = 0; i < old_dag.num_nodes(); i++) {
-
-				Node n = old_dag.get_node(i);
-				if (n.type() == XID_TYPE_AD) {
-					ad_index = i;
-					old_ad = new Node(n);
-				}
-				else if (n.type() == XID_TYPE_HID && new_hid->equal_to(n)) {
-					// we found an HID that matches the one in the new dag
-					hid_index = i;
-				}
-			}
-
-			if (check_pair(old_dag, ad_index, hid_index)) {
-
-				// HIDs match, time to update dags in our database
-
-				// this dag has migrated, put new record in table
-				syslog(LOG_INFO, "migrated host record %s to %s:%s", name,
-						new_ad->type_string().c_str(), new_ad->id_string().c_str());
-				name_to_dag_db_table[name].dag = dag;
-				name_to_dag_db_table[name].flags = 0;
-
-				// now walk the list of registered dags and update those that should migrate
-				/*
-				for (it = name_to_dag_db_table.begin(); it != name_to_dag_db_table.end(); it++) {
-					string ds = it->second;
-					string nm = it->first;
-					Graph g(ds);
-
-					ad_index = -1;
-					hid_index = -1;
-
-					for (int i = 0; i < g.num_nodes(); i++) {
-						if (old_ad->equal_to(g.get_node(i)))
-							ad_index = i;
-						else if (new_hid->equal_to(g.get_node(i)))
-							hid_index = i;
-					}
-
-					if (check_pair(g, ad_index, hid_index)) {
-
-						// update the AD node
-						syslog(LOG_INFO, "migrated name record %s to %s:%s", nm.c_str(),
-							new_ad->type_string().c_str(), new_ad->id_string().c_str());
-						g.replace_node_at(ad_index, *new_ad);
-						name_to_dag_db_table[nm] = g.dag_string();
-					}
-				}
-				*/
-			}
-		}
-
-		if (new_ad)  delete new_ad;
-		if (new_hid) delete new_hid;
-		if (old_ad)  delete old_ad;
-
-	} else {
-		syslog(LOG_DEBUG, "%s is new, no migration needed", name);
-		syslog(LOG_INFO, "registered %s", name);
-		name_to_dag_db_table[name].dag = dag;
-		name_to_dag_db_table[name].flags = 0;
-	}
-}
-
 
 int main(int argc, char *argv[]) {
 	sockaddr_x ddag;
@@ -269,28 +134,20 @@ int main(int argc, char *argv[]) {
 
 		switch (req_pkt.type) {
 		case NS_TYPE_REGISTER:
+		{
 			// insert a new entry
 
-			if (req_pkt.flags & NS_FLAGS_MIGRATE) {
-				// this should be a host record, if no matching name is in the
-				//  database, just add the record
-				// if the name already exists, check that the HIDs match, and
-				//  if so replace the entry, and update the AD in any name records that
-				//  contain the same HID
-				migrate(req_pkt.name, req_pkt.dag);
-			} else {
-				// just add the new name record
-				dbreq d;
+			dbreq d;
 
-				d.dag = req_pkt.dag;
-				d.flags = flags;
+			d.dag = req_pkt.dag;
+			d.flags = flags;
 
-				syslog(LOG_INFO, "new entry: %02x %s = %s", flags, req_pkt.name, req_pkt.dag);
+			syslog(LOG_INFO, "new entry: %02x %s = %s", flags, req_pkt.name, req_pkt.dag);
 
-				name_to_dag_db_table[req_pkt.name] = d;
-			}
+			name_to_dag_db_table[req_pkt.name] = d;
 			rtype = NS_TYPE_RESPONSE_REGISTER;
 			break;
+		}
 		case NS_TYPE_ANYCAST_REGISTER:
 		{
 			syslog(LOG_INFO, "new entry: %s = %s", req_pkt.name, req_pkt.dag);
