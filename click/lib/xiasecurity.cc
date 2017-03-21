@@ -78,7 +78,8 @@ XIASecurityBuffer::XIASecurityBuffer(const char *buf, uint16_t len)
 	// Copy the serialized buffer
 	_buffer = (char *)calloc(len, 1);
 	if(_buffer == NULL) {
-		xs_chatter("XIASecurityBuffer:: CRITICAL, could not allocate %d bytes for buffer", len);
+		xs_chatter("XIASecurityBuffer ERROR: allocating %d bytes", len);
+		throw std::bad_alloc();
 	}
 	memcpy(_buffer, buf, len);
 	// Update pointers
