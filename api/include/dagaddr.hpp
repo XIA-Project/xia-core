@@ -85,6 +85,20 @@ private:
 	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
 
+/*!
+ * @brief Build DAGs for use as addresses in XIA
+ *
+ * This class provides the user a simple set of operators to build a DAG
+ * for use as address within XIA.
+ *
+ * NOTE:
+ * ----
+ * Create Node(s) first and then build Graph from them
+ * Node objects are compared by reference. So even if two Nodes have
+ * the same XID, they are considered separate. This allows us to build
+ * Graphs with the same XID appearing more than once.
+ *
+ */
 class Graph
 {
 public:
@@ -94,6 +108,12 @@ public:
 	Graph(std::string dag_string);
 	Graph(const sockaddr_x *s);
 
+	// Graph manipulation operations
+	//
+	// NOTE: Nodes are compared by reference not value
+	//
+	// So create Node objects first, then build Graph
+	//
 	Graph& operator=(const Graph& r);
 	Graph& operator*=(const Graph& r);
 	Graph operator*(const Graph& r) const;
