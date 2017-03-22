@@ -80,12 +80,14 @@ message ConfigMsg {
 message HelloMsg {
 	required Node   node  = 1;
 	optional uint32 flags = 2;
+	optional bytes  dag   = 3;
 }
 
 message LSAMsg {
 	required Node          node  = 1;
-	optional uint32        flags = 2;
-	repeated NeighborEntry peers = 3;
+	required bytes         dag   = 2;
+	optional uint32        flags = 3;
+	repeated NeighborEntry peers = 4;
 }
 
 message HostJoinMsg {

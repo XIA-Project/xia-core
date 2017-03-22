@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include "Xsocket.h"
 #include "xroute.pb.h"
+#include "Xkeys.h"
+#include "dagaddr.hpp"
 #include "RouterConfig.hh"
 #include "../common/XIARouter.hh"
 
@@ -14,9 +16,11 @@
 #define MAX_XID_SIZE 64
 
 const std::string flood_fid      ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+const std::string controller_fid ("FID:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
 const std::string broadcast_fid  ("FID:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
 const std::string intradomain_sid("SID:1110000000000000000000000000000000001112");
 const std::string controller_sid ("SID:1110000000000000000000000000000000001114");
+const std::string local_sid      ("SID:1110000000000000000000000000000000001115");
 const std::string lsa_sid        ("SID:9999999999999999999999999999999999999999");
 
 // routing table flag values
@@ -40,9 +44,21 @@ protected:
 	const char *_hostname;
 	XIARouter _xr;
 
+	int _broadcast_sock;
+	int _local_sock;
+	int _source_sock;
+
+	sockaddr_x _broadcast_dag;
+	sockaddr_x _controller_dag;
+	sockaddr_x _local_dag;
+	sockaddr_x _source_dag;
+
 	RouteModule(const char *name) {_hostname = name;}
 
-	int sendMessage(int sock, sockaddr_x *dest, const Xroute::XrouteMsg &msg);
+	int sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg);
+	int sendBroadcastMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_broadcast_dag, msg); };
+	int sendControllerMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_controller_dag, msg); };
+	int sendLocalMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_local_dag, msg); };
 
 	// virtual functions to be defined by the subclasses
 	virtual int init() = 0;      // configure the route module

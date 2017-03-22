@@ -29,6 +29,7 @@ struct NeighborEntry{
 typedef struct {
 	std::string ad;
 	std::string hid;
+	sockaddr_x dag;
 	uint32_t num_neighbors;	// number of neighbors of dest AD //TODO: remove
 	std::vector<NeighborEntry> neighbor_list; // neighbor list
 

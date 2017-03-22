@@ -24,9 +24,11 @@ protected:
 	std::string _myAD;
 	std::string _myHID;
 
-	int32_t _sock;
-	sockaddr_x _sdag;
-	sockaddr_x _ddag;
+	int _router_sock;
+
+	sockaddr_x _router_dag;
+
+
 
 	int32_t _num_neighbors;	// number of neighbor routers
 	int32_t _lsa_seq;		// LSA sequence number of this router
@@ -50,6 +52,7 @@ protected:
 
 	void *handler();
 	int init();
+	int makeSockets();
 
 	int processMsg(std::string msg, uint32_t iface);
 

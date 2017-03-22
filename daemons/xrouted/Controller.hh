@@ -105,9 +105,11 @@ protected:
 
 	std::string _myAD;
 	std::string _myHID;
+	Node _my_fid;
 
-	sockaddr_x _sdag;
-	sockaddr_x _ddag;
+	int _controller_sock;
+
+
 
 	char myAD[MAX_XID_SIZE]; // this router AD
 	char myHID[MAX_XID_SIZE]; // this router HID
@@ -158,6 +160,8 @@ protected:
 
 	void *handler();
 	int init();
+	int makeSockets();
+
 
 	int sendHello();
 	int sendInterDomainLSA();

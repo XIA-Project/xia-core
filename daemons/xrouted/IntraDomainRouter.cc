@@ -45,16 +45,33 @@ void *IntraDomainRouter::handler()
 			timeradd(&now, &l_freq, &l_fire);
 		}
 
-		struct pollfd pfd;
+		struct pollfd pfd[3];
 
-		pfd.fd = _sock;
-		pfd.events = POLLIN;
+		pfd[0].fd = _broadcast_sock;
+		pfd[1].fd = _router_sock;
+		pfd[2].fd = _local_sock;
+		pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
 
 		tspec.tv_sec = 0;
 		tspec.tv_nsec = 500000000;
 
-		rc = Xppoll(&pfd, 1, &tspec, NULL);
+		rc = Xppoll(pfd, 1, &tspec, NULL);
 		if (rc > 0) {
+			int sock = -1;
+
+			for (int i = 0; i < 3; i++) {
+				if (pfd[i].revents & POLLIN) {
+					sock = pfd[i].fd;
+					break;
+				}
+			}
+
+			if (sock < 0) {
+				// something weird happened
+				return 0;
+			}
+
+
 			// receiving a Hello or LSA packet
 			memset(&recv_message[0], 0, sizeof(recv_message));
 
@@ -83,7 +100,7 @@ void *IntraDomainRouter::handler()
 
 			mh.msg_controllen = cmsg->cmsg_len;
 
-			if ((rc = Xrecvmsg(_sock, &mh, 0)) < 0) {
+			if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
 				perror("recvfrom");
 
 			} else {
@@ -149,48 +166,129 @@ void *IntraDomainRouter::handler()
 	return 0;
 }
 
-
-int IntraDomainRouter::init()
+int IntraDomainRouter::makeSockets()
 {
-	char dag[MAX_DAG_SIZE];
+	char s[MAX_DAG_SIZE];
+	Graph g;
+	Node src;
 
-	// open socket for route process
-	_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create a socket");
-		exit(-1);
+	// broadcast socket - hello messages, can hopefully go away
+	_broadcast_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_broadcast_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the broadcast socket");
+		return -1;
 	}
 
-	// make the broadcast dag we'll use to send to the other routers
-	Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
-	g.fill_sockaddr(&_ddag);
-	syslog(LOG_INFO, "Router broadcast DAG: %s", g.dag_string().c_str());
+	// control socket - local communication
+	_local_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_local_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the local control socket");
+		return -1;
+	}
 
+	// router socket - flooded & interdomain communication
+	_router_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_router_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the controller socket");
+		return -1;
+	}
+
+	// source socket - sending socket
+	_source_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_source_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the out socket");
+		return -1;
+	}
 
 	// get our AD and HID
-	if ( XreadLocalHostAddr(_sock, dag, MAX_DAG_SIZE, NULL, 0) < 0 ) {
+	if ( XreadLocalHostAddr(_local_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
 		syslog(LOG_ALERT, "Unable to read local XIA address");
-		exit(-1);
+		return -1;
 	}
-	Graph glocal(dag);
+
+	// FIXME: these should probably be Nodes instead of strings!
+	Graph glocal(s);
 	_myAD = glocal.intent_AD_str();
 	_myHID = glocal.intent_HID_str();
 
-	// make the dag we will listen on
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, intradomain_sid.c_str(), NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "unable to create source DAG");
-		exit(-1);
-	}
-	memcpy(&_sdag, ai->ai_addr, sizeof(sockaddr_x));
-	Graph gg(&_sdag);
-	syslog(LOG_INFO, "xroute Source DAG: %s", gg.dag_string().c_str());
 
-	// bind to the src DAG
-	if (Xbind(_sock, (struct sockaddr*)&_sdag, sizeof(sockaddr_x)) < 0) {
-		Graph g(&_sdag);
+	// make the dag we'll receive local broadcasts on
+	g = src * Node(broadcast_fid) * Node(intradomain_sid);
+
+	g.fill_sockaddr(&_broadcast_dag);
+	syslog(LOG_INFO, "Broadcast DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the broadcast receive socket
+	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
 		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		Xclose(_sock);
+		return -1;
+	}
+
+	// make the dag we'll receive local messages on
+	g = src * Node(local_sid);
+
+	g.fill_sockaddr(&_local_dag);
+	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the broadcast receive socket
+	if (Xbind(_local_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+	// make the dag we'll receive controller messages on
+	XcreateFID(s, sizeof(s));
+
+	Node nFID(s);
+	Node nHID(_myHID);
+
+	XmakeNewSID(s, sizeof(s));
+
+	Node rSID(s);
+	g = (src + nHID * nFID * rSID) + (src * nFID * rSID);
+
+	g.fill_sockaddr(&_router_dag);
+	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the controller receive socket
+	if (Xbind(_router_sock, (struct sockaddr*)&_router_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+
+	// make the DAG we'll send with
+	XmakeNewSID(s, sizeof(s));
+	Node nAD(_myAD);
+	Node outSID(s);
+	g = nAD * nHID * outSID;
+
+	g.fill_sockaddr(&_source_dag);
+	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the source socket
+	if (Xbind(_source_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+
+	// make the dag we'll send controller messages to
+	// FIXME: eventually we'll get this from xnetjd
+	nFID = Node(controller_fid);
+	Node ncSID(controller_sid);
+	g = (src + nHID * nFID * ncSID) + (src * nFID * ncSID);
+
+	g.fill_sockaddr(&_controller_dag);
+	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+
+	return 0;
+}
+
+
+int IntraDomainRouter::init()
+{
+	if (makeSockets() < 0) {
 		exit(-1);
 	}
 
@@ -202,7 +300,7 @@ int IntraDomainRouter::init()
 	// FIXME: figure out what the correct type of router we are
 	_flags = F_EDGE_ROUTER;
 
-	if( XisDualStackRouter(_sock) == 1 ) {
+	if( XisDualStackRouter(_local_sock) == 1 ) {
 		_flags |= F_IP_GATEWAY;
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
 	}
@@ -239,6 +337,7 @@ int IntraDomainRouter::sendHello()
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 	hello->set_flags(_flags);
+	hello->set_dag(&_router_dag, sizeof(sockaddr_x));
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -248,7 +347,7 @@ int IntraDomainRouter::sendHello()
 
 
 //	printf("sending %s\n", msg.DebugString().c_str());
-	return sendMessage(_sock, &_ddag, msg);
+	return sendBroadcastMessage(msg);
 }
 
 // send LinkStateAdvertisement message (flooding)
@@ -267,6 +366,7 @@ int IntraDomainRouter::sendLSA()
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 
 	lsa->set_flags(_flags);
+	lsa->set_dag(&_router_dag, sizeof(sockaddr_x));
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -293,7 +393,7 @@ int IntraDomainRouter::sendLSA()
 	}
 
 //	printf("sending %s\n", msg.DebugString().c_str());
-	return sendMessage(_sock, &_ddag, msg);
+	return sendMessage(&_controller_dag, msg);
 }
 
 int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
@@ -383,10 +483,10 @@ int IntraDomainRouter::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 	}
 
 
-	// FIXME: we shoudn't need this once flooding is turned on
-	if (dstHID != _myHID) {
-		return sendMessage(_sock, &_ddag, xmsg);
-	}
+//	// FIXME: we shoudn't need this once flooding is turned on
+//	if (dstHID != _myHID) {
+//		return sendMessage(_sock, &_ddag, xmsg);
+//	}
 
 	std::map<std::string, XIARouteEntry> xrt;
 	_xr.getRoutes("AD", xrt);
@@ -504,6 +604,9 @@ int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		neighbor.HID = neighborHID;
 	}
 
+	if (msg.has_dag()) {
+	}
+
 	if (msg.has_flags()) {
 		flags = msg.flags();
 	}
@@ -572,9 +675,9 @@ int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 		return 1;
 	}
 
-	syslog(LOG_INFO, "Forward-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
-
-	return sendMessage(_sock, &_ddag, msg);
+	return 1;
+//	syslog(LOG_INFO, "Forward-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
+//	return sendMessage(_sock, &_ddag, msg);
 }
 
 
@@ -598,10 +701,10 @@ int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 		return 1;
 	}
 
-	// FIXME: we shoudn't need this once flooding is turned on
-	if ((dstAD != _myAD) || (dstHID != _myHID)) {
-		return sendMessage(_sock, &_ddag, xmsg);
-	}
+//	// FIXME: we shoudn't need this once flooding is turned on
+//	if ((dstAD != _myAD) || (dstHID != _myHID)) {
+//		return sendMessage(_sock, &_ddag, xmsg);
+//	}
 
 	uint32_t numEntries = msg.routes_size();
 

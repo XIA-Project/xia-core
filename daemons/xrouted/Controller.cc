@@ -56,29 +56,28 @@ void *Controller::handler()
 
 	struct pollfd pfd[3];
 
-	pfd[0].fd = _rsock;
-	pfd[1].fd = _csock;
-	pfd[2].fd = _fsock;
+	pfd[0].fd = _broadcast_sock;
+	pfd[1].fd = _controller_sock;
+	pfd[2].fd = _local_sock;
 	pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
 
 	tspec.tv_sec = 0;
 	tspec.tv_nsec = 500000000;
 
-	rc = Xppoll(pfd, 2, &tspec, NULL);
+	rc = Xppoll(pfd, 3, &tspec, NULL);
 	if (rc > 0) {
-		int sock;
+		int sock = -1;
 
-		if (pfd[0].revents & POLLIN) {
-			sock = pfd[0].fd;
+		for (int i = 0; i < 3; i++) {
+			if (pfd[i].revents & POLLIN) {
+				sock = pfd[i].fd;
+				break;
+			}
+		}
 
-		} else if (pfd[1].revents & POLLIN) {
-			sock = pfd[1].fd;
-
-		} else if (pfd[2].revents & POLLIN) {
-			sock = pfd[2].fd;
-
-		} else {
-			// something bad may have happened
+		if (sock < 0) {
+			// something weird happened
+			return 0;
 		}
 
 		// receiving a Hello or LSA packet
@@ -207,97 +206,125 @@ void *Controller::handler()
 	return NULL;
 }
 
+
+
+int Controller::makeSockets()
+{
+	char s[MAX_DAG_SIZE];
+	Graph g;
+	Node src;
+
+	// broadcast socket - hello messages, can hopefully go away
+	_broadcast_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_broadcast_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the broadcast socket");
+		return -1;
+	}
+
+	// control socket - local communication
+	_local_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_local_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the local control socket");
+		return -1;
+	}
+
+	// controller socket - flooded & interdomain communication
+	_controller_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_controller_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the controller socket");
+		return -1;
+	}
+
+	// source socket - sending socket
+	_source_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_source_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the out socket");
+		return -1;
+	}
+
+	// get our AD and HID
+	if ( XreadLocalHostAddr(_local_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
+		syslog(LOG_ALERT, "Unable to read local XIA address");
+		return -1;
+	}
+
+	// FIXME: these should probably be Nodes instead of strings!
+	Graph glocal(s);
+	_myAD = glocal.intent_AD_str();
+	_myHID = glocal.intent_HID_str();
+
+
+	// make the dag we'll receive local broadcasts on
+	g = src * Node(broadcast_fid) * Node(intradomain_sid);
+
+	g.fill_sockaddr(&_broadcast_dag);
+	syslog(LOG_INFO, "Broadcast DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the broadcast receive socket
+	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+	// make the dag we'll receive local messages on
+	g = src * Node(local_sid);
+
+	g.fill_sockaddr(&_local_dag);
+	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the broadcast receive socket
+	if (Xbind(_local_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+	// make the dag we'll receive controller messages on
+	// FIXME: use a static FID for now...
+	//XcreateFID(s, sizeof(s));
+	strcpy(s, controller_fid.c_str());
+
+	Node nFID(s);
+	Node nHID(_myHID);
+	Node ncSID(controller_sid);
+	g = (src + nHID * nFID * ncSID) + (src * nFID * ncSID);
+
+	g.fill_sockaddr(&_controller_dag);
+	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the controller receive socket
+	if (Xbind(_controller_sock, (struct sockaddr*)&_controller_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+
+	// make the DAG we'll send with
+	XmakeNewSID(s, sizeof(s));
+	Node nAD(_myAD);
+	Node outSID(s);
+	g = nAD * nHID * outSID;
+
+	g.fill_sockaddr(&_source_dag);
+	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
+
+	// and bind it to the source socket
+	if (Xbind(_source_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+		return -1;
+	}
+
+	return 0;
+}
+
 int Controller::init()
 {
-	char dag[MAX_DAG_SIZE];
-
 	srand (time(NULL));
 
 	_flags = F_CONTROLLER; // FIXME: set any other useful flags at this time
 
-
-	// open socket for route process
-	_rsock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_rsock < 0) {
-		syslog(LOG_ALERT, "Unable to create a socket");
+	if (makeSockets() < 0) {
 		exit(-1);
 	}
-
-	// make the broadcast dag we'll use to send to our child routers
-	Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
-	g.fill_sockaddr(&_ddag);
-	syslog(LOG_INFO, "Controller broadcast DAG: %s", g.dag_string().c_str());
-
-	// get our AD and HID
-	if ( XreadLocalHostAddr(_rsock, dag, MAX_DAG_SIZE, NULL, 0) < 0 ) {
-		syslog(LOG_ALERT, "Unable to read local XIA address");
-		exit(-1);
-	}
-	Graph glocal(dag);
-	_myAD = glocal.intent_AD_str();
-	_myHID = glocal.intent_HID_str();
-
-	// make the src DAG (the one we talk to child routers with)
-	struct addrinfo *ai;
-	if (Xgetaddrinfo(NULL, intradomain_sid.c_str(), NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "unable to create source DAG");
-		exit(-1);
-	}
-	memcpy(&_sdag, ai->ai_addr, sizeof(sockaddr_x));
-	Graph gg(&_sdag);
-	syslog(LOG_INFO, "xroute Source DAG: %s", gg.dag_string().c_str());
-
-	// bind to the src DAG
-	if (Xbind(_rsock, (struct sockaddr*)&_sdag, sizeof(sockaddr_x)) < 0) {
-		Graph g(&_sdag);
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		Xclose(_rsock);
-		exit(-1);
-	}
-
-
-
-// make temporary test socket for receiving lsas
-	_fsock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_fsock < 0) {
-		syslog(LOG_ALERT, "Unable to create a socket");
-		exit(-1);
-	}
-
-	char fstr[1000];
-	sockaddr_x fdag;
-	sprintf(fstr, "DAG 0 1 -\n%s 1 -\n%s 2 -\n%s", _myHID.c_str(), flood_fid.c_str(), lsa_sid.c_str());
-	xia_pton(AF_XIA, fstr, &fdag);
-
-	if (Xbind(_fsock, (struct sockaddr*)&fdag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", fstr);
-		Xclose(_fsock);
-		exit(-1);
-	}
-
-
-	// now make the contoller socket
-	_csock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_csock < 0) {
-		syslog(LOG_ALERT, "Unable to create a socket");
-		exit(-1);
-	}
-
-	// bind to the controller service
-	sockaddr_x tempDAG;
-	if (Xgetaddrinfo(NULL, controller_sid.c_str(), NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "unable to bind controller service");
-		exit(-1);
-	}
-	memcpy(&tempDAG, ai->ai_addr, sizeof(sockaddr_x));
-
-	if (Xbind(_csock, (struct sockaddr*)&tempDAG, sizeof(sockaddr_x)) < 0) {
-		Graph g(&tempDAG);
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		Xclose(_csock);
-		exit(-1);
-	}
-
 
 	_num_neighbors = 0; // number of neighbor routers
 	_lsa_seq = rand() % MAX_SEQNUM;	// LSA sequence number of this router
@@ -335,7 +362,7 @@ int Controller::init()
 }
 
 
-// FIXME: this did 2 sends in the original SDN code, will this change work?
+// FIXME: this did 2 sends in the original SDN code, still needed?
 int Controller::sendHello()
 {
 	int rc;
@@ -352,20 +379,22 @@ int Controller::sendHello()
 
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
+	hello->set_dag(&_controller_dag, sizeof(sockaddr_x));
 	hello->set_flags(F_CONTROLLER);
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 
-	if ((rc = sendMessage(_rsock, &_ddag, msg)) > 0) {
+
+	if ((rc = sendBroadcastMessage(msg)) > 0) {
 
 		// now do it again with the SID
 		Xroute::XID *sid = node->mutable_sid();
 		sid->set_type(n_sid.type());
 		sid->set_id(n_sid.id(), XID_SIZE);
 
-		rc = sendMessage(_rsock, &_ddag, msg);
+		rc = sendBroadcastMessage(msg);
 	}
 
 	return rc;
@@ -422,7 +451,7 @@ int Controller::sendInterDomainLSA()
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
 
-		int temprc = sendMessage(_csock, &ddag, msg);
+		int temprc = sendMessage(&ddag, msg);
 		rc = (temprc < rc)? temprc : rc;
 	}
 
@@ -489,7 +518,7 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
-		return sendMessage(_rsock, &ddag, msg);
+		return sendMessage(&ddag, msg);
 	}
 }
 
@@ -669,7 +698,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
 		g.fill_sockaddr(&ddag);
 
-		int temprc = sendMessage(_csock, &ddag, xmsg);
+		int temprc = sendMessage(&ddag, xmsg);
 		rc = (temprc < rc)? temprc : rc;
 	}
 	return rc;
@@ -713,7 +742,7 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 			sockaddr_x ddag;
 			xia_pton(AF_XIA, it->second.leaderAddr.c_str(), &ddag);
 
-			int temprc = sendMessage(_csock, &ddag, msg);
+			int temprc = sendMessage(&ddag, msg);
 			rc = (temprc < rc)? temprc : rc;
 			//syslog(LOG_DEBUG, "sent SID %s keep alive to %s", it->first.c_str(), it->second.leaderAddr.c_str());
 		}
@@ -1703,6 +1732,9 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		flags = msg.flags();
 	}
 
+	if (msg.has_dag()) {
+	}
+
 	// Update neighbor table
 	NeighborEntry neighbor;
 	neighbor.AD        = neighborAD;
@@ -1780,12 +1812,15 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		return 1;
 	}
 
+
+
 	uint32_t numNeighbors = msg.peers_size();
 
 	// 2. Update the network table
 	NodeStateEntry entry;
 	entry.ad  = srcAD;
 	entry.hid = srcHID;
+	memcpy(&entry.dag, msg.dag().c_str(), sizeof(sockaddr_x));
 	entry.num_neighbors = numNeighbors;
 
 	for (uint32_t i = 0; i < numNeighbors; i++) {
