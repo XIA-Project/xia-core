@@ -92,6 +92,7 @@ private:
 	int _num_ports;
 	XID _local_hid;
 	XID _bcast_xid;
+	XID _flood_xid;
 };
 
 CLICK_ENDDECLS

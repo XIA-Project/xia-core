@@ -64,6 +64,9 @@ int FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 	String broadcast_xid(BFID);  // broadcast FID
 	_bcast_xid.parse(broadcast_xid);
 
+	String flood_xid(FFID);  // flood FID
+	_flood_xid.parse(flood_xid);
+
 	return 0;
 }
 
@@ -474,7 +477,7 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 		p->set_nexthop_neighbor_xid_anno(fid);
 		return DESTINED_FOR_BROADCAST;
 
-	} else if (fid == flood_xid) {
+	} else if (fid == _flood_xid) {
 		// it's the global FID
 		// FIXME: is this a temporary case?
 
