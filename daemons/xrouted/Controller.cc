@@ -253,6 +253,7 @@ int Controller::makeSockets()
 	_myAD = glocal.intent_AD_str();
 	_myHID = glocal.intent_HID_str();
 
+	Node nHID(_myHID);
 
 	// make the dag we'll receive local broadcasts on
 	g = src * Node(broadcast_fid) * Node(intradomain_sid);
@@ -267,7 +268,7 @@ int Controller::makeSockets()
 	}
 
 	// make the dag we'll receive local messages on
-	g = src * Node(local_sid);
+	g = src * nHID * Node(local_sid);
 
 	g.fill_sockaddr(&_local_dag);
 	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
@@ -282,11 +283,12 @@ int Controller::makeSockets()
 	// FIXME: use a static FID for now...
 	//XcreateFID(s, sizeof(s));
 	strcpy(s, controller_fid.c_str());
+	_xr.setRoute(controller_fid, -2, "", 0);
+
 
 	Node nFID(s);
-	Node nHID(_myHID);
 	Node ncSID(controller_sid);
-	g = (src + nHID * nFID * ncSID) + (src * nFID * ncSID);
+	g = (src * nHID * nFID * ncSID) + (src * nFID * ncSID);
 
 	g.fill_sockaddr(&_controller_dag);
 	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
@@ -297,12 +299,11 @@ int Controller::makeSockets()
 		return -1;
 	}
 
-
 	// make the DAG we'll send with
 	XmakeNewSID(s, sizeof(s));
 	Node nAD(_myAD);
 	Node outSID(s);
-	g = nAD * nHID * outSID;
+	g = src * nAD * nHID * outSID;
 
 	g.fill_sockaddr(&_source_dag);
 	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
@@ -385,7 +386,6 @@ int Controller::sendHello()
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
-
 
 	if ((rc = sendBroadcastMessage(msg)) > 0) {
 
@@ -1821,6 +1821,11 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	entry.ad  = srcAD;
 	entry.hid = srcHID;
 	memcpy(&entry.dag, msg.dag().c_str(), sizeof(sockaddr_x));
+
+	char xxx[1000];
+	xia_ntop(AF_XIA, &entry.dag, xxx, sizeof(xxx));
+
+	printf("lsa dag: %s\n", xxx);
 	entry.num_neighbors = numNeighbors;
 
 	for (uint32_t i = 0; i < numNeighbors; i++) {

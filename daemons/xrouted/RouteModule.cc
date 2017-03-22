@@ -5,15 +5,15 @@ pthread_t RouteModule::start()
 {
 	int rc;
 
-	init();
-	_enabled = true;
-
 	// connect to the click route engine
 	_xr.setRouter(_hostname);
 	if ((rc = _xr.connect()) != 0) {
 		syslog(LOG_ALERT, "unable to connect to click (%d)", rc);
 		exit(-1);
 	}
+
+	init();
+	_enabled = true;
 
 	rc = pthread_create(&_t, NULL, run, (void*)this);
 	if (rc == 0) {

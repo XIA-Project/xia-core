@@ -58,13 +58,11 @@ int main(int argc, char *argv[])
 	if (config.routers() & LOCAL_ROUTER) {
 		IntraDomainRouter *r = new IntraDomainRouter(config.hostname());
 		r->start();
-		printf("router\n");
 		modules.push_back(r);
 	}
 	if (config.routers() & SDN_ROUTER) {
 		Controller *c = new Controller(config.hostname());
 		c->start();
-		printf("controller\n");
 		modules.push_back(c);
 	}
 
