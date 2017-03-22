@@ -14,7 +14,6 @@
 #include <clicknet/xia.h>
 #include "xiaxidroutetable.hh"
 #include <click/string.hh>
-#include <elements/ipsec/sha1_impl.hh>
 #include <click/xiastreamheader.hh>
 #include "xtransport.hh"
 #include <clicknet/tcp_fsm.h>
