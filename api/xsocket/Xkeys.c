@@ -34,7 +34,20 @@
 /*! \endcond */
 
 
-// Convert a SHA1 hash to a hex string
+/*!
+ * @brief Convert a SHA1 hash to a hex string
+ *
+ * If a valid SHA-1 digest is provided, this function converts it into a
+ * string. If the buffers are not big enough, we assert and terminate
+ * the application.
+ *
+ * @param digest a buffer containing a SHA1 hash
+ * @param digest_len length of digest. Must be SHA_DIGEST_LENGTH
+ * @param hex_string a buffer to be filled in with SHA1 hash as a string
+ * @param hex_string_len length of hex_string buffer
+ *
+ * @returns void
+ */
 void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_string, int hex_string_len)
 {
 	int i;
@@ -46,7 +59,23 @@ void sha1_hash_to_hex_string(unsigned char *digest, int digest_len, char *hex_st
 	hex_string[hex_string_len-1] = '\0';
 }
 
-// Calculate SHA1 hash of a public key in PEM format
+/*!
+ * @brief Calculate SHA1 hash of a public key in PEM format
+ *
+ * \todo in future, we should consider converting the key into binary format
+ * and then hashing the binary data instead of the string representation.
+ *
+ * Strip off the newline characters in the string representation of the
+ * provided public key and generate a SHA-1 hash on it.
+ *
+ * @param hash a buffer to be filled in with SHA-1 hash of pemkey
+ * @param hashlen length of hash
+ * @param pemkey a buffer containing a public key to be hashed
+ * @param keylen length of pemkey buffer
+ *
+ * @returns 0 on success
+ * @return -1 on failure
+ */
 static int sha1_hash_of_pubkey(unsigned char *hash, int hashlen, char *pemkey, int keylen)
 {
 	int i, j;
@@ -72,7 +101,20 @@ static int sha1_hash_of_pubkey(unsigned char *hash, int hashlen, char *pemkey, i
 	return 0;
 }
 
-// Write keys in PEM format to filesystem
+/*!
+ * @brief Write keys in PEM format to filesystem
+ *
+ * For a given RSA key-pair, and hash of the public key, two files will be
+ * created in the key directory: <hash> and <hash>.pub, where the files
+ * contain the private and the public keys respectively.
+ *
+ * @praam keydir a string containing the key directory location on filesystem
+ * @param pubkeyhashstr a string containing hash of the public key
+ * @param r RSA key pair to be written to disk
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 static int write_key_files(const char *keydir, char *pubkeyhashstr, RSA *r)
 {
 	int state = 0;
@@ -134,6 +176,16 @@ cleanup_write_key_files:
 	return retval;
 }
 
+/*!
+ * @brief check if the file exists and is a regular file
+ *
+ * stat the requested file and ensure it is a regular file.
+ *
+ * @param filepath location of file on the filesystem
+ *
+ * @returns 1 if the file exists
+ * @returns 0 if the file does not exist
+ */
 static int file_exists(char *filepath)
 {
 	struct stat fileinfo;
@@ -146,6 +198,16 @@ static int file_exists(char *filepath)
 	return 1;
 }
 
+/*!
+ * @brief checkif the requested directory exists
+ *
+ * stat the requested directory path and ensure that it is a directory.
+ *
+ * @param keydir the directory to be checked for existence
+ *
+ * @returns 1 if the directory exists
+ * @returns 0 if the directory is not found
+ */
 static int dir_exists(const char *keydir)
 {
 	struct stat keydirinfo;
@@ -161,10 +223,16 @@ static int dir_exists(const char *keydir)
 	return 1;
 }
 
-// Find the location of key directory
-// Once found we never look for it again
-// NOTE: Call must NOT free the pointer returned
-// memory is allocated for the key directory only once.
+/*!
+ * @brief Find the location of key directory
+ *
+ * Once found we never look for it again
+ * NOTE: Call must NOT free the pointer returned
+ * memory is allocated for the key directory only once.
+ *
+ * @returns NULL if the key directory is not found
+ * @returns null-terminated string containing key directory, if found
+ */
 static const char *get_keydir()
 {
 	static const char *keydir = NULL;
@@ -184,6 +252,20 @@ static const char *get_keydir()
 	return keydir;
 }
 
+
+/*!
+ * @brief delete the key pair matching the public key hash provided by caller
+ *
+ * We keep key files in the key directory with filenames matching the hash
+ * of the public key in the key pair. This function allows the caller to
+ * delete files associated with the requested key pair.
+ *
+ * @param pubkeyhashstr hash string of pubkey, for pair to be deleted
+ * @param hashstrlen length of provided hash of pubkey
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int destroy_keypair(const char *pubkeyhashstr, int hashstrlen)
 {
 	char *privfilepath;
@@ -241,6 +323,17 @@ destroy_keypair_done:
 	return rc;
 }
 
+/*!
+ * @brief remove keys associated with given SID
+ *
+ * An SID is a hash of the public key preceded by the string "SID:".
+ * We remove the key files associated with the given SID.
+ *
+ * @param sid string representing the SID
+ *
+ * @returns 0 on successful deletion of key-pair files associated with sid
+ * @returns -1 on failure
+ */
 int XremoveSID(const char *sid)
 {
 	int sidhashlen = strlen(sid) - 4;
@@ -249,7 +342,19 @@ int XremoveSID(const char *sid)
 	return destroy_keypair(sid_hash, sidhashlen);
 }
 
-
+/*!
+ * @brief generate a cryptographic key-pair
+ *
+ * Create a new cryptographic key pair. The keys are stored in the key
+ * directory and a hash of the public key is provided to the caller as
+ * a handle to reference the key pair in future.
+ *
+ * @param pubkeyhashstr buffer to return hash of newly generated public key
+ * @param hashstrlen length of pubkeyhashstr buffer
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 {
 	int retval = -1;
@@ -359,6 +464,18 @@ cleanup_generate_keypair:
 	return retval;
 }
 
+/*!
+ * @brief make a new SID backed by a crypto key-pair
+ *
+ * Create a new session identifier that an application can use to uniquely
+ * identify itself in XIA.
+ *
+ * @param randomSID a buffer to return the newly generated SID
+ * @param randomSIDlen length of randomSID buffer
+ *
+ * @returns 0 on success
+ * @return -1 on failure
+ */
 int XmakeNewSID(char *randomSID, int randomSIDlen)
 {
 	char pubkeyhashstr[XIA_SHA_DIGEST_STR_LEN];
@@ -463,7 +580,17 @@ int XremoveFID(const char *fid)
 	return destroy_keypair(p, len);
 }
 
-// Check that key files matching pubkeyhashstr exist in keydir
+/*!
+ * @brief Check that key files matching pubkeyhashstr exist in keydir
+ *
+ * Given a public-key hash, check if the corresponding key-pair is
+ * on the local disk, available for signing or encrypting.
+ *
+ * @param pubkeyhashstr Hash of a public key
+ *
+ * @returns 1 if the keys are available.
+ * @returns 0 if keys are not found.
+ */
 int exists_keypair(const char *pubkeyhashstr)
 {
 	int retval = 0;
@@ -510,19 +637,15 @@ exists_keypair_done:
 	return retval;
 }
 
+/*!
+ * @brief check if keys corresponding to an SID exist locally
+ *
+ * @param sid Session Identifier whose keys we are looking for
+ *
+ * @returns 1 if keys corresponding to SID are available.
+ * @returns 0 if the keys for the given SID are not found.
+ */
 int XexistsSID(const char *sid)
 {
 	return exists_keypair(&sid[4]);
 }
-
-/*
-int main(int argc, char* argv[])
-{
-	char pubkeyhexdigest[SHA_DIGEST_LENGTH*2+1];
-	int retval = generate_keypair("key", pubkeyhexdigest, sizeof(pubkeyhexdigest));
-	if(!retval) {
-		printf("Generated key:%s:\n", pubkeyhexdigest);
-	}
-	return retval;
-}
-*/

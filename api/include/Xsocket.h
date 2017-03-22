@@ -151,7 +151,6 @@ extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 extern int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XregisterAnycastName(const char *name, sockaddr_x *DAG);
-extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID);
 extern int Xgethostname(char *name, size_t len);

@@ -12,7 +12,7 @@ int main()
 	struct addrinfo *pai;
 	sockaddr_x *psa;
 	sockaddr_x sax;
-	char s[2048];
+	char s[XIA_MAX_DAG_STR_SIZE];
 
 	// RE dag string with a primay path direct to the SID and a fallback that goes through the AD & HID
 	// NOTE: spaces are important in RE formatted DAGS!

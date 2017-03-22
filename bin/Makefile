@@ -6,6 +6,13 @@ MANDIR=$(XIADIR)/doc/man/man1
 MANUAL="XIA system utilities"
 SOURCE="Carnegie Mellon University"
 
+#
+# if needed
+# command to generate online man pages, currently not automated
+# man2html xtrace.1 | pandoc -f html -t markdown > ~/osx/foo.md
+#
+
+
 UTILITIES=     \
 	cachectl   \
 	psx        \
@@ -23,6 +30,7 @@ UTILITIES=     \
 	xping      \
 	xroute     \
 	xtop       \
+	xtrace     \
 	xtraceroute\
 	xwrap
 
@@ -89,6 +97,9 @@ $(MANDIR)/xwrap.1: ./xwrap
 
 $(MANDIR)/xdocs.1: ./xdocs
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "view online documentation" ./$< -o$@
+
+$(MANDIR)/xtrace.1: ./xtrace
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "manage packet tracing" ./$< -o$@
 
 $(MANDIR):
 	@[ ! -d $(MANDIR) ] && mkdir $(MANDIR)

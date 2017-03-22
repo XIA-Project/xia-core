@@ -178,8 +178,8 @@ elementclass XIALineCard {
 //	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
-	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, -);
+	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, -);
 
 	// AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(INTERFACE $num, ACTIVE $isrouter);
@@ -240,8 +240,8 @@ elementclass IPLineCard {
 	print_out :: XIAPrint("<<< $ip (Out Port $num)");
 
 	// TODO: Make a counter for IP
-	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
-	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, -);
+	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, -);
 
 	toNet :: Null -> print_out -> Queue(200) -> [0]output; //count_final_out -> count_next_out -> [0]output;
 

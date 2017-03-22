@@ -293,16 +293,22 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	}
 }
 
+String XTRANSPORT::routeTableString(String xid)
+{
+	// get the type string of the XID
+	int i = xid.find_left(':');
+	assert (i != -1);
+	String typestr = xid.substring(0, i).upper();
+
+	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+	return table;
+}
+
 void XTRANSPORT::manageRoute(const XID &xid, bool create)
 {
 	String xidstr = xid.unparse();
 
-	// get the type string of the XID
-	int i = xidstr.find_left(':');
-	assert (i != -1);
-	String typestr = xidstr.substring(0, i).upper();
-
-	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+	String table = routeTableString(xidstr);
 
 	if (create) {
 		HandlerCall::call_write(table + ".add", xidstr + " " + String(DESTINED_FOR_LOCALHOST), this);
@@ -1538,7 +1544,7 @@ void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /
 	UNUSED(_sport);
 	notify_listeners.push_back(id);
 
-	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
+	// we just go away and wait for Xupdatedag to be called which will trigger a response on this client socket
 }
 
 
@@ -2178,6 +2184,13 @@ void XTRANSPORT::update_default_route(String table_str,
 	update_route("-", table_str, interface, next_xid);
 }
 
+void XTRANSPORT::remove_route(String xidstr)
+{
+	String cmd = routeTableString(xidstr) + ".remove";
+	String cmdargs = xidstr;
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+}
+
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
@@ -2212,15 +2225,13 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	// Delete route to the old AD
 	std::string old_ad = old_dag.intent_ad_str();
 	if (old_ad.length() > CLICK_XIA_XID_ID_LEN) {    // 20 bytes
-		cmd = ad_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_ad.c_str(), this);
+		remove_route(old_ad.c_str());
 	}
 
 	// Delete route for the old RHID
 	if(_interfaces.has_rhid(interface)) {
 		String old_rhid = _interfaces.getRHID(interface);
-		cmd = hid_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_rhid.c_str(), this);
+		remove_route(old_rhid);
 	}
 
 	// Retrieve new AD from router_dag
@@ -2296,14 +2307,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in PacketRoute
 		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
 		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
-		// FIXME: remove this
-		// // All the XIAXIDRouteTable elements
-		// std::string routetables[5] = {"rt_AD", "rt_HID", "rt_SID", "rt_CID", "rt_IP"};
-		// for(int i=0; i<5; i++) {
-		// 	String route_table_str = _hostname + "/xrc/n/proc/" + routetables[i].c_str() + ".dag";
-		// 	click_chatter("XTRANSPORT:Xupdatedag notifying: %s", route_table_str.c_str());
-		// 	HandlerCall::call_write(route_table_str.c_str(), new_dag.unparse().c_str(), this);
-		// }
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
@@ -2311,24 +2314,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	}
 
 	// Migrate sessions that can be migrated
-	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
-		uint32_t _migrateid = iter->first;
-		sock *sk = idToSock.get(_migrateid);
-		if (! migratable_sock(sk, interface)) {
-			continue;
-		}
+	migrateActiveSessions(interface, new_dag);
 
-		if (! update_src_path(sk, new_dag)) {
-			click_chatter("Migration skipped. Failed updating src path");
-			continue;
-		}
-
-		sk->migrating = true;
-		XStream *st = dynamic_cast<XStream *>(sk);
-
-		st->usrmigrate();
-	}
-
+	// Notify caller that the DAG has been updated
 	ReturnResult(_sport, xia_socket_msg);
 
 
@@ -2349,6 +2337,28 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 }
 
 
+void XTRANSPORT::migrateActiveSessions(int interface, XIAPath new_dag)
+{
+	// Migrate sessions that can be migrated
+	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
+		uint32_t _migrateid = iter->first;
+		sock *sk = idToSock.get(_migrateid);
+		if (! migratable_sock(sk, interface)) {
+			continue;
+		}
+
+		if (! update_src_path(sk, new_dag)) {
+			click_chatter("Migration skipped. Failed updating src path");
+			continue;
+		}
+
+		sk->migrating = true;
+		XStream *st = dynamic_cast<XStream *>(sk);
+
+		st->usrmigrate();
+	}
+
+}
 
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
