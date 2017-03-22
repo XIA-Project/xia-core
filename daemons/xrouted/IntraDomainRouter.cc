@@ -246,7 +246,7 @@ int IntraDomainRouter::makeSockets()
 	XmakeNewSID(s, sizeof(s));
 
 	Node rSID(s);
-	g = (src + nHID * nFID * rSID) + (src * nFID * rSID);
+	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 
 	g.fill_sockaddr(&_router_dag);
 	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
