@@ -290,7 +290,7 @@ int IntraDomainRouter::makeSockets()
 	// FIXME: eventually we'll get this from xnetjd
 	nFID = Node(controller_fid);
 	Node ncSID(controller_sid);
-	g = (src + nHID * nFID * ncSID) + (src * nFID * ncSID);
+	g = (src * nHID * nFID * ncSID) + (src * nFID * ncSID);
 
 	g.fill_sockaddr(&_controller_dag);
 	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
