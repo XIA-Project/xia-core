@@ -471,12 +471,17 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
 	if (fid == _bcast_xid) {
+		p->set_nexthop_neighbor_xid_anno(fid);
+		return DESTINED_FOR_BROADCAST;
+
+	} else if (fid == flood_xid) {
 		// it's the global FID
 		// FIXME: is this a temporary case?
 
 		// we want to handle this locally and also reflood it
-		p->set_nexthop_neighbor_xid_anno(fid);
-		return DESTINED_FOR_FLOOD_ALL;
+
+		// p->set_nexthop_neighbor_xid_anno(fid);
+		// return DESTINED_FOR_FLOOD_ALL;
 	}
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);

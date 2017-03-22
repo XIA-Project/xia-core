@@ -31,7 +31,7 @@ so use the XIACheckDest element before using this element.
 #define TOTAL_SPECIAL_CASES 8
 #define DESTINED_FOR_DISCARD -1
 #define DESTINED_FOR_LOCALHOST -2
-#define DESTINED_FOR_DHCP -3
+#define DESTINED_FOR_FLOOD -3
 #define DESTINED_FOR_BROADCAST -4
 #define REDIRECT -5
 #define UNREACHABLE -6
@@ -47,39 +47,39 @@ typedef struct {
 
 class XIAXIDRouteTable : public Element { public:
 
-    XIAXIDRouteTable();
-    ~XIAXIDRouteTable();
+	XIAXIDRouteTable();
+	~XIAXIDRouteTable();
 
-    const char *class_name() const		{ return "XIAXIDRouteTable"; }
-    const char *port_count() const		{ return "-/-"; }
-    const char *processing() const		{ return PUSH; }
+	const char *class_name() const		{ return "XIAXIDRouteTable"; }
+	const char *port_count() const		{ return "-/-"; }
+	const char *processing() const		{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *);
-    void add_handlers();
+	int configure(Vector<String> &, ErrorHandler *);
+	void add_handlers();
 
-    void push(int in_ether_port, Packet *);
+	void push(int in_ether_port, Packet *);
 
 	int set_enabled(int e);
 	int get_enabled();
 
 protected:
-    int lookup_route(Packet *);
-    //int process_xcmp_redirect(Packet *);
+	int lookup_route(Packet *);
+	//int process_xcmp_redirect(Packet *);
 
-    static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
-    static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
-    static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
-    static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
-    static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+	static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+	static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+	static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 	static String read_handler(Element *e, void *thunk);
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
 
-    static String list_routes_handler(Element *e, void *thunk);
+	static String list_routes_handler(Element *e, void *thunk);
 
 private:
 	HashTable<XID, XIARouteData*> _rts;
 	XIARouteData _rtdata;
-    uint32_t _drops;
+	uint32_t _drops;
 
 	int _principal_type_enabled;
 };
