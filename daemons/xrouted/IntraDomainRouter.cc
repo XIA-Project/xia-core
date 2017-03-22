@@ -211,6 +211,8 @@ int IntraDomainRouter::makeSockets()
 	_myAD = glocal.intent_AD_str();
 	_myHID = glocal.intent_HID_str();
 
+	Node nHID(_myHID);
+
 
 	// make the dag we'll receive local broadcasts on
 	g = src * Node(broadcast_fid) * Node(intradomain_sid);
@@ -225,7 +227,7 @@ int IntraDomainRouter::makeSockets()
 	}
 
 	// make the dag we'll receive local messages on
-	g = src * Node(local_sid);
+	g = src * nHID * Node(local_sid);
 
 	g.fill_sockaddr(&_local_dag);
 	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
@@ -240,7 +242,6 @@ int IntraDomainRouter::makeSockets()
 	XcreateFID(s, sizeof(s));
 
 	Node nFID(s);
-	Node nHID(_myHID);
 
 	XmakeNewSID(s, sizeof(s));
 
