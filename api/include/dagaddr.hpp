@@ -53,8 +53,8 @@ public:
 	bool has_valid_xid() const;
 
 	Node& operator=(const Node& r);
-	bool operator==(const Node& r) const { return equal_to(r); }
-	bool operator!=(const Node& r) const { return !equal_to(r); }
+	bool operator==(const Node& r) const { return ptr_ == r.ptr_; }
+	bool operator!=(const Node& r) const { return ptr_ != r.ptr_; }
 	Graph operator*(const Node& r) const;
 	Graph operator*(const Graph& r) const;
 	Graph operator+(const Node& r) const;
