@@ -54,12 +54,12 @@ void *Controller::handler()
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
 
-	struct pollfd pfd[2];
+	struct pollfd pfd[3];
 
 	pfd[0].fd = _rsock;
-	pfd[0].events = POLLIN;
 	pfd[1].fd = _csock;
-	pfd[1].events = POLLIN;
+	pfd[2].fd = _fsock;
+	pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
 
 	tspec.tv_sec = 0;
 	tspec.tv_nsec = 500000000;
@@ -73,6 +73,10 @@ void *Controller::handler()
 
 		} else if (pfd[1].revents & POLLIN) {
 			sock = pfd[1].fd;
+
+		} else if (pfd[2].revents & POLLIN) {
+			sock = pfd[2].fd;
+
 		} else {
 			// something bad may have happened
 		}
@@ -211,6 +215,7 @@ int Controller::init()
 
 	_flags = F_CONTROLLER; // FIXME: set any other useful flags at this time
 
+
 	// open socket for route process
 	_rsock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (_rsock < 0) {
@@ -249,6 +254,27 @@ int Controller::init()
 		Xclose(_rsock);
 		exit(-1);
 	}
+
+
+
+// make temporary test socket for receiving lsas
+	_fsock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
+	if (_fsock < 0) {
+		syslog(LOG_ALERT, "Unable to create a socket");
+		exit(-1);
+	}
+
+	char fstr[1000];
+	sockaddr_x fdag;
+	sprintf(fstr, "DAG 0 1 -\n%s 1 -\n%s 2 -\n%s", _myHID.c_str(), flood_fid.c_str(), lsa_sid.c_str());
+	xia_pton(AF_XIA, fstr, &fdag);
+
+	if (Xbind(_fsock, (struct sockaddr*)&fdag, sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to local DAG : %s", fstr);
+		Xclose(_fsock);
+		exit(-1);
+	}
+
 
 	// now make the contoller socket
 	_csock = Xsocket(AF_XIA, SOCK_DGRAM, 0);

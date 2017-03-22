@@ -326,17 +326,18 @@ void FIDRouteEngine::push(int in_ether_port, Packet *p)
 		// we'll handle it locally
 		output(1).push(p);
 
-	} else if (port == DESTINED_FOR_FLOOD_ALL) {
+	} else if (port == DESTINED_FOR_FLOOD) {
 		// reflood the packet
 
+printf("reflooding\n");
 		// FIXME: treat the FID as a broadcast until the router is fixed to work correctly
-		// for (int i = 0; i <= _num_ports; i++) {
-		// 	if (i != in_ether_port) {
-		// 		Packet *q = p->clone();
-		// 		SET_XIA_PAINT_ANNO(q, i);
-		// 		output(0).push(q);
-		// 	}
-		// }
+		for (int i = 0; i <= _num_ports; i++) {
+			if (i != in_ether_port) {
+				Packet *q = p->clone();
+				SET_XIA_PAINT_ANNO(q, i);
+				output(0).push(q);
+			}
+		}
 
 		// and handle it locally
 		output(1).push(p);
@@ -474,8 +475,12 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
 	if (fid == _bcast_xid) {
-		p->set_nexthop_neighbor_xid_anno(fid);
-		return DESTINED_FOR_BROADCAST;
+		// FIXME: is this the right change??
+		//p->set_nexthop_neighbor_xid_anno(fid);
+		//return DESTINED_FOR_BROADCAST;
+
+		//handle broadcast packet locally and don't resend
+		return DESTINED_FOR_LOCALHOST;
 
 	} else if (fid == _flood_xid) {
 		// it's the global FID
@@ -483,8 +488,9 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 
 		// we want to handle this locally and also reflood it
 
-		// p->set_nexthop_neighbor_xid_anno(fid);
-		// return DESTINED_FOR_FLOOD_ALL;
+		printf("got a global flood packet\n");
+		p->set_nexthop_neighbor_xid_anno(fid);
+		return DESTINED_FOR_FLOOD;
 	}
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);

@@ -13,9 +13,11 @@
 #define MAX_DAG_SIZE 1024
 #define MAX_XID_SIZE 64
 
-const std::string broadcast_fid  ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+const std::string flood_fid      ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+const std::string broadcast_fid  ("FID:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
 const std::string intradomain_sid("SID:1110000000000000000000000000000000001112");
 const std::string controller_sid ("SID:1110000000000000000000000000000000001114");
+const std::string lsa_sid        ("SID:9999999999999999999999999999999999999999");
 
 // routing table flag values
 #define F_HOST         0x0001 // node is a host
