@@ -280,7 +280,7 @@ int IntraDomainRouter::makeSockets()
 	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
 
 	// and bind it to the source socket
-	if (Xbind(_source_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+	if (Xbind(_source_sock, (struct sockaddr*)&_source_dag, sizeof(sockaddr_x)) < 0) {
 		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
 		return -1;
 	}
@@ -429,6 +429,7 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::TABLE_UPDATE_MSG:
+		printf("got update\n");
 			rc = processRoutingTable(msg);
 			break;
 
@@ -437,6 +438,7 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::SID_TABLE_UPDATE_MSG:
+		printf("got sid update\n");
 			processSidRoutingTable(msg);
 			break;
 
@@ -454,6 +456,8 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 		// We should never see these as they are meant for the controller!
 		case Xroute::LSA_MSG:
 			// FIXME: this can be no-op'd once flooding is turned on
+		printf("got lsa\n");
+
 			rc = processLSA(msg);
 			break;
 
@@ -699,6 +703,8 @@ int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
 	Xroute::TableUpdateMsg msg = xmsg.table_update();
 
+printf("processRoutingTable 1\n");
+
 	Xroute::XID fa = msg.from().ad();
 	Xroute::XID fh = msg.from().hid();
 	Xroute::XID ta = msg.to().ad();
@@ -714,6 +720,7 @@ int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 		return 1;
 	}
 
+printf("processRoutingTable 2\n");
 //	// FIXME: we shoudn't need this once flooding is turned on
 //	if ((dstAD != _myAD) || (dstHID != _myHID)) {
 //		return sendMessage(_sock, &_ddag, xmsg);
@@ -722,6 +729,7 @@ int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 	uint32_t numEntries = msg.routes_size();
 
 	for (uint i = 0; i < numEntries; i++) {
+printf("processRoutingTable 3\n");
 
 		Xroute::TableEntry e = msg.routes(i);
 		string xid     = Node(e.xid().type(),      e.xid().id().c_str(),      0).to_string();

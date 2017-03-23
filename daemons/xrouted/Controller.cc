@@ -323,7 +323,7 @@ int Controller::makeSockets()
 	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
 
 	// and bind it to the source socket
-	if (Xbind(_source_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
+	if (Xbind(_source_sock, (struct sockaddr*)&_source_dag, sizeof(sockaddr_x)) < 0) {
 		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
 		return -1;
 	}
