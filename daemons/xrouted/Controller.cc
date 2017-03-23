@@ -126,12 +126,14 @@ void *Controller::handler()
 			perror("recvfrom");
 
 		} else {
+			iface = -9;
 			for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
 				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
 					iface = pinfo->ipi_ifindex;
 				}
 			}
+			printf("iface = %d\n", iface);
 			processMsg(string(recv_message, rc), iface);
 		}
 	}
@@ -472,11 +474,11 @@ int Controller::sendInterDomainLSA()
 	return rc;
 }
 
-int Controller::sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable)
+int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
 {
 	//syslog(LOG_INFO, "Controller::Send-RT");
 
-	if (destHID == _myHID) {
+	if (nodeState == NULL) {
 		// If destHID is self, process immediately
 		return processRoutingTable(routingTable);
 	} else {
@@ -484,7 +486,7 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 		Node fad(_myAD);
 		Node fhid(_myHID);
 		Node tad(_myAD);
-		Node thid(destHID);
+		Node thid(nodeState->hid);
 
 		Xroute::XrouteMsg msg;
 		Xroute::TableUpdateMsg *t    = msg  .mutable_table_update();
@@ -525,14 +527,9 @@ int Controller::sendRoutingTable(std::string destHID, std::map<std::string, Rout
 			e->set_flags(it->second.flags);
 		}
 
-		// FIXME: use the FID and SID from the router
-		sockaddr_x ddag;
-		Graph g = Node() * Node(broadcast_fid) * Node(intradomain_sid);
-		g.fill_sockaddr(&ddag);
-
-		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 		//syslog(LOG_INFO, "msg: %s", msg.c_str());
-		return sendMessage(&ddag, msg);
+
+		return sendMessage(&nodeState->dag, msg);
 	}
 }
 
@@ -1758,6 +1755,8 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	neighbor.cost      = 1; // for now, same cost
 	neighbor.timestamp = time(NULL);
 
+printf("iface = %d\n", neighbor.port);
+
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);
 	_neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
@@ -1793,6 +1792,7 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
 		if (it->second.dest == controller_sid) {
 			continue;
 		}
+printf("setting route for %s on %d\n", it->second.dest.c_str(), it->second.port);
 		if ((rc = _xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
@@ -1834,12 +1834,9 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	NodeStateEntry entry;
 	entry.ad  = srcAD;
 	entry.hid = srcHID;
+	bzero(&entry.dag, sizeof(sockaddr_x));
 	memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
 
-	char xxx[1000];
-	xia_ntop(AF_XIA, &entry.dag, xxx, sizeof(xxx));
-
-	printf("lsa dag: %s\n", xxx);
 	entry.num_neighbors = numNeighbors;
 
 	for (uint32_t i = 0; i < numNeighbors; i++) {
@@ -1852,6 +1849,9 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.HID  = Node(h.type(), h.id().c_str(), 0).to_string();
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
+
+		printf("process lsa: port:%d, %s %s\n", n.port(), neighbor.AD.c_str(), neighbor.HID.c_str());
+
 
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
@@ -1867,7 +1867,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 	if (_calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || _calc_dijstra_ticks  < 0)
 	{
-		// syslog(LOG_DEBUG, "Calcuating shortest paths\n");
+		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
 		std::map<std::string, RouteEntry> ADRoutingTable;
@@ -1898,7 +1898,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
 
-			sendRoutingTable(it1->second.hid, routingTable);
+			sendRoutingTable(&it1->second, routingTable);
 		}
 
 		// HACK HACK HACK!!!!
@@ -1909,7 +1909,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		populateRoutingTable(_myHID, _networkTable, routingTable);
 		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
 		populateADEntries(routingTable, ADRoutingTable);
-		sendRoutingTable(_myHID, routingTable);
+		processRoutingTable(routingTable);
 		// END HACK
 
 		_calc_dijstra_ticks = _calc_dijstra_ticks >0?0:_calc_dijstra_ticks;
@@ -2015,16 +2015,21 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 		currXID = (it2->AD == _myAD) ? it2->HID : it2->AD;
 
+printf("populate 1\n");
 		if (networkTable.find(currXID) != networkTable.end()) {
+printf("populate 2\n");
+//			networkTable[currXID].port = it2->port;
 			networkTable[currXID].cost = it2->cost;
 			networkTable[currXID].prevNode = srcHID;
 
 		} else {
+printf("populate 3\n");
 			// We have an endhost
 			NeighborEntry neighbor;
 			neighbor.AD = _myAD;
 			neighbor.HID = srcHID;
-			neighbor.port = 0; // Endhost only has one port
+//FIXME: is this right now?			neighbor.port = 0; // Endhost only has one port
+			neighbor.port = it2->port; // Endhost only has one port
 			neighbor.cost = 1;
 
 			NodeStateEntry entry;
@@ -2108,6 +2113,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 					if (((it2->AD == _myAD) ? it2->HID : it2->AD) == tempHID2) {
+printf("port = %d\n", it2->port);
 						routingTable[tempHID1].port = it2->port;
 					}
 				}

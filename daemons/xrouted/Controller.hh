@@ -167,7 +167,7 @@ protected:
 	int sendInterDomainLSA();
 	int sendKeepAliveToServiceControllerLeader();
 	int sendSidDiscovery();
-	int sendRoutingTable(std::string destHID, std::map<std::string, RouteEntry> routingTable);
+	int sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable);
 	int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
 	int processMsg(std::string msg, uint32_t iface);
