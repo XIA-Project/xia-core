@@ -126,14 +126,12 @@ void *Controller::handler()
 			perror("recvfrom");
 
 		} else {
-			iface = -9;
 			for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
 				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
 					iface = pinfo->ipi_ifindex;
 				}
 			}
-			printf("iface = %d\n", iface);
 			processMsg(string(recv_message, rc), iface);
 		}
 	}
@@ -1743,9 +1741,6 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		flags = msg.flags();
 	}
 
-	if (msg.has_dag()) {
-	}
-
 	// Update neighbor table
 	NeighborEntry neighbor;
 	neighbor.AD        = neighborAD;
@@ -1754,8 +1749,6 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	neighbor.flags     = flags;
 	neighbor.cost      = 1; // for now, same cost
 	neighbor.timestamp = time(NULL);
-
-printf("iface = %d\n", neighbor.port);
 
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);
@@ -1768,6 +1761,11 @@ printf("iface = %d\n", neighbor.port);
 	NodeStateEntry entry;
 	entry.hid = myHID;
 	entry.num_neighbors = _num_neighbors;
+
+	bzero(&entry.dag, sizeof(sockaddr_x));
+	if (msg.has_dag()) {
+		memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
+	}
 
 	// Add neighbors to network table entry
 	std::map<std::string, NeighborEntry>::iterator it;
@@ -1792,7 +1790,7 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
 		if (it->second.dest == controller_sid) {
 			continue;
 		}
-printf("setting route for %s on %d\n", it->second.dest.c_str(), it->second.port);
+
 		if ((rc = _xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
@@ -1849,9 +1847,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.HID  = Node(h.type(), h.id().c_str(), 0).to_string();
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
-
-		printf("process lsa: port:%d, %s %s\n", n.port(), neighbor.AD.c_str(), neighbor.HID.c_str());
-
 
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
@@ -2015,15 +2010,12 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 		currXID = (it2->AD == _myAD) ? it2->HID : it2->AD;
 
-printf("populate 1\n");
 		if (networkTable.find(currXID) != networkTable.end()) {
-printf("populate 2\n");
 //			networkTable[currXID].port = it2->port;
 			networkTable[currXID].cost = it2->cost;
 			networkTable[currXID].prevNode = srcHID;
 
 		} else {
-printf("populate 3\n");
 			// We have an endhost
 			NeighborEntry neighbor;
 			neighbor.AD = _myAD;
@@ -2039,6 +2031,7 @@ printf("populate 3\n");
 			entry.neighbor_list.push_back(neighbor);
 			entry.cost = neighbor.cost;
 			entry.prevNode = neighbor.HID;
+			memcpy(&entry.dag, &networkTable[srcHID].dag, sizeof(sockaddr_x));
 
 			networkTable[currXID] = entry;
 		}
@@ -2113,7 +2106,7 @@ printf("populate 3\n");
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 					if (((it2->AD == _myAD) ? it2->HID : it2->AD) == tempHID2) {
-printf("port = %d\n", it2->port);
+//printf("port = %d\n", it2->port);
 						routingTable[tempHID1].port = it2->port;
 					}
 				}
