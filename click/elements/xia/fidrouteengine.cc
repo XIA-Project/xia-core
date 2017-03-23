@@ -466,6 +466,7 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	XIDtuple xt(fid, src, dst);
 
 	if (!check(xt, p)) {
+		printf("fid discarding\n");
 		// we've seen this packet or it has expired
 		return DESTINED_FOR_DISCARD;
 	}
@@ -507,11 +508,17 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
 		}
 
+XIAHeader xiah(p);
+printf("src:%s\n", xiah.src_path().unparse().c_str());
+printf("dst:%s\n", xiah.dst_path().unparse().c_str());
+printf("fid port = %d fid = %s\n", xrd->port, fid.unparse().c_str());
 		return xrd->port;
 
 	} else {
 		// fall through, not a global broadcast and not for us, just reflood it
 	}
+
+printf("fid fall through\n");
 
 	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
 	return DESTINED_FOR_BROADCAST;
