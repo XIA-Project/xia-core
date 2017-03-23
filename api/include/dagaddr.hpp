@@ -150,6 +150,7 @@ public:
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
 	bool replace_intent_HID(std::string new_hid_str);
+	bool replace_intent_AD(std::string new_ad_str);
 	size_t unparse_node_size() const;
 	bool flatten();
 	bool first_hop_is_sid() const;
@@ -164,6 +165,7 @@ public:
 
 	int compare_except_intent_AD(Graph other) const;
 private:
+	bool replace_intent_XID(uint32_t xid_type, std::string new_xid_str);
 	std::size_t intent_XID_index(uint32_t xid_type) const;
 	std::size_t intent_AD_index() const;
 	std::size_t intent_HID_index() const;

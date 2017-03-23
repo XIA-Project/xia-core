@@ -985,15 +985,27 @@ Graph::intent_AD_index() const
 }
 
 bool
-Graph::replace_intent_HID(std::string new_hid_str)
+Graph::replace_intent_XID(uint32_t xid_type, std::string new_xid_str)
 {
-	std::size_t intent_hid_index = intent_HID_index();
-	if (intent_hid_index == INVALID_GRAPH_INDEX) {
+	std::size_t intent_xid_index = intent_XID_index(xid_type);
+	if (intent_xid_index == INVALID_GRAPH_INDEX) {
 		return false;
 	}
-	Node new_hid(new_hid_str);
-	nodes_[intent_hid_index] = new_hid;
+	Node new_xid(new_xid_str);
+	nodes_[intent_xid_index] = new_xid;
 	return true;
+}
+
+bool
+Graph::replace_intent_HID(std::string new_hid_str)
+{
+	return replace_intent_XID(XID_TYPE_HID, new_hid_str);
+}
+
+bool
+Graph::replace_intent_AD(std::string new_ad_str)
+{
+	return replace_intent_XID(XID_TYPE_AD, new_ad_str);
 }
 
 /**
