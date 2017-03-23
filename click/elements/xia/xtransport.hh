@@ -64,7 +64,6 @@ using namespace xia;
 #define BAD_PORT	 1  // FIXME why do we still have this?
 #define NETWORK_PORT 2
 #define CACHE_PORT   3
-#define XHCP_PORT	 4
 
 // Verbosity Bitmask definitions, directly from tcpspeaker code
 #define VERB_NONE       0
@@ -120,7 +119,7 @@ public:
 	~XTRANSPORT();
 
 	const char *class_name() const { return "XTRANSPORT"; }
-	const char *port_count() const { return "5/4"; }
+	const char *port_count() const { return "4/4"; }
 	const char *processing() const { return PUSH; }
 
 	int configure(Vector<String> &, ErrorHandler *);

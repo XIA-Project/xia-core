@@ -324,7 +324,6 @@ elementclass XIARoutingCore {
 
 	// quick fix
 	n[3] -> Discard();
-	Idle() -> [4]xtransport;
 
 	// set up XCMP elements
 	c :: Classifier(01/01, -); // XCMP

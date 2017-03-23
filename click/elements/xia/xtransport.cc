@@ -282,11 +282,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			p_in->kill();
 			break;
 
-		case XHCP_PORT:		//Packet with DHCP information
-			ProcessXhcpPacket(p_in);
-			p_in->kill();
-			break;
-
 		default:
 			ERROR("packet from unknown port: %d\n", port);
 			break;
@@ -789,25 +784,6 @@ void XTRANSPORT::run_timer(Timer *timer)
 	}
 	return;
 
-}
-
-
-
-/*************************************************************
-** XHCP PACKET HANDLER
-*************************************************************/
-void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
-{
-	WARN("IS THIS USED ANYMORE?\n");
-	XIAHeader xiah(p_in->xia_header());
-	String temp = _local_addr.unparse();
-	Vector<String> ids;
-	cp_spacevec(temp, ids);;
-	if (ids.size() < 3) {
-		String new_route((char *)xiah.payload());
-		String new_local_addr = new_route + " " + ids[1];
-		_local_addr.parse(new_local_addr);
-	}
 }
 
 
