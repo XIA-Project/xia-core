@@ -66,6 +66,10 @@ protected:
 	int processRoutingTable(const Xroute::XrouteMsg& msg);
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
 
+
+	int getControllerDag(sockaddr_x *dag);
+
+
 	// FIXME: improve these guys
 	struct timeval h_freq, h_fire;
 	struct timeval l_freq, l_fire;

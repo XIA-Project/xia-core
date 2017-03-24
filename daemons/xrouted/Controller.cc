@@ -474,6 +474,8 @@ int Controller::sendInterDomainLSA()
 
 int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
 {
+	return 0;
+
 	//syslog(LOG_INFO, "Controller::Send-RT");
 
 	if (nodeState == NULL) {
@@ -1800,12 +1802,6 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
 	return 1;
 }
 
-/* Procedure:
-   0. scan this LSA (mark AD with a DualRouter if there)
-   1. filter out the already seen LSA (via LSA-seq for this dest)
-   2. update the network table
-   3. rebroadcast this LSA
-*/
 int Controller::processLSA(const Xroute::LSAMsg& msg)
 {
 	Xroute::XID a = msg.node().ad();
@@ -1824,11 +1820,9 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		return 1;
 	}
 
-
-
 	uint32_t numNeighbors = msg.peers_size();
 
-	// 2. Update the network table
+	// Update the network table
 	NodeStateEntry entry;
 	entry.ad  = srcAD;
 	entry.hid = srcHID;
@@ -1860,6 +1854,10 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	_networkTable[srcHID] = entry;
 	_calc_dijstra_ticks++;
 
+
+printf("%d\n\n", _networkTable.size());
+return 1;
+
 	if (_calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || _calc_dijstra_ticks  < 0)
 	{
 		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
@@ -1886,8 +1884,11 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 			}
 			std::map<std::string, RouteEntry> routingTable;
 
-			// Calculate routing table for HIDs instead it1 AD
+			// Calculate routing table for HIDs instead
 			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
+
+			printf("routing table size = %d\n", routingTable.size());
+
 			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
@@ -1902,6 +1903,11 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		// it's the same logic from inside the loop above
 		std::map<std::string, RouteEntry> routingTable;
 		populateRoutingTable(_myHID, _networkTable, routingTable);
+		if (routingTable.size() == 0) {
+			printf("table empty!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			return 1;
+		}
+
 		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
 		populateADEntries(routingTable, ADRoutingTable);
 		processRoutingTable(routingTable);
@@ -1990,6 +1996,10 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			++it1;
 		}
 	}
+
+//	if (networkTable.size() == 0) {
+//		return;
+//	}
 
 	unvisited = networkTable;
 

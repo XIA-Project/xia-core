@@ -17,9 +17,30 @@
 
 // FIXME: on new source tree
 // modify XreradLocalAddr to not require a 4id
-// make the messages binary instead of text
 // make the xiarouter return a map instead of vector
 
+
+int IntraDomainRouter::getControllerDag(sockaddr_x *dag)
+{
+	// make the dag we'll send controller messages to
+	// FIXME: eventually we'll get this from xnetjd
+
+	sockaddr_x ns;
+
+	XreadNameServerDAG(_local_sock, &ns);
+
+	Graph g(&ns);
+
+	Node src;
+	Node h = g.intent_HID();
+	Node f(controller_fid);
+	Node s(controller_sid);
+	g = (src * h * f * s) + (src * f * s);
+
+	g.fill_sockaddr(dag);
+	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+	return 0;
+}
 
 // FIXME: put this somewhere common
 static uint32_t sockaddr_size(const sockaddr_x *s)
@@ -59,10 +80,11 @@ void *IntraDomainRouter::handler()
 
 		struct pollfd pfd[3];
 
-		pfd[0].fd = _broadcast_sock;
-		pfd[1].fd = _router_sock;
-		pfd[2].fd = _local_sock;
+		pfd[2].fd = _broadcast_sock;
+		pfd[0].fd = _router_sock;
+		pfd[1].fd = _local_sock;
 		pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
+		pfd[0].revents = pfd[1].revents = pfd[2].revents = 0;
 
 		tspec.tv_sec = 0;
 		tspec.tv_nsec = 500000000;
@@ -74,6 +96,7 @@ void *IntraDomainRouter::handler()
 			for (int i = 0; i < 3; i++) {
 				if (pfd[i].revents & POLLIN) {
 					sock = pfd[i].fd;
+					printf("i = %d\n", i);
 					break;
 				}
 			}
@@ -116,6 +139,7 @@ void *IntraDomainRouter::handler()
 				perror("recvfrom");
 
 			} else {
+				printf("Xrecvmsg returned %d\n", rc);
 				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
 					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
@@ -285,15 +309,7 @@ int IntraDomainRouter::makeSockets()
 		return -1;
 	}
 
-
-	// make the dag we'll send controller messages to
-	// FIXME: eventually we'll get this from xnetjd
-	nFID = Node(controller_fid);
-	Node ncSID(controller_sid);
-	g = (src * nHID * nFID * ncSID) + (src * nFID * ncSID);
-
-	g.fill_sockaddr(&_controller_dag);
-	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+	getControllerDag(&_controller_dag);
 
 	return 0;
 }
@@ -597,6 +613,7 @@ int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
+	printf("process hello\n");
 	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
 	NeighborEntry neighbor;
