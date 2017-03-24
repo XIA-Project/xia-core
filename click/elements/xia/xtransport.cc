@@ -273,10 +273,6 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			ProcessAPIPacket(p_in);
 			break;
 
-		case BAD_PORT: //packet from ???
-			ERROR("\n\nERROR: BAD INPUT PORT TO XTRANSPORT!!!\n\n");
-			break;
-
 		case NETWORK_PORT: //Packet from network layer
 			ProcessNetworkPacket(p_in);
 			p_in->kill();

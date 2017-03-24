@@ -52,8 +52,6 @@ using namespace xia;
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
-#define NETWORK_PORT		2
-
 // was 32, changed to match XTCP_OPTIONS_MAX from clicknet/xtcp.h
 #define MAX_TCPOPTLEN		XTCP_OPTIONS_MAX
 
