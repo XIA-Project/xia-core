@@ -329,9 +329,8 @@ void FIDRouteEngine::push(int in_ether_port, Packet *p)
 	} else if (port == DESTINED_FOR_FLOOD) {
 		// reflood the packet
 
-printf("reflooding\n");
 		// FIXME: treat the FID as a broadcast until the router is fixed to work correctly
-		for (int i = 0; i <= _num_ports; i++) {
+		for (int i = 0; i < _num_ports; i++) {
 			if (i != in_ether_port) {
 				Packet *q = p->clone();
 				SET_XIA_PAINT_ANNO(q, i);
@@ -345,13 +344,16 @@ printf("reflooding\n");
 	} else if (port == DESTINED_FOR_BROADCAST) {
 		// send it out on all interfaces except the one it came in on
 		// FIXME: eventually restrict external interfaces as well
-		for (int i = 0; i <= _num_ports; i++) {
+		for (int i = 0; i < _num_ports; i++) {
 			if (i != in_ether_port) {
 				Packet *q = p->clone();
 				SET_XIA_PAINT_ANNO(q, i);
 				output(0).push(q);
 			}
 		}
+		p->kill();
+
+	} else if (port == DESTINED_FOR_DISCARD) {
 		p->kill();
 
 	} else {
@@ -372,8 +374,8 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	seq_info si;
 	uint32_t new_ts = fhdr.tstamp();
 
+	//INFO("seq = %lu", seq);
 	//xt.dump();
-	//INFO("seq# = %u", seq);
 
 	it = _seq_nos.find(xt);
 
@@ -383,11 +385,9 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 		uint32_t forward = ((uint32_t)(seq - si.seq));
 		uint32_t reverse = ((uint32_t)(si.seq - seq));
 
-		//INFO("FID seq# found: old = %u new = %u\n", old, seq);
-
 		if (seq == si.seq) {
 			// duplicate
-			INFO("FID Engine: dup sequence #");
+			//INFO("FID Engine: dup sequence # %lu %u", seq, si.seq);
 			return false;
 
 		} else if (forward > reverse) {
@@ -449,24 +449,28 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	if (in_ether_port == DESTINED_FOR_LOCALHOST) {
 		// Mark packet for flooding
 		//  which will duplicate the packet and send to every interface
+		//INFO("flooding to %s", fid.unparse().c_str());
 		p->set_nexthop_neighbor_xid_anno(fid);
 		return DESTINED_FOR_BROADCAST;
 	}
 
 	// get the source and destination intent xids
-	// HACK HACK HACK until new routing is in place. All route code is using the same SIDs
-	// which causes conflicts. Use the source HID instead for now
-	//const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
-	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 2];
+	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
 	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
 	XID src(snode.xid);
 	XID dst(dnode.xid);
+
+	//INFO("tuple: f:%s s:%s d:%s ", fid.unparse().c_str(), src.unparse().c_str(), dst.unparse().c_str());
+	if (src == _local_hid) {
+		INFO("(%s) got our own packet back, discarding...\n", fid.unparse().c_str());
+		return DESTINED_FOR_DISCARD;
+	}
 
 	// create the index into the sequence number table
 	XIDtuple xt(fid, src, dst);
 
 	if (!check(xt, p)) {
-		printf("fid discarding\n");
+		//INFO("\nfid discarding");
 		// we've seen this packet or it has expired
 		return DESTINED_FOR_DISCARD;
 	}
@@ -508,17 +512,11 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
 		}
 
-XIAHeader xiah(p);
-printf("src:%s\n", xiah.src_path().unparse().c_str());
-printf("dst:%s\n", xiah.dst_path().unparse().c_str());
-printf("fid port = %d fid = %s\n", xrd->port, fid.unparse().c_str());
 		return xrd->port;
 
 	} else {
 		// fall through, not a global broadcast and not for us, just reflood it
 	}
-
-printf("fid fall through\n");
 
 	p->set_nexthop_neighbor_xid_anno(_bcast_xid);
 	return DESTINED_FOR_BROADCAST;
