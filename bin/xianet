@@ -32,7 +32,7 @@ NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
 RESOLVCONF=$XIADIR/etc/resolv.conf
 
-ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted controld xnetjd xcache xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -49,6 +49,7 @@ RUN_VISUALIZER_SERVER=0
 VISUALIZER_SERVER="localhost"
 MAKECONF=""
 CONFFLAGS=""
+ROUTER=xrouted
 L2_TYPE="ethernet"      # "dsrc" is the only other supported
 
 # On Arada boxes, don't use -s because /etc/hosts has no entry for hostname
@@ -69,7 +70,7 @@ help()
 
 Start or stop the XIA network services.
 
-usage: $NAME [-cCvV48rtnZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
+usage: $NAME [-cCvV48rtnSZg] [-l <loglevel>] [-i <hostname>] [-m <ip-addr>]
 			 [-f <filter_str>] [-P <socket-ports>]
 			 [-W <dsrc_mac_addr>,<arada_ip_addr>:<waveserver_port_num>]
 			 [-s <script>] [-z <statserver>] start|stop|check|kill|restart
@@ -87,6 +88,7 @@ Configure:
   -r generate and use a generic router click script
   -n this node will be the name server
   -R this node will provide rendezvous service
+  -S this node will run as a controller
   -i use the supplied name as the click element name and HID shortcut
   -f don't use interfaces matching the supplied string
 	 (to ignore multiple interfaces, use a comma-separated list)
@@ -127,7 +129,7 @@ setup()
 {
 	local OPTARG=$2
 
-	while getopts "cCl:s:qvV48nN:rRthi:m:f:z:ZP:gW:H" opt; do
+	while getopts "cCl:s:qvV48nN:SrRthi:m:f:z:ZP:gW:H" opt; do
 		case $opt in
 			c)
 				CLICK_ONLY=1
@@ -165,6 +167,9 @@ setup()
 				;;
 			R)
 				RENDEZVOUS=1
+				;;
+			S)
+				ROUTER=controld
 				;;
 			t)
 				MAKECONF=$MAKECONF"host"
@@ -342,18 +347,21 @@ router()
 	case $action in
 		"start")
 			cd $XIADIR/bin
-			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
-			sleep 0.5
+			sleep 0.2
+			./$ROUTER -h $host $LOG_FLAGS &
+			sleep 0.2
 			;;
 		"stop")
-			kill_service $host "xrouted"
+			kill_service $host xrouted
+			kill_service $host controld
 			kill_service $host "xnetjd"
 			kill_service $host "xcache"
 			;;
 		"check")
-			check_service $host "xrouted"
+			check_service $host xrouted
+			check_service $host controld
 			check_service $host "xnetjd"
 			check_service $host "xcache"
 			;;

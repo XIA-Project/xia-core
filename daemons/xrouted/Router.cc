@@ -3,7 +3,7 @@
 #include <math.h>
 
 #include "../common/XIARouter.hh"
-#include "IntraDomainRouter.hh"
+#include "Router.hh"
 #include "dagaddr.hpp"
 
 // FIXME:
@@ -20,7 +20,7 @@
 // make the xiarouter return a map instead of vector
 
 
-int IntraDomainRouter::getControllerDag(sockaddr_x *dag)
+int Router::getControllerDag(sockaddr_x *dag)
 {
 	// make the dag we'll send controller messages to
 	// FIXME: eventually we'll get this from xnetjd
@@ -54,7 +54,7 @@ static uint32_t sockaddr_size(const sockaddr_x *s)
 	return len;
 }
 
-void *IntraDomainRouter::handler()
+void *Router::handler()
 {
 	int rc;
 	char recv_message[10240];
@@ -202,7 +202,7 @@ void *IntraDomainRouter::handler()
 	return 0;
 }
 
-int IntraDomainRouter::makeSockets()
+int Router::makeSockets()
 {
 	char s[MAX_DAG_SIZE];
 	Graph g;
@@ -315,7 +315,7 @@ int IntraDomainRouter::makeSockets()
 }
 
 
-int IntraDomainRouter::init()
+int Router::init()
 {
 	if (makeSockets() < 0) {
 		exit(-1);
@@ -348,7 +348,7 @@ int IntraDomainRouter::init()
 	return 0;
 }
 
-int IntraDomainRouter::sendHello()
+int Router::sendHello()
 {
 	string message;
 
@@ -380,7 +380,7 @@ int IntraDomainRouter::sendHello()
 }
 
 // send LinkStateAdvertisement message (flooding)
-int IntraDomainRouter::sendLSA()
+int Router::sendLSA()
 {
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
@@ -425,7 +425,7 @@ int IntraDomainRouter::sendLSA()
 	return sendMessage(&_controller_dag, msg);
 }
 
-int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
+int Router::processMsg(std::string msg_str, uint32_t iface)
 {
 	int rc = 0;
 	Xroute::XrouteMsg msg;
@@ -497,7 +497,7 @@ int IntraDomainRouter::processMsg(std::string msg_str, uint32_t iface)
 	return rc;
 }
 
-int IntraDomainRouter::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
+int Router::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
 	Xroute::SIDTableUpdateMsg msg = xmsg.sid_table_update();
 	Xroute::XID fa = msg.from().ad();
@@ -566,7 +566,7 @@ int IntraDomainRouter::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 	return rc;
 }
 
-int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
+int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 {
 	int rc;
 	uint32_t flags;
@@ -611,7 +611,7 @@ int IntraDomainRouter::processHostRegister(const Xroute::HostJoinMsg& msg)
 	return 1;
 }
 
-int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
+int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
 	printf("process hello\n");
 	string neighborAD, neighborHID, neighborSID;
@@ -682,7 +682,7 @@ int IntraDomainRouter::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	return 1;
 }
 
-int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
+int Router::processLSA(const Xroute::XrouteMsg& msg)
 {
 	// FIXME: we still need to reflood until the FID logic is switched out of broadcast mode
 
@@ -716,7 +716,7 @@ int IntraDomainRouter::processLSA(const Xroute::XrouteMsg& msg)
 
 
 // process a control message
-int IntraDomainRouter::processRoutingTable(const Xroute::XrouteMsg& xmsg)
+int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
 	Xroute::TableUpdateMsg msg = xmsg.table_update();
 

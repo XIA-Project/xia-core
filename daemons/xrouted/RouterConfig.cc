@@ -11,7 +11,6 @@ RouterConfig::RouterConfig()
 	_hostname[0] = _appname[0] = _ident[0] = '\0';
 	_verbose = false;
 	_loglevel = LOG_ERR;
-	_routers = 0;
 }
 
 RouterConfig::~RouterConfig()
@@ -20,13 +19,8 @@ RouterConfig::~RouterConfig()
 
 void RouterConfig::help()
 {
-	printf("\nusage: %s [-IRSCO][-l level] [-v] [-c config] [-h hostname]\n", _appname);
+	printf("\nusage: %s [-l level] [-v] [-c config] [-h hostname]\n", _appname);
 	printf("where:\n");
-	printf(" -I          : loads the inter-domain controller module\n");
-	printf(" -R          : loads the intra-domain route module\n");
-	printf(" -S          : loads the SID route module\n");
-	printf(" -C          : loads the CID route module\n");
-	printf(" -O          : loads the old style route module (not compatible with the others)\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
 	printf(" -v          : log to the console as well as syslog\n");
 	printf(" -h hostname : click device name (default=`hostname -s`)\n");
@@ -47,20 +41,8 @@ int RouterConfig::parseCmdLine(int argc, char**argv)
 	}
 
 	opterr = 0;
-	while ((c = getopt(argc, argv, "IRSCOh:l:v")) != -1) {
+	while ((c = getopt(argc, argv, "h:l:v")) != -1) {
 		switch (c) {
-			case 'I':
-				_routers |= SDN_ROUTER;
-				break;
-			case 'R':
-				_routers |= LOCAL_ROUTER;
-				break;
-			case 'S':
-				_routers |= SID_ROUTER;
-				break;
-			case 'C':
-				_routers |= CID_ROUTER;
-				break;
 			case 'h':
 				strncpy(_hostname, optarg, sizeof(_hostname));
 				break;
@@ -77,14 +59,6 @@ int RouterConfig::parseCmdLine(int argc, char**argv)
 				rc = -1;
 				break;
 		}
-	}
-
-
-	if (_routers == 0) {
-		_routers = LOCAL_ROUTER;
-//		printf("No route modules selected\n");
-//		help();
-//		rc = -1;
 	}
 
 	// create the syslog identifier

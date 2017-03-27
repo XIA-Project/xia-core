@@ -2,7 +2,7 @@
 #include <signal.h>
 #include "RouterConfig.hh"
 #include "RouteModule.hh"
-#include "Router.hh"
+#include "Controller.hh"
 
 // FIXME: we need to stop LSA and Route Table broadcasts from leaving our AD
 
@@ -54,9 +54,9 @@ int main(int argc, char *argv[])
 	// sigprocmask(SIG_BLOCK, &sigset, &oldset);
 
 
-	Router *r = new Router(config.hostname());
-	r->start();
-	modules.push_back(r);
+	Controller *c = new Controller(config.hostname());
+	c->start();
+	modules.push_back(c);
 
 	// wait for everyone to quit
 	ModuleList::iterator it;

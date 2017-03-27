@@ -1,5 +1,5 @@
-#ifndef _IntraDomainRouter_hh
-#define _IntraDomainRouter_hh
+#ifndef _Router_hh
+#define _Router_hh
 
 #include <syslog.h>
 #include <map>
@@ -15,10 +15,10 @@
 #define HELLO_EXPIRE_TIME 10
 #define EXPIRE_TIME       60
 
-class IntraDomainRouter : public RouteModule {
+class Router : public RouteModule {
 public:
-	IntraDomainRouter(const char *name) : RouteModule(name) {}
-	~IntraDomainRouter() {}
+	Router(const char *name) : RouteModule(name) {}
+	~Router() {}
 
 protected:
 	std::string _myAD;
