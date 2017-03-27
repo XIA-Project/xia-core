@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+#
+# Copyright 2017 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import re
+import sys
+import argparse
+import clicksock
+import xiapyutils
+
+APP="xtrace"
+APP_VERSION="1.0"
+
+# click read & write handler path
+CMD="%s/xlc%s/print_out.verbosity"
+
+# list of eth interface -> port mappings
+interfaces = {}
+
+#
+# get list of eth interface to click port mappings from the XIA click config file
+#
+def get_interfaces(click):
+
+	# find all of the FromeElement -> router entries in [host|router].click
+	r = re.compile("FromDevice\((.+?)\)[ \t]+->[ \t]+\[(.+?)\]")
+
+	conf = click.readData("config").split("\n")
+	for line in conf:
+		m = r.match(line)
+		if m != None:
+			# save the mapping
+			interfaces[m.group(1)] = m.group(2)
+
+#
+# print out the tracing status for the given interface
+#
+def print_status(click, iface):
+	levels = ["nothing", "nothing", "data packets only", "all traffic"]
+
+	try:
+		port = interfaces[iface]
+	except:
+		print "no XIA port associated with interface %s" % args.iface
+		sys.exit(1)
+
+	cmd = CMD % (hostname, port)
+	v = int(click.readData(cmd))
+	print "tracing %s on %s" % (levels[v], iface)
+
+#
+# let's do this thing!
+#
+parser = argparse.ArgumentParser(description='enable/disable XIA packet tracing',
+	epilog='if no parameters are given, status is printed for all XIA interfaces')
+parser.add_argument("iface", nargs='?', help="ethernet interface to manage tracing on")
+parser.add_argument("--version", action='store_true', help='display version number')
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-v", "--verbose", action="store_true", help='trace data packets')
+group.add_argument("-V", "--noisy", action="store_true", help='trace data and management packets (very noisy!)')
+group.add_argument("-q", "--quiet", action='store_true', help='disable packet traces')
+args = parser.parse_args()
+
+if args.version:
+	print "%s %s" % (APP, APP_VERSION)
+	sys.exit(0)
+
+hostname = xiapyutils.getxiaclickhostname()
+
+with clicksock.clicksock() as click:
+
+	get_interfaces(click)
+
+	if args.iface != None:
+		try:
+			port = interfaces[args.iface]
+		except:
+			print "no XIA port associated with interface %s" % args.iface
+			sys.exit(1)
+
+		cmd = CMD % (hostname, port)
+
+		if args.verbose:
+			# trace everything except management traffic
+			click.writeData(cmd + " 2")
+		elif args.noisy:
+			# trace all packets
+			click.writeData(cmd + " 3")
+		elif args.quiet:
+			# disable tracing
+			click.writeData(cmd + " 0")
+			verbosity = 0
+		print_status(click, args.iface)
+
+	elif args.verbose == False and args.noisy == False and args.quiet == False:
+		# no options were set, print the status for all interfaces
+		for iface, port in interfaces.iteritems():
+			print_status(click, iface)
+
+	else:
+		print "You must specify an interface card"
+		sys.exit(1)
+

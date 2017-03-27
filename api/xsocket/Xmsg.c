@@ -15,14 +15,17 @@
 */
 /*!
 ** @file Xmsg.c
-** @brief implements Xrecvmsg, Xsendmsg()
+** @brief Xrecvmsg(), Xsendmsg() - send/receive a message on a socket
+\todo write msg api docs
 */
 
-#include <errno.h>
 #include "Xsocket.h"
+/*! \cond */
+#include <errno.h>
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
+/*! \endcond */
 
 
 ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags)

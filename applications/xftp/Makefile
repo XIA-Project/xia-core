@@ -12,4 +12,4 @@ all: $(TARGETS)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
 clean:
-	rm -f $(TARGETS)
+	@-rm -f $(TARGETS)

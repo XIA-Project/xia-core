@@ -22,6 +22,10 @@ import sys
 import os
 from socket import *
 
+if len(sys.argv) != 2:
+	print "usage: ec hostname"
+	sys.exit(1)
+
 sock = socket(AF_INET, SOCK_DGRAM)
 
 while (1):
@@ -30,7 +34,11 @@ while (1):
 	text = text.strip()
 	if (len(text) == 0):
 		break
-	sock.sendto(text, 0, ("10.0.0.10", 8888))
+	try:
+		sock.sendto(text, 0, (sys.argv[1], 8888))
+	except:
+		print sys.argv[1] + " was not found"
+		sys.exit(1)
 
 	(data, addr) = sock.recvfrom(8192, 0)
 	print data

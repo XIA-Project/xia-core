@@ -4,7 +4,7 @@ require(library xia_address.click);
 log::XLog(VERBOSE 0, LEVEL 6);
 
 // router instantiation
-${HNAME} :: XIARouter4Port(1500, ${HNAME}, $EXTERNAL_IP, $MAC0, $MAC1, $MAC2, $MAC3);
+${HNAME} :: XIARouter4Port(1500, ${HNAME}, $EXTERNAL_IP, $MACS);
 
 waveDevice :: WaveDeviceRemoteUdp(HOSTNAME $RIPADDR, PORT $RPORT, CHANNEL 172);
 

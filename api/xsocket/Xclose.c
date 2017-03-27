@@ -16,22 +16,26 @@
 */
 /*!
 ** @file Xclose.c
-** @brief implements Xclose()
+** @brief Xclose() - close a socket
 */
 
 #include "Xsocket.h"
+/*! \cond */
 #include "Xinit.h"
 #include "Xutil.h"
 #include "Xkeys.h"
 #include <errno.h>
+/*! \endcond */
 
 /*!
-** @brief Close an Xsocket.
+** @brief close an Xsocket
 **
 ** Causes the XIA transport to tear down the underlying XIA socket state and
 ** also closes the UDP control socket used to talk to the transport.
 **
-** @param sockfd	The control socket
+** @param sockfd the socket
+**
+** @note See the man page for the standard close() call for more details.
 **
 ** @returns 0 on success
 ** @returns -1 on error with errno set to a value compatible with the standard

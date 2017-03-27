@@ -9,7 +9,7 @@ NS=$(BINDIR)/xrendezvous
 all: $(NS)
 
 $(NS): $(SOURCES) $(XINC)/Xsocket.h $(XINC)/xns.h
-	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)	
+	$(CC) -o $@ $(CFLAGS) $(SOURCES) $(LDFLAGS)
 
 clean:
-	-rm $(NS)
+	@-rm -f $(NS)

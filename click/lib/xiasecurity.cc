@@ -19,53 +19,18 @@
 #include <string>
 #include <strings.h> // bzero
 
-/*
-// Generate HMAC-SHA1
-int xs_HMAC(void* key, int keylen, unsigned char* buf, size_t buflen, unsigned char* hmac, unsigned int* hmac_len)
-{
-	return 0;
-}
-
-// Compare two HMACs
-int xs_compareHMACs(unsigned char *hmac1, unsigned char *hmac2, unsigned int hmac_len)
-{
-	return 0;
-}
-
-// Generate a buffer with random data
-int xs_makeRandomBuffer(char *buf, int buf_len)
-{
-	return 0;
-}
-*/
-
-/*
-class XIASecurityBuffer {
-    public:
-        XIASecurityBuffer(int initialSize);
-		XIASecurityBuffer(const char *buf, uint16_t len);
-        ~XIASecurityBuffer();
-        bool pack(const char *data, uint16_t length);
-		bool unpack(char *data, uint16_t *length);
-        char *get_buffer();
-        uint16_t size();
-		uint16_t get_numEntries();
-		int peekUnpackLength();
-    private:
-        bool initialize(); // Called on first pack()
-        bool extend(uint32_t length);
-		int numEntriesSize;
-        int initialSize;
-        bool initialized;
-        uint16_t *numEntriesPtr;
-        char *dataPtr;
-        uint32_t remainingSpace;
-        char *_buffer;
-        char *nextPack;
-        char *nextUnpack;
-};
-*/
-
+/*!
+ * @brief print debug output in click as well as user-space
+ *
+ * The XIA Stack is written in Click and has access to click_chatter()
+ * functions for output. However, the same functionality is not available
+ * to user space applications. This file is compiled both for use in
+ * Click as well as user-space so it needs its own output functionality.
+ *
+ * @param fmt formatted string similar to printf
+ *
+ * @returns void
+ */
 void xs_chatter(const char *fmt, ...)
 {
 	va_list val;
@@ -75,6 +40,16 @@ void xs_chatter(const char *fmt, ...)
 	va_end(val);
 }
 
+/*!
+ * @brief XIASecurityBuffer serialization/deserialization class constructor
+ *
+ * The user can provide an estimated size to initialize the internal buffer
+ * in the constructor. If the estimate is too low, additional space will
+ * be allocated automatically with a slight performance penalty. If the
+ * size estimate is too high, memory will be wasted.
+ *
+ * @param initSize estimated initial size of buffer
+ */
 XIASecurityBuffer::XIASecurityBuffer(int initSize)
 {
 	numEntriesSize = sizeof(uint16_t);
@@ -88,13 +63,23 @@ XIASecurityBuffer::XIASecurityBuffer(int initSize)
 	nextUnpack = NULL;
 }
 
+/*!
+ * @brief Construct XIASecurityBuffer from a binary buffer
+ *
+ * A serialized representation of XIASecurityBuffer can be provided to
+ * this constructor to deserialize the memory contents.
+ *
+ * @param buf buffer containing a valid serialized XIASecurityBuffer
+ * @param len length of buf
+ */
 XIASecurityBuffer::XIASecurityBuffer(const char *buf, uint16_t len)
 {
 	numEntriesSize = sizeof(uint16_t);
 	// Copy the serialized buffer
 	_buffer = (char *)calloc(len, 1);
 	if(_buffer == NULL) {
-		xs_chatter("XIASecurityBuffer:: CRITICAL, could not allocate %d bytes for buffer", len);
+		xs_chatter("XIASecurityBuffer ERROR: allocating %d bytes", len);
+		throw std::bad_alloc();
 	}
 	memcpy(_buffer, buf, len);
 	// Update pointers
@@ -108,6 +93,11 @@ XIASecurityBuffer::XIASecurityBuffer(const char *buf, uint16_t len)
 	initialized = true;
 }
 
+/*!
+ * @brief XIASecurityBuffer destructor frees internally allocated memory
+ *
+ * Free up the internally allocated memory for this security buffer
+ */
 XIASecurityBuffer::~XIASecurityBuffer()
 {
 	if(_buffer) {
@@ -115,6 +105,18 @@ XIASecurityBuffer::~XIASecurityBuffer()
 	}
 }
 
+/*!
+ * @brief allocate the initial memory for use by the object
+ *
+ * Initialize storage space for this object to store data. We store
+ * the number of entries in the first two bytes of the buffer itself.
+ * This is followed by size and corresponding data for each entry. So
+ * when the user requests a serialized buffer, we can simply return
+ * the internal _buffer.
+ *
+ * @returns true on success
+ * @returns false on failure to initialize the storage space
+ */
 bool XIASecurityBuffer::initialize()
 {
 	_buffer = (char *)calloc(initialSize, 1);
@@ -130,7 +132,18 @@ bool XIASecurityBuffer::initialize()
 	return true;
 }
 
-// Extend buffer to store the length plus length-bytes of data
+/*!
+ * @brief Extend buffer to store the length plus length-bytes of data
+ *
+ * Check if the requested bytes can be stored in the internal buffer.
+ * If not, extend it automatically to be large enough to store, at
+ * least, the requested number of bytes.
+ *
+ * @param length number of bytes we intend to store
+ *
+ * @returns true on success in extending the buffer
+ * @returns false on failure to extend the buffer
+ */
 bool XIASecurityBuffer::extend(uint32_t length)
 {
 	uint16_t total_bytes = sizeof(uint16_t) + length;
@@ -160,6 +173,15 @@ bool XIASecurityBuffer::extend(uint32_t length)
 	return true;
 }
 
+/*!
+ * @brief Get a serialized buffer containing all the data stored
+ *
+ * Since all the data is already stored serialized, we simply return
+ * the internal buffer when the user requests serialized data with
+ * this function call.
+ *
+ * @returns buffer holding serialized data
+ */
 char *XIASecurityBuffer::get_buffer()
 {
 	if(initialized) {
@@ -169,6 +191,15 @@ char *XIASecurityBuffer::get_buffer()
 	}
 }
 
+/*!
+ * @brief Size of the serialized XIASecurityBuffer
+ *
+ * Used along with get_buffer() this function returns the serialized
+ * buffer's size.
+ *
+ * @returns number of bytes in serialized buffer at this time
+ * @returns 0 if the buffer is uninitialized or contains no data
+ */
 uint16_t XIASecurityBuffer::size()
 {
 	if(initialized) {
@@ -178,11 +209,29 @@ uint16_t XIASecurityBuffer::size()
 	}
 }
 
+/*!
+ * @brief Find the number of entries in the buffer
+ *
+ * An XIASecurityBuffer is just a collection of [size, data] entries.
+ * This function provides the number of such entries in the current
+ * buffer.
+ *
+ * @return number of data objects in the current buffer
+ */
 uint16_t XIASecurityBuffer::get_numEntries()
 {
 	return *numEntriesPtr;
 }
 
+/*!
+ * @brief pack the provided data as an entry in the XIASecurityBuffer
+ *
+ * @param data a buffer containing the data to be packed
+ * @length number of bytes in the buffer
+ *
+ * @returns true on success
+ * @returns false on failure
+ */
 bool XIASecurityBuffer::pack(const char *data, uint16_t length)
 {
 	if(!initialized) {
@@ -208,6 +257,17 @@ bool XIASecurityBuffer::pack(const char *data, uint16_t length)
 	return true;
 }
 
+/*!
+ * @brief pack the provided null terminated string into the XIASecurityBuffer
+ *
+ * A convenience function to pack a null-terminated string as a data entry
+ * into the XIASecurityBuffer.
+ *
+ * @param data a null-terminated string
+ *
+ * @returns true on successful packing of data
+ * @returns false if the packing fails
+ */
 bool XIASecurityBuffer::pack(const char *data)
 {
 	uint16_t len = strlen(data);
@@ -215,6 +275,21 @@ bool XIASecurityBuffer::pack(const char *data)
 	return pack(data, len);
 }
 
+/*!
+ * @brief sign and include signature in the XIASecurityBuffer
+ *
+ * The user provides an XIASecurityBuffer containing all the data to be signed.
+ * This function puts the user's XIASecurityBuffer as an entry in this buffer
+ * and then includes the signature and the corresponding public key in this
+ * buffer. The signing is only possible if the key files for the requested
+ * XIA XID are available for signing.
+ *
+ * @param payloadbuf another XIASecurityBuffer whose contents will be signed
+ * @param xid_str the XIA XID signing this message. Keys must be present.
+ *
+ * @returns true if we are able to sign and pack the requested buffer
+ * @returns false if the signing or packing fails
+ */
 bool XIASecurityBuffer::sign_and_pack(XIASecurityBuffer &payloadbuf, const std::string &xid_str)
 {
 
@@ -254,8 +329,19 @@ bool XIASecurityBuffer::sign_and_pack(XIASecurityBuffer &payloadbuf, const std::
     return true;
 }
 
-// Unpack items from buffer, one per call
-// Typical usage: while(unpack(buf, &len)) ... do something
+/*!
+ * @brief Unpack items from buffer, one per call
+ *
+ * Unpack data entries from the buffer one at a time.
+ * Typical usage: while(unpack(buf, &len)) ... do something
+ *
+ * @param data a buffer in which the data entry will be unpacked
+ * @param length size of the user provided data buffer
+ *
+ * @returns length of actual data entry in the length pointer
+ * @returns true on successfully unpacking an entry
+ * @returns false on failure to unpack an entry
+ */
 bool XIASecurityBuffer::unpack(char *data, uint16_t *length)
 {
 	// zero out the buffer so user won't be burned if they unpack a string
@@ -289,6 +375,14 @@ int XIASecurityBuffer::peekUnpackLength()
 	return (int)length;
 }
 
+/*!
+ * @brief find the key directory where the key-pairs for signing are stored
+ *
+ * This function is just a wrapper around the two different APIs for getting
+ * the key directory in Click and user-facing API
+ *
+ * @returns a string containing the key directory path
+ */
 static const char *get_keydir()
 {
     static const char *keydir = NULL;
@@ -312,14 +406,39 @@ static const char *get_keydir()
     return keydir;
 }
 
-// Generate SHA1 hash of a given buffer
+/*!
+ * @brief Generate SHA1 hash of a given buffer
+ *
+ * Given a buffer containing user data, generate its SHA-1 hash
+ *
+ * @param data user data buffer
+ * @param data_len size of the data buffer
+ * @param digest a buffer where the generated SHA-1 hash will be stored
+ * @praam digest_len length of the digest buffer. Must be SHA_DIGEST_LENGTH.
+ *
+ * @returns void
+ */
 void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, int digest_len)
 {
 	assert(digest_len == SHA_DIGEST_LENGTH);
 	SHA1(data, data_len, digest);
 }
 
-// Convert a SHA1 digest to a hex string
+/*!
+ * @brief Convert a SHA1 digest to a hex string
+ *
+ * Convert the binary SHA-1 hash into a hex string
+ *
+ * Note: this function does not return the hex_string's length because it
+ * is already null-terminated and the user can call strlen() on it.
+ *
+ * @param digest a buffer containing the SHA-1 hash to be converted
+ * @param digest_len length of the SHA-1 buffer
+ * @param hex_string the user buffer to hold the converted hex string
+ * @param hex_string_len length of the hex_string buffer
+ *
+ * @returns void
+ */
 void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_string_len)
 {
     int i;
@@ -333,6 +452,18 @@ void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_str
     hex_string[hex_string_len-1] = '\0';
 }
 
+/*!
+ * @brief generate a hash of the given public key
+ *
+ * Given a public key, generate it's SHA-1 hash.
+ *
+ * @param pubkey a string representation of the public key to be hashed
+ * @param digest user provided buffer to hold the SHA-1 hash
+ * @param digest_len length of the digest buffer
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 {
 	int i, j;
@@ -365,8 +496,20 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 	return 0;
 }
 
-// Verify signature using public key read from file for given xid
-// NOTE: Public key must be available from local file
+/*!
+ * @brief Verify signature using public key read from file for given xid
+ *
+ * NOTE: Public key must be available from local file
+ *
+ * @param data data to be verified
+ * @param datalen length of the data buffer
+ * @param signature a buffer holding the signature to be verified against
+ * @param siglen the size of the signature buffer
+ * @param xid the XIA XID to be used for verification
+ *
+ * @returns 1 if the signature is valid
+ * @returns 0 if the signature does not match the data
+ */
 int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid)
 {
 	char pem_pub[MAX_PUBKEY_SIZE];
@@ -380,7 +523,23 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	return xs_isValidSignature(data, datalen, signature, siglen, pem_pub, pem_pub_len);
 }
 
-// Verify signature using public key in memory
+/*!
+ * @brief Verify signature using public key in memory
+ *
+ * Use this function at a recipient that just received a signed
+ * XIASecurityBuffer.
+ *
+ * NOTE: The public key is provided in a buffer
+ *
+ * @param data a buffer containing the data to be verified
+ * @param datalen length of the data buffer
+ * @param signature a buffer holding the signature to be verified against
+ * @param siglen the size of the signature buffer
+ * @param pem_pub a buffer holding the public key
+ * @param length of the pem_pub buffer length
+ *
+ * @returns non-zero if the signature matches data, verified against pem_pub
+ */
 int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *pem_pub, int pem_pub_len)
 {
 	int sig_verified;
@@ -400,12 +559,38 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	return sig_verified;
 }
 
+/*!
+ * @brief retrieve XID in hex string form from an XID given as a string
+ *
+ * Simply strips out the XID: string and returns the hex string. This
+ * can be used to look for the corresponding key-pair files.
+ *
+ * @param xid the XID whose hex ID string should be found
+ *
+ * @returns the hex string corresponding to the XID
+ */
 const char *xs_XIDHash(const char *xid)
 {
 	return strchr((char *)xid, ':') + 1;
 }
 
-// Sign data using private key of the given xid
+/*!
+ * @brief Sign data using private key of the given xid
+ *
+ * Sign the given data using the private key corresponding to the given
+ * XID. This can only be done if the private key is available locally
+ * and is accessible to the calling application.
+ *
+ * @param xid the XID whose private key will be used for signing
+ * @param data the data to be signed
+ * @param datalen the length of data to be signed
+ * @param signature a buffer to hold the signature
+ * @param siglen the length of the user provided buffer to hold signature
+ *
+ * @returns siglen the length of the actual signature
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen)
 {
 	char *privkeyhash = NULL;
@@ -491,7 +676,19 @@ xs_sign_done:
 	return retval;
 }
 
-// Get the public key for a given xid
+/*!
+ * @brief Get the public key for a given xid
+ *
+ * Given an XID, find the public key for it. The public key file must
+ * be present on the local disk in the key directory.
+ *
+ * @param xid the XID whose public key is to be found
+ * @param pubkey a buffer to hold the public key
+ * @param pubkey_len the length of public key buffer
+ *
+ * @returns 0 on success
+ * @returns negative value on failure
+ */
 int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 {
 	int pubfilepathlen;
@@ -562,6 +759,17 @@ xs_getPubkey_cleanup:
 	return retval;
 }
 
+/*!
+ * @brief check if hash of the public key matches the XID
+ *
+ * Generate a SHA-1 hash of the public key and see if it matches XID
+ *
+ * @param pubkey the public key in string format
+ * @param xid the XID in hex hash string
+ *
+ * @returns 1 if the public key matches the XID
+ * @returns 0 if it is not a match
+ */
 int xs_pubkeyMatchesXID(const char *pubkey, const char *xid)
 {
     char pubkeyHash[SHA_DIGEST_LENGTH];

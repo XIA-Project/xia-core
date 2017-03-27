@@ -1,0 +1,21 @@
+XIA API documentation
+
+Documentation for the XIA APIs is available as web and man pages.
+
+To generate the documentation ensure that the doxygen package is installed
+on your system. Then run 'make doc' from the xia-core directory.
+
+HTML pages will be placed in xia-core/doc/html
+
+The doc/xdocs command will launch a browser with the documentation, or they
+can be navigated to with your preferred browser.
+
+
+man pages will be placed in xia-core/doc/html
+
+The doc/xiaman command can be used to display the XIA specific man pages.
+
+Alternately, add the following line to your .bashrc or .zshrc file to access
+the XIA man pages with the default man command.
+
+export MANPATH=$MANPATH:~/xia-core/doc/man

@@ -9,7 +9,7 @@ SOURCES=$(addsuffix .c, $(OUT))
 all: $(TARGETS)
 
 $(TARGETS): $(SOURCES)
-	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) 
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
-clean: 
-	-rm $(TARGETS)
+clean:
+	@-rm -f $(TARGETS)

@@ -77,14 +77,18 @@ OBJS = string.o straccum.o glue.o \
 	landmarkt.o lexert.o lexertinfo.o driver.o \
 	confparse.o args.o archive.o processingt.o etraits.o elementmap.o \
 	userutils.o md5.o toolutils.o clp.o \
-	xid.o xiapath.o xiaheader.o xiaextheader.o xiautil.o \
+	xid.o xiapath.o xiaheader.o xiautil.o ../../../api/dagaddr/cpp/dagaddr.o  \
+	../../../api/dagaddr/cpp/utils.o  \
 	@LIBOBJS@ @EXTRA_TOOL_OBJS@
+
 BUILDOBJS = $(patsubst %.o,%.bo,$(OBJS))
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_TOOL
 CFLAGS = @CFLAGS@
 CXXFLAGS = @CXXFLAGS@
 DEPCFLAGS = @DEPCFLAGS@
+
+CFLAGS+=-std=c++11
 
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \

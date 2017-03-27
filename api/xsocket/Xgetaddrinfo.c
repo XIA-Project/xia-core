@@ -16,18 +16,68 @@
 */
 /*!
  @file Xgetaddrinfo.c
- @brief Implements Xgetgetaddrinfo(), Xfreeaddrinfo(), and Xgai_strerror()
+ @brief Xgetaddrinfo(), Xfreeaddrinfo(), Xgai_strerror() - network address and service translation
 */
+
+#include "Xsocket.h"
+/*! \cond */
 #include <errno.h>
 #include <netdb.h>
 #include <string.h>
 #include <strings.h>
 #include "minIni.h"
-#include "Xsocket.h"
 #include "Xinit.h"
 #include "Xutil.h"
 #include "dagaddr.hpp"
 
+
+#if 0
+
+
+typedef struct {
+	unsigned int  s_type;
+	unsigned char s_id[XID_SIZE];
+} xid_t;
+
+typedef struct {
+	xid_t         s_xid;
+	unsigned char s_edge[EDGES_MAX];
+} node_t;
+
+typedef struct click_xia_xid xid_t;
+
+typedef struct click_xia_xid_node node_t;
+
+typedef struct {
+	unsigned char s_count;
+	node_t        s_addr[NODES_MAX];
+} x_addr_t;
+
+
+
+typedef struct {
+	// common sockaddr fields
+#ifdef __APPLE__
+	unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
+	unsigned char sx_family;
+#else
+	unsigned short sx_family;
+#endif
+
+	// XIA specific fields
+	x_addr_t      sx_addr;
+} sockaddr_x;
+
+
+/*! @struct sockaddr_x
+ *  @brief This structure blah blah blah...
+ *  @var foreignstruct::a
+ *  Member 'a' contains...
+ *  @var foreignstruct::b
+ *  Member 'b' contains...
+ */
+
+#endif
 /* FIXME:
 ** - should we have XIA specific protocols for use in the addrinfo structure, or should it always be 0?
 ** - do something with the fallback flag
@@ -35,8 +85,6 @@
 ** philisophical questions:
 ** - is there an equivilent loopback address in XIA?
 ** - are there well know SIDs in XIA that should be findable in a getservbyname function?
-** - are there multiple interfaces allowed in XIA?
-** - are multiple AD/HIDs allowed on either the same interface, or different interfaces?
 */
 
 //#define DAG_PLUS4ID   "RE ( %s ) %s %s"
@@ -45,43 +93,66 @@
 //#define DAG_F 		  "RE ( %s %s )"
 #define XID_LEN		  64
 
+#define CONFIG_PATH_BUF_SIZE 1024
+#define RESOLV_CONF "/etc/resolv.conf"
+/*! \endcond */
+
+/*! struct xid_t
+** @brief XID definition
+** @var xid_t::s_type
+** @var xid_t::s_id
+*/
+
 
 // XIA specific addrinfo error strings
-const char *xerr_unimplemented = "This feature is not currently supported";
-
+static const char *xerr_unimplemented = "This feature is not currently supported";
 
 
  const char *Xgai_strerror(int code)
  {
- 	const char *msg = NULL;
+	const char *msg = NULL;
 
- 	switch (code) {
- 		case XEAI_UNIMPLEMENTED:
- 			msg = xerr_unimplemented;
- 			break;
+	switch (code) {
+		case XEAI_UNIMPLEMENTED:
+			msg = xerr_unimplemented;
+			break;
 
- 		default:
- 			msg = gai_strerror(code);
- 	}
+		default:
+			msg = gai_strerror(code);
+	}
 
- 	return msg;
+	return msg;
  }
 
-#define CONFIG_PATH_BUF_SIZE 1024
-#define RESOLV_CONF "/etc/resolv.conf"
 
-// Read DAG for rendezvous server data plane from resolv.conf
+/*!
+ * Read DAG for rendezvous server data plane from resolv.conf
+ *
+ * The XreadRVServerAddr() API will read the rendezvous service address
+ * from etc/resolv.conf file. The caller must be expecting the address
+ * to be available in the config file. This API does not call into the
+ * XIA stack and is simply a way to read the config file.
+ *
+ * @param rv_dag_str a buffer to be filled in
+ * @param rvstrlen the size of the rv_dag_str buffer
+ *
+ * @returns 0 on success, -1 on failure
+ */
 int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 {
 	int ret = -1;
 	int rc;
+
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
+
 	// clear out the buffers
 	bzero(rv_dag_str, rvstrlen);
 	bzero(root, CONFIG_PATH_BUF_SIZE);
+
 	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
-	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvous", rv_dag_str, rv_dag_str, rvstrlen,
+			strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		if (rc < rvstrlen) {
 			ret = 0;
@@ -90,34 +161,49 @@ int XreadRVServerAddr(char *rv_dag_str, int rvstrlen)
 			printf(" for %d byte RV DAG\n", rc);
 		}
 	} else {
-		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
+		printf("XreadRVServerAddr: Rendezvous server DAG not found:%s:\n",
+				rv_dag_str);
 	}
 	return ret;
 }
 
-// Read DAG for rendezvous server control plane from resolv.conf
+/*!
+ * Read DAG for rendezvous server control plane from resolv.conf
+ *
+ * The XreadRVServecControlAddr reads the control-plane address for the
+ * rendezvous service running on this system from etc/resolv.conf. The
+ * caller must be expecting the address to be available in the config
+ * file. This API does not call into the XIA stack and is simply a way
+ * to read the config file.
+ *
+ * @param rv_dag_str a buffer to return the control address in
+ * @param rvstrlen the size of rv_dag_str buffer
+ *
+ * @returns 0 on success, -1 on failure
+ */
 int XreadRVServerControlAddr(char *rv_dag_str, int rvstrlen)
 {
 	int ret = -1;
 	int rc;
+
 	// If there is a resolv.conf file with rendezvous info, return that info
 	char root[CONFIG_PATH_BUF_SIZE];
+
 	// clear out the buffers
 	bzero(rv_dag_str, rvstrlen);
 	bzero(root, CONFIG_PATH_BUF_SIZE);
+
 	// Read Rendezvous server DAG from xia-core/etc/resolv.conf, if present
-	//printf("XreadRVServerControlAddr: reading config file:%s:\n", strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
-	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen, strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
+	rc = ini_gets(NULL, "rendezvousc", rv_dag_str, rv_dag_str, rvstrlen,
+			strcat(XrootDir(root, CONFIG_PATH_BUF_SIZE), RESOLV_CONF));
 	if(rc > 0) {
 		printf("XreadRVServerControlAddr: found server at:%s:\n", rv_dag_str);
 		ret = 0;
-	}// else {
-	//	printf("XreadRVServerControlAddr: Rendezvous server DAG not found:%s:\n", rv_dag_str);
-	//}
+	}
 	return ret;
 }
 
-int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int protocol, int cname)
+static int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int protocol, int cname)
 {
 	struct addrinfo *ai = NULL;
 	// allocate memory needed
@@ -160,13 +246,30 @@ int _append_addrinfo(struct addrinfo **pai, sockaddr_x sa, int socktype, int pro
 	return 0;
 }
 
-/*
-** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
-**  they are just checked to make sure no IPv4 code slips past us by mistake.
-*/
 
+/*!
+** @brief Get the full DAG of the remote socket.
+**
+** \todo flesh out Xgetaddrinfo() text
+**
+** @param sockfd An Xsocket of type SOCK_STREAM
+** @param dag A sockaddr to hold the returned DAG.
+** @param len On input contans the size of the sockaddr
+**  on output contains sizeof(sockaddr_x).
+**
+** @returns 0 on success
+** @returns -1 on failure with errno set
+** @returns errno = EFAULT if dag is NULL
+** @returns errno = EOPNOTSUPP if sockfd is not of type XSSOCK_STREAM
+** @returns errno = ENOTCONN if sockfd is not in a connected state
+**
+*/
 int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *hints, struct addrinfo **pai)
 {
+	/*
+	** NOTE: although we currently check them, we don't use the protocol or socktype fields of the hints structure.
+	**  they are just checked to make sure no IPv4 code slips past us by mistake.
+	*/
 	int rc;
 	sockaddr_x sa;
 	socklen_t slen;
@@ -330,7 +433,10 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 				} else {
 					g = gif;
 				}
+			} else {
+				g = gif;
 			}
+
 			g.fill_sockaddr(&sa);
 			if((rc =_append_addrinfo(pai, sa, socktype, protocol, cname)) != 0) {
 				Xfreeifaddrs(ifaddr);

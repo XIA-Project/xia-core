@@ -3,7 +3,39 @@
 # grab every bit of state about XIA that we can find
 #
 
-# FIXME: do we want minute/second resolution in the file name?
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+capture all XIA system info to a file
+
+options:
+  -h, --help    display this help
+  -v, --version display the version number
+sources:
+  list of running XIA processes
+
+  syslog entries from click and the XIA daemons
+
+  list of network interfaces
+
+  output from xdag, log, xroute, xnetstat, & psx commands
+
+  config files from etc & etc/click
+
+  list of files in the key directory
+
+  list of cached chunks
+
+output:
+  xia-<hostname>-<date>.log
+EOH
+	exit 0
+
+elif [ "$1" == "-v" ] || [ "$1" == "--version" ]; then
+	echo "xinfo 1.0"
+	exit 0
+fi
+
+
 outfile="xia-$(hostname -s)-$(date +%Y-%m-%d).log"
 exec >$outfile
 exec 2>&1
@@ -16,8 +48,8 @@ echo "generated on $(date)"
 XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 
-# XIA commands
-cmds=" \
+# XIA command
+scmds=" \
 	xdag \
 	xlog \
 	xroute \
@@ -37,6 +69,7 @@ files=" \
 	etc/xids \
 	xia.mk
 	"
+
 
 
 # print a fancy header

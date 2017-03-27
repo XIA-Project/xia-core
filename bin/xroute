@@ -23,8 +23,8 @@ import telnetlib
 import socket
 import xiapyutils
 
-APP_VERSION="1.0"
-TITLE="XIA Route version %s"
+APP="xroute"
+APP_VERSION="1.5"
 
 # default Click host and port (can be changed on cmd line)
 HOST="localhost"
@@ -33,6 +33,14 @@ PORT=7777
 # Minimum Click version required
 MAJOR=1
 MINOR=3
+
+# route table flags
+F_HOST         = 0x0001 # node is a host
+F_CORE_ROUTER  = 0x0002 # node is an internal router
+F_EDGE_ROUTER  = 0x0004 # node is an edge router
+F_CONTROLLER   = 0x0008 # node is a controller
+F_IP_GATEWAY   = 0x0010 # router is a dual stack router
+F_STATIC_ROUTE = 0x0100 #route entry was added manually and should not expire
 
 KNOWN_XIDS = [ "AD", "HID", "FID", "SID", "CID", "IP" ]
 #
@@ -57,11 +65,12 @@ class Options:
 	# parse the command line so we can do stuff
 	#
 	def getOptions(self):
+
 		try:
 			# FIXME: make the option names more meaningful
 			shortopt = "hpnvif:d:a:r:"
 			opts, args = getopt.getopt(sys.argv[1:], shortopt,
-				["help", "print", "names", "verbose",
+				["help", "print", "names", "verbose", "version",
 				"host=", "port=", "file=", "dump=", "add=", "remove=",
 				"type="])
 		except getopt.GetoptError, err:
@@ -71,6 +80,7 @@ class Options:
 			sys.exit(2)
 
 		for o, a in opts:
+
 			if o in ("-h", "--help"):
 				self.help()
 			elif o in ("-p", "--print"):
@@ -98,8 +108,11 @@ class Options:
 				self._port = a
 			elif o in ("--type"):
 				self._types.append(a)
+			elif o in ("--version"):
+				print "%s %s" % (APP, APP_VERSION)
+				sys.exit(0)
 			else:
-			 	assert False, "unhandled option"
+				assert False, "unhandled option"
 
 	#
 	# display helpful information
@@ -108,42 +121,33 @@ class Options:
 		print """
 usage: xroute [-hpnvif:d:a:r:] [commands]
 where:
-  -h <host>        : specify the click host address
-  --host=<host>
+  -h <host>,--host=<host>      specify the click host address
+  --port=<port>                specify the click control port
+  --type=<xid>                 only output information for the specified XID type
+                               can be specified multile times on the command line
+  -p, --print                  print the route tables to stdout (default action)
+  -n, --names                  print the known alias:xid mappings to stdout
+  -v, --verbose                always print the full XID even if an alias exists
+  -f <file>, --file=<file>     read add/delete commands from a config file
 
-  --port=<port>    : specify the click control port
+  commands are in the form of:
+    add/update:
+      cmd type,xid,port[,nexthop,flags]
+      add AD,AD0,1
+      add HID,-,0,HID1,0
+    delete:
+      del CID,CID:0000000000000000000000000000000000000000
 
-  --type=<xid>     : only output information for the specified XID type
-                     can be specified multile times on the command line
+  -d <file> , --dump=<file>    dump a command file contining the current route tables
+                               the file format will be the same as the above command
 
-  -p               : print the route tables to stdout (default action)
-  --print
+  -a <entry>, --add=<entry>    add a route, can be specified multipe times
+                               format of entry is the same as above except the add/del
+                               prefix is not used
 
-  -n               : print the known alias:xid mappings to stdout
-  --names
-
-  -v               : always print the full XID even if an alias exists
-  --verbose
-
-  -f <file>        : read add/delete commands from a config file
-  --file=<file>      commands are in the form of:
-                     add/update:
-                       cmd type,xid,port[,nexthop,flags]
-                       add AD,AD0,1
-                       add HID,-,0,HID1,0
-                     delete:
-                       del CID,CID:0000000000000000000000000000000000000000
-
-  -d <file>        : dump a command file contining the current route tables
-  --dump=<file>      the file format will be the same as the above command
-
-  -a <entry>       : add a route, can be specified multipe times
-  --add=<entry>      format of entry is the same as above except the add/del
-                     prefix is not used
-
-  -r <entry>       : remove a route, can be specified multipe times
-  --remove=<entry>   format of entry is the same as above except the add/del
-                     prefix is not used
+  -r <entry>, --remove=<entry> remove a route, can be specified multipe times
+                               format of entry is the same as above except the add/del
+                               prefix is not used
 """
 		sys.exit()
 	#
@@ -548,9 +552,10 @@ class XrouteApp:
 			nexthop = ""
 
 		if len(parts) == 5:
-			flags = parts[4]
+			flags = int(parts[4])
 		else:
 			flags = 0
+                flags |= F_STATIC_ROUTE
 
 		if table not in (KNOWN_XIDS):
 			print "attempting to add a route for a non-standard XID: %s" % table
@@ -651,10 +656,8 @@ class XrouteApp:
 # let's do this thing
 #
 def main():
-	print TITLE % (APP_VERSION)
-
 	xroute = XrouteApp()
 	xroute.run()
 
 if __name__ == "__main__":
-    main()
+	main()

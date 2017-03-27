@@ -13,7 +13,7 @@
 #include <string>
 #include <map>
 
-#ifdef CLICK_USERLEVEL
+#if defined(CLICK_USERLEVEL) || defined(CLICK_TOOL)
 #include <clicknet/xia.h>
 #else
 #include "xia.h"
@@ -85,6 +85,20 @@ private:
 	void construct_from_strings(const std::string type_string, const std::string id_string);
 };
 
+/*!
+ * @brief Build DAGs for use as addresses in XIA
+ *
+ * This class provides the user a simple set of operators to build a DAG
+ * for use as address within XIA.
+ *
+ * NOTE:
+ * ----
+ * Create Node(s) first and then build Graph from them
+ * Node objects are compared by reference. So even if two Nodes have
+ * the same XID, they are considered separate. This allows us to build
+ * Graphs with the same XID appearing more than once.
+ *
+ */
 class Graph
 {
 public:
@@ -94,6 +108,12 @@ public:
 	Graph(std::string dag_string);
 	Graph(const sockaddr_x *s);
 
+	// Graph manipulation operations
+	//
+	// NOTE: Nodes are compared by reference not value
+	//
+	// So create Node objects first, then build Graph
+	//
 	Graph& operator=(const Graph& r);
 	Graph& operator*=(const Graph& r);
 	Graph operator*(const Graph& r) const;
@@ -109,6 +129,9 @@ public:
 	void print_graph() const;
 	std::string http_url_string() const;
 	std::string dag_string() const;
+	const Node& intent_AD() const;
+	const Node& intent_HID() const;
+	const Node& intent_SID() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
@@ -120,7 +143,6 @@ public:
 	Graph first_hop();
 	uint8_t num_nodes() const;
 	Node get_node(int i) const;
-	std::vector<std::size_t> get_out_edges(int i) const;
 	size_t fill_wire_buffer(node_t *buf) const;
 	void fill_sockaddr(sockaddr_x *s) const;
 	void from_wire_format(uint8_t num_nodes, const node_t *buf);
@@ -128,6 +150,7 @@ public:
 	void replace_final_intent(const Node& new_intent);
 	Node get_final_intent() const;
 	bool replace_intent_HID(std::string new_hid_str);
+	bool replace_intent_AD(std::string new_ad_str);
 	size_t unparse_node_size() const;
 	bool flatten();
 	bool first_hop_is_sid() const;
@@ -142,6 +165,7 @@ public:
 
 	int compare_except_intent_AD(Graph other) const;
 private:
+	bool replace_intent_XID(uint32_t xid_type, std::string new_xid_str);
 	std::size_t intent_XID_index(uint32_t xid_type) const;
 	std::size_t intent_AD_index() const;
 	std::size_t intent_HID_index() const;
@@ -152,6 +176,7 @@ private:
 
 	void replace_node_at(int i, const Node& new_node);
 
+	std::vector<std::size_t> get_out_edges(int i) const;
 
 	bool is_source(std::size_t id) const;
 	bool is_sink(std::size_t id) const;
@@ -170,7 +195,7 @@ private:
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
 
-	bool depth_first_walk(std::size_t node, std::vector<Node> &paths) const;
+	bool depth_first_walk(int node, std::vector<Node> &paths) const;
 	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
 	void dump_stack_trace() const;
