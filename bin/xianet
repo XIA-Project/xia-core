@@ -349,7 +349,7 @@ router()
 			cd $XIADIR/bin
 			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
-			sleep 0.2
+			sleep 0.4
 			./$ROUTER -h $host $LOG_FLAGS &
 			sleep 0.2
 			;;
@@ -683,6 +683,7 @@ case $1 in
 		process_nodes "stop"
 		[ $NO_CLICK != 1 ] && kill_service "click"
 		visualizer "stop"
+		sleep .2
 		check_all_services
 		rm -f /tmp/xcache*
 		;;

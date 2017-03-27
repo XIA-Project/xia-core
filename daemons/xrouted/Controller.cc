@@ -70,10 +70,13 @@ void *Controller::handler()
 
 	struct pollfd pfd[3];
 
+	bzero(pfd, sizeof(pfd));
 	pfd[0].fd = _broadcast_sock;
 	pfd[1].fd = _controller_sock;
 	pfd[2].fd = _local_sock;
-	pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
+	pfd[0].events = POLLIN;
+	pfd[1].events = POLLIN;
+	pfd[2].events = POLLIN;
 
 	tspec.tv_sec = 0;
 	tspec.tv_nsec = 500000000;
@@ -1855,7 +1858,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	_calc_dijstra_ticks++;
 
 
-printf("%d\n\n", _networkTable.size());
+//printf("%d\n\n", _networkTable.size());
 return 1;
 
 	if (_calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || _calc_dijstra_ticks  < 0)
@@ -1887,7 +1890,7 @@ return 1;
 			// Calculate routing table for HIDs instead
 			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
 
-			printf("routing table size = %d\n", routingTable.size());
+			printf("routing table size = %lu\n", routingTable.size());
 
 			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);

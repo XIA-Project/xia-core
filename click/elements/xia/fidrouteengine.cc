@@ -387,7 +387,7 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 
 		if (seq == si.seq) {
 			// duplicate
-			//INFO("FID Engine: dup sequence # %lu %u", seq, si.seq);
+			INFO("FID Engine: dup sequence # %lu %u", seq, si.seq);
 			return false;
 
 		} else if (forward > reverse) {
@@ -470,7 +470,6 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	XIDtuple xt(fid, src, dst);
 
 	if (!check(xt, p)) {
-		//INFO("\nfid discarding");
 		// we've seen this packet or it has expired
 		return DESTINED_FOR_DISCARD;
 	}

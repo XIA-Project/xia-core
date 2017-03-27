@@ -80,18 +80,20 @@ void *Router::handler()
 
 		struct pollfd pfd[3];
 
-		pfd[2].fd = _broadcast_sock;
-		pfd[0].fd = _router_sock;
-		pfd[1].fd = _local_sock;
-		pfd[0].events = pfd[1].events = pfd[2].events = POLLIN;
-		pfd[0].revents = pfd[1].revents = pfd[2].revents = 0;
+		bzero(pfd, sizeof(pfd));
+		pfd[0].fd = _broadcast_sock;
+		pfd[1].fd = _router_sock;
+		pfd[2].fd = _local_sock;
+		pfd[0].events = POLLIN;
+		pfd[1].events = POLLIN;
+		pfd[2].events = POLLIN;
 
 		tspec.tv_sec = 0;
 		tspec.tv_nsec = 500000000;
 
 		rc = Xppoll(pfd, 1, &tspec, NULL);
 		if (rc > 0) {
-			int sock = -1;
+				int sock = -1;
 
 			for (int i = 0; i < 3; i++) {
 				if (pfd[i].revents & POLLIN) {
