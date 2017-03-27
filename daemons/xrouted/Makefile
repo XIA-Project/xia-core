@@ -3,7 +3,7 @@ VPATH=../common
 
 .PHONY: all clean
 
-SOURCES=xrouted.cc csclient.cc XIARouter.cc ControlMessage.cc RouterConfig.cc IntraDomainRouter.cc RouteModule.cc Controller.cc xroute.pb.cc
+SOURCES=xrouted.cc csclient.cc XIARouter.cc RouterConfig.cc IntraDomainRouter.cc RouteModule.cc Controller.cc xroute.pb.cc
 
 XROUTED=$(BINDIR)/xrouted
 LDFLAGS += $(LIBS) -lprotobuf
@@ -16,6 +16,7 @@ xroute.pb.cc: xroute.proto
 
 $(XROUTED): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
+
 
 clean:
 	-rm $(XROUTED)
