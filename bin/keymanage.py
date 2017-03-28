@@ -3,9 +3,14 @@
 import re
 import os
 import os.path
-import psutil
 import sys
 import clickcontrol
+
+try:
+    import psutil
+except ImportError:
+    print 'keymanage.py: Please install python-psutil package'
+    sys.exit(-1)
 
 class KeyManager:
     _keydirname = 'key'
