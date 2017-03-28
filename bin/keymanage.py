@@ -49,21 +49,24 @@ class KeyManager:
 
     def _remove_keys_except(self, keydir, save_keys, test):
         for filename in os.listdir(keydir):
-            for key in save_keys:
+            filekeyhash = os.path.splitext(filename)[0]
 
-                # Skip keys that were to be saved
-                if key in filename:
-                    continue;
+            # Skip keys that were to be saved
+            if filekeyhash in save_keys:
+                continue
 
-                # Remove others
-                filepath = os.path.join(keydir, filename)
+            # Remove others
+            filepath = os.path.join(keydir, filename)
 
-                # Remove only if not testing
-                if not test:
-                    print "Removing {}".format(filepath)
+            # Remove only if not testing
+            if not test:
+                print "Removing {}".format(filepath)
+                try:
                     os.remove(filepath)
-                else:
-                    print "Test rm {}".format(filepath)
+                except OSError as err:
+                    print 'Remove failed {}'.format(err)
+            else:
+                print "Test rm {}".format(filepath)
 
     def _click_running(self):
         for pid in psutil.pids():
