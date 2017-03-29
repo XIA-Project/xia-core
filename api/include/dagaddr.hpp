@@ -1,11 +1,11 @@
 #pragma once
 
+/*! \cond */
  #define PATH_SIZE 4096
  #include <unistd.h>
  #include <stdio.h>
  #include <string.h>
  #include <stdlib.h>
-
 
 
 #include <stdint.h>	// for non-c++0x
@@ -18,9 +18,13 @@
 #else
 #include "xia.h"
 #endif
+/*! \endcond */
 
 class Graph;
 
+/*!
+ * @brief Class defining XIDs that are used by the Graph class.
+ */
 class Node
 {
 public:

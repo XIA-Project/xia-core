@@ -16,11 +16,12 @@
 */
 /*!
  @file dagaddr.cpp
- @brief Implements dagaddr library
+ @brief Implements the dagaddr classes Node and Graph
 */
 
 
 #include "dagaddr.hpp"
+/*! \cond */
 #include "utils.hpp"
 #include <cstring>
 #include <map>
@@ -31,6 +32,7 @@
 #include <arpa/inet.h>
 #include <stdint.h> // for uint8_t
 #include <execinfo.h> // for backtrace, backtrace_symbols_fd
+/*! \endcond */
 
 static const std::size_t vector_find_npos = std::size_t(-1);
 
