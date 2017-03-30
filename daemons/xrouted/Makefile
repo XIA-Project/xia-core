@@ -28,5 +28,5 @@ $(CONTROLD): $(COMMON_OBJS) $(CONTROL_OBJS)
 
 clean:
 	@-rm -f $(XROUTED)
-	@-rm -f $(OBJS)
+	@-rm -f *.o
 	@-rm -f xroute.pb.*
