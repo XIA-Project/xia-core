@@ -98,7 +98,6 @@ void *Router::handler()
 			for (int i = 0; i < 3; i++) {
 				if (pfd[i].revents & POLLIN) {
 					sock = pfd[i].fd;
-					printf("i = %d\n", i);
 					break;
 				}
 			}
@@ -141,7 +140,6 @@ void *Router::handler()
 				perror("recvfrom");
 
 			} else {
-				printf("Xrecvmsg returned %d\n", rc);
 				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
 					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
@@ -352,6 +350,7 @@ int Router::init()
 
 int Router::sendHello()
 {
+	// FIXME: removed sending SIDs for now, do we need to in the future???
 	string message;
 
 	Node n_ad(_myAD);
@@ -363,7 +362,7 @@ int Router::sendHello()
 	Xroute::Node     *node  = hello->mutable_node();
 	Xroute::XID      *ad    = node->mutable_ad();
 	Xroute::XID      *hid   = node->mutable_hid();
-	Xroute::XID      *sid   = node->mutable_sid();
+	//Xroute::XID      *sid   = node->mutable_sid();
 
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
@@ -373,17 +372,20 @@ int Router::sendHello()
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
-	sid->set_type(n_sid.type());
-	sid->set_id(n_sid.id(), XID_SIZE);
+	// sid->set_type(n_sid.type());
+	// sid->set_id(n_sid.id(), XID_SIZE);
 
-
-//	printf("sending %s\n", msg.DebugString().c_str());
 	return sendBroadcastMessage(msg);
 }
 
 // send LinkStateAdvertisement message (flooding)
 int Router::sendLSA()
 {
+	// don't bother if our neighbor table is empty
+	if (_neighborTable.size() == 0) {
+		return 1;
+	}
+
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
 
@@ -402,6 +404,8 @@ int Router::sendLSA()
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
+
+printf("send lsa size = %lu\n", _neighborTable.size());
 
 	map<std::string, NeighborEntry>::iterator it;
 	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
@@ -593,6 +597,7 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 	//  update my entry in the networkTable
 	NodeStateEntry entry;
 	entry.hid = _myHID;
+	entry.ad = _myAD;
 	entry.num_neighbors = _num_neighbors;
 
 	// fill my neighbors into my entry in the networkTable
@@ -615,7 +620,6 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
-	printf("process hello\n");
 	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
 	NeighborEntry neighbor;
@@ -636,6 +640,8 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		sid = Node(xsid.type(), xsid.id().c_str(), 0);
 		neighborSID = sid.to_string();
 		neighbor.HID = neighborSID;
+
+		printf("has sid\n");
 	} else {
 		neighbor.HID = neighborHID;
 	}
@@ -663,6 +669,7 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	// Update network table
 	NodeStateEntry entry;
 	entry.hid = _myHID;
+	entry.ad = _myAD;
 	entry.num_neighbors = _num_neighbors;
 
 	// Add neighbors to network table entry
@@ -672,6 +679,9 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	_networkTable[_myHID] = entry;
 
+	printf("network table size = %lu\n", _networkTable.size());
+	printf("neighbor table size = %lu\n", _neighborTable.size());
+	printf("entry.neighborlist size = %lu\n", entry.neighbor_list.size());
 
 
 	// FIXME: hack until xnetjd deals with hid hello routes
@@ -691,7 +701,9 @@ int Router::processLSA(const Xroute::XrouteMsg& msg)
 	string neighborAD, neighborHID;
 	string srcAD, srcHID;
 
-//	printf("processLSA: %s\n", lsa.DebugString().c_str());
+
+// FIXME: we should never get here!
+printf("processLSA: %s\n", msg.DebugString().c_str());
 
 	const Xroute::LSAMsg& lsa = msg.lsa();
 
@@ -704,7 +716,7 @@ int Router::processLSA(const Xroute::XrouteMsg& msg)
 	srcAD  = ad.to_string();
 	srcHID = hid.to_string();
 
-//	syslog(LOG_INFO, "Process-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
+	syslog(LOG_INFO, "Process-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
 
 	if (srcHID.compare(_myHID) == 0) {
 		// skip if from me
