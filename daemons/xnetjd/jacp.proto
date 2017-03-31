@@ -165,6 +165,7 @@ message ClientCredentials {
 message RouterCredentials {
    oneof router_cred_option {
        NullRouterCredential null = 1;
+       ADOnlyRouterCredential adonly = 2;
    }
 }
 
@@ -428,6 +429,9 @@ message IPv4Request {
 message NullClientCredential {
 }
 message NullRouterCredential {
+}
+message ADOnlyRouterCredential {
+    required string ad = 1;
 }
 
 // Some\ dummy\ /\ placeholder\ stubs:1 ends here
