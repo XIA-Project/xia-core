@@ -29,7 +29,7 @@ pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t dagVecLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t stageMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t StageControl = PTHREAD_MUTEX_INITIALIZER;
-
+pthread_mutex_t fetchLock = PTHREAD_MUTEX_INITIALIZER;
 
 long timeStamp;
 ofstream connetTime("connetTime.log");
@@ -163,6 +163,7 @@ void *clientCmd(void *socketid)
             //pthread_mutex_unlock(&StageControl);
         }
         else if (strncmp(cmd, "fetch", 5) == 0) {
+            pthread_mutex_lock(&fetchLock);
             say("Receive a chunk request\n");
 	    pthread_mutex_unlock(&StageControl);
             char dag[256] = ""; 
@@ -170,7 +171,8 @@ void *clientCmd(void *socketid)
             if (delegationHandler(sock, dag) < 0) {
                 break;
             }
-            pthread_mutex_unlock(&StageControl);
+            
+            //pthread_mutex_unlock(&StageControl);
         }
         else if (strncmp(cmd, "time", 4) == 0) {
             say("Get Time! cmd: %s\n", cmd);
@@ -228,12 +230,13 @@ void *stageData(void *)
         netStageOn = false;
         pthread_exit(NULL);
     }
-
+    //pthread_mutex_unlock(&StageControl);
     // TODO: need to handle the case that new SID joins dynamically
     // TODO: handle no in-net staging service
     while (1) {
         say("*********************************Before while loop of stageData\n");
         pthread_mutex_lock(&StageControl);
+	pthread_mutex_unlock(&fetchLock);
         say("*********************************In while loop of stageData\n");
         if(!isConnect()){
             long newStamp = now_msec();
@@ -246,7 +249,7 @@ void *stageData(void *)
             say("Thread id: %d Network changed, create another thread to continue!\n");
             lastSSID = currSSID;
             pthread_t thread_stageDataNew;
-            pthread_mutex_unlock(&StageControl);
+            
             pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
@@ -319,6 +322,7 @@ void *stageData(void *)
 }
 int main()
 {
+//pthread_mutex_lock(&StageControl);
 //say("before getSSID");
     lastSSID = getSSID();
 //say("after getSSID");

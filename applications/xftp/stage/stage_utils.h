@@ -50,7 +50,7 @@
 #define PREFETCH_MANAGER_NAME "www_s.prefetch_client.aaa.xia"
 #define UNIXMANAGERSOCK "/tmp/stage_manager.sock"
 //#define GETSSID_CMD "iwgetid -r"
-#define GETSSID_CMD "iwconfig wlan0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
+#define GETSSID_CMD "iwconfig wlp1s0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
 #define GETSSID_CMD2 "iwconfig wlan0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
 //#define GETSSID_CMD "iwconfig wlp6s0 | grep '\\\"[a-zA-Z\\_0-9.]*\\\"' -o"
 #define PURGE_DELAY_SEC 10
