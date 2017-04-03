@@ -197,7 +197,10 @@ class NetjoinHandshakeOne(object):
             logging.info("Join request from a client")
         elif (self.payload.core.HasField('router_credentials')):
             if self.valid_router_creds(self.payload.core.router_credentials):
-            logging.info("Join request from a router")
+                logging.info("Join request from a router")
+            else:
+                logging.warning("Invalid router credentials")
+                return False
         else:
             logging.warning("No credentials in join request")
             return False
