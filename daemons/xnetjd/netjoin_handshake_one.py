@@ -2,12 +2,14 @@
 #
 
 from google.protobuf import text_format as protobuf_text_format
+import os.path
 import struct
 import logging
 import jacp_pb2
 import threading
 import nacl.utils
 import netjoin_session
+from credmgr import CredMgr
 from netjoin_xiaconf import NetjoinXIAConf
 from netjoin_l2_handler import NetjoinL2Handler
 from netjoin_message_pb2 import SignedMessage
@@ -23,7 +25,7 @@ class NetjoinHandshakeOne(object):
         self.challenge = challenge
         self.is_router = is_router
         self.cred_mgr = CredMgr()
-        self.rcredfilepath = "RHID.cred"
+        self.rcredfilepath = os.path.join(self.conf.get_conf_dir(), 'RHID.cred')
 
         # No challenge, means AP got this handshake
         # It will use from_wire_handshake_one() to fill in everything
@@ -49,7 +51,7 @@ class NetjoinHandshakeOne(object):
             # Get the router credential from file
             router_cred = self.get_router_creds()
             if router_cred is not None:
-                core.router_credentials = router_cred
+                core.router_credentials.CopyFrom(router_cred)
             else:
                 core.router_credentials.null.SetInParent()
         else:
