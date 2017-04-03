@@ -52,7 +52,7 @@ class CredMgr(object):
 # Argument parser
 def parse_args():
     parser = argparse.ArgumentParser(description="XIA Credential Manager")
-    
+
     # Issue a router credential. AD only for now.
     parser.add_argument("-r", "--issue_router_cred",
             help="issue router credential", action="store_true")
