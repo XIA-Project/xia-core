@@ -24,7 +24,7 @@ class CredMgr(object):
 
     def issue_router_cred(self):
         # We can issue credentials only when running on controller
-        if not self.is_controller():
+        if not self.is_controller:
             raise RuntimeError("Credentials can only be issued on controller")
 
         # Router credential file name. Will include RHID in future.
