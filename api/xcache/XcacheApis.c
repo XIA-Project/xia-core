@@ -1,4 +1,4 @@
-p/* ts=4 */
+/* ts=4 */
 /*
 ** Copyright 2017 Carnegie Mellon University
 **
