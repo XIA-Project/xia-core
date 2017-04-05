@@ -27,7 +27,19 @@ int Router::getControllerDag(sockaddr_x *dag)
 
 	sockaddr_x ns;
 
-	XreadNameServerDAG(_local_sock, &ns);
+	while (1) {
+		// we can get the HID from the Nameserver DAG
+		if (XreadNameServerDAG(_local_sock, &ns) < 0) {
+			if (errno == EWOULDBLOCK) {
+				syslog(LOG_INFO, "iName server DAG not ready yet, looping...\n");
+				sleep(1);
+				continue;
+			}
+			return -1;
+		}
+
+		break;
+	}
 
 	Graph g(&ns);
 
@@ -38,7 +50,7 @@ int Router::getControllerDag(sockaddr_x *dag)
 	g = (src * h * f * s) + (src * f * s);
 
 	g.fill_sockaddr(dag);
-	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Controller's DAG: %s", g.dag_string().c_str());
 	return 0;
 }
 
@@ -249,7 +261,6 @@ int Router::makeSockets()
 
 	Node nHID(_myHID);
 
-
 	// make the dag we'll receive local broadcasts on
 	g = src * Node(broadcast_fid) * Node(intradomain_sid);
 
@@ -285,7 +296,7 @@ int Router::makeSockets()
 	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 
 	g.fill_sockaddr(&_router_dag);
-	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Control Receiver DAG: %s", g.dag_string().c_str());
 
 	// and bind it to the controller receive socket
 	if (Xbind(_router_sock, (struct sockaddr*)&_router_dag, sizeof(sockaddr_x)) < 0) {
@@ -296,9 +307,10 @@ int Router::makeSockets()
 
 	// make the DAG we'll send with
 	XmakeNewSID(s, sizeof(s));
+
 	Node nAD(_myAD);
 	Node outSID(s);
-	g = nAD * nHID * outSID;
+	g = src * nAD * nHID * outSID;
 
 	g.fill_sockaddr(&_source_dag);
 	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
@@ -405,7 +417,7 @@ int Router::sendLSA()
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 
-printf("send lsa size = %lu\n", _neighborTable.size());
+//printf("send lsa size = %lu\n", _neighborTable.size());
 
 	map<std::string, NeighborEntry>::iterator it;
 	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
@@ -679,9 +691,9 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	_networkTable[_myHID] = entry;
 
-	printf("network table size = %lu\n", _networkTable.size());
-	printf("neighbor table size = %lu\n", _neighborTable.size());
-	printf("entry.neighborlist size = %lu\n", entry.neighbor_list.size());
+//	printf("network table size = %lu\n", _networkTable.size());
+//	printf("neighbor table size = %lu\n", _neighborTable.size());
+//	printf("entry.neighborlist size = %lu\n", entry.neighbor_list.size());
 
 
 	// FIXME: hack until xnetjd deals with hid hello routes
