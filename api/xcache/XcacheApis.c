@@ -30,12 +30,14 @@
 #include <stdlib.h>
 #include "xcache_cmd.pb.h"
 #include "xcache_sock.h"
+#include "cid.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include "dagaddr.hpp"
 /*! \endcond */
 
+#define IO_BUF_SIZE (1024 * 1024)
 
 static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, sockaddr_x *, socklen_t) = {
 	NULL,
@@ -745,6 +747,12 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 
 	fprintf(stderr, "Inside %s\n", __func__);
 
+	// Bypass cache if requesting chunk without caching
+	int bypass_cache_flags = XCF_BLOCK | XCF_CACHE;
+	if (flags & bypass_cache_flags) {
+		return _XfetchRemoteChunkBlocking(buf, addr, len);
+	}
+
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
 	cmd.set_dag(addr, len);
@@ -777,6 +785,109 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 
 		return to_copy;
 	}
+
+	return 0;
+}
+
+/*!
+ * @brief bypass xcache and fetch chunk without caching
+ *
+ * This function is an optimization for fetching chunks faster. It achieves
+ * the speed by bypassing requesting chunks through xcache daemon and
+ * caching them on the localhost.
+ *
+ * Note: If called on a router, the xcache daemon will still passively
+ * be able to cache the chunks and may affect performance.
+ *
+ * @param buf pointer to chunk's data. Caller must free it
+ * @param addr the DAG of the chunk to retrieve
+ * @param len size of addr. Should be sizeof(sockaddr_x)
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
+{
+	// NOTE: Code copied from xcache_controller::fetch_content_remote()
+	// Must stay in sync with that code base
+	int sock;
+	Graph g(addr);
+
+	fprintf(stderr, "Fetching: %s\n", g.dag_string().c_str());
+
+	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	if (sock < 0) {
+		fprintf(stderr, "ERROR creating Xsocket: %s\n", strerror(errno));
+		return -1;
+	}
+
+	if (Xconnect(sock, (struct sockaddr *)addr, len) < 0) {
+		fprintf(stderr, "ERROR connecting to CID: %s\n", strerror(errno));
+		return -1;
+	}
+
+	std::string data;
+	char buf[IO_BUF_SIZE];
+	struct cid_header header;
+	int to_recv, recvd;
+	size_t remaining;
+	size_t offset;
+	unsigned hop_count;
+
+	Node expected_cid(g.get_final_intent());
+
+	remaining = sizeof(cid_header);
+	offset = 0;
+
+	while (remaining > 0) {
+		fprintf(stderr, "Remaining(1) = %lu\n", remaining);
+		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
+		if (recvd < 0) {
+			fprintf(stderr, "Sender Closed the connection: %s", strerror(errno));
+			Xclose(sock);
+			assert(0);
+			break;
+		} else if (recvd == 0) {
+			fprintf(stderr, "Xrecv returned 0\n");
+			break;
+		}
+		remaining -= recvd;
+		offset += recvd;
+	}
+
+	remaining = ntohl(header.length);
+	hop_count = ntohl(header.hop_count);
+
+	while (remaining > 0) {
+		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
+
+		recvd = Xrecv(sock, buf, to_recv, 0);
+		if (recvd < 0) {
+			fprintf(stderr, "Receiver Closed the connection; %s", strerror(errno));
+			Xclose(sock);
+			assert(0);
+			break;
+		} else if (recvd == 0) {
+			fprintf(stderr, "Xrecv returned 0");
+			break;
+		}
+		fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+
+		remaining -= recvd;
+		std::string temp(buf, recvd);
+
+		data += temp;
+	}
+
+	// TODO: Verify that data matches intent CID in addr
+
+	// Copy data to a buffer to be returned
+	int to_copy = data.length();
+	*chunk = malloc(to_copy);
+	memcpy(*chunk, data.c_str(), to_copy);
+	hopCount = hop_count;
+
+	Xclose(sock);
 
 	return 0;
 }
