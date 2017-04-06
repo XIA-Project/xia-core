@@ -698,7 +698,6 @@ Graph::remove_intent_sid_node()
 	// Ensure that the sink node is an SID
 	std::size_t intent_index = final_intent_index();
 	if (nodes_[intent_index].type() != XID_TYPE_SID) {
-		printf("Graph::remove_intent_sid_node() Intent node was not SID\n");
 		return false;
 	}
 	return remove_intent_node();
@@ -1024,12 +1023,12 @@ Graph::compare_except_intent_AD(Graph other) const
 	// Find our and their intent AD
 	size_t intent_ad = intent_AD_index();
 	if (intent_ad == INVALID_GRAPH_INDEX) {
-		printf("Graph::compare_except_intent_AD ERROR No intent AD\n");
+		//printf("Graph::compare_except_intent_AD No intent AD\n");
 		return -1;
 	}
 	size_t their_intent_ad = them.intent_AD_index();
 	if (their_intent_ad == INVALID_GRAPH_INDEX) {
-		printf("Graph::compare_except_intent_AD ERROR: No other intent AD\n");
+		//printf("Graph::compare_except_intent_AD No other intent AD\n");
 		return -1;
 	}
 
@@ -1042,9 +1041,9 @@ Graph::compare_except_intent_AD(Graph other) const
 		return 0;
 	}
 
-	printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
-	printf("this: %s\n", this->dag_string().c_str());
-	printf("them: %s\n", them.dag_string().c_str());
+	//printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
+	//printf("this: %s\n", this->dag_string().c_str());
+	//printf("them: %s\n", them.dag_string().c_str());
 	return -1;
 }
 
@@ -1326,7 +1325,8 @@ Graph::is_final_intent(const Node& n)
 		if (nodes_[i] == n) return is_sink(i);
 	}
 
-	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", n.id_string().c_str());
+	printf("Warning: is_final_intent: node not found in DAG: %s\n",
+			n.id_string().c_str());
 	return false;
 }
 
@@ -1354,7 +1354,8 @@ Graph::is_final_intent(const std::string xid_string)
 		if (nodes_[i].id_string() == xid_str) return is_final_intent(nodes_[i]);
 	}
 
-	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", xid_str.c_str());
+	printf("Warning: is_final_intent: node not found in DAG: %s\n",
+			xid_str.c_str());
 	return false;
 }
 

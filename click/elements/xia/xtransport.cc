@@ -1012,9 +1012,10 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 
 	// Compare our DAG in packet with the one we bound to
 	if (bound_dag.compare_except_intent_ad(pkt_dag)) {
-		ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
-		ERROR("Current network:%s", local_ad_str.c_str());
-		ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		//ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
+		//ERROR("Current network:%s", local_ad_str.c_str());
+		//ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		INFO("DAG not/incorrectly modified by rendezvous service");
 		return false;
 	}
 	/*
