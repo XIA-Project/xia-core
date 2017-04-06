@@ -717,7 +717,7 @@ Graph::remove_intent_node()
 
 	// Ensure that there's just one incoming edge to the intent node
 	if (in_edges_[intent_index].size() != 1) {
-		printf("Graph::remove_intent_sid() SID must have 1 incoming edge\n");
+		printf("Graph::remove_intent_node() must have 1 incoming edge\n");
 		return false;
 	}
 
@@ -732,7 +732,7 @@ Graph::remove_intent_node()
 		}
 	}
 
-	// Remove the SID node
+	// Remove the intent node
 	nodes_.erase(nodes_.begin() + intent_index);
 	in_edges_.erase(in_edges_.begin() + intent_index);
 	out_edges_.erase(out_edges_.begin() + intent_index);
