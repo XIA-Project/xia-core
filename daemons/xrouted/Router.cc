@@ -31,7 +31,7 @@ int Router::getControllerDag(sockaddr_x *dag)
 		// we can get the HID from the Nameserver DAG
 		if (XreadNameServerDAG(_local_sock, &ns) < 0) {
 			if (errno == EWOULDBLOCK) {
-				syslog(LOG_INFO, "iName server DAG not ready yet, looping...\n");
+				syslog(LOG_INFO, "Name server DAG not ready yet, looping...\n");
 				sleep(1);
 				continue;
 			}
