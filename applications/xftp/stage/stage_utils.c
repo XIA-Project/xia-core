@@ -1,6 +1,6 @@
 #include "stage_utils.h"
 
-int verbose = 1;
+int verbose = 0;
 
 void say(const char *fmt, ...)
 {

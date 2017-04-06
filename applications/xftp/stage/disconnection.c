@@ -3,17 +3,14 @@
 #define SCAN_INTERVAL 10
 #define MAX_SIZE 1024 * 10
 
-#define INTERFACE1 "wlp6s0 "
-#define INTERFACE2 "wlan0 "
+#define INTERFACE1 "wlp1s0 "
+#define INTERFACE2 "wlx60a44ceca928 "
 
-#define CONNECT_TIME 16 * 1000
-#define DISCONNECT_TIME 4 * 1000
+int CONNECT_TIME = 8 * 1000;
+int DISCONNECT_TIME = 32 * 1000;
 
 #define GET_SSID_LIST "iwlist wlp6s0 scanning | grep -E '(\\\"[a-zA-Z0-9 _-.]*\\\")|(Signal level=-?[0-9]* dBm)' -o"
 #define CLOSE_NETWORK_MANAGER "service network-manager stop"
-//#define CONNECT_TO "iwconfig wlp6s0 essid "
-//#define GET_CUR_SSID "iwconfig wlp6s0 | grep '\\\"[a-zA-Z0-9 _-.]*\\\"' -o"
-//#define GET_DHCP "dhcpcd wlp6s0"
 
 int cast_sig(char * p_sig){
 //say("in cast_sig\n");
@@ -55,9 +52,9 @@ say("ssid = %s\n", ssid.c_str());
 int disconnect_SSID(int interface){
 say("in disconnect_SSID\n");
 	string result;
-	string cmd;
+	string cmd="";
 
-	cmd += "iwconfig ";
+	cmd += "iw ";
 	if(interface == 1){
 		cmd += INTERFACE1;
 	}
@@ -66,7 +63,7 @@ say("in disconnect_SSID\n");
 	}
 	else
 		return -1;
-	cmd += "essid off";
+	cmd += "disconnect";
 say("cmd = %s\n", cmd.c_str());
 	result = execSystem(cmd);
 	say("disconnect to SSID: %s\n", result.c_str());
@@ -76,70 +73,100 @@ say("cmd = %s\n", cmd.c_str());
 int connect_SSID(int interface, char * ssid){
 say("in connect_SSID\n");
 	string result;
-	string cmd;
+	string cmd1,cmd2;
 
-	cmd += "iwconfig ";
+	cmd1 = "iw ";
 	if(interface == 1){
-		cmd += INTERFACE1;
+		cmd1 += INTERFACE1;
 	}
 	else if(interface == 2){
-		cmd += INTERFACE2;
+		cmd1 += INTERFACE2;
 	}
 	else
 		return -1;
-	cmd += "essid ";
-	cmd += ssid;
-//say("cmd = %s\n", cmd.c_str());
-	result = execSystem(cmd);
+	cmd1 += "connect ";
+	cmd1 += ssid;
+say("cmd1 = %s\n", cmd1.c_str());
+	result = execSystem(cmd1);
 	say("connect to SSID: %s\n", result.c_str());
-
-	cmd = "dhcpcd ";
+cmd2 = "iw dev ";
 	if(interface == 1){
-		cmd += INTERFACE1;
+		cmd2 += INTERFACE1;
 	}
 	else if(interface == 2){
-		cmd += INTERFACE2;
+		cmd2 += INTERFACE2;
 	}
 	else
 		return -1;
-//say("cmd = %s\n", cmd.c_str());
-	result = execSystem(string(cmd));
-	say("get dhcp done: %s\n",result.c_str());
+	cmd2 += "link";
+say("cmd2 = %s\n", cmd2.c_str());
+	int looptime=0;
+	while(1){
+	++looptime;
+	result = execSystem(cmd2);
+        say("check SSID: %s\n", result.c_str());
+	    if(result != "Not connected."){
+		say("connected!\n");
+		break;
+	    }
+	usleep(10);
+	/*
+	if (looptime>10){
+		connect_SSID(interface,ssid);
+		break;
+	}*/
+	}
 	return 0;
 }
-
+int disconnect(int interface){
+	long begin_time, end_time, total_time;
+	int rtn;
+	begin_time = now_msec();
+	printf("-------------disconnect begin at %ld \n", begin_time);
+	rtn = disconnect_SSID(interface);
+	usleep(DISCONNECT_TIME * 1000);
+	end_time = now_msec();
+	say("-------------disconnect end at %ld \n", end_time);
+	total_time = end_time - begin_time;
+	printf("-------------disconnect total time = %ld \n", total_time);
+}
+int connect(int interface, char * ssid){
+	int rtn;
+	long begin_time, end_time, total_time;
+	begin_time = now_msec();
+	printf("-------------connect begin at %ld \n", begin_time);
+	rtn = connect_SSID(interface, ssid);
+	usleep(CONNECT_TIME * 1000);
+	end_time = now_msec();
+	say("-------------connect end at %ld \n", end_time);
+	total_time = end_time - begin_time;
+	printf("-------------connect total time = %ld \n", total_time);
+}
 int main(){
 	string result;	
 	long begin_time, end_time, total_time;
+	int netsize;
 	result = execSystem(CLOSE_NETWORK_MANAGER);
 	printf("close_network_manager %s\n", result.c_str());
-	//result = execSystem("iwconfig wlan0 essid off");
-	result = execSystem("iwconfig wlp6s0 essid off");
-	
+
+	disconnect_SSID(1);
+	printf("connect time >> ");
+	scanf("%d",&CONNECT_TIME);
+	printf("disconnect time >> ");
+	scanf("%d",&DISCONNECT_TIME);
+	printf("Network size >> ");
+	scanf("%d",&netsize);
+	CONNECT_TIME *= 1000;
+	DISCONNECT_TIME *= 1000;
 	while (1) {			
-		//ssid_list = execSystem(GET_SSID_LIST);
-		//printf("scanning\n");
-		int rtn;
-		begin_time = now_msec();
-		say("-------------connect begin at %ld \n", begin_time);
-		rtn = connect_SSID(1, "XIA_Tenda_1");
-		usleep(CONNECT_TIME * 1000);
-		end_time = now_msec();
-		say("-------------connect end at %ld \n", end_time);
-		total_time = end_time - begin_time;
-		say("-------------connect total time = %ld \n", total_time);
-		
-		
-		begin_time = now_msec();
-		say("-------------disconnect begin at %ld \n", begin_time);
-		rtn = disconnect_SSID(1);
-		usleep(DISCONNECT_TIME * 1000);
-		end_time = now_msec();
-		say("-------------disconnect end at %ld \n", end_time);
-		total_time = end_time - begin_time;
-		say("-------------disconnect total time = %ld \n", total_time);
-		
-		say("\n-----------------------------------------------------------------\n");
+		for(int i = 0; i < netsize; ++i){
+			connect(1, "XIA_Tenda_2");
+			disconnect(1);
+		}
+		for(int i = 0; i < netsize; ++i){
+			connect(1, "XIA-TP-LINK_5G");
+			disconnect(1);
+		}
 	}
 	return 0;
 }
