@@ -68,6 +68,7 @@ void *Controller::handler()
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
 
+
 	struct pollfd pfd[3];
 
 	bzero(pfd, sizeof(pfd));
@@ -478,15 +479,16 @@ int Controller::sendInterDomainLSA()
 
 int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
 {
-	return 0;
-
-	//syslog(LOG_INFO, "Controller::Send-RT");
+	syslog(LOG_INFO, "Controller::Send-RT");
 
 	if (nodeState == NULL) {
 		// If destHID is self, process immediately
+printf("it's null!\n");
 		return processRoutingTable(routingTable);
 	} else {
 		// If destHID is not SID, send to relevant router
+		//
+printf("sending %lu to %s\n", routingTable.size(), nodeState->hid.c_str());
 		Node fad(_myAD);
 		Node fhid(_myHID);
 		Node tad(_myAD);
@@ -531,7 +533,9 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string
 			e->set_flags(it->second.flags);
 		}
 
-		//syslog(LOG_INFO, "msg: %s", msg.c_str());
+		char ss[2048];
+		xia_ntop(AF_XIA, &nodeState->dag, ss, sizeof(ss));
+		syslog(LOG_INFO, "sending to %s", ss);
 
 		return sendMessage(&nodeState->dag, msg);
 	}
@@ -1900,6 +1904,7 @@ printf("populate\n");
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
 
+printf("time to send %s %d\n", it1->first.c_str(), routingTable.size());
 			sendRoutingTable(&it1->second, routingTable);
 		}
 
@@ -2069,7 +2074,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 		}
 		if(selectedHID.empty()) {
 			// Rest of the nodes cannot be reached from the visited set
-			syslog(LOG_DEBUG, "%s has an empty routingTable", srcHID.c_str());
+			syslog(LOG_INFO, "%s has an empty routingTable", srcHID.c_str());
 			break;
 		}
 
@@ -2106,6 +2111,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			continue;
 		}
 		if (srcHID.compare(tempHID1) != 0) {
+printf("updating %s\n", srcHID.c_str());
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
@@ -2122,7 +2128,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 					if (((it2->AD == _myAD) ? it2->HID : it2->AD) == tempHID2) {
-//printf("port = %d\n", it2->port);
+printf("port = %d\n", it2->port);
 						routingTable[tempHID1].port = it2->port;
 					}
 				}
@@ -2130,6 +2136,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 		}
 	}
 
+printf("next loop\n");
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
 		tempHID1 = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
 		if (unvisited.find(it1->first) !=  unvisited.end()) { // the unreachable set
@@ -2140,6 +2147,8 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			continue;
 		}
 		if (srcHID.compare(tempHID1) != 0) {
+
+printf("%s %s\n", srcHID.c_str(), tempHID1.c_str());
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
@@ -2171,6 +2180,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 				}
 				if (!entryFound) {
 					// Delete SID entry from routingTable
+					printf("erasing???\n");
 					routingTable.erase(tempHID1);
 				}
 			}
