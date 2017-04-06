@@ -737,7 +737,7 @@ int XgetPrevFetchHopCount(){
 ** @param addr the DAG of the chunk to retreive
 ** @param len the size of the memory pointed to by addr (should be sizeof(sockaddr_x))
 **
-** @returns 0 on success
+** @returns size of data stored in *buf
 ** @returns -1 with errno set appropriately if an error occurs
 **
 */
@@ -747,9 +747,8 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 
 	fprintf(stderr, "Inside %s\n", __func__);
 
-	// Bypass cache if requesting chunk without caching
-	int bypass_cache_flags = XCF_BLOCK | XCF_CACHE;
-	if (flags & bypass_cache_flags) {
+	// Bypass cache if blocked requesting chunk without caching
+	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
 		return _XfetchRemoteChunkBlocking(buf, addr, len);
 	}
 
@@ -803,7 +802,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
  * @param addr the DAG of the chunk to retrieve
  * @param len size of addr. Should be sizeof(sockaddr_x)
  *
- * @returns 0 on success
+ * @returns size of data stored in *chunk
  * @returns -1 on failure
  */
 int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
@@ -884,12 +883,13 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	// Copy data to a buffer to be returned
 	int to_copy = data.length();
 	*chunk = malloc(to_copy);
+	bzero(*chunk, to_copy);
 	memcpy(*chunk, data.c_str(), to_copy);
 	hopCount = hop_count;
 
 	Xclose(sock);
 
-	return 0;
+	return to_copy;
 }
 
 /* Notficiations */
