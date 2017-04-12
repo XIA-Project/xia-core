@@ -16,11 +16,12 @@
 */
 /*!
  @file dagaddr.cpp
- @brief Implements dagaddr library
+ @brief Implements the dagaddr classes Node and Graph
 */
 
 
 #include "dagaddr.hpp"
+/*! \cond */
 #include "utils.hpp"
 #include <cstring>
 #include <map>
@@ -31,6 +32,7 @@
 #include <arpa/inet.h>
 #include <stdint.h> // for uint8_t
 #include <execinfo.h> // for backtrace, backtrace_symbols_fd
+/*! \endcond */
 
 static const std::size_t vector_find_npos = std::size_t(-1);
 
@@ -696,7 +698,6 @@ Graph::remove_intent_sid_node()
 	// Ensure that the sink node is an SID
 	std::size_t intent_index = final_intent_index();
 	if (nodes_[intent_index].type() != XID_TYPE_SID) {
-		printf("Graph::remove_intent_sid_node() Intent node was not SID\n");
 		return false;
 	}
 	return remove_intent_node();
@@ -715,7 +716,7 @@ Graph::remove_intent_node()
 
 	// Ensure that there's just one incoming edge to the intent node
 	if (in_edges_[intent_index].size() != 1) {
-		printf("Graph::remove_intent_sid() SID must have 1 incoming edge\n");
+		printf("Graph::remove_intent_node() must have 1 incoming edge\n");
 		return false;
 	}
 
@@ -730,7 +731,7 @@ Graph::remove_intent_node()
 		}
 	}
 
-	// Remove the SID node
+	// Remove the intent node
 	nodes_.erase(nodes_.begin() + intent_index);
 	in_edges_.erase(in_edges_.begin() + intent_index);
 	out_edges_.erase(out_edges_.begin() + intent_index);
@@ -985,15 +986,27 @@ Graph::intent_AD_index() const
 }
 
 bool
-Graph::replace_intent_HID(std::string new_hid_str)
+Graph::replace_intent_XID(uint32_t xid_type, std::string new_xid_str)
 {
-	std::size_t intent_hid_index = intent_HID_index();
-	if (intent_hid_index == INVALID_GRAPH_INDEX) {
+	std::size_t intent_xid_index = intent_XID_index(xid_type);
+	if (intent_xid_index == INVALID_GRAPH_INDEX) {
 		return false;
 	}
-	Node new_hid(new_hid_str);
-	nodes_[intent_hid_index] = new_hid;
+	Node new_xid(new_xid_str);
+	nodes_[intent_xid_index] = new_xid;
 	return true;
+}
+
+bool
+Graph::replace_intent_HID(std::string new_hid_str)
+{
+	return replace_intent_XID(XID_TYPE_HID, new_hid_str);
+}
+
+bool
+Graph::replace_intent_AD(std::string new_ad_str)
+{
+	return replace_intent_XID(XID_TYPE_AD, new_ad_str);
 }
 
 /**
@@ -1010,12 +1023,12 @@ Graph::compare_except_intent_AD(Graph other) const
 	// Find our and their intent AD
 	size_t intent_ad = intent_AD_index();
 	if (intent_ad == INVALID_GRAPH_INDEX) {
-		printf("Graph::compare_except_intent_AD ERROR No intent AD\n");
+		//printf("Graph::compare_except_intent_AD No intent AD\n");
 		return -1;
 	}
 	size_t their_intent_ad = them.intent_AD_index();
 	if (their_intent_ad == INVALID_GRAPH_INDEX) {
-		printf("Graph::compare_except_intent_AD ERROR: No other intent AD\n");
+		//printf("Graph::compare_except_intent_AD No other intent AD\n");
 		return -1;
 	}
 
@@ -1028,9 +1041,9 @@ Graph::compare_except_intent_AD(Graph other) const
 		return 0;
 	}
 
-	printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
-	printf("this: %s\n", this->dag_string().c_str());
-	printf("them: %s\n", them.dag_string().c_str());
+	//printf("Graph::compare_except_intent_AD: ERROR mismatched graphs\n");
+	//printf("this: %s\n", this->dag_string().c_str());
+	//printf("them: %s\n", them.dag_string().c_str());
 	return -1;
 }
 
@@ -1312,7 +1325,8 @@ Graph::is_final_intent(const Node& n)
 		if (nodes_[i] == n) return is_sink(i);
 	}
 
-	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", n.id_string().c_str());
+	printf("Warning: is_final_intent: node not found in DAG: %s\n",
+			n.id_string().c_str());
 	return false;
 }
 
@@ -1340,7 +1354,8 @@ Graph::is_final_intent(const std::string xid_string)
 		if (nodes_[i].id_string() == xid_str) return is_final_intent(nodes_[i]);
 	}
 
-	printf("Warning: is_final_intent: supplied node not found in DAG: %s\n", xid_str.c_str());
+	printf("Warning: is_final_intent: node not found in DAG: %s\n",
+			xid_str.c_str());
 	return false;
 }
 
