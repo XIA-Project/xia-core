@@ -54,7 +54,6 @@ int disconnect_SSID(int interface){
 say("in disconnect_SSID\n");
 	string result;
 	string cmd;
-
 	cmd += "iwconfig ";
 	if(interface == 1){
 		cmd += INTERFACE1;

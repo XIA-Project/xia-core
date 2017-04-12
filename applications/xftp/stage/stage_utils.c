@@ -1,6 +1,6 @@
 #include "stage_utils.h"
 
-int verbose = 1;
+int verbose = 0;
 
 void say(const char *fmt, ...)
 {
@@ -191,8 +191,19 @@ int XmyReadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *lo
 
 	char *ads = strstr(sdag, "AD:");	// first occurrence
 	char *hids = strstr(sdag, "HID:");
-	char *ad_end = strstr(ads, " ");
-	*ad_end = 0;
+	char *ad_end;
+say("sdag=\n%s\n",sdag);
+	while(ads==NULL){
+		if(XreadLocalHostAddr(sockfd, sdag, sizeof(sdag), local4ID, len4ID)<0)
+			die(-1, "Unable to get local host address");
+
+		ads = strstr(sdag, "AD:");	// first occurrence
+		hids = strstr(sdag, "HID:");
+	}
+	if(ads!=NULL){
+		ad_end = strstr(ads, " ");
+		*ad_end = 0;
+	}
 	if (sscanf(ads, "%s", localhostAD) < 1 || strncmp(localhostAD, "AD:", 3) != 0) {
 		die(-1, "Unable to extract AD.");
 	}

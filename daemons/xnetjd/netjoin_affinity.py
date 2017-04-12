@@ -49,7 +49,7 @@ class NetjoinAffinity(object):
         Returns:
             True if the first (beacon, interface) is preferred
         """
-
+        return True
         if key1[1] != key2[1]:
             logging.error("Mismatched interface during preference comparison")
             return False
