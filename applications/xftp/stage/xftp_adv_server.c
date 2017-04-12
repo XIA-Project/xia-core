@@ -64,6 +64,7 @@ say("Receive cmd: %s\n", cmd);
 				warn("unable to serve the file: %s\n", fname);
 				sprintf(reply, "FAIL: File (%s) not found", fname);
 			} 
+
 			else {
 				int offset = 0;
 				int num;
@@ -130,6 +131,14 @@ say("Receive cmd: %s\n", cmd);
 int main(int argc, char **argv) 
 {
 	getConfig(argc, argv);	
+	sockaddr_x *info = NULL;
+	XcacheHandle xcache;
+	XcacheHandleInit(&xcache);
+	XputFile(&xcache, "11", CHUNKSIZE, &info);
+	XputFile(&xcache, "22", CHUNKSIZE, &info);
+	XputFile(&xcache, "33", CHUNKSIZE, &info);
+	XputFile(&xcache, "44", CHUNKSIZE, &info);
+	XputFile(&xcache, "55", CHUNKSIZE, &info);
 	int ftpListenSock = registerStreamReceiver(getXftpName(), myAD, myHID, my4ID);
 	blockListener((void *)&ftpListenSock, recvCmd);
 	return 0;
