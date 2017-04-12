@@ -23,12 +23,18 @@ import clickcontrol
 # NOTE: We only support one HID for all interfaces in multihoming Phase 1
 
 # Retrieve config file paths from arguments
-if len(sys.argv) != 3:
-    print 'Usage: %s <nodes.conf> <address.conf>' % sys.argv[0]
+if len(sys.argv) != 4:
+    print 'Usage: %s <nodes.conf> <address.conf> <router_type>' % sys.argv[0]
     sys.exit(-1)
 
 nodesconf = sys.argv[1]
 addressconf = sys.argv[2]
+router_type = sys.argv[3]
+
+iscontroller = False
+if router_type == "--controller":
+    iscontroller = True
+
 ns_sid = 'SID:1110000000000000000000000000000000001113'
 
 # We create resolv.conf in the same directory as address.conf
@@ -66,8 +72,8 @@ def assign_xids(outfile, hostname, hosttype):
     # All other host/router entries have arguments in parentheses
     outfile.write('%s %s (' % (hostname, hosttype))
 
-    # Assign an AD for every router
-    if 'Router' in hosttype:
+    # Assign an AD for routers running a controller
+    if 'Router' in hosttype and iscontroller:
         outfile.write('%s ' % genkeys.create_new_AD())
 
     # Assign the same HID for every interface this host has
@@ -118,7 +124,7 @@ def configure_click(click, config):
             hid = match.group(3)
 
             # Routers have AD and HID in their arguments
-            if 'Router' in hosttype:
+            if 'Router' in hosttype and iscontroller:
                 ad, hid = hid.split(' ')
 
             # Assign HID to this host

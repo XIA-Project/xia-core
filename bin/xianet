@@ -30,7 +30,6 @@ SCRIPT=""
 
 NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
-RESOLVCONF=$XIADIR/etc/resolv.conf
 
 ALL_PROCESSES="click xrouted controld xnetjd xcache xnameservice xstats xstatserver"
 
@@ -43,7 +42,7 @@ CLICK_ONLY=0
 NO_CLICK=0
 NAMESERVER=0
 RENDEZVOUS=0
-ROUTER_TYPE=""
+ROUTER_TYPE="--router"
 REMOTEDSRC=0
 RUN_VISUALIZER_CLIENT=0
 RUN_VISUALIZER_SERVER=0
@@ -546,7 +545,7 @@ start_click()
 	$XIADIR/bin/xlog $V_FLAG -l $LOG_LEVEL >/dev/null
 
 	echo "Reading $NODECONF and assigning addresses in $ADDRCONF if needed"
-	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF
+	$XIADIR/bin/assign_addresses.py $NODECONF $ADDRCONF $ROUTER_TYPE
 
 	[ $CLICK_ONLY -eq 1 ] && check_service click && exit
 }
@@ -668,11 +667,6 @@ shift $((OPTIND-1))
 
 case $1 in
 	start)
-		if [ "$NODETYPE" == "router" ] && [ "$NAMESERVER" == "0" ] && [ ! -f $RESOLVCONF ]; then
-			echo "ERROR: $RESOLVCONF not found"
-			echo "Copy resolv.conf from the nameserver host and start again"
-			exit -1
-		fi
 		[ $NO_CLICK != 1 ] && start_click
 		process_nodes "start"
 		visualizer "start"
