@@ -102,6 +102,9 @@ class NetjoinXIAConf(object):
             router_dag = "RE AD:{} HID:{}".format(ad, hid)
         return router_dag
 
+    def get_conf_dir(self):
+        return self.conf_dir
+
     # Read address.conf looking for HID of this host
     def get_ad_hid(self):
         hid = None

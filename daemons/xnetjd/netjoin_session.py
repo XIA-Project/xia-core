@@ -11,6 +11,7 @@ import dagaddr
 import c_xsocket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
+from dagaddr import Graph
 from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
@@ -37,6 +38,7 @@ class NetjoinSession(threading.Thread):
     # policy is set only on client side
     def __init__(self, hostname, shutdown_event,
             receiver=None,
+            is_router=False,
             auth=None, beacon_id=None, policy=None):
         threading.Thread.__init__(self)
 
@@ -50,6 +52,7 @@ class NetjoinSession(threading.Thread):
         self.auth = auth
         self.beacon_id = beacon_id
         self.policy = policy
+        self.is_router = is_router
         self.l2_handler = None    # Created on receiving beacon or handshake1
         self.last_message_tuple = None # (message, outgoing_interface, theirmac)
         self.last_message_remaining_iterations = None
@@ -155,6 +158,9 @@ class NetjoinSession(threading.Thread):
         l2_type = message.net_descriptor.l2_id.l2_type
         self.l2_handler = self.create_l2_handler(l2_type)
 
+        # Save the network descriptor (beacon)
+        self.beacon.from_net_descriptor(message.net_descriptor)
+
         # Save access point verify key included in NetDescriptor message
         join_auth_info = message.net_descriptor.ac_shared.ja
         gateway_raw_key = join_auth_info.gateway_ephemeral_pubkey.the_key
@@ -164,7 +170,8 @@ class NetjoinSession(threading.Thread):
         gw_nonce = join_auth_info.gateway_nonce
 
         # Build handshake one
-        netjoin_h1 = NetjoinHandshakeOne(self, mymac, challenge=gw_nonce)
+        netjoin_h1 = NetjoinHandshakeOne(self, mymac,
+                is_router=self.is_router, challenge=gw_nonce)
 
         # Send handshake one
         self.send_netjoin_message(netjoin_h1, interface, theirmac)
@@ -195,6 +202,7 @@ class NetjoinSession(threading.Thread):
             logging.info("HandshakeOne invalid, denying connection request")
         logging.info("Accepted handshake one from client")
         self.client_hid = netjoin_h1.hex_client_hid()
+        client_is_router = netjoin_h1.is_from_router()
 
         # Retrieve handshake one info to be included in handshake two
         client_session_id = netjoin_h1.client_session_id()
@@ -202,6 +210,7 @@ class NetjoinSession(threading.Thread):
         # Now build a handshake two message
         logging.info("Now sending handshake two")
         netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
+                hostname=self.hostname,
                 client_session=client_session_id, l2_reply=l2_reply)
 
         # Send handshake two
@@ -260,7 +269,7 @@ class NetjoinSession(threading.Thread):
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:
                 # TODO: Switch out router HID with client HID
-                if click.assignRVDAG(self.hostname, "XIAEndHost",
+                if click.assignRVDAG(self.hostname,
                         str(router_rv_dag), interface) == False:
                     logging.error("Failed updating RV DAG in XIA Stack")
                     return
@@ -274,6 +283,11 @@ class NetjoinSession(threading.Thread):
                     logging.error("Failed updating Control RV DAG in XIA Stack")
                     return
                 logging.info("Control RV DAG sent to Click and processed")
+
+        # TODO: Create XARP entry for router HID
+        router_hid = Graph(router_dag).intent_HID_str()
+        sendermacstr = "%02x:%02x:%02x:%02x:%02x:%02x" % (theirmac)
+        logging.info("XARP: {} has {}".format(sendermacstr, router_hid))
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
@@ -403,6 +417,22 @@ class NetjoinSession(threading.Thread):
         total_joining_time = time.time() - self.start_time
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
         self.state = self.HS_DONE
+
+        # If we are running as a router, start announcing this network
+        if self.is_router:
+
+            # TODO: Need to get l2_type to announce from a config file
+            # TODO: Need to get beacon_interval from a config file
+            l2_type = LayerTwoIdentifier.ETHERNET
+            beacon_interval = 0.5
+            net_id = self.beacon.find_xip_netid()
+            assert(net_id is not None)
+
+            # Ask the NetjoinReceiver to announce the newly joined network
+            # TODO: CRITICAL - only start one announcer for one net_id
+            self.receiver.announce(l2_type, net_id, beacon_interval)
+
+        logging.info("Announcing the newly joined network now")
         return True
 
     # Note: we forget the last message on disabling retransmission

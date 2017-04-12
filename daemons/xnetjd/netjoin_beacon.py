@@ -15,10 +15,10 @@ from netjoin_authsession import NetjoinAuthsession
 
 # This is a wrapper for the NetDescriptor protobuf defined in ndap.proto
 class NetjoinBeacon(object):
-    def __init__(self):
+    def __init__(self, xip_netid=None):
         self.net_descriptor = ndap_pb2.NetDescriptor()
         self.guid = None
-        self.xip_netid = None
+        self.xip_netid = xip_netid
         self.xip_hid = None
         self.raw_verify_key = None
 
@@ -36,10 +36,25 @@ class NetjoinBeacon(object):
         # TODO: store hash if this method is called several times
         return hashlib.sha256(fixed_descriptor.SerializeToString()).hexdigest()
 
+    def find_xip_netid(self):
+        netid = None
+
+        # Walk the nodes to the end to find XIP network
+        # TODO: Create graph and walk like the policy module does
+        for node in self.net_descriptor.auth_cap.nodes:
+            if node.HasField('xip'):
+                netid = node.xip.NetworkId
+                break
+
+        return netid
+
     def _update_object_from_net_descriptor(self):
         # NOTE: we don't have xip_netid received beacon
         self.guid = self.net_descriptor.GUID
         self.raw_verify_key = self.net_descriptor.ac_shared.ja.gateway_ephemeral_pubkey.the_key
+        self.xip_netid = self.find_xip_netid()
+
+        assert(self.xip_netid != None)
 
     def from_net_descriptor(self, net_descriptor):
         self.net_descriptor.CopyFrom(net_descriptor)
@@ -51,10 +66,8 @@ class NetjoinBeacon(object):
         self._update_object_from_net_descriptor()
 
     # For now we just build a beacon with a dummy AuthCapStruct
-    def initialize(self, raw_verify_key, l2_type, guid=None, xip_netid=None,
-            xip_hid=None):
+    def initialize(self, raw_verify_key, l2_type, guid=None, xip_hid=None):
         self.guid = guid
-        self.xip_netid = xip_netid
         self.xip_hid = xip_hid
         self.raw_verify_key = raw_verify_key
 
@@ -63,8 +76,8 @@ class NetjoinBeacon(object):
             logging.warning("GUID not provided. Assigning a temporary one")
 
         if self.xip_netid == None:
-            self.xip_netid = uuid.uuid4().bytes
-            logging.warning("XIP NID not given. Assigning a temporary one")
+            logging.error("XIP NID not given.")
+            raise RuntimeError("XIP network ID not known.")
 
         # If l2 type is not known throw an exception and end
         if l2_type not in NetjoinL2Handler.l2_type_info:

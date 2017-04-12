@@ -5,6 +5,7 @@ import logging
 import hashlib
 import networkx
 import ndap_pb2
+import uuid
 from netjoin_beacon import NetjoinBeacon
 from netjoin_affinity import NetjoinAffinity
 from google.protobuf import text_format as protobuf_text_format
@@ -208,9 +209,11 @@ class NetjoinPolicy:
 # Unit test this module when run by itself
 if __name__ == "__main__":
     iface = 0
+    net_id = uuid.uuid4().bytes
+    conf = NetjoinXIAConf()
     policy = NetjoinPolicy()
     beacon = NetjoinBeacon()
-    beacon.initialize() # A default beacon announcing this network
+    beacon.initialize(net_id) # A default beacon announcing this network
     serialized_test_beacon = beacon.update_and_get_serialized_beacon()
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)
