@@ -4,7 +4,7 @@ require(library xia_address.click);
 log::XLog(VERBOSE 0, LEVEL 6);
 
 // host instantiation
-$HNAME :: XIAEndHost (1500, ${HNAME}, $MAC0, $MAC1, $MAC2, $MAC3);
+$HNAME :: XIAEndHost (1500, ${HNAME}, $MACS);
 
 waveDevice :: WaveDeviceRemoteUdp(HOSTNAME $RIPADDR, PORT $RPORT, CHANNEL 172);
 

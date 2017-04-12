@@ -336,7 +336,7 @@ void quithandler(int)
 */
 int main(int argc, char **argv)
 {
-	char buf[256];
+	char buf[XIA_MAX_DAG_STR_SIZE];
 
 	srand(time(NULL));
 	getConfig(argc, argv);

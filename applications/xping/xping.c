@@ -114,7 +114,7 @@ void help()
 
 int main(int argc, char **argv)
 {
-	char buf[1024];
+	char buf[XIA_MAX_DAG_STR_SIZE];
 	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;

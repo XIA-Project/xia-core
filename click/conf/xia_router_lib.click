@@ -10,7 +10,7 @@ elementclass XIAFromHost {
 elementclass XIAToHost {
 	$click_port |
 	// Packets to send up to API
-	// input: packets to send up (usually xtransport[1])
+	// input: packets to send up (usually xtransport[0])
 	input -> Socket("UDP", 0.0.0.0, 0, SNAPLEN 65536);
 };
 
@@ -178,8 +178,8 @@ elementclass XIALineCard {
 //	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
-	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, -);
+	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, -);
 
 	// AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(INTERFACE $num, ACTIVE $isrouter);
@@ -240,8 +240,8 @@ elementclass IPLineCard {
 	print_out :: XIAPrint("<<< $ip (Out Port $num)");
 
 	// TODO: Make a counter for IP
-	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, -);
-	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, -);
+	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, -);
+	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, -);
 
 	toNet :: Null -> print_out -> Queue(200) -> [0]output; //count_final_out -> count_next_out -> [0]output;
 
@@ -305,10 +305,7 @@ elementclass XIARoutingCore {
 
 
 	XIAFromHost($click_port) -> xtransport;
-	Idle -> [1]xtransport;
 	xtransport[0] -> XIAToHost($click_port);
-
-	xtransport[1] -> Discard; // Port 1 is unused for now.
 
 	Script(write n/proc/rt_HID.add - $FALLBACK);
 	Script(write n/proc/rt_AD.add - $FALLBACK);	 // no default route for AD; consider other path
@@ -324,7 +321,6 @@ elementclass XIARoutingCore {
 
 	// quick fix
 	n[3] -> Discard();
-	Idle() -> [4]xtransport;
 
 	// set up XCMP elements
 	c :: Classifier(01/01, -); // XCMP
@@ -333,16 +329,11 @@ elementclass XIARoutingCore {
 	n[0] -> output;
 	input -> [0]n;
 
-	n[1] -> c[1] -> [2]xtransport[2] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
+	n[1] -> c[1] -> [1]xtransport[1] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine
 
-	//NITIN disable XCMP REDIRECT messages
-	//NITIN x[1] -> rsw :: XIAPaintSwitch -> [2]xtransport; // XCMP packets destined for this machine
-	x[1] -> [2]xtransport; // XCMP packets destined for this machine
-	//NITIN disable XCMP REDIRECT messages
-	//NITIN rsw[1] -> XIAPaint($REDIRECT) -> [0]n; // XCMP redirect packet, so a route update will be done.
+	x[1] -> [1]xtransport; // XCMP packets destined for this machine
 	n[2] -> [1]n; // Harshad dirty hack FIXME: Remove both ports
-	xtransport[3]->[3]xtransport; // Harshad dirty hack FIXME: Remove both ports
 
 	// For get and put cid
 }

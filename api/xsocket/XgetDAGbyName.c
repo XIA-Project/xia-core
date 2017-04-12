@@ -559,55 +559,6 @@ int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 }
 
 
-int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG)
-{
-	// Find the rendezvous service control address
-	char rvControlDAG[MAX_RV_DAG_SIZE];
-	if(XreadRVServerControlAddr(rvControlDAG, MAX_RV_DAG_SIZE)) {
-		syslog(LOG_INFO, "No RV control address. Skipping update");
-		return 1;
-	}
-	Graph rvg(rvControlDAG);
-	sockaddr_x rv_dag;
-	rvg.fill_sockaddr(&rv_dag);
-
-	// Validate arguments
-	if(!DAG) {
-		syslog(LOG_ERR, "NULL DAG for rendezvous update");
-		return -1;
-	}
-	Graph g(DAG);
-	if(g.num_nodes() <= 0) {
-		syslog(LOG_ERR, "Invalid DAG provided for rendezvous update");
-		return -1;
-	}
-	std::string dag_string = g.dag_string();
-
-	// Prepare a control message for the rendezvous service
-	int controlPacketLength = MAX_XID_STR_SIZE + MAX_RV_DAG_SIZE;
-	char controlPacket[controlPacketLength];
-	int index = 0;
-	strcpy(&controlPacket[index], hidstr);
-	index += strlen(hidstr) + 1;
-	strcpy(&controlPacket[index], dag_string.c_str());
-	index += dag_string.size() + 1;
-	controlPacketLength = index;
-	// TODO: No intrinsic security for now
-
-	// Create a socket, and send the message over it
-	int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if(sock < 0) {
-		syslog(LOG_ERR, "Failed creating socket to talk with RV server");
-		return -1;
-	}
-	if(Xsendto(sock, controlPacket, controlPacketLength, 0, (const struct sockaddr *)&rv_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ERR, "Failed sending registration message to RV server");
-		return -1;
-	}
-	// TODO: Receive ack from server
-	return 0;
-}
-
 /*
 ** called by XregisterName and XregisterHost to do the actual work
 */
@@ -815,7 +766,7 @@ int XregisterAnycastName(const char *name, sockaddr_x *DAG){
 **  when the host has moved to a new AD
 */
 int XregisterHost(const char *name, sockaddr_x *DAG) {
-	return _xregister(name, DAG, NS_FLAGS_MIGRATE);
+	return _xregister(name, DAG, 0);
 }
 
 /*!
