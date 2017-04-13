@@ -251,7 +251,7 @@ int Controller::saveControllerDAG()
 	}
 
 	xia_ntop(AF_XIA, &_controller_dag, s, sizeof(s));
-	fprintf(f, "controller=%s\n", s);
+	fprintf(f, "%s\n", s);
 	fclose(f);
 
 	return 0;
