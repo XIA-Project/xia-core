@@ -60,7 +60,7 @@ class NetjoinHandshakeTwo(object):
             # TODO: Then read it from click to give out
             if(self.client_is_router):
                 logging.info("Sending controller dag to new router")
-                xhcp_reply.controller_dag = "RE AD:123 HID:234"
+                xhcp_reply.controller_dag = self.conf.get_controller_dag()
 
             # Get router/ns/rv dags from click and fill into xhcp_reply
             with ClickControl() as click:

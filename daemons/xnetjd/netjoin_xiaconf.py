@@ -160,6 +160,13 @@ class NetjoinXIAConf(object):
     def get_clickcontrol_path(self):
         return os.path.join(self.src_dir, "bin")
 
+    def get_controller_dag(self):
+        controller_dag = None
+        controller_dag_filepath = os.path.join(self.conf_dir, 'controller_dag')
+        with open(controller_dag_filepath) as controller_dag_file:
+            controller_dag = controller_dag_file.read()
+        return controller_dag
+
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
     raw_hid = conf.get_raw_hid()
