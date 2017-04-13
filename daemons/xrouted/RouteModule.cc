@@ -5,9 +5,9 @@
 RouteModule::RouteModule(const char *name)
 {
 	_hostname       = name;
-	_broadcast_sock = 0;
-	_local_sock     = 0;
-	_source_sock    = 0;
+	_broadcast_sock = -1;
+	_local_sock     = -1;
+	_source_sock    = -1;
 }
 pthread_t RouteModule::start()
 {

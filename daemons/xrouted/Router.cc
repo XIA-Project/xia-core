@@ -51,9 +51,9 @@ void *Router::handler()
 	struct pollfd pfd[3];
 
 	bzero(pfd, sizeof(pfd));
-	pfd[0].fd = _broadcast_sock;
-	pfd[1].fd = _router_sock;
-	pfd[2].fd = _local_sock;
+	pfd[0].fd = _local_sock;
+	pfd[1].fd = _broadcast_sock;
+	pfd[2].fd = _router_sock;
 	pfd[0].events = POLLIN;
 	pfd[1].events = POLLIN;
 	pfd[2].events = POLLIN;
@@ -61,7 +61,10 @@ void *Router::handler()
 	tspec.tv_sec = 0;
 	tspec.tv_nsec = 500000000;
 
-	rc = Xppoll(pfd, 1, &tspec, NULL);
+	// only poll for local sock if we haven't gotten config info from the network
+	int num_pfds = _joined ? 3 : 1;
+
+	rc = Xppoll(pfd, num_pfds, &tspec, NULL);
 	if (rc > 0) {
 			int sock = -1;
 
@@ -590,6 +593,8 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	_myAD = msg.ad();
 
 	inet_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
+
+	printf("\n\n\nProcessConfig\n%s\n%s\n\n", _myAD.c_str(), msg.controller_dag().c_str());
 
 	postJoin();
 	return 1;
