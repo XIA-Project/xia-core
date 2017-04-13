@@ -51,7 +51,7 @@ protected:
 
 	void *handler();
 	int init();
-	int makeNetSockets();
+	int postJoin();
 
 	int processMsg(std::string msg, uint32_t iface);
 

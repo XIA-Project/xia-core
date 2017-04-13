@@ -192,7 +192,7 @@ void *Router::handler()
 	return 0;
 }
 
-int Router::makeNetSockets()
+int Router::postJoin()
 {
 	char s[MAX_DAG_SIZE];
 	Graph g;
@@ -280,6 +280,11 @@ int Router::makeNetSockets()
 		return -1;
 	}
 
+	if( XisDualStackRouter(_source_sock) == 1 ) {
+		_flags |= F_IP_GATEWAY;
+		syslog(LOG_DEBUG, "configured as a dual-stack router");
+	}
+
 	return 0;
 }
 
@@ -294,11 +299,6 @@ int Router::init()
 
 	// FIXME: figure out what the correct type of router we are
 	_flags = F_EDGE_ROUTER;
-
-	if( XisDualStackRouter(_source_sock) == 1 ) {
-		_flags |= F_IP_GATEWAY;
-		syslog(LOG_DEBUG, "configured as a dual-stack router");
-	}
 
 	struct timeval now;
 
@@ -591,7 +591,7 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 
 	inet_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
-	makeNetSockets();
+	postJoin();
 	return 1;
 }
 
