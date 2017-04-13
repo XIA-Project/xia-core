@@ -311,14 +311,15 @@ int Controller::makeSockets()
 	}
 
 	// make the dag we'll receive controller messages on
-	// FIXME: use a static FID for now...
-	//XcreateFID(s, sizeof(s));
-	strcpy(s, controller_fid.c_str());
-	_xr.setRoute(controller_fid, -2, "", 0);
-
-
+	XcreateFID(s, sizeof(s));
 	Node nFID(s);
-	Node ncSID(controller_sid);
+	//strcpy(s, controller_fid.c_str());
+	_xr.setRoute(s, -2, "", 0);
+	_controller_sid = s;
+
+	XmakeNewSID(s, sizeof(s));
+	Node ncSID(s);
+
 	g = (src * nHID * nFID * ncSID) + (src * nFID * ncSID);
 
 	g.fill_sockaddr(&_controller_dag);
@@ -373,7 +374,7 @@ int Controller::init()
 	_ctl_seq = 0;	// LSA sequence number of this router
 	_sid_ctl_seq = 0; // TODO: init values should be a random int
 
-	_dual_router_AD = "";
+	_dual_router_AD = std::string("");
 	// mark if this is a dual XIA-IPv4 router
 	if( XisDualStackRouter(_source_sock) == 1 ) {
 		_dual_router = 1;
@@ -408,7 +409,7 @@ int Controller::sendHello()
 
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
-	Node n_sid(controller_sid);
+	//Node n_sid(_controller_sid);
 
 	Xroute::XrouteMsg msg;
 	Xroute::HelloMsg *hello = msg.mutable_hello();
@@ -484,7 +485,7 @@ int Controller::sendInterDomainLSA()
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
 		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
+		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
 		g.fill_sockaddr(&ddag);
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
@@ -661,7 +662,7 @@ int Controller::sendSidDiscovery()
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); ++it)
 	{
 		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
+		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
 		g.fill_sockaddr(&ddag);
 
 		string message;
@@ -734,7 +735,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 	std::map<std::string, NeighborEntry>::iterator it;
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++) {
 		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(controller_sid);
+		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
 		g.fill_sockaddr(&ddag);
 
 		int temprc = sendMessage(&ddag, xmsg);
@@ -1818,7 +1819,7 @@ int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTab
 		// TODO check for all published SIDs
 		// TODO do this for xrouted as well
 		// Ignore SIDs that we publish
-		if (it->second.dest == controller_sid) {
+		if (it->second.dest == _controller_sid) {
 			continue;
 		}
 
