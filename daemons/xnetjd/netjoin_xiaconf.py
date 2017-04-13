@@ -160,12 +160,18 @@ class NetjoinXIAConf(object):
     def get_clickcontrol_path(self):
         return os.path.join(self.src_dir, "bin")
 
+    def __controller_dag_filepath(self):
+        return os.path.join(self.conf_dir, 'controller_dag')
+
     def get_controller_dag(self):
         controller_dag = None
-        controller_dag_filepath = os.path.join(self.conf_dir, 'controller_dag')
-        with open(controller_dag_filepath) as controller_dag_file:
+        with open(self.__controller_dag_filepath()) as controller_dag_file:
             controller_dag = controller_dag_file.read()
         return controller_dag
+
+    def write_controller_dag(self, controller_dag):
+        with open(self.__controller_dag_filepath(), 'w') as outfile:
+            outfile.write(controller_dag)
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
