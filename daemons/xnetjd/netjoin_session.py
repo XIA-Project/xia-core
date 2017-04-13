@@ -9,6 +9,7 @@ import threading
 import Queue
 import dagaddr
 import c_xsocket
+import socket
 from clickcontrol import ClickControl
 from ndap_pb2 import LayerTwoIdentifier, NetDescriptor
 from dagaddr import Graph
@@ -326,10 +327,10 @@ class NetjoinSession(threading.Thread):
         self.state = self.HS_4_WAIT
 
     def __send_xrouted_msg(self, packet):
-        rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
-        router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
-        c_xsocket.Xsendto(rsockfd, packet, 0, router_dag_str)
-        c_xsocket.Xclose(rsockfd)
+        rsockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        router_addr = ('127.0.0.1', 1510)   # From xrouted/RouteModule.hh
+        rsockfd.sendto(packet, router_addr)
+        rsockfd.close()
 
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
