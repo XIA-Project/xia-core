@@ -53,6 +53,7 @@ class NetjoinSession(threading.Thread):
         self.beacon_id = beacon_id
         self.policy = policy
         self.is_router = is_router
+        self.controller_dag = None
         self.l2_handler = None    # Created on receiving beacon or handshake1
         self.last_message_tuple = None # (message, outgoing_interface, theirmac)
         self.last_message_remaining_iterations = None
@@ -211,7 +212,8 @@ class NetjoinSession(threading.Thread):
         logging.info("Now sending handshake two")
         netjoin_h2 = NetjoinHandshakeTwo(self, deny=deny_h2,
                 hostname=self.hostname,
-                client_session=client_session_id, l2_reply=l2_reply)
+                client_session=client_session_id, l2_reply=l2_reply,
+                client_is_router=client_is_router)
 
         # Send handshake two
         self.send_netjoin_message(netjoin_h2, interface, theirmac)
@@ -244,6 +246,10 @@ class NetjoinSession(threading.Thread):
             logging.error("Our join request was denied")
             return
         logging.info("Valid handshake two: We can join this network now")
+
+        # Save controller_dag for xrouted notification after hs4
+        if self.is_router:
+            self.controller_dag = str(netjoin_h2.controller_dag())
 
         # Configure Click info
         router_dag = str(netjoin_h2.router_dag())
@@ -318,6 +324,12 @@ class NetjoinSession(threading.Thread):
         # Now we are waiting for handshake 4 confirmation message
         self.state = self.HS_4_WAIT
 
+    def __send_xrouted_msg(self, packet):
+        rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
+        router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
+        c_xsocket.Xsendto(rsockfd, packet, 0, router_dag_str)
+        c_xsocket.Xclose(rsockfd)
+
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
@@ -370,10 +382,7 @@ class NetjoinSession(threading.Thread):
             xrmsg.host_join.interface = interface
             register_packet = xrmsg.SerializeToString()
 
-            rsockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
-            router_dag_str = 'RE SID:1110000000000000000000000000000000001112'
-            c_xsocket.Xsendto(rsockfd, register_packet, 0, router_dag_str)
-            c_xsocket.Xclose(rsockfd)
+            self.__send_xrouted_msg(register_packet)
 
         # Tell client that gateway side configuration is now complete
         logging.info("Sending handshake four")
@@ -418,8 +427,12 @@ class NetjoinSession(threading.Thread):
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
         self.state = self.HS_DONE
 
-        # If we are running as a router, start announcing this network
+        # On routers; Notify xrouted and start announcing this network
         if self.is_router:
+
+            if self.controller_dag == None:
+                logging.error("Controller DAG not received in HS2")
+                return False
 
             # TODO: Need to get l2_type to announce from a config file
             # TODO: Need to get beacon_interval from a config file
@@ -427,6 +440,17 @@ class NetjoinSession(threading.Thread):
             beacon_interval = 0.5
             net_id = self.beacon.find_xip_netid()
             assert(net_id is not None)
+
+            # Inform local xrouted that NetJoin is complete
+            xrmsg = xroute_pb2.XrouteMsg()
+            xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
+            xrmsg.type = xroute_pb2.CONFIG_MSG
+            conf = NetjoinXIAConf()
+            ad = "AD:{}".format(conf.raw_ad_to_hex(net_id))
+            xrmsg.config.ad = ad
+            xrmsg.config.controller_dag = self.controller_dag
+            config_packet = xrmsg.SerializeToString()
+            self.__send_xrouted_msg(config_packet)
 
             # Ask the NetjoinReceiver to announce the newly joined network
             # TODO: CRITICAL - only start one announcer for one net_id
