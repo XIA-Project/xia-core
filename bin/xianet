@@ -570,6 +570,7 @@ clean_conf_and_keys()
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/hosts.xia
+	rm -f $XIADIR/etc/controller_dag
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
 	echo "Deleting content files"
@@ -681,6 +682,7 @@ case $1 in
 		sleep .2
 		check_all_services
 		rm -f /tmp/xcache*
+		rm -f $XIADIR/etc/controller_dag
 		;;
 	restart|reload)
 		echo "Stopping XIA"
