@@ -122,7 +122,10 @@ class NetjoinXIAConf(object):
                 host_type = match.group(2)
                 hid = match.group(3)
                 if "Router" in host_type:
-                    ad, hid = hid.split(' ')
+                    # Only controllers have AD in address.conf
+                    xids = hid.split(' ')
+                    if (len(xids) == 2):
+                        ad, hid = hid.split(' ')
                 break
 
         if ad:
