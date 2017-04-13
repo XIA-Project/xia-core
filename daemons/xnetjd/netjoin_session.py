@@ -45,6 +45,7 @@ class NetjoinSession(threading.Thread):
         threading.Thread.__init__(self)
 
         self.xianetjoin = ("127.0.0.1", 9882)
+        self.conf = NetjoinXIAConf()
         self.beacon = NetjoinBeacon()
         self.state = self.START
         self.start_time = time.time()
@@ -432,9 +433,13 @@ class NetjoinSession(threading.Thread):
         # On routers; Notify xrouted and start announcing this network
         if self.is_router:
 
+            # Routers must have received controller_dag in HS2
             if self.controller_dag == None:
                 logging.error("Controller DAG not received in HS2")
                 return False
+
+            # Write the controller_dag config file to etc
+            self.conf.write_controller_dag(self.controller_dag)
 
             # TODO: Need to get l2_type to announce from a config file
             # TODO: Need to get beacon_interval from a config file
@@ -447,8 +452,7 @@ class NetjoinSession(threading.Thread):
             xrmsg = xroute_pb2.XrouteMsg()
             xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
             xrmsg.type = xroute_pb2.CONFIG_MSG
-            conf = NetjoinXIAConf()
-            ad = "AD:{}".format(conf.raw_ad_to_hex(net_id))
+            ad = "AD:{}".format(self.conf.raw_ad_to_hex(net_id))
             xrmsg.config.ad = ad
             xrmsg.config.controller_dag = self.controller_dag
             config_packet = xrmsg.SerializeToString()
