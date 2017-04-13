@@ -233,6 +233,30 @@ void *Controller::handler()
 }
 
 
+int Controller::saveControllerDAG()
+{
+	char s[2048];
+
+	if (XrootDir(s, sizeof(s)) == NULL) {
+		// handle error
+		return -1;
+	}
+
+	strncat(s, "/etc/controller_dag", sizeof(s));
+
+	FILE *f = fopen(s, "w");
+
+	if (f == NULL) {		// handle error
+		return -1;
+	}
+
+	xia_ntop(AF_XIA, &_controller_dag, s, sizeof(s));
+	fprintf(f, "controller=%s\n", s);
+	fclose(f);
+
+	return 0;
+}
+
 
 int Controller::makeSockets()
 {
@@ -305,6 +329,13 @@ int Controller::makeSockets()
 		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
 		return -1;
 	}
+
+
+	// save the controller dag to disk so xnetj can find it
+	if (saveControllerDAG() < 0) {
+		// handle the error
+	}
+
 
 	// make the DAG we'll send with
 	XmakeNewSID(s, sizeof(s));

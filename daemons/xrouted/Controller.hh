@@ -157,7 +157,7 @@ protected:
 	void *handler();
 	int init();
 	int makeSockets();
-
+	int saveControllerDAG();
 
 	int sendHello();
 	int sendInterDomainLSA();
