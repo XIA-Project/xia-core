@@ -26,9 +26,8 @@ protected:
 
 	int _router_sock;
 
+	bool _joined;
 	sockaddr_x _router_dag;
-
-
 
 	int32_t _num_neighbors;	// number of neighbor routers
 	int32_t _lsa_seq;		// LSA sequence number of this router
@@ -52,9 +51,10 @@ protected:
 
 	void *handler();
 	int init();
-	int makeSockets();
+	int makeNetSockets();
 
 	int processMsg(std::string msg, uint32_t iface);
+
 
 	// Intradomain Message Handlers
 	int sendHello();
@@ -62,13 +62,12 @@ protected:
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::XrouteMsg& msg);
 
+	int processConfig(const Xroute::ConfigMsg &msg);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
+
+
 	int processRoutingTable(const Xroute::XrouteMsg& msg);
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
-
-
-	int getControllerDag(sockaddr_x *dag);
-
 
 	// FIXME: improve these guys
 	struct timeval h_freq, h_fire;

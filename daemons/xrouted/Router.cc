@@ -1,5 +1,7 @@
 //#include <signal.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <errno.h>
 #include <math.h>
 
 #include "../common/XIARouter.hh"
@@ -19,40 +21,6 @@
 // modify XreradLocalAddr to not require a 4id
 // make the xiarouter return a map instead of vector
 
-
-int Router::getControllerDag(sockaddr_x *dag)
-{
-	// make the dag we'll send controller messages to
-	// FIXME: eventually we'll get this from xnetjd
-
-	sockaddr_x ns;
-
-	while (1) {
-		// we can get the HID from the Nameserver DAG
-		if (XreadNameServerDAG(_local_sock, &ns) < 0) {
-			if (errno == EWOULDBLOCK) {
-				syslog(LOG_INFO, "Name server DAG not ready yet, looping...\n");
-				sleep(1);
-				continue;
-			}
-			return -1;
-		}
-
-		break;
-	}
-
-	Graph g(&ns);
-
-	Node src;
-	Node h = g.intent_HID();
-	Node f(controller_fid);
-	Node s(controller_sid);
-	g = (src * h * f * s) + (src * f * s);
-
-	g.fill_sockaddr(dag);
-	syslog(LOG_INFO, "Controller's DAG: %s", g.dag_string().c_str());
-	return 0;
-}
 
 // FIXME: put this somewhere common
 static uint32_t sockaddr_size(const sockaddr_x *s)
@@ -74,56 +42,48 @@ void *Router::handler()
 	struct timespec tspec;
 	vector<string> routers;
 	time_t last_purge, hello_last_purge;
+	int iface;
 
 	struct timeval now;
 
 	last_purge = hello_last_purge = time(NULL);
-	{
-	//while (1) {
-		gettimeofday(&now, NULL);
-		if (timercmp(&now, &h_fire, >=)) {
-			sendHello();
-			timeradd(&now, &h_freq, &h_fire);
-		}
-		if (timercmp(&now, &l_fire, >=)) {
-			sendLSA();
-			timeradd(&now, &l_freq, &l_fire);
-		}
 
-		struct pollfd pfd[3];
+	struct pollfd pfd[3];
 
-		bzero(pfd, sizeof(pfd));
-		pfd[0].fd = _broadcast_sock;
-		pfd[1].fd = _router_sock;
-		pfd[2].fd = _local_sock;
-		pfd[0].events = POLLIN;
-		pfd[1].events = POLLIN;
-		pfd[2].events = POLLIN;
+	bzero(pfd, sizeof(pfd));
+	pfd[0].fd = _broadcast_sock;
+	pfd[1].fd = _router_sock;
+	pfd[2].fd = _local_sock;
+	pfd[0].events = POLLIN;
+	pfd[1].events = POLLIN;
+	pfd[2].events = POLLIN;
 
-		tspec.tv_sec = 0;
-		tspec.tv_nsec = 500000000;
+	tspec.tv_sec = 0;
+	tspec.tv_nsec = 500000000;
 
-		rc = Xppoll(pfd, 1, &tspec, NULL);
-		if (rc > 0) {
-				int sock = -1;
+	rc = Xppoll(pfd, 1, &tspec, NULL);
+	if (rc > 0) {
+			int sock = -1;
 
-			for (int i = 0; i < 3; i++) {
-				if (pfd[i].revents & POLLIN) {
-					sock = pfd[i].fd;
-					break;
-				}
+		for (int i = 0; i < 3; i++) {
+			if (pfd[i].revents & POLLIN) {
+				sock = pfd[i].fd;
+				break;
 			}
+		}
 
-			if (sock < 0) {
-				// something weird happened
-				return 0;
+		memset(&recv_message[0], 0, sizeof(recv_message));
+
+		if (sock <= 0) {
+			// something weird happened
+			return 0;
+
+		} else if (sock == _local_sock) {
+			iface = 0;
+			if ((rc = recvfrom(sock, recv_message, sizeof(recv_message), 0, NULL, NULL)) < 0) {
+				syslog(LOG_WARNING, "local message receive error");
 			}
-
-
-			// receiving a Hello or LSA packet
-			memset(&recv_message[0], 0, sizeof(recv_message));
-
-			int iface;
+		} else {
 			struct msghdr mh;
 			struct iovec iov;
 			struct in_pktinfo pi;
@@ -158,63 +118,81 @@ void *Router::handler()
 						iface = pinfo->ipi_ifindex;
 					}
 				}
-				processMsg(string(recv_message, rc), iface);
 			}
 		}
 
-		time_t nowt = time(NULL);
-		if (nowt - last_purge >= EXPIRE_TIME) {
-			last_purge = nowt;
-			//fprintf(stderr, "checking entry\n");
-			map<string, time_t>::iterator iter = timeStamp.begin();
-
-			while (iter != timeStamp.end()) {
-				if (nowt - iter->second >= EXPIRE_TIME) {
-					_xr.delRoute(iter->first);
-					syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-					timeStamp.erase(iter++);
-				} else {
-					++iter;
-				}
-			}
+		if (rc > 0) {
+			processMsg(string(recv_message, rc), iface);
 		}
+	}
 
-		if (nowt - hello_last_purge >= HELLO_EXPIRE_TIME) {
-			hello_last_purge = nowt;
-			//fprintf(stderr, "checking hello entry\n");
-			map<string, time_t>::iterator iter = _hello_timeStamp.begin();
+	if (!_joined) {
+		return 0;
+	}
 
-			while (iter !=  _hello_timeStamp.end()) {
-				if (nowt - iter->second >= HELLO_EXPIRE_TIME) {
-					_xr.delRoute(iter->first);
-					syslog(LOG_INFO, "purging hello route for : %s", iter->first.c_str());
+	time_t nowt = time(NULL);
+	if (nowt - last_purge >= EXPIRE_TIME) {
+		last_purge = nowt;
+		//fprintf(stderr, "checking entry\n");
+		map<string, time_t>::iterator iter = timeStamp.begin();
 
-
-					// Update network table
-
-					// remove the item from neighbor_list
-					_networkTable[_myHID].neighbor_list.erase(
-						std::remove(_networkTable[_myHID].neighbor_list.begin(), _networkTable[_myHID].neighbor_list.end(), _neighborTable[iter->first]),
-						_networkTable[_myHID].neighbor_list.end());
-
-					if (_neighborTable.erase(iter->first) < 1) {
-						 syslog(LOG_INFO, "failed to erase %s from neighbors", iter->first.c_str());
-					}
-					_num_neighbors = _neighborTable.size();
-					_networkTable[_myHID].num_neighbors = _num_neighbors;
-
-					// remove the item and go on
-					_hello_timeStamp.erase(iter++);
-				} else {
-					++iter;
-				}
+		while (iter != timeStamp.end()) {
+			if (nowt - iter->second >= EXPIRE_TIME) {
+				_xr.delRoute(iter->first);
+				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				timeStamp.erase(iter++);
+			} else {
+				++iter;
 			}
 		}
 	}
+
+	if (nowt - hello_last_purge >= HELLO_EXPIRE_TIME) {
+		hello_last_purge = nowt;
+		//fprintf(stderr, "checking hello entry\n");
+		map<string, time_t>::iterator iter = _hello_timeStamp.begin();
+
+		while (iter !=  _hello_timeStamp.end()) {
+			if (nowt - iter->second >= HELLO_EXPIRE_TIME) {
+				_xr.delRoute(iter->first);
+				syslog(LOG_INFO, "purging hello route for : %s", iter->first.c_str());
+
+
+				// Update network table
+
+				// remove the item from neighbor_list
+				_networkTable[_myHID].neighbor_list.erase(
+					std::remove(_networkTable[_myHID].neighbor_list.begin(), _networkTable[_myHID].neighbor_list.end(), _neighborTable[iter->first]),
+					_networkTable[_myHID].neighbor_list.end());
+
+				if (_neighborTable.erase(iter->first) < 1) {
+					 syslog(LOG_INFO, "failed to erase %s from neighbors", iter->first.c_str());
+				}
+				_num_neighbors = _neighborTable.size();
+				_networkTable[_myHID].num_neighbors = _num_neighbors;
+
+				// remove the item and go on
+				_hello_timeStamp.erase(iter++);
+			} else {
+				++iter;
+			}
+		}
+	}
+
+	gettimeofday(&now, NULL);
+	if (timercmp(&now, &h_fire, >=)) {
+		sendHello();
+		timeradd(&now, &h_freq, &h_fire);
+	}
+	if (timercmp(&now, &l_fire, >=)) {
+		sendLSA();
+		timeradd(&now, &l_freq, &l_fire);
+	}
+
 	return 0;
 }
 
-int Router::makeSockets()
+int Router::makeNetSockets()
 {
 	char s[MAX_DAG_SIZE];
 	Graph g;
@@ -224,13 +202,6 @@ int Router::makeSockets()
 	_broadcast_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (_broadcast_sock < 0) {
 		syslog(LOG_ALERT, "Unable to create the broadcast socket");
-		return -1;
-	}
-
-	// control socket - local communication
-	_local_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_local_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the local control socket");
 		return -1;
 	}
 
@@ -249,19 +220,19 @@ int Router::makeSockets()
 	}
 
 	// get our AD and HID
-	if ( XreadLocalHostAddr(_local_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
+	if ( XreadLocalHostAddr(_source_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		return -1;
 	}
 
 	// FIXME: these should probably be Nodes instead of strings!
-	Graph glocal(s);
-	_myAD = glocal.intent_AD_str();
-	_myHID = glocal.intent_HID_str();
+	Graph gbroad(s);
+	_myAD = gbroad.intent_AD_str();
+	_myHID = gbroad.intent_HID_str();
 
 	Node nHID(_myHID);
 
-	// make the dag we'll receive local broadcasts on
+	// make the dag we'll receive broadcasts on
 	g = src * Node(broadcast_fid) * Node(intradomain_sid);
 
 	g.fill_sockaddr(&_broadcast_dag);
@@ -269,19 +240,7 @@ int Router::makeSockets()
 
 	// and bind it to the broadcast receive socket
 	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		return -1;
-	}
-
-	// make the dag we'll receive local messages on
-	g = src * nHID * Node(local_sid);
-
-	g.fill_sockaddr(&_local_dag);
-	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the broadcast receive socket
-	if (Xbind(_local_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
+		syslog(LOG_ALERT, "unable to bind to broadcast receive DAG : %s", g.dag_string().c_str());
 		return -1;
 	}
 
@@ -321,18 +280,13 @@ int Router::makeSockets()
 		return -1;
 	}
 
-	getControllerDag(&_controller_dag);
-
 	return 0;
 }
 
 
 int Router::init()
 {
-	if (makeSockets() < 0) {
-		exit(-1);
-	}
-
+	_joined = false; 				// we're not part of a network yet
 	_num_neighbors = 0;				// number of seen neighbor routers
 	_lsa_seq = rand() % MAX_SEQNUM;	// make our initial LSA sequence numbe
 
@@ -341,7 +295,7 @@ int Router::init()
 	// FIXME: figure out what the correct type of router we are
 	_flags = F_EDGE_ROUTER;
 
-	if( XisDualStackRouter(_local_sock) == 1 ) {
+	if( XisDualStackRouter(_source_sock) == 1 ) {
 		_flags |= F_IP_GATEWAY;
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
 	}
@@ -484,6 +438,7 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::CONFIG_MSG:
+			rc = processConfig(msg.config());
 			break;
 
 		//////////////////////////////////////////////////////////////////////
@@ -627,6 +582,16 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 	_hello_timeStamp[neighbor.HID] = time(NULL);
 
+	return 1;
+}
+
+int Router::processConfig(const Xroute::ConfigMsg &msg)
+{
+	_myAD = msg.ad();
+
+	inet_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
+
+	makeNetSockets();
 	return 1;
 }
 

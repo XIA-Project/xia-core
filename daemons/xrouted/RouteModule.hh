@@ -23,6 +23,8 @@ const std::string controller_sid ("SID:1110000000000000000000000000000000001114"
 const std::string local_sid      ("SID:1110000000000000000000000000000000001115");
 const std::string lsa_sid        ("SID:9999999999999999999999999999999999999999");
 
+#define LOCAL_PORT 1510
+
 // routing table flag values
 #define F_HOST         0x0001 // node is a host
 #define F_CORE_ROUTER  0x0002 // node is an internal router
@@ -50,15 +52,16 @@ protected:
 
 	sockaddr_x _broadcast_dag;
 	sockaddr_x _controller_dag;
-	sockaddr_x _local_dag;
 	sockaddr_x _source_dag;
 
-	RouteModule(const char *name) {_hostname = name;}
+	RouteModule(const char *name);
+
+	int makeLocalSocket();
 
 	int sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg);
 	int sendBroadcastMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_broadcast_dag, msg); };
 	int sendControllerMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_controller_dag, msg); };
-	int sendLocalMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_local_dag, msg); };
+//	int sendLocalMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_local_dag, msg); };
 
 	// virtual functions to be defined by the subclasses
 	virtual int init() = 0;      // configure the route module

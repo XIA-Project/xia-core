@@ -45,6 +45,7 @@ void *Controller::handler()
 	time_t last_purge = time(NULL);
 	time_t last_update_config = last_purge;
 	time_t last_update_latency = last_purge;
+	int iface;
 
 	struct timeval now;
 
@@ -93,49 +94,56 @@ void *Controller::handler()
 			}
 		}
 
-		if (sock < 0) {
-			// something weird happened
-			return 0;
-		}
-
-		// receiving a Hello or LSA packet
 		memset(&recv_message[0], 0, sizeof(recv_message));
 
-		int iface;
-		struct msghdr mh;
-		struct iovec iov;
-		struct in_pktinfo pi;
-		struct cmsghdr *cmsg;
-		struct in_pktinfo *pinfo;
-		char cbuf[CMSG_SPACE(sizeof pi)];
+		if (sock <= 0) {
+			// something weird happened
+			return 0;
 
-		iov.iov_base = recv_message;
-		iov.iov_len = sizeof(recv_message);
-
-		mh.msg_name = &theirDAG;
-		mh.msg_namelen = sizeof(theirDAG);
-		mh.msg_iov = &iov;
-		mh.msg_iovlen = 1;
-		mh.msg_control = cbuf;
-		mh.msg_controllen = sizeof(cbuf);
-
-		cmsg = CMSG_FIRSTHDR(&mh);
-		cmsg->cmsg_level = IPPROTO_IP;
-		cmsg->cmsg_type = IP_PKTINFO;
-		cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
-
-		mh.msg_controllen = cmsg->cmsg_len;
-
-		if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
-			perror("recvfrom");
-
+		} else if (sock == _local_sock) {
+			iface = 0;
+			if ((rc = recvfrom(sock, recv_message, sizeof(recv_message), 0, NULL, NULL)) < 0) {
+				syslog(LOG_WARNING, "local message receive error");
+			}
 		} else {
-			for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
-				if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
-					pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-					iface = pinfo->ipi_ifindex;
+			struct msghdr mh;
+			struct iovec iov;
+			struct in_pktinfo pi;
+			struct cmsghdr *cmsg;
+			struct in_pktinfo *pinfo;
+			char cbuf[CMSG_SPACE(sizeof pi)];
+
+			iov.iov_base = recv_message;
+			iov.iov_len = sizeof(recv_message);
+
+			mh.msg_name = &theirDAG;
+			mh.msg_namelen = sizeof(theirDAG);
+			mh.msg_iov = &iov;
+			mh.msg_iovlen = 1;
+			mh.msg_control = cbuf;
+			mh.msg_controllen = sizeof(cbuf);
+
+			cmsg = CMSG_FIRSTHDR(&mh);
+			cmsg->cmsg_level = IPPROTO_IP;
+			cmsg->cmsg_type = IP_PKTINFO;
+			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+			mh.msg_controllen = cmsg->cmsg_len;
+
+			if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
+				perror("recvfrom");
+
+			} else {
+				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
+					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+						iface = pinfo->ipi_ifindex;
+					}
 				}
 			}
+		}
+
+		if (rc > 0) {
 			processMsg(string(recv_message, rc), iface);
 		}
 	}
@@ -239,13 +247,6 @@ int Controller::makeSockets()
 		return -1;
 	}
 
-	// control socket - local communication
-	_local_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_local_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the local control socket");
-		return -1;
-	}
-
 	// controller socket - flooded & interdomain communication
 	_controller_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
 	if (_controller_sock < 0) {
@@ -261,15 +262,15 @@ int Controller::makeSockets()
 	}
 
 	// get our AD and HID
-	if ( XreadLocalHostAddr(_local_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
+	if ( XreadLocalHostAddr(_controller_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
 		syslog(LOG_ALERT, "Unable to read local XIA address");
 		return -1;
 	}
 
 	// FIXME: these should probably be Nodes instead of strings!
-	Graph glocal(s);
-	_myAD = glocal.intent_AD_str();
-	_myHID = glocal.intent_HID_str();
+	Graph gbroad(s);
+	_myAD = gbroad.intent_AD_str();
+	_myHID = gbroad.intent_HID_str();
 
 	Node nHID(_myHID);
 
@@ -281,18 +282,6 @@ int Controller::makeSockets()
 
 	// and bind it to the broadcast receive socket
 	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		return -1;
-	}
-
-	// make the dag we'll receive local messages on
-	g = src * nHID * Node(local_sid);
-
-	g.fill_sockaddr(&_local_dag);
-	syslog(LOG_INFO, "Local DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the broadcast receive socket
-	if (Xbind(_local_sock, (struct sockaddr*)&_local_dag, sizeof(sockaddr_x)) < 0) {
 		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
 		return -1;
 	}
@@ -353,9 +342,9 @@ int Controller::init()
 	_ctl_seq = 0;	// LSA sequence number of this router
 	_sid_ctl_seq = 0; // TODO: init values should be a random int
 
-	_dual_router_AD = "NULL";
+	_dual_router_AD = "";
 	// mark if this is a dual XIA-IPv4 router
-	if( XisDualStackRouter(_rsock) == 1 ) {
+	if( XisDualStackRouter(_source_sock) == 1 ) {
 		_dual_router = 1;
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
 	} else {
@@ -1540,7 +1529,7 @@ int Controller::sendSidRoutingTable(std::string destHID, std::map<std::string, s
 			}
 		}
 
-		return msg.send(_rsock, &_ddag);
+		return msg.send(_source_sock, &_ddag);
 	}
 }
 
@@ -1904,7 +1893,7 @@ printf("populate\n");
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
 
-printf("time to send %s %d\n", it1->first.c_str(), routingTable.size());
+printf("time to send %s %lu\n", it1->first.c_str(), routingTable.size());
 			sendRoutingTable(&it1->second, routingTable);
 		}
 

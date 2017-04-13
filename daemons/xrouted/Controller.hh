@@ -97,10 +97,6 @@ public:
 	~Controller() {}
 
 protected:
-	int32_t _fsock; // lsa handling socket
-	int32_t _rsock; // socket for broadcasts to routers
-	int32_t _csock; // socket for talking to controllers
-
 	uint32_t _flags;
 
 	std::string _myAD;

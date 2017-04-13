@@ -1,6 +1,14 @@
 #include "RouteModule.hh"
 #include <syslog.h>
 
+
+RouteModule::RouteModule(const char *name)
+{
+	_hostname       = name;
+	_broadcast_sock = 0;
+	_local_sock     = 0;
+	_source_sock    = 0;
+}
 pthread_t RouteModule::start()
 {
 	int rc;
@@ -12,6 +20,8 @@ pthread_t RouteModule::start()
 		exit(-1);
 	}
 
+	makeLocalSocket();
+
 	init();
 	_enabled = true;
 
@@ -22,6 +32,29 @@ pthread_t RouteModule::start()
 		return 0;
 	}
 }
+
+
+int RouteModule::makeLocalSocket()
+{
+	struct sockaddr_in sin;
+
+	inet_pton(AF_INET, "127.0.0.1", &sin.sin_addr);
+	sin.sin_port = htons(LOCAL_PORT);
+	sin.sin_family = AF_INET;
+
+	_local_sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (_local_sock < 0) {
+		syslog(LOG_ALERT, "Unable to create the local control socket");
+		return -1;
+	}
+	if (bind(_local_sock, (struct sockaddr*)&sin, sizeof(struct sockaddr)) < 0) {
+		syslog(LOG_ALERT, "unable to bind to localhost:%u", LOCAL_PORT);
+		return -1;
+	}
+
+	return 0;
+}
+
 
 int RouteModule::sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg)
 {
