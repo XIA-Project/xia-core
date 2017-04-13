@@ -103,6 +103,9 @@ class NetjoinHandshakeTwo(object):
     def nameserver_dag(self):
         return self.xhcp_info().nameserver_dag
 
+    def controller_dag(self):
+        return self.xhcp_info().controller_dag
+
     def router_rv_dag(self):
         if self.xhcp_info().HasField('router_rv_dag'):
             return self.xhcp_info().router_rv_dag
