@@ -43,6 +43,9 @@ class NetjoinReceiver(threading.Thread):
 		self.shutdown)
 	self.announcer.announce()
 
+    def get_net_id(self):
+        return self.announcer.get_net_id()
+
     def handle_net_descriptor(self, message_tuple):
 
         logging.debug("Got a beacon")

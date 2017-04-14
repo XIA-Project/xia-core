@@ -52,6 +52,9 @@ class NetjoinAnnouncer(object):
         self.beacon = NetjoinBeacon(self.net_id)
         self.beacon.initialize(self.auth.get_raw_verify_key(), l2_type)
 
+    def get_net_id(self):
+        return self.net_id
+
 # Parse arguments and launch necessary threads
 def main():
 

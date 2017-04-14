@@ -165,10 +165,14 @@ class NetjoinHandshakeOne(object):
         ad = adonly_cred.ad
         logging.info("AD in credential: {}".format(ad))
         logging.info("Local AD: {}".format(self.conf.get_ad()))
+        session_netid = self.session.receiver.get_net_id()
+        session_ad = self.session.conf.raw_ad_to_hex(session_netid)
+        logging.info("Announced AD: {}".format(session_ad))
         # TODO Ensure it matches our AD else return False
         if ad != self.conf.get_ad():
-            logging.warning("AD in credential doesn't match local AD")
-            return False
+            if ad != session_ad:
+                logging.warning("AD in credential doesn't match local AD")
+                return False
         logging.info("Valid AD credential");
         return True
 
