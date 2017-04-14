@@ -104,7 +104,7 @@ protected:
 	Node _my_fid;
 
 	int _controller_sock;
-
+	std::string _controller_sid;
 
 
 	char myAD[MAX_XID_SIZE]; // this router AD

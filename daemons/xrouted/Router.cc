@@ -288,6 +288,9 @@ int Router::postJoin()
 		syslog(LOG_DEBUG, "configured as a dual-stack router");
 	}
 
+	// we're part of the network now and can start talking
+	_joined = true;
+
 	return 0;
 }
 
@@ -592,7 +595,7 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 {
 	_myAD = msg.ad();
 
-	inet_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
+	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
 	printf("\n\n\nProcessConfig\n%s\n%s\n\n", _myAD.c_str(), msg.controller_dag().c_str());
 
