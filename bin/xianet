@@ -571,6 +571,7 @@ clean_conf_and_keys()
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/hosts.xia
 	rm -f $XIADIR/etc/controller_dag
+	rm -f $XIADIR/etc/RHID.cred
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
 	echo "Deleting content files"
