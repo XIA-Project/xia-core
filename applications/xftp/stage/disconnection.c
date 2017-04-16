@@ -10,6 +10,7 @@ int CONNECT_TIME = 8 * 1000;
 int DISCONNECT_TIME = 32 * 1000;
 int netsize = 1;
 pthread_mutex_t encounterTime = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t disconnectTime = PTHREAD_MUTEX_INITIALIZER;
 #define GET_SSID_LIST "iwlist wlp6s0 scanning | grep -E '(\\\"[a-zA-Z0-9 _-.]*\\\")|(Signal level=-?[0-9]* dBm)' -o"
 #define CLOSE_NETWORK_MANAGER "service network-manager stop"
 void getConfig(int argc, char** argv)
@@ -140,12 +141,11 @@ say("cmd2 = %s\n", cmd2.c_str());
 		say("connected!\n");
 		break;
 	    }
-	usleep(10);
-	/*
-	if (looptime>10){
+	usleep(10 * 1000);
+	
+	if (looptime>=5){
 		connect_SSID(interface,ssid);
-		break;
-	}*/
+	}
 	}
 	result = execSystem("date '+%c%N'");
         printf("connect time: %s\n", result.c_str());
@@ -154,7 +154,7 @@ say("cmd2 = %s\n", cmd2.c_str());
 int disconnect(int interface){
 	long begin_time, end_time, total_time;
 	int rtn;
-	pthread_mutex_lock(&encounterTime);
+	pthread_mutex_lock(&disconnectTime);
 	begin_time = now_msec();
 	printf("-------------disconnect begin at %ld \n", begin_time);
 	rtn = disconnect_SSID(interface);
@@ -179,10 +179,18 @@ int connect(int interface, char * ssid){
 }
 void * time_control(void *){
     while(1){
+	for(int i = 0; i < netsize; ++i){
+		pthread_mutex_unlock(&encounterTime);
+		usleep(CONNECT_TIME * 1000 / netsize);
+		pthread_mutex_unlock(&disconnectTime);
+	}
+/*
 	usleep(CONNECT_TIME * 1000);
 	pthread_mutex_unlock(&encounterTime);
+*/
 	usleep(DISCONNECT_TIME * 1000);
-	pthread_mutex_unlock(&encounterTime);
+	//pthread_mutex_unlock(&disconnectTime);
+
 
     }
 }
@@ -203,8 +211,10 @@ int main(int argc, char **argv){
 	scanf("%d",&netsize);
 	CONNECT_TIME *= 1000;
 	DISCONNECT_TIME *= 1000;*/
+pthread_mutex_lock(&encounterTime);
+pthread_mutex_lock(&disconnectTime);
 	pthread_t thread_time;
-
+	
     	pthread_create(&thread_time, NULL, time_control, NULL);
 	while (1) {			
 		for(int i = 0; i < netsize; ++i){
