@@ -55,7 +55,7 @@ void stageControl(int sock, char *cmd)
             
         }
 	char str_arr[strlen(cmd)+1];
-	strcpy(str_arr, cmd);
+	strcpy(str_arr, cmd+10);
 	char *saveptr;
 	char *str = strtok_r(str_arr, " ", &saveptr);
 	CIDs.push_back(str);
@@ -251,7 +251,7 @@ void *stageCmd(void *socketid)
         say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
         if (strncmp(cmd, "stage", 5) == 0) {
             say("Receive a stage message: %s\n", cmd);
-            stageControl(sock, cmd + 6);
+            stageControl(sock, cmd);
         }
     }
 
