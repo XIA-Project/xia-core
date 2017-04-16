@@ -43,7 +43,7 @@ void updateStageArg() {
     if (rttWifi != -1 && rttInt != -1 && timeWifi && timeInt) {
         int left = timeWifi + rttWifi;//rttWifi是stage_manager和stage_server; timeWifi是client下载一个chunk的时间
         int right = timeInt + rttWifi + rttInt;//rttInt是stage_server到content_server; timeInt是stage一个chunk要花的时间
-        chunkToStage = static_cast<double>(left) / right + 1;
+        chunkToStage = static_cast<double>(right) / left + 1;
     }
     else {
         chunkToStage = 3;
@@ -249,7 +249,7 @@ void *stageData(void *)
             say("Thread id: %d Network changed, create another thread to continue!\n");
             lastSSID = currSSID;
             pthread_t thread_stageDataNew;
-            
+            pthread_mutex_unlock(&StageControl);
             pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
@@ -317,6 +317,7 @@ void *stageData(void *)
             }
         }
         pthread_mutex_unlock(&dagVecLock);
+	
     }
     pthread_exit(NULL);
 }
