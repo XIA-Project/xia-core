@@ -44,8 +44,28 @@ void stageControl(int sock, char *cmd)
 
     XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
 
-    vector<string> CIDs = strVector(cmd);
-
+    vector<string> CIDs ;//= strVector(cmd);
+    while(1){
+	if (strncmp(cmd, "stageEnd", 8) == 0) {
+	    break;
+	}
+	say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
+	if (strncmp(cmd, "stageCont", 9) == 0) {
+            say("Receive a stage message: %s\n", cmd);
+            
+        }
+	char str_arr[strlen(cmd)+1];
+	strcpy(str_arr, cmd);
+	char *saveptr;
+	char *str = strtok_r(str_arr, " ", &saveptr);
+	CIDs.push_back(str);
+	int n;
+	if (( n = Xrecv(sock, cmd, XIA_MAXBUF, 0))  < 0) {
+            warn("socket error while waiting for data, closing connection\n");
+            break;
+	} 
+    }
+   
     for (auto CID : CIDs) {
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
         //url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
