@@ -348,9 +348,9 @@ router()
 	case $action in
 		"start")
 			cd $XIADIR/bin
+			./$ROUTER -h $host $LOG_FLAGS &
 			./xnetjd $ROUTER_TYPE --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
-			./$ROUTER -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
