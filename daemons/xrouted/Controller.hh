@@ -107,9 +107,9 @@ protected:
 	std::string _controller_sid;
 
 
-	char myAD[MAX_XID_SIZE]; // this router AD
-	char myHID[MAX_XID_SIZE]; // this router HID
-	char my4ID[MAX_XID_SIZE]; // not used
+//	char myAD[MAX_XID_SIZE]; // this router AD
+//	char myHID[MAX_XID_SIZE]; // this router HID
+//	char my4ID[MAX_XID_SIZE]; // not used
 
 	int32_t _dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
 	std::string _dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
@@ -167,6 +167,7 @@ protected:
 	int sendSidRoutingTable(std::string destHID, std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);
 
 	int processMsg(std::string msg, uint32_t iface);
+	int processHostRegister(const Xroute::HostJoinMsg& msg);
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processServiceKeepAlive(const Xroute::KeepAliveMsg& msg);
