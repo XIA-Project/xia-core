@@ -167,7 +167,6 @@ void *Controller::handler()
 	if (nowt - last_purge >= expire_time)
 	{
 		last_purge = nowt;
-		//fprintf(stderr, "checking entry\n");
 		map<string, time_t>::iterator iter = _timeStamp.begin();
 
 		while (iter != _timeStamp.end())
@@ -489,7 +488,6 @@ int Controller::sendInterDomainLSA()
 		g.fill_sockaddr(&ddag);
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
-		//syslog(LOG_INFO, "msg: %s", msg.c_str());
 
 		int temprc = sendMessage(&ddag, msg);
 		rc = (temprc < rc)? temprc : rc;
@@ -500,16 +498,18 @@ int Controller::sendInterDomainLSA()
 
 int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
 {
-	syslog(LOG_INFO, "Controller::Send-RT");
+//	syslog(LOG_INFO, "Controller::Send-RT");
 
-	if (nodeState == NULL) {
+	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
-printf("it's null!\n");
 		return processRoutingTable(routingTable);
+	} else if (nodeState->dag.sx_family != AF_XIA) {
+		// this entry was created for something we haven't seen yet,
+		// don't try to send a table
+		return 1;
 	} else {
 		// If destHID is not SID, send to relevant router
 		//
-printf("sending %lu to %s\n", routingTable.size(), nodeState->hid.c_str());
 		Node fad(_myAD);
 		Node fhid(_myHID);
 		Node tad(_myAD);
@@ -556,7 +556,6 @@ printf("sending %lu to %s\n", routingTable.size(), nodeState->hid.c_str());
 
 		char ss[2048];
 		xia_ntop(AF_XIA, &nodeState->dag, ss, sizeof(ss));
-		syslog(LOG_INFO, "sending to %s", ss);
 
 		return sendMessage(&nodeState->dag, msg);
 	}
@@ -752,8 +751,8 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 	for (it = _LocalSidList.begin(); it != _LocalSidList.end(); ++it)
 	{
 		Node sid(it->first);
-		Node  ad(myAD);
-		Node hid(myHID);
+		Node  ad(_myAD);
+		Node hid(_myHID);
 
 		Xroute::XrouteMsg msg;
 		Xroute::KeepAliveMsg *ka = msg.mutable_keep_alive();
@@ -1754,6 +1753,56 @@ int Controller::updateADPathStates(void)
 	return rc;
 }
 
+
+int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
+{
+	int rc;
+	uint32_t flags;
+
+	if (msg.has_flags()) {
+		flags = msg.flags();
+	} else {
+		flags = F_HOST;
+	}
+
+	NeighborEntry neighbor;
+	neighbor.AD = _myAD;
+	neighbor.HID = msg.hid();
+	neighbor.port = msg.interface();
+	neighbor.cost = 1; // for now, same cost
+	neighbor.flags = flags;
+
+	// Add host to neighbor table so info can be sent to controller
+	_neighborTable[neighbor.HID] = neighbor;
+	_num_neighbors = _neighborTable.size();
+
+	//  update my entry in the networkTable
+	NodeStateEntry entry;
+	entry.hid = _myHID;
+	entry.ad = _myAD;
+	entry.num_neighbors = _num_neighbors;
+
+	// fill my neighbors into my entry in the networkTable
+	std::map<std::string, NeighborEntry>::iterator it;
+	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++) {
+		entry.neighbor_list.push_back(it->second);
+	}
+
+	_networkTable[_myHID] = entry;
+
+	// update the host entry in (click-side) HID table
+	//syslog(LOG_INFO, "Routing table entry: interface=%d, host=%s\n", msg.interface(), hid.c_str());
+	if ((rc = _xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, flags)) != 0) {
+		syslog(LOG_ERR, "unable to set host route: %s (%d)", neighbor.HID.c_str(), rc);
+	}
+
+	// FIXME: handle timeouts
+//	_hello_timeStamp[neighbor.HID] = time(NULL);
+
+	return 1;
+}
+
+
 int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
 	string neighborAD, neighborHID, neighborSID;
@@ -1787,24 +1836,18 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	_num_neighbors = _neighborTable.size();
 
 	// Update network table
-	std::string myHID = _myHID;
-
 	NodeStateEntry entry;
-	entry.hid = myHID;
-	entry.ad = myAD;
+	entry.hid = _myHID;
+	entry.ad = _myAD;
 	entry.num_neighbors = _num_neighbors;
-
-	bzero(&entry.dag, sizeof(sockaddr_x));
-	if (msg.has_dag()) {
-		memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
-	}
 
 	// Add neighbors to network table entry
 	std::map<std::string, NeighborEntry>::iterator it;
-	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
+	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++) {
 		entry.neighbor_list.push_back(it->second);
+	}
 
-	_networkTable[myHID] = entry;
+	_networkTable[_myHID] = entry;
 	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
 	return 1;
@@ -1882,9 +1925,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	_networkTable[srcHID] = entry;
 	_calc_dijstra_ticks++;
 
-
-printf("network table size %lu\n", _networkTable.size());
-
 	if (_calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || _calc_dijstra_ticks  < 0) {
 		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
@@ -1901,31 +1941,23 @@ printf("network table size %lu\n", _networkTable.size());
 		// Iterate through ADs
 		for (it1 = _networkTable.begin(); it1 != _networkTable.end(); ++it1)
 		{
-printf("ad = %s hid = %s key=%s\n", it1->second.ad.c_str(), it1->second.hid.c_str(), it1->first.c_str());
-
 			if ((it1->second.ad != _myAD) || (it1->second.hid == "")) {
 				// Don't calculate routes for external ADs
-printf("fail1\n");
 				continue;
 			} else if (it1->second.hid.find(string("SID")) != string::npos) {
 				// Don't calculate routes for SIDs
-printf("fail2\n");
 				continue;
 			}
 			std::map<std::string, RouteEntry> routingTable;
 
-printf("populate\n");
 			// Calculate routing table for HIDs instead
 			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
-
-			printf("routing table size = %lu\n", routingTable.size());
 
 			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
 			//printRoutingTable(it1->second.hid, routingTable);
 
-printf("time to send %s %lu\n", it1->first.c_str(), routingTable.size());
 			sendRoutingTable(&it1->second, routingTable);
 		}
 
@@ -1936,7 +1968,6 @@ printf("time to send %s %lu\n", it1->first.c_str(), routingTable.size());
 		std::map<std::string, RouteEntry> routingTable;
 		populateRoutingTable(_myHID, _networkTable, routingTable);
 		if (routingTable.size() == 0) {
-			printf("table empty!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 			return 1;
 		}
 
@@ -1955,12 +1986,11 @@ printf("time to send %s %lu\n", it1->first.c_str(), routingTable.size());
 int Controller::extractNeighborADs(void)
 {
 	// Update network table
-	std::string myAD = _myAD;
 
 // FIXME: should these both be AD?????
 	NodeStateEntry entry;
-	entry.ad = myAD;
-	entry.hid = myAD;
+	entry.ad = _myAD;
+	entry.hid = _myAD;
 	entry.num_neighbors = _ADNeighborTable.size();
 	entry.timestamp = time(NULL);
 
@@ -1969,7 +1999,7 @@ int Controller::extractNeighborADs(void)
 	for (it1 = _ADNeighborTable.begin(); it1 != _ADNeighborTable.end(); ++it1)
 		entry.neighbor_list.push_back(it1->second);
 
-	_ADNetworkTable[myAD] = entry;
+	_ADNetworkTable[_myAD] = entry;
 	return 1;
 }
 
@@ -2022,7 +2052,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	//@ (When do these appear? Should they not be introduced in the first place? How about SIDs?)
 	it1 = networkTable.begin();
 	while (it1 != networkTable.end()) {
-		printf("pop neighbors = %d %s %s\n", it1->second.num_neighbors, it1->second.ad.c_str(), it1->second.hid.c_str());
+
 		if (it1->second.num_neighbors == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
 			networkTable.erase(it1++);
 		} else {
@@ -2046,22 +2076,31 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	networkTable[srcHID].checked = true;
 	networkTable[srcHID].cost = 0;
 
-	// Process neighboring nodes of root node
+	// loop through the neighbor table of the source node
 	for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 		currXID = (it2->AD == _myAD) ? it2->HID : it2->AD;
 
 		if (networkTable.find(currXID) != networkTable.end()) {
+			// there is an entry for this neighbor in the network table already
+			// just update the cost to get there and set previous node to the one we are currently doing neighbors for
+			// FIXME: variable names are confusing here
+			// cost in the neighbor table is actually the link's cost which by default is 1
+			//  not the distance to that node from here which goes into the final cost.
 			networkTable[currXID].cost = it2->cost;
 			networkTable[currXID].prevNode = srcHID;
 
 		} else {
-			// We have an endhost
+			// We have an endhost or a router we haven't seen an LSA from yet
+			// make an entry for it in the network table and add a route to the source node to it
+
+			// create a neighbor entry for the source node
 			NeighborEntry neighbor;
 			neighbor.AD = _myAD;
 			neighbor.HID = srcHID;
 			neighbor.port = it2->port;
 			neighbor.cost = 1;
 
+			// create a network table entry for the new node
 			NodeStateEntry entry;
 			entry.ad = it2->AD;
 			entry.hid = it2->HID;
@@ -2069,11 +2108,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			entry.neighbor_list.push_back(neighbor);
 			entry.cost = neighbor.cost;
 			entry.prevNode = neighbor.HID;
-			memcpy(&entry.dag, &networkTable[srcHID].dag, sizeof(sockaddr_x));
-
-			// if (entry.ad == "") {
-			// 	entry.ad = _myAD;
-			// }
+			bzero(&entry.dag, sizeof(sockaddr_x));
 
 			networkTable[currXID] = entry;
 		}
@@ -2083,11 +2118,11 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	while (!unvisited.empty()) {
 		int minCost = 10000000;
 		string selectedHID;
+
 		// Select unvisited node with min cost
 		for (it1 = unvisited.begin(); it1 != unvisited.end(); ++it1) {
-			syslog(LOG_INFO, "it1 %s, %s", it1->second.ad.c_str(), it1->second.hid.c_str());
 			currXID = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
-			syslog(LOG_INFO, "CurrXID is %s, cost %d", currXID.c_str(), networkTable[currXID].cost);
+
 			if (networkTable[currXID].cost < minCost) {
 				minCost = networkTable[currXID].cost;
 				selectedHID = currXID;
@@ -2123,16 +2158,18 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	int hop_count;
 
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
+
+		// FIXME: this could also just check the checked flag
 		if (unvisited.find(it1->first) !=  unvisited.end()) { // the unreachable set
 			continue;
 		}
+
 		tempHID1 = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
 		if (tempHID1.find(string("SID")) != string::npos) {
 			// Skip SIDs on first pass
 			continue;
 		}
 		if (srcHID.compare(tempHID1) != 0) {
-printf("updating %s\n", srcHID.c_str());
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
@@ -2149,7 +2186,6 @@ printf("updating %s\n", srcHID.c_str());
 				// Find port of next hop
 				for (it2 = networkTable[srcHID].neighbor_list.begin(); it2 < networkTable[srcHID].neighbor_list.end(); it2++) {
 					if (((it2->AD == _myAD) ? it2->HID : it2->AD) == tempHID2) {
-printf("port = %d\n", it2->port);
 						routingTable[tempHID1].port = it2->port;
 					}
 				}
@@ -2157,7 +2193,6 @@ printf("port = %d\n", it2->port);
 		}
 	}
 
-printf("next loop\n");
 	for (it1 = networkTable.begin(); it1 != networkTable.end(); it1++) {
 		tempHID1 = (it1->second.ad == _myAD) ? it1->second.hid : it1->second.ad;
 		if (unvisited.find(it1->first) !=  unvisited.end()) { // the unreachable set
@@ -2169,7 +2204,6 @@ printf("next loop\n");
 		}
 		if (srcHID.compare(tempHID1) != 0) {
 
-printf("%s %s\n", srcHID.c_str(), tempHID1.c_str());
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
@@ -2201,7 +2235,7 @@ printf("%s %s\n", srcHID.c_str(), tempHID1.c_str());
 				}
 				if (!entryFound) {
 					// Delete SID entry from routingTable
-					printf("erasing???\n");
+
 					routingTable.erase(tempHID1);
 				}
 			}
@@ -2398,7 +2432,8 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 		}
 
 	} catch (std::exception e) {
-		printf("is this gonna work for bad data\n");
+		syslog(LOG_INFO, "invalid router message received\n");
+		return 0;
 	}
 
 	switch (msg.type()) {
@@ -2415,6 +2450,9 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 			rc = processInterdomainLSA(msg);
 			break;
 
+		case Xroute::HOST_JOIN_MSG:
+			rc = processHostRegister(msg.host_join());
+			break;
 
 		case Xroute::SID_MANAGE_KA_MSG:
 			rc = processServiceKeepAlive(msg.keep_alive());
@@ -2423,7 +2461,6 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 		//////////////////////////////////////////////////////////////////////
 		// ignore
 		case Xroute::CONFIG_MSG:
-		case Xroute::HOST_JOIN_MSG:
 			syslog(LOG_INFO, "controller received a config message");
 			break;
 
