@@ -253,7 +253,20 @@ void *stageCmd(void *socketid)
         say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
         if (strncmp(cmd, "stage", 5) == 0) {
             say("Receive a stage message: %s\n", cmd+6);
-            stageControl(sock, cmd + 6);
+
+            char cmd1[XIA_MAXBUF];
+			char * start, *end;
+			start = cmd;
+			while((end = strstr(start+6, "stage")) > 0){
+				n = end - start;
+				printf("n = %d\n", n);
+				strncpy(cmd1, start, end - start);
+				start = end;
+				*(cmd1+(end-start))=0;
+				say("Successfully devide command . CMD: %s\n",cmd1);
+				stageControl(sock, cmd1 + 6);
+			}
+            stageControl(sock, start + 6);
         }
     }
 
