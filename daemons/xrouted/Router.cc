@@ -136,7 +136,6 @@ void *Router::handler()
 	time_t nowt = time(NULL);
 	if (nowt - last_purge >= EXPIRE_TIME) {
 		last_purge = nowt;
-		//fprintf(stderr, "checking entry\n");
 		map<string, time_t>::iterator iter = timeStamp.begin();
 
 		while (iter != timeStamp.end()) {
@@ -152,7 +151,6 @@ void *Router::handler()
 
 	if (nowt - hello_last_purge >= HELLO_EXPIRE_TIME) {
 		hello_last_purge = nowt;
-		//fprintf(stderr, "checking hello entry\n");
 		map<string, time_t>::iterator iter = _hello_timeStamp.begin();
 
 		while (iter !=  _hello_timeStamp.end()) {
@@ -377,8 +375,6 @@ int Router::sendLSA()
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 
-//printf("send lsa size = %lu\n", _neighborTable.size());
-
 	map<std::string, NeighborEntry>::iterator it;
 	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
 		Xroute::NeighborEntry *n;
@@ -399,7 +395,6 @@ int Router::sendLSA()
 		n->set_port(it->second.port);
 	}
 
-//	printf("sending %s\n", msg.DebugString().c_str());
 	return sendMessage(&_controller_dag, msg);
 }
 
@@ -423,7 +418,6 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::TABLE_UPDATE_MSG:
-		printf("got update\n");
 			rc = processRoutingTable(msg);
 			break;
 
@@ -432,7 +426,6 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::SID_TABLE_UPDATE_MSG:
-		printf("got sid update\n");
 			processSidRoutingTable(msg);
 			break;
 
@@ -451,8 +444,6 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 		// We should never see these as they are meant for the controller!
 		case Xroute::LSA_MSG:
 			// FIXME: this can be no-op'd once flooding is turned on
-		printf("got lsa\n");
-
 			rc = processLSA(msg);
 			break;
 
@@ -597,7 +588,9 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 
 	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
-	printf("\n\n\nProcessConfig\n%s\n%s\n\n", _myAD.c_str(), msg.controller_dag().c_str());
+	// the default AD & HID got set when xnetjoin setup our AD, reset them to fallback
+	_xr.setRoute("AD:-", FALLBACK, "", 0);
+	_xr.setRoute("HID:-", FALLBACK, "", 0);
 
 	postJoin();
 	return 1;
@@ -626,7 +619,6 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 		neighborSID = sid.to_string();
 		neighbor.HID = neighborSID;
 
-		printf("has sid\n");
 	} else {
 		neighbor.HID = neighborHID;
 	}
@@ -664,15 +656,8 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	_networkTable[_myHID] = entry;
 
-//	printf("network table size = %lu\n", _networkTable.size());
-//	printf("neighbor table size = %lu\n", _neighborTable.size());
-//	printf("entry.neighborlist size = %lu\n", entry.neighbor_list.size());
-
-
 	// FIXME: hack until xnetjd deals with hid hello routes
 	_xr.setRoute(neighborHID, iface, neighborHID, flags);
-
-
 
 	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
@@ -719,8 +704,6 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
 	Xroute::TableUpdateMsg msg = xmsg.table_update();
 
-printf("processRoutingTable 1\n");
-
 	Xroute::XID fa = msg.from().ad();
 	Xroute::XID fh = msg.from().hid();
 	Xroute::XID ta = msg.to().ad();
@@ -736,16 +719,9 @@ printf("processRoutingTable 1\n");
 		return 1;
 	}
 
-printf("processRoutingTable 2\n");
-//	// FIXME: we shoudn't need this once flooding is turned on
-//	if ((dstAD != _myAD) || (dstHID != _myHID)) {
-//		return sendMessage(_sock, &_ddag, xmsg);
-//	}
-
 	uint32_t numEntries = msg.routes_size();
 
 	for (uint i = 0; i < numEntries; i++) {
-printf("processRoutingTable 3\n");
 
 		Xroute::TableEntry e = msg.routes(i);
 		string xid     = Node(e.xid().type(),      e.xid().id().c_str(),      0).to_string();
@@ -763,5 +739,6 @@ printf("processRoutingTable 3\n");
 
 		_timeStamp[xid] = time(NULL);
 	}
+
 	return 1;
 }
