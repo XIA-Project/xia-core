@@ -51,6 +51,15 @@ class NetjoinHandshakeOne(object):
             # Get the router credential from file
             router_cred = self.get_router_creds()
             if router_cred is not None:
+                # Verify cred matches network being advertised
+                ap_net_id = self.conf.raw_hid_to_hex(
+                        self.session.beacon.xip_netid)
+                cred_net_id = router_cred.adonly.ad
+                if ap_net_id != cred_net_id:
+                    logging.error("AP advertized: {} and our cred is {}".format(
+                        ap_net_id, cred_net_id))
+                else:
+                    logging.info("We have creds to join this network")
                 core.router_credentials.CopyFrom(router_cred)
             else:
                 core.router_credentials.null.SetInParent()

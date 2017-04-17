@@ -37,7 +37,7 @@ class CredMgr(object):
             rcredfile.write(router_cred.SerializeToString())
 
     def read_router_cred(self, rcredfilepath):
-        router_cred = get_router_cred(rcredfilepath)
+        router_cred = self.get_router_cred(rcredfilepath)
         if router_cred is not None:
             print protobuf_text_format.MessageToString(router_cred)
 
