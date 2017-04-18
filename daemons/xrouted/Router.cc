@@ -402,18 +402,22 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 	int rc = 0;
 	Xroute::XrouteMsg msg;
 
-	// validate the protobuf
-	if (!msg.ParseFromString(msg_str)) {
-		syslog(LOG_WARNING, "illegal packet received");
-		return -1;
-	} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
-		syslog(LOG_WARNING, "invalid version # received");
-		return -1;
+	try {
+		if (!msg.ParseFromString(msg_str)) {
+			syslog(LOG_WARNING, "illegal packet received");
+			return -1;
+		} else if (msg.version() != Xroute::XROUTE_PROTO_VERSION) {
+			syslog(LOG_WARNING, "invalid version # received");
+			return -1;
+		}
+
+	} catch (std::exception e) {
+		syslog(LOG_INFO, "invalid router message received\n");
+		return 0;
 	}
 
 	switch (msg.type()) {
 		case Xroute::HELLO_MSG:
-			// process the incoming Hello message
 			rc = processHello(msg.hello(), iface);
 			break;
 
@@ -429,13 +433,13 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			rc = processHostLeave(msg.host_leave());
 			break;
 
-		case Xroute::CONFIG_MSG:
 		// FIXME: validate these came on control interface?
 		case Xroute::HOST_JOIN_MSG:
 			// process the incoming host-register message
 			rc = processHostRegister(msg.host_join());
 			break;
 
+		case Xroute::CONFIG_MSG:
 			rc = processConfig(msg.config());
 			break;
 
@@ -680,5 +684,4 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 
 	return 1;
 }
-
 
