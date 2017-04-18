@@ -11,10 +11,12 @@
 // FIXME:
 // import sid routehandler?
 // does the dual router flag serve any purpose?
-// implement host leave functionality so that all routers correctly remove the host
 // implement security!!!
-//
 
+#define BUFFER_SIZE 16384	// read buffer
+
+
+// purge stale entries from our tables
 void Router::purge()
 {
 	// initialize if this is first time in
@@ -65,23 +67,7 @@ void Router::purge()
 	}
 }
 
-void Router::sendMessages()
-{
-	struct timeval now;
-	gettimeofday(&now, NULL);
-
-	if (timercmp(&now, &h_fire, >=)) {
-		sendHello();
-		timeradd(&now, &h_freq, &h_fire);
-	}
-	if (timercmp(&now, &l_fire, >=)) {
-		sendLSA();
-		timeradd(&now, &l_freq, &l_fire);
-	}
-}
-
-#define BUFFER_SIZE 16384
-
+// Read in a packet from the network or control interface
 int Router::readMessage(char *recv_message, int *iface)
 {
 	int rc = -1;
@@ -170,6 +156,7 @@ int Router::readMessage(char *recv_message, int *iface)
 	return rc;
 }
 
+
 void *Router::handler()
 {
 	int rc;
@@ -187,12 +174,25 @@ void *Router::handler()
 		// once we are initialized, purge any stale routes
 		//  and start sending hello's and lsa's
 		purge();
-		sendMessages();
+
+		struct timeval now;
+		gettimeofday(&now, NULL);
+
+		if (timercmp(&now, &h_fire, >=)) {
+			sendHello();
+			timeradd(&now, &h_freq, &h_fire);
+		}
+		if (timercmp(&now, &l_fire, >=)) {
+			sendLSA();
+			timeradd(&now, &l_freq, &l_fire);
+		}
 	}
 
 	return NULL;
 }
 
+
+// now that we've joined the network, set up our dags and sockets
 int Router::postJoin()
 {
 	char s[MAX_DAG_SIZE];
@@ -317,6 +317,8 @@ int Router::init()
 	return 0;
 }
 
+// send hello on braodcast interface
+// will eventually go away when netjoin does this for us
 int Router::sendHello()
 {
 	// FIXME: removed sending SIDs for now, do we need to in the future???
@@ -346,7 +348,10 @@ int Router::sendHello()
 	return sendBroadcastMessage(msg);
 }
 
-// send LinkStateAdvertisement message (flooding)
+
+// send LinkStateAdvertisement message
+// messages will flood eventually, and will then become unicast
+// once the network routes get set up
 int Router::sendLSA()
 {
 	Node n_ad(_myAD);
@@ -391,11 +396,13 @@ int Router::sendLSA()
 	return sendMessage(&_controller_dag, msg);
 }
 
+// handle the incoming messages
 int Router::processMsg(std::string msg_str, uint32_t iface)
 {
 	int rc = 0;
 	Xroute::XrouteMsg msg;
 
+	// validate the protobuf
 	if (!msg.ParseFromString(msg_str)) {
 		syslog(LOG_WARNING, "illegal packet received");
 		return -1;
@@ -418,17 +425,17 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			processSidRoutingTable(msg);
 			break;
 
+		case Xroute::HOST_LEAVE_MSG:
+			rc = processHostLeave(msg.host_leave());
+			break;
+
+		case Xroute::CONFIG_MSG:
 		// FIXME: validate these came on control interface?
 		case Xroute::HOST_JOIN_MSG:
 			// process the incoming host-register message
 			rc = processHostRegister(msg.host_join());
 			break;
 
-		case Xroute::HOST_LEAVE_MSG:
-			rc = processHostLeave(msg.host_leave());
-			break;
-
-		case Xroute::CONFIG_MSG:
 			rc = processConfig(msg.config());
 			break;
 
@@ -439,6 +446,7 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 
 	return rc;
 }
+
 
 int Router::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
@@ -503,6 +511,7 @@ int Router::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 	return rc;
 }
 
+
 int Router::processHostLeave(const Xroute::HostLeaveMsg& msg)
 {
 	// FIXME: figure out how we do this
@@ -517,6 +526,7 @@ int Router::processHostLeave(const Xroute::HostLeaveMsg& msg)
 	_xr.delRoute(msg.hid());
 	return 1;
 }
+
 
 int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 {
@@ -539,18 +549,6 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
 
-	//  update my entry in the networkTable
-	NodeStateEntry entry;
-	entry.hid = _myHID;
-	entry.ad = _myAD;
-
-	// fill my neighbors into my entry in the networkTable
-	NeighborTable::iterator it;
-	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
-		entry.neighbor_list.push_back(it->second);
-
-	_networkTable[_myHID] = entry;
-
 	// update the host entry in (click-side) HID table
 	//syslog(LOG_INFO, "Routing table entry: interface=%d, host=%s\n", msg.interface(), hid.c_str());
 	if ((rc = _xr.setRoute(neighbor.HID, neighbor.port, neighbor.HID, flags)) != 0) {
@@ -561,6 +559,7 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 	return 1;
 }
+
 
 int Router::processConfig(const Xroute::ConfigMsg &msg)
 {
@@ -575,6 +574,7 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	postJoin();
 	return 1;
 }
+
 
 int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
@@ -629,8 +629,6 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
 		entry.neighbor_list.push_back(it->second);
 
-	_networkTable[_myHID] = entry;
-
 	// FIXME: hack until xnetjd deals with hid hello routes
 	_xr.setRoute(neighborHID, iface, neighborHID, flags);
 
@@ -639,41 +637,7 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	return 1;
 }
 
-int Router::processLSA(const Xroute::XrouteMsg& msg)
-{
-	// FIXME: we still need to reflood until the FID logic is switched out of broadcast mode
 
-	string neighborAD, neighborHID;
-	string srcAD, srcHID;
-
-
-// FIXME: we should never get here!
-
-	const Xroute::LSAMsg& lsa = msg.lsa();
-
-	Xroute::XID a = lsa.node().ad();
-	Xroute::XID h = lsa.node().hid();
-
-	Node  ad(a.type(), a.id().c_str(), 0);
-	Node hid(h.type(), h.id().c_str(), 0);
-
-	srcAD  = ad.to_string();
-	srcHID = hid.to_string();
-
-	syslog(LOG_INFO, "Process-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
-
-	if (srcHID.compare(_myHID) == 0) {
-		// skip if from me
-		return 1;
-	}
-
-	return 1;
-//	syslog(LOG_INFO, "Forward-LSA: %s %s", srcAD.c_str(), srcHID.c_str());
-//	return sendMessage(_sock, &_ddag, msg);
-}
-
-
-// process a control message
 int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 {
 	Xroute::TableUpdateMsg msg = xmsg.table_update();
@@ -716,3 +680,5 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 
 	return 1;
 }
+
+

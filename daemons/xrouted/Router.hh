@@ -28,7 +28,6 @@ protected:
 	int sendHello();
 	int sendLSA();
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
-	int processLSA(const Xroute::XrouteMsg& msg);
 
 	int processConfig(const Xroute::ConfigMsg &msg);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
@@ -37,25 +36,31 @@ protected:
 	int processRoutingTable(const Xroute::XrouteMsg& msg);
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
 
+	// other stuff
 	int readMessage(char *recv_message, int *iface);
-	void sendMessages();
 	int postJoin();
 	void purge();
 
+protected:
+	// local addr, these should change to nodes
 	std::string _myAD;
 	std::string _myHID;
 
+	// socket and dag we recv route messages on
 	int _router_sock;
 	sockaddr_x _router_dag;
 
+	// true once we are configured to be on the network
 	bool _joined;
 
-	NeighborTable _neighborTable;	// neighbor nodes I've discovered
-	NetworkTable  _networkTable;	// Cnodes given to me by the controller
+	// neighbor nodes I've discovered
+	NeighborTable _neighborTable;
 
+	// our route table flags we send to others
 	uint32_t _flags;
 
 	// FIXME: improve these guys
+	// track when to fire off lsa and hello msgs
 	struct timeval h_freq, h_fire;
 	struct timeval l_freq, l_fire;
 
