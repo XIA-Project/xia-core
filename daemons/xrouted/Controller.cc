@@ -188,7 +188,6 @@ void *Controller::handler()
 				last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
 				_neighborTable.erase(iter2++);
-				_num_neighbors -= 1;
 			} else {
 				++iter2;
 			}
@@ -351,7 +350,6 @@ int Controller::init()
 		exit(-1);
 	}
 
-	_num_neighbors = 0; // number of neighbor routers
 	_lsa_seq = rand() % MAX_SEQNUM;	// LSA sequence number of this router
 	_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 	_calc_dijstra_ticks = -8;
@@ -683,8 +681,6 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		return 1;
 	}
 
-	entry.num_neighbors = msg.neighbors_size();
-
 	// See if this LSA comes from AD with dualRouter
 	if (msg.flags() & F_IP_GATEWAY) {
 		_dual_router_AD = entry.ad;
@@ -693,7 +689,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 	//syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), numNeighbors);
 	entry.timestamp = time(NULL);
 
-	for (uint32_t i = 0; i < entry.num_neighbors; i++) {
+	for (int i = 0; i < msg.neighbors_size(); i++) {
 		NeighborEntry neighbor;
 
 		Xroute::NeighborEntry n = msg.neighbors(i);
@@ -1759,13 +1755,11 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
-	_num_neighbors = _neighborTable.size();
 
 	//  update my entry in the networkTable
 	NodeStateEntry entry;
 	entry.hid = _myHID;
 	entry.ad = _myAD;
-	entry.num_neighbors = _num_neighbors;
 
 	// fill my neighbors into my entry in the networkTable
 	std::map<std::string, NeighborEntry>::iterator it;
@@ -1818,13 +1812,11 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);
 	_neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
-	_num_neighbors = _neighborTable.size();
 
 	// Update network table
 	NodeStateEntry entry;
 	entry.hid = _myHID;
 	entry.ad = _myAD;
-	entry.num_neighbors = _num_neighbors;
 
 	// Add neighbors to network table entry
 	std::map<std::string, NeighborEntry>::iterator it;
@@ -1884,8 +1876,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	entry.hid = srcHID;
 	bzero(&entry.dag, sizeof(sockaddr_x));
 	memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
-
-	entry.num_neighbors = numNeighbors;
 
 	for (uint32_t i = 0; i < numNeighbors; i++) {
 		NeighborEntry neighbor;
@@ -1976,7 +1966,6 @@ int Controller::extractNeighborADs(void)
 	NodeStateEntry entry;
 	entry.ad = _myAD;
 	entry.hid = _myAD;
-	entry.num_neighbors = _ADNeighborTable.size();
 	entry.timestamp = time(NULL);
 
 	// Add neighbors to network table entry
@@ -2038,7 +2027,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 	it1 = networkTable.begin();
 	while (it1 != networkTable.end()) {
 
-		if (it1->second.num_neighbors == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
+		if (it1->second.neighbor_list.size() == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
 			networkTable.erase(it1++);
 		} else {
 			//syslog(LOG_DEBUG, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
@@ -2089,7 +2078,6 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			NodeStateEntry entry;
 			entry.ad = it2->AD;
 			entry.hid = it2->HID;
-			entry.num_neighbors = 1;
 			entry.neighbor_list.push_back(neighbor);
 			entry.cost = neighbor.cost;
 			entry.prevNode = neighbor.HID;
