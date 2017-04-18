@@ -187,6 +187,7 @@ extern void debug(int sock);
 
 const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
 int xia_pton(int af, const char *src, sockaddr_x *dst);
+size_t sockaddr_size(const sockaddr_x *s);
 
 #ifdef __cplusplus
 }
