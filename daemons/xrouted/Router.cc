@@ -9,29 +9,60 @@
 #include "dagaddr.hpp"
 
 // FIXME:
-// move setup info from constructor into a method and call it from run
-// pass info between modules
-// make a routercore class for xiarouter and passing info between modules
-// what is the difference between the purge and purge host loops?
 // import sid routehandler?
 // does the dual router flag serve any purpose?
-// should we support an old style (controllerless) route daemon?
+// implement host leave functionality so that all routers correctly remove the host
+// implement security!!!
+//
 
-// FIXME: on new source tree
-// modify XreradLocalAddr to not require a 4id
-// make the xiarouter return a map instead of vector
-
-
-// FIXME: put this somewhere common
-static uint32_t sockaddr_size(const sockaddr_x *s)
+void Router::purge()
 {
-	// max possible size
-	size_t len = sizeof(sockaddr_x);
+	// initialize if this is first time in
+	if (_last_route_purge == 0) {
+		_last_route_purge = time(NULL);
+		_last_neighbor_purge = time(NULL);
+	}
 
-	// subtract the space occupied by unallocated nodes
-	len -= (CLICK_XIA_ADDR_MAX_NODES - s->sx_addr.s_count) * sizeof(node_t);
+	time_t nowt = time(NULL);
 
-	return len;
+	// walk list of routes given to us by the controller
+	//  and delete any that are stale
+	if (nowt - _last_route_purge >= ROUTE_EXPIRE_TIME) {
+		_last_route_purge = nowt;
+
+		TimestampList::iterator iter = _route_timestamp.begin();
+		while (iter != _route_timestamp.end()) {
+
+			if (nowt - iter->second >= ROUTE_EXPIRE_TIME) {
+				syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
+				_xr.delRoute(iter->first);
+				_route_timestamp.erase(iter++);
+
+			} else {
+				++iter;
+			}
+		}
+	}
+
+	// walk list of neighbors we've discovered via hello
+	//  and delete any that are stale
+	if (nowt - _last_neighbor_purge >= NEIGHBOR_EXPIRE_TIME) {
+		_last_neighbor_purge = nowt;
+
+		TimestampList::iterator iter = _neighbor_timestamp.begin();
+		while (iter !=  _neighbor_timestamp.end()) {
+
+			if (nowt - iter->second >= NEIGHBOR_EXPIRE_TIME) {
+				syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
+				_xr.delRoute(iter->first);
+				_neighborTable.erase(iter->first);
+				_neighbor_timestamp.erase(iter++);
+
+			} else {
+				++iter;
+			}
+		}
+	}
 }
 
 void *Router::handler()
@@ -41,13 +72,8 @@ void *Router::handler()
 	sockaddr_x theirDAG;
 	struct timespec tspec;
 	vector<string> routers;
-	time_t last_purge, hello_last_purge;
 	int iface;
-
 	struct timeval now;
-
-	last_purge = hello_last_purge = time(NULL);
-
 	struct pollfd pfd[3];
 
 	bzero(pfd, sizeof(pfd));
@@ -68,14 +94,14 @@ void *Router::handler()
 	if (rc > 0) {
 			int sock = -1;
 
-		for (int i = 0; i < 3; i++) {
+		for (int i = 0; i < num_pfds; i++) {
 			if (pfd[i].revents & POLLIN) {
 				sock = pfd[i].fd;
 				break;
 			}
 		}
 
-		memset(&recv_message[0], 0, sizeof(recv_message));
+		bzero(recv_message, sizeof(recv_message));
 
 		if (sock <= 0) {
 			// something weird happened
@@ -133,52 +159,6 @@ void *Router::handler()
 		return 0;
 	}
 
-	time_t nowt = time(NULL);
-	if (nowt - last_purge >= EXPIRE_TIME) {
-		last_purge = nowt;
-		map<string, time_t>::iterator iter = timeStamp.begin();
-
-		while (iter != timeStamp.end()) {
-			if (nowt - iter->second >= EXPIRE_TIME) {
-				_xr.delRoute(iter->first);
-				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-				timeStamp.erase(iter++);
-			} else {
-				++iter;
-			}
-		}
-	}
-
-	if (nowt - hello_last_purge >= HELLO_EXPIRE_TIME) {
-		hello_last_purge = nowt;
-		map<string, time_t>::iterator iter = _hello_timeStamp.begin();
-
-		while (iter !=  _hello_timeStamp.end()) {
-			if (nowt - iter->second >= HELLO_EXPIRE_TIME) {
-				_xr.delRoute(iter->first);
-				syslog(LOG_INFO, "purging hello route for : %s", iter->first.c_str());
-
-
-				// Update network table
-
-				// remove the item from neighbor_list
-				_networkTable[_myHID].neighbor_list.erase(
-					std::remove(_networkTable[_myHID].neighbor_list.begin(), _networkTable[_myHID].neighbor_list.end(), _neighborTable[iter->first]),
-					_networkTable[_myHID].neighbor_list.end());
-
-				if (_neighborTable.erase(iter->first) < 1) {
-					 syslog(LOG_INFO, "failed to erase %s from neighbors", iter->first.c_str());
-				}
-				_num_neighbors = _neighborTable.size();
-				_networkTable[_myHID].num_neighbors = _num_neighbors;
-
-				// remove the item and go on
-				_hello_timeStamp.erase(iter++);
-			} else {
-				++iter;
-			}
-		}
-	}
 
 	gettimeofday(&now, NULL);
 	if (timercmp(&now, &h_fire, >=)) {
@@ -296,10 +276,6 @@ int Router::postJoin()
 int Router::init()
 {
 	_joined = false; 				// we're not part of a network yet
-	_num_neighbors = 0;				// number of seen neighbor routers
-	_lsa_seq = rand() % MAX_SEQNUM;	// make our initial LSA sequence numbe
-
-	_ctl_seq = 0;	// LSA sequence number of this router
 
 	// FIXME: figure out what the correct type of router we are
 	_flags = F_EDGE_ROUTER;
@@ -310,6 +286,9 @@ int Router::init()
 	h_freq.tv_usec = 100000;
 	l_freq.tv_sec = 0;
 	l_freq.tv_usec = 300000;
+
+	_last_route_purge = 0;
+	_last_neighbor_purge = 0;
 
 	gettimeofday(&now, NULL);
 	timeradd(&now, &h_freq, &h_fire);
@@ -350,11 +329,6 @@ int Router::sendHello()
 // send LinkStateAdvertisement message (flooding)
 int Router::sendLSA()
 {
-	// don't bother if our neighbor table is empty
-	if (_neighborTable.size() == 0) {
-		return 1;
-	}
-
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
 
@@ -374,7 +348,7 @@ int Router::sendLSA()
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 
-	map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for ( it=_neighborTable.begin() ; it != _neighborTable.end(); it++ ) {
 		Xroute::NeighborEntry *n;
 
@@ -420,42 +394,22 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			rc = processRoutingTable(msg);
 			break;
 
-		case Xroute::HOST_LEAVE_MSG:
-			// FIXME: should this move to the controller?
-			break;
-
 		case Xroute::SID_TABLE_UPDATE_MSG:
 			processSidRoutingTable(msg);
 			break;
 
-		//////////////////////////////////////////////////////////////////////
-		// FIXME: move these to the control interface
+		// FIXME: validate these came on control interface?
 		case Xroute::HOST_JOIN_MSG:
 			// process the incoming host-register message
 			rc = processHostRegister(msg.host_join());
 			break;
 
+		case Xroute::HOST_LEAVE_MSG:
+			rc = processHostLeave(msg.host_leave());
+			break;
+
 		case Xroute::CONFIG_MSG:
 			rc = processConfig(msg.config());
-			break;
-
-		//////////////////////////////////////////////////////////////////////
-		// We should never see these as they are meant for the controller!
-		case Xroute::LSA_MSG:
-			// FIXME: this can be no-op'd once flooding is turned on
-			rc = processLSA(msg);
-			break;
-
-		// not sure all of these below were ever implemented
-		case Xroute::GLOBAL_LSA_MSG:
-		case Xroute::SID_DISCOVERY_MSG:
-		case Xroute::SID_MANAGE_KA_MSG:
-		case Xroute::SID_RE_DISCOVERY_MSG:
-		case Xroute::AD_PATH_STATE_PING_MSG:
-		case Xroute::AD_PATH_STATE_PONG_MSG:
-		case Xroute::SID_DECISION_QUERY_MSG:
-		case Xroute::SID_DECISION_ANSWER_MSG:
-			syslog(LOG_INFO, "this is a controller message");
 			break;
 
 		default:
@@ -484,18 +438,12 @@ int Router::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 		return 1;
 	}
 
-
-//	// FIXME: we shoudn't need this once flooding is turned on
-//	if (dstHID != _myHID) {
-//		return sendMessage(_sock, &_ddag, xmsg);
-//	}
-
-	std::map<std::string, XIARouteEntry> xrt;
+	XIARouteTable xrt;
 	_xr.getRoutes("AD", xrt);
 
 	// change vector to map AD:RouteEntry for faster lookup
-	std::map<std::string, XIARouteEntry> ADlookup;
-	map<std::string, XIARouteEntry>::iterator ir;
+	XIARouteTable ADlookup;
+	XIARouteTable::iterator ir;
 	for (ir = xrt.begin(); ir != xrt.end(); ++ir) {
 		ADlookup[ir->second.xid] = ir->second;
 	}
@@ -535,6 +483,21 @@ int Router::processSidRoutingTable(const Xroute::XrouteMsg& xmsg)
 	return rc;
 }
 
+int Router::processHostLeave(const Xroute::HostLeaveMsg& msg)
+{
+	// FIXME: figure out how we do this
+	// The controller and every router in the AD have to know the host
+	// left so that they can remove it fromm the routing table.
+	// there's an additional problem if the host migrated to a new location
+	// in the same AD as we need to telll everyone except the new router
+	// that the host is gone
+	// the new router will advertise the host, but if it's not removed, some
+	// routers will get routes to the host's old location
+
+	_xr.delRoute(msg.hid());
+	return 1;
+}
+
 int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 {
 	int rc;
@@ -555,16 +518,14 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
-	_num_neighbors = _neighborTable.size();
 
 	//  update my entry in the networkTable
 	NodeStateEntry entry;
 	entry.hid = _myHID;
 	entry.ad = _myAD;
-	entry.num_neighbors = _num_neighbors;
 
 	// fill my neighbors into my entry in the networkTable
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
 		entry.neighbor_list.push_back(it->second);
 
@@ -576,7 +537,7 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 		syslog(LOG_ERR, "unable to set host route: %s (%d)", neighbor.HID.c_str(), rc);
 	}
 
-	_hello_timeStamp[neighbor.HID] = time(NULL);
+	_neighbor_timestamp[neighbor.HID] = time(NULL);
 
 	return 1;
 }
@@ -635,18 +596,16 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);
 	_neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
-	_num_neighbors = _neighborTable.size();
 
-	_hello_timeStamp[internal ? neighbor.HID : neighbor.AD] = time(NULL);
+	_neighbor_timestamp[internal ? neighbor.HID : neighbor.AD] = time(NULL);
 
 	// Update network table
 	NodeStateEntry entry;
 	entry.hid = _myHID;
 	entry.ad = _myAD;
-	entry.num_neighbors = _num_neighbors;
 
 	// Add neighbors to network table entry
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
 		entry.neighbor_list.push_back(it->second);
 
@@ -733,7 +692,7 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 		if ((rc = _xr.setRoute(xid, port, nextHop, flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d: %s, nextHop: %s, port: %d, flags %d", rc, xid.c_str(), nextHop.c_str(), port, flags);
 
-		_timeStamp[xid] = time(NULL);
+		_route_timestamp[xid] = time(NULL);
 	}
 
 	return 1;
