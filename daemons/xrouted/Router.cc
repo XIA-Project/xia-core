@@ -23,17 +23,17 @@ void Router::purge()
 		_last_neighbor_purge = time(NULL);
 	}
 
-	time_t nowt = time(NULL);
+	time_t now = time(NULL);
 
 	// walk list of routes given to us by the controller
 	//  and delete any that are stale
-	if (nowt - _last_route_purge >= ROUTE_EXPIRE_TIME) {
-		_last_route_purge = nowt;
+	if (now - _last_route_purge >= ROUTE_EXPIRE_TIME) {
+		_last_route_purge = now;
 
 		TimestampList::iterator iter = _route_timestamp.begin();
 		while (iter != _route_timestamp.end()) {
 
-			if (nowt - iter->second >= ROUTE_EXPIRE_TIME) {
+			if (now - iter->second >= ROUTE_EXPIRE_TIME) {
 				syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
 				_xr.delRoute(iter->first);
 				_route_timestamp.erase(iter++);
@@ -46,13 +46,13 @@ void Router::purge()
 
 	// walk list of neighbors we've discovered via hello
 	//  and delete any that are stale
-	if (nowt - _last_neighbor_purge >= NEIGHBOR_EXPIRE_TIME) {
-		_last_neighbor_purge = nowt;
+	if (now - _last_neighbor_purge >= NEIGHBOR_EXPIRE_TIME) {
+		_last_neighbor_purge = now;
 
 		TimestampList::iterator iter = _neighbor_timestamp.begin();
 		while (iter !=  _neighbor_timestamp.end()) {
 
-			if (nowt - iter->second >= NEIGHBOR_EXPIRE_TIME) {
+			if (now - iter->second >= NEIGHBOR_EXPIRE_TIME) {
 				syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
 				_xr.delRoute(iter->first);
 				_neighborTable.erase(iter->first);
@@ -65,16 +65,29 @@ void Router::purge()
 	}
 }
 
-void *Router::handler()
+void Router::sendMessages()
 {
-	int rc;
-	char recv_message[10240];
-	sockaddr_x theirDAG;
-	struct timespec tspec;
-	vector<string> routers;
-	int iface;
 	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	if (timercmp(&now, &h_fire, >=)) {
+		sendHello();
+		timeradd(&now, &h_freq, &h_fire);
+	}
+	if (timercmp(&now, &l_fire, >=)) {
+		sendLSA();
+		timeradd(&now, &l_freq, &l_fire);
+	}
+}
+
+#define BUFFER_SIZE 16384
+
+int Router::readMessage(char *recv_message, int *iface)
+{
+	int rc = -1;
+	sockaddr_x theirDAG;
 	struct pollfd pfd[3];
+	struct timespec tspec;
 
 	bzero(pfd, sizeof(pfd));
 	pfd[0].fd = _local_sock;
@@ -101,18 +114,21 @@ void *Router::handler()
 			}
 		}
 
-		bzero(recv_message, sizeof(recv_message));
+		bzero(recv_message, BUFFER_SIZE);
 
 		if (sock <= 0) {
 			// something weird happened
 			return 0;
 
 		} else if (sock == _local_sock) {
+			// it's  a normal UDP socket
 			iface = 0;
-			if ((rc = recvfrom(sock, recv_message, sizeof(recv_message), 0, NULL, NULL)) < 0) {
+			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, NULL, NULL)) < 0) {
 				syslog(LOG_WARNING, "local message receive error");
 			}
 		} else {
+			// it's an Xsocket, use Xrecvmsg to get interface message came in on
+
 			struct msghdr mh;
 			struct iovec iov;
 			struct in_pktinfo pi;
@@ -121,7 +137,7 @@ void *Router::handler()
 			char cbuf[CMSG_SPACE(sizeof pi)];
 
 			iov.iov_base = recv_message;
-			iov.iov_len = sizeof(recv_message);
+			iov.iov_len = BUFFER_SIZE;
 
 			mh.msg_name = &theirDAG;
 			mh.msg_namelen = sizeof(theirDAG);
@@ -144,33 +160,37 @@ void *Router::handler()
 				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
 					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
 						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-						iface = pinfo->ipi_ifindex;
+						*iface = pinfo->ipi_ifindex;
 					}
 				}
 			}
 		}
-
-		if (rc > 0) {
-			processMsg(string(recv_message, rc), iface);
-		}
 	}
 
-	if (!_joined) {
-		return 0;
+	return rc;
+}
+
+void *Router::handler()
+{
+	int rc;
+	char recv_message[BUFFER_SIZE];
+	vector<string> routers;
+	int iface;
+
+	// get the next incoming message
+	if ((rc = readMessage(recv_message, &iface)) > 0) {
+		processMsg(string(recv_message, rc), iface);
 	}
 
 
-	gettimeofday(&now, NULL);
-	if (timercmp(&now, &h_fire, >=)) {
-		sendHello();
-		timeradd(&now, &h_freq, &h_fire);
-	}
-	if (timercmp(&now, &l_fire, >=)) {
-		sendLSA();
-		timeradd(&now, &l_freq, &l_fire);
+	if (_joined) {
+		// once we are initialized, purge any stale routes
+		//  and start sending hello's and lsa's
+		purge();
+		sendMessages();
 	}
 
-	return 0;
+	return NULL;
 }
 
 int Router::postJoin()
@@ -628,7 +648,6 @@ int Router::processLSA(const Xroute::XrouteMsg& msg)
 
 
 // FIXME: we should never get here!
-printf("processLSA: %s\n", msg.DebugString().c_str());
 
 	const Xroute::LSAMsg& lsa = msg.lsa();
 

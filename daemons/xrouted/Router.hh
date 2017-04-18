@@ -37,6 +37,8 @@ protected:
 	int processRoutingTable(const Xroute::XrouteMsg& msg);
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
 
+	int readMessage(char *recv_message, int *iface);
+	void sendMessages();
 	int postJoin();
 	void purge();
 
