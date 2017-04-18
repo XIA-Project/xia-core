@@ -242,7 +242,7 @@ void *stageCmd(void *socketid)
         }
         if (strncmp(cmd, "xping", 5) == 0) {
             say("Xping to %s\n", cmd);
-            int rtt = getRTT(cmd);
+            int rtt = getRTT(cmd +6);
             sprintf(cmd, "rtt %d", rtt);
             say("Xping Response: %s\n", cmd);
             if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
