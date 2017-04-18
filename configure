@@ -58,7 +58,7 @@ LD=mips-linux-g++
 CFLAGS=$CFLAGS -Wall -Wextra -Wno-strict-aliasing -Wno-unused-parameter -march=24kc -fomit-frame-pointer -fPIC -pipe -fno-caller-saves -I\$(XINC) -I\$(MIPSINCDIR) -I\$(MIPSPYINCDIR)
 CXXFLAGS=\$(CFLAGS)
 
-LDFLAGS=-L\$(MIPSLIBDIR) -lpthread
+LDFLAGS=-L\$(MIPSLIBDIR) -lpthread -Wl,-rpath,\$(APIDIR)/lib
 
 PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
 PYINCLUDES=-I\$(MIPSPYINCDIR)
@@ -85,7 +85,7 @@ CC=g++
 LD=g++
 CFLAGS=$CFLAGS -I\$(XINC)
 CXXFLAGS=$CFLAGS
-LDFLAGS=-lpthread
+LDFLAGS=-lpthread -Wl,-rpath,\$(APIDIR)/lib
 LIBS=\$(XLIB)/libxcache.so \$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
 PYLDFLAGS=`python-config --ldflags`
 PYINCLUDES=`python-config --includes`

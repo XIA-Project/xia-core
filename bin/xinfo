@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# grab every bit of state about XIA that we can find
+#
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+capture all XIA system info to a file
+
+options:
+  -h, --help    display this help
+  -v, --version display the version number
+sources:
+  list of running XIA processes
+
+  syslog entries from click and the XIA daemons
+
+  list of network interfaces
+
+  output from xdag, log, xroute, xnetstat, & psx commands
+
+  config files from etc & etc/click
+
+  list of files in the key directory
+
+  list of cached chunks
+
+output:
+  xia-<hostname>-<date>.log
+EOH
+	exit 0
+
+elif [ "$1" == "-v" ] || [ "$1" == "--version" ]; then
+	echo "xinfo 1.0"
+	exit 0
+fi
+
+
+outfile="xia-$(hostname -s)-$(date +%Y-%m-%d).log"
+exec >$outfile
+exec 2>&1
+echo "XIA Information for $(hostname -s)"
+echo "generated on $(date)"
+
+
+# find the root of the XIA tree.
+# requires script to live in the bin directory
+XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+
+# XIA command
+scmds=" \
+	xdag \
+	xlog \
+	xroute \
+	xnetstat \
+	psx
+	"
+
+
+# XIA config and build files
+files=" \
+	etc/click/router.click \
+	etc/click/host.click \
+	etc/address.conf \
+	etc/nodes.conf \
+	etc/resolv.conf \
+	etc/xcache.ini \
+	etc/xids \
+	xia.mk
+	"
+
+
+
+# print a fancy header
+header () {
+	local lchar="="
+	local msg=""
+	local max=100
+
+	[ -n "$1" ] && msg="$*"
+
+	dashes=$(expr $max - ${#msg} - 7)
+
+	printf "\n\n\n===[ %s ]" "$msg"
+	printf "%0.s=" $(seq 1 $dashes)
+	printf "\n"
+}
+
+
+# check the processes
+header xianet
+$XIADIR/bin/xianet check
+
+# run the list of commands
+for c in $cmds; do
+	header $c
+	$XIADIR/bin/$c
+done
+
+# get the live network adapters
+header "ifconfig"
+ifconfig
+
+# get all network adapters
+header "ifconfig -a"
+ifconfig -a
+
+# print out the XIA config files
+for f in $files; do
+	if [ -e $XIADIR/$f ]; then
+		header $f
+		cat $XIADIR/$f
+	fi
+done
+
+# see the keys we've generated
+header "keys"
+ls -al $XIADIR/key
+
+# show the xcache domain sockets
+header "domain sockets"
+ls -l /tmp/x*
+
+# show all of the cached CIDs
+# NOTE: these may not all have routes associated
+# if we haven't cleaned up the directory
+header "cached CIDs"
+ls -l /tmp/content
+
+# print the XIA related entries from syslog
+# NOTE: we don't look at the syslog.n files
+header "syslog"
+egrep "Click|xcache|xroute|xname|xnetj" /var/log/syslog

@@ -18,6 +18,7 @@
 #include <click/xiaifacetable.hh>
 #include <click/error.hh>
 #include <click/error-syslog.hh>
+#include <click/task.hh> /* Task */
 
 #include "clicknet/tcp_timer.h"
 #include "clicknet/tcp_var.h"
@@ -48,8 +49,6 @@ using namespace xia;
 #define ACK_DELAY			300
 #define MIGRATEACK_DELAY	3000
 #define TEARDOWN_DELAY		240000
-#define HLIM_DEFAULT		250
-#define LAST_NODE_DEFAULT	-1
 #define RANDOM_XID_FMT		"%s:30000ff0000000000000000000000000%08x"
 #define UDP_HEADER_SIZE		8
 
@@ -62,10 +61,7 @@ using namespace xia;
 #define MAX_RETRANSMIT_TRIES 30
 
 #define API_PORT	 0
-#define BAD_PORT	 1  // FIXME why do we still have this?
-#define NETWORK_PORT 2
-#define CACHE_PORT   3
-#define XHCP_PORT	 4
+#define NETWORK_PORT 1
 
 // Verbosity Bitmask definitions, directly from tcpspeaker code
 #define VERB_NONE       0
@@ -114,12 +110,14 @@ struct tcp_globals
 class sock;
 
 class XTRANSPORT : public Element {
+	friend class XDatagram;
+	friend class XStream;
 public:
 	XTRANSPORT();
 	~XTRANSPORT();
 
 	const char *class_name() const { return "XTRANSPORT"; }
-	const char *port_count() const { return "5/4"; }
+	const char *port_count() const { return "2/2"; }
 	const char *processing() const { return PUSH; }
 
 	int configure(Vector<String> &, ErrorHandler *);
@@ -127,18 +125,15 @@ public:
 	int initialize(ErrorHandler *);
 	void run_timer(Timer *timer);
 
-	XID local_hid()	  { return _hid; };
-	XIAPath local_addr() { return _local_addr; };
-	XID local_4id()	  { return _local_4id; };
 	void add_handlers();
 
 	static int write_param(const String &, Element *, void *vparam, ErrorHandler *);
 	//ErrorHandler *error_handler()   { return _errhandler; }
+    int verbosity()             { return _verbosity; }
 
 private:
 	Timer _timer;
 
-	uint32_t _cid_type, _sid_type;
 	XIAPath _local_addr;
 	String _hostname;
 	XID _hid;
@@ -154,12 +149,15 @@ private:
 	Packet* UDPIPPrep(Packet *, int);
     bool migratable_sock(sock *, int);
     bool update_src_path(sock *, XIAPath&);
+	String routeTableString(String xid);
+	void remove_route(String xidstr);
+	void update_route(String xid, String table, int iface, String next);
+	void update_default_route(String table_str, int interface, String next_xid);
+	void change_default_routes(int interface, String rhid);
 
-public:
 	/* TCP related fields */
     tcp_globals *globals()  { return &_tcp_globals; }
     uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
-    int verbosity()             { return _verbosity; }
     // Element Handler Methods
     static String read_verb(Element*, void*);
     static int write_verb(const String&, Element*, void*, ErrorHandler*);
@@ -171,9 +169,6 @@ public:
 
     tcp_globals     _tcp_globals;
 	ErrorHandler    *_errhandler;
-
-public:
-	XIAXIDRouteTable *_routeTable;
 
 	// list of ids wanting xcmp notifications
 	list<uint32_t> xcmp_listeners;
@@ -202,7 +197,9 @@ public:
 	/* =========================
 	 * Xtransport Methods
 	* ========================= */
-public:
+	XID local_hid()	  { return _hid; };
+	XIAPath local_addr() { return _local_addr; };
+	XID local_4id()	  { return _local_4id; };
 	void ReturnResult(unsigned short sport, xia::XSocketMsg *xia_socket_msg, int rc = 0, int err = 0);
 
 	char *random_xid(const char *type, char *buf);
@@ -247,6 +244,9 @@ public:
 	void Xfork(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xreplay(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
 	void ProcessDatagramPacket(WritablePacket *p_in);
@@ -272,17 +272,22 @@ public:
 	void _add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface);
 
 	// modify routing table
-	void addRoute(const XID &sid) {
-		String cmd = sid.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
-		HandlerCall::call_write(_routeTable, "add", cmd);
+	void manageRoute(const XID &xid, bool create);
+	void addRoute(const XID &xid) {
+		manageRoute(xid, true);
+	}
+	void delRoute(const XID &xid) {
+		manageRoute(xid, false);
 	}
 
-	void delRoute(const XID &sid) {
-		String cmd = sid.unparse();
-		HandlerCall::call_write(_routeTable, "remove", cmd);
-	}
+	// mobility
+	void migrateActiveSessions(int interface, XIAPath new_dag);
 
 	uint32_t NewID();
+
+	uint32_t NextFIDSeqNo(sock *sk, XIAPath &dst);
+	bool run_task(Task*);
+
 };
  typedef HashTable<XIDpair, sock*>::iterator ConnIterator;
 
@@ -292,7 +297,11 @@ public:
 class sock : public Element {
 	friend class XTRANSPORT;
 	public:
-		const char *class_name() const      { return "GENERIC_TRANSPORT"; }
+		const char *class_name() const      { return "sock"; }
+
+    virtual bool run_task(Task*) { return false; };
+
+    using Element::push;
     void push(WritablePacket *){};
     // virtual Packet *pull(const int port) = 0;
     int read_from_recv_buf(XSocketMsg *xia_socket_msg) ;
@@ -305,10 +314,6 @@ class sock : public Element {
     void set_src_path(XIAPath p) {src_path = p;}
     XIAPath get_dst_path() {return dst_path;}
     void set_dst_path(XIAPath p) {dst_path = p;}
-    int get_nxt() {return nxt;}
-    void set_nxt(int n) {nxt = n;}
-    int get_last() {return last;}
-    void set_last(int n) {last = n;}
     uint8_t get_hlim() {return hlim;}
     void set_hlim(uint8_t n) {hlim = n;}
     uint8_t get_hop_count() {return hop_count;}
@@ -364,6 +369,11 @@ class sock : public Element {
 	int refcount;				// # of processes that have this socket open
 
 	/* =========================
+	 * Flooding state
+	 * ========================= */
+	 HashTable<XIDpair, uint32_t> flood_sequence_numbers;
+
+	/* =========================
 	 * "TCP" state
 	 * ========================= */
 	unsigned backlog;			// max # of outstanding connections
@@ -404,8 +414,12 @@ class sock : public Element {
 	bool migrating;
 	bool migrateacking;
 	String last_migrate_ts;			// timestamp of last migrate/migrateack seen
-	int num_migrate_tries;			// number of migrate tries (Connection closes after MAX_MIGRATE_TRIES trials)
-	WritablePacket *migrate_pkt;
+
+	/*
+	 * =========================
+	 * rendezvous state
+	 * ========================= */
+	bool rv_modified_dag;
 
 	/* =========================
 	 * Chunk States
@@ -417,9 +431,6 @@ protected:
     XTRANSPORT *transport;
     HandlerState hstate;
     XIDpair key;
-
-    int nxt;
-    int last;
 
 	uint32_t id;
 

@@ -18,12 +18,13 @@ import os
 import re
 import sys
 import socket
+import xiapyutils
 
 # Number of interfaces for each host type
-numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter2Port':2}
+numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter8Port':8, 'XIARouter2Port':2}
 
 # Principal types
-principals = ['AD', 'HID', 'SID', 'CID', 'IP']
+principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
 
 # Pattern to read AD from a network DAG
 adInDagPattern = re.compile('RE\s+(AD:\w+)')
@@ -125,9 +126,10 @@ class ClickControl:
 
     # Get a list of elements' write handlers
     def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
+		# FIXME: delete these lines?
         # Routing tables for each principal type
-        for principal in principals:
-            elements.append('xrc/n/proc/rt_%s' % principal)
+        #for principal in principals:
+        #    elements.append('xrc/n/proc/rt_%s' % principal)
 
         # Iterate over the number of interfaces for this host type
         for i in range(numIfaces[hosttype]):
@@ -144,7 +146,8 @@ class ClickControl:
         iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
+        # FIXME: HACK - remove the FID entry once routing is correct
+        hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_FID']
         return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
@@ -180,9 +183,17 @@ class ClickControl:
             return False
         return True
 
-    # Assign a Rendezvous DAG to a given router
-    def assignRVDAG(self, hostname, hosttype, dag):
-        if not self.writeCommand('%s/xrc/xtransport.rvDAG %s' % (hostname, dag)):
+    # Assign a Rendezvous DAG to an interface. All interfaces by default.
+    def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
+    # Assign a Rendezvous Control-plane DAG to an interface. default=all.
+    def assignRVControlDAG(self, hostname, hosttype, dag, iface=-1):
+        cmd = '%s/xrc/xtransport.rvcDAG %d,%s' % (hostname, iface, dag)
+        if not self.writeCommand(cmd):
             return False
         return True
 
@@ -199,17 +210,22 @@ class ClickControl:
         # TODO: Remove this hacky import.
         # Only python modules that have XIA swig in path can call this method
         import c_xsocket
-        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_STREAM)
+        sockfd = c_xsocket.Xsocket(c_xsocket.SOCK_DGRAM)
         retval = c_xsocket.XupdateNameServerDAG(sockfd, ns_dag)
+        c_xsocket.Xclose(sockfd)
         if retval != 0:
             print "Failed updating Nameserver DAG in Click"
             return False
         return True
 
+    # TODO: Add setRVControlDAG function here.
+    def setRVControlDAG(self, interface, control_plane_dag):
+        print "setRVControlDAG called, but ignored"
+
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
 if __name__ == "__main__":
-    hostname = socket.gethostname()
+    hostname = xiapyutils.getxiaclickhostname()
     hosttype = 'XIAEndHost'
     hid = 'HID:abf1014f0cc6b4d98b6748f23a7a8f22a3f7b199'
     dag = 'RE AD:abf1014f0cc6b4d98b6748f23a7a8f22a0000000' + ' ' + hid

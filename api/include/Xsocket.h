@@ -14,8 +14,8 @@
 ** limitations under the License.
 */
 /*!
-  @file Xsocket.h
-  @brief Xsocket API header file
+	@file Xsocket.h
+	@brief Xsocket API header file
 */
 
 #ifndef XSOCKET_H
@@ -44,13 +44,13 @@ extern "C" {
 #define MAXBUFLEN    62000	// Must be smaller than the MTU of localhost to allow for the protobuf and its contained data
 							// this isn't calculated, so make sure more than enough room is available for now
 #ifdef __mips__ // to add missing constants
-    #define F_SETOWN_EX 15
-    #define F_GETOWN_EX 16
-    #define F_SETPIPE_SZ 1031
-    #define F_GETPIPE_SZ 1032
-    #define SO_REUSEPORT 15
-    #define IPPROTO_BEETPH 94
-    #define MSG_FASTOPEN 0x20000000
+	#define F_SETOWN_EX 15
+	#define F_GETOWN_EX 16
+	#define F_SETPIPE_SZ 1031
+	#define F_GETPIPE_SZ 1032
+	#define SO_REUSEPORT 15
+	#define IPPROTO_BEETPH 94
+	#define MSG_FASTOPEN 0x20000000
 #endif
 
 
@@ -81,6 +81,9 @@ extern "C" {
 
 #define DEFAULT_CHUNK_SIZE	2000
 
+// XIA specific ifaddr flags
+// must exceed last entry in enum net_device_flags in /usr/include/linux/if.h
+#define XIFA_RVDAG 1<<25	// past /usr/include/linux/if.h net_device_flags
 
 // XIA specific addrinfo flags
 #define XAI_DAGHOST	AI_NUMERICHOST	// if set, name is a dag instead of a generic name string
@@ -139,12 +142,11 @@ extern int Xnotify(void);
 extern int Xsetsockopt(int sockfd, int optname, const void *optval, socklen_t optlen);
 extern int Xgetsockopt(int sockfd, int optname, void *optval, socklen_t *optlen);
 
-extern int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr, socklen_t *addrlen);
+extern int XgetNamebyDAG(char *name, int namelen, const sockaddr_x *addr);
 extern int XgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XgetDAGbyAnycastName(const char *name, sockaddr_x *addr, socklen_t *addrlen);
 extern int XregisterName(const char *name, sockaddr_x *addr);
 extern int XregisterAnycastName(const char *name, sockaddr_x *DAG);
-extern int XrendezvousUpdate(const char *hidstr, sockaddr_x *DAG);
 
 extern int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID);
 extern int Xgethostname(char *name, size_t len);
@@ -152,9 +154,15 @@ extern int XsetXcacheSID(int sockfd, char *, unsigned);
 extern int Xgetifaddrs(struct ifaddrs **ifap);
 extern void Xfreeifaddrs(struct ifaddrs *ifa);
 
+extern int XupdateDefaultInterface(int sockfd, int interface);
+extern int XdefaultInterface(int sockfd);
+
+extern int XcreateFID(char *fid, int len);
+extern int XremoveFID(const char *fid);
+
 /* internal only functions */
 extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
-extern int XupdateRV(int sockfd, int interface, const char *rv_control_dag);
+extern int XupdateRV(int sockfd, int interface);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
 extern int XisDualStackRouter(int sockfd);
@@ -172,6 +180,9 @@ extern int checkXid(const char *xid, const char *type);
 
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
+
+const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
+int xia_pton(int af, const char *src, sockaddr_x *dst);
 
 #ifdef __cplusplus
 }

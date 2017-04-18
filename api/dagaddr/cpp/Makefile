@@ -2,12 +2,12 @@ include ../../../xia.mk
 
 .PHONY: all clean doc
 
-SOURCES=dagaddr.cpp utils.cpp c_dagaddr.cpp
+SOURCES=dagaddr.cpp utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 LIBS=$(XLIB)/libdagaddr.so
 STATICLIB=$(XLIB)/libdagaddr.a
 
-all: $(LIB) dagaddr_test
+all: $(LIBS) dagaddr_test
 
 static: $(STATICLIB) dagaddr_test
 

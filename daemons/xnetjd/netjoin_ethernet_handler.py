@@ -7,7 +7,7 @@ from jacp_pb2 import LayerTwoRequest, LayerTwoReply
 # LayerTwoReply.EthernetL2Config - for inclusion in HandshakeTwo
 class NetjoinEthernetHandler(NetjoinL2Handler):
     def __init__(self):
-        logging.info("Initialized l2 handler")
+        logging.info("Initialized ethernet l2 handler")
         NetjoinL2Handler.__init__(self, LayerTwoIdentifier.ETHERNET)
 
     # Build a LayerTwoRequest.EthernetL2Request

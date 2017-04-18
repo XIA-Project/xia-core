@@ -1818,6 +1818,8 @@ Packet::set_nexthop_neighbor_xid_anno(XID x)
     struct click_xia_xid xid_temp;
     xid_temp = x.xid();
 
+    assert(nexthop_neighbor_xid_anno_offset + 4 + sizeof(xid_temp.id) \
+      < anno_size);
     xanno()->u32[nexthop_neighbor_xid_anno_offset / 4] = xid_temp.type;
 
     for (size_t d = 0; d < sizeof(xid_temp.id); d++) {

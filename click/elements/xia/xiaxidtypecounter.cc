@@ -133,7 +133,7 @@ XIAXIDTypeCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void 
+void
 XIAXIDTypeCounter::count_stats(int cl)
 {
     assert(cl < _size);
@@ -157,7 +157,7 @@ XIAXIDTypeCounter::match(Packet *p)
 
     /*
     if (p==NULL) return -1;
-    if (!hdr) 
+    if (!hdr)
         return -1;
     if (hdr->dnode == 0 || hdr->snode == 0)
         return -1;
@@ -188,7 +188,7 @@ XIAXIDTypeCounter::match(Packet *p)
     	strcmp(ds, "SID:1110000000000000000000000000000000001111") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001112") == 0 ||
     	strcmp(ds, "SID:1110000000000000000000000000000000001113") == 0 ||
-    	strcmp(ds, BHID) == 0) {
+        strcmp(ds, BFID) == 0) {
     	return -1;
     }
 #endif
@@ -204,7 +204,7 @@ XIAXIDTypeCounter::match(Packet *p)
                 if (current_edge.idx < hdr->dnode)
                     next_xid_type = hdr->node[current_edge.idx].xid.type;
         }
-    }   
+    }
 
     for (int i = 0; i < _patterns.size(); i++) {
         const struct pattern& pat = _patterns[i];

@@ -8,6 +8,7 @@ LDFLAGS +=-lprotobuf -lc -ldl -lcrypto -lssl $(XLIB)/libdagaddr.so
 
 SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XgetDAGbyName.c Xinit.c  \
+	XdefaultInterface.c \
 	Xrecv.c Xselect.c Xsend.c Xsetsockopt.c Xsocket.c \
 	XupdateDAG.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
 	Xmsg.c Xfork.c Xnotify.c \
@@ -38,8 +39,7 @@ $(LIB): $(OBJS)
 $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)
 
-doc: Xdoc.h $(SOURCES)
-	doxygen XsocketsAPI.cfg
+doc:
 	make -C python doc
 
 unittest: unittest.cpp  $(LIB) $(XINC)/Xsocket.h $(XINC)/xia.h
@@ -52,6 +52,5 @@ clean:
 	-rm -f $(LIB)
 	-rm -f $(STATICLIB)
 	-rm -f *.o xia.pb.*
-	-rm -rf doc
 	-rm -f unittest
 	make -C python clean

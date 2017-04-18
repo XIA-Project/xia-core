@@ -18,4 +18,4 @@ $(XCACHE): $(SOURCES)
 	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 clean:
-	@-rm $(XCACHE)
+	@-rm -f $(XCACHE)

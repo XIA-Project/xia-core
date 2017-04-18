@@ -4,11 +4,41 @@
 #
 # copies all new and modified files to the specified hosts
 
+[ "$1" == "-v" ] || [ "$1" == "--version" ] && echo "xmodified 1.0" && exit 0
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	cat << EOH
+xmodified host [host] ...
+
+copies all new and modified source files to the specified machines
+
+options:
+  host          copy files to the specified host(s)
+  -h, --help    display this help
+  -v, --version display the version number
+
+example:
+  xmakehosts host1 router1 www.example.com 192.168.1.1
+
+requirements:
+  the parallel-scp package must be installed
+
+note:
+  XIA must be installed in the same location on each machine for this script to work
+
+  names specified on the command line can be IP addresses or resolveable host names
+
+  Connections are made via TCP/IP using parallel-ssh & parallel-scp rather than over XIA
+EOH
+	exit 0
+fi
+
 for f in $(git status | grep modified | tr -s " " | cut -d " " -f2); do
+	echo $f
 	d=$(pwd)/$(dirname $f)
 	parallel-scp -H "$*" $f $d
 done
 for f in $(git status | grep "new file" | tr -s " " | cut -d" " -f3); do
+	echo $f
 	d=$(pwd)/$(dirname $f)
 	parallel-scp -H "$*" $f $d
 done

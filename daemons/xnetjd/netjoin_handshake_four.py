@@ -78,13 +78,13 @@ class NetjoinHandshakeFour(object):
         return protobuf_text_format.MessageToString(self.handshake_four)
 
     def print_handshake_four(self):
-        print self.handshake_four_str()
+        logging.info(self.handshake_four_str())
 
     def cyphertext_str(self):
         return protobuf_text_format.MessageToString(self.cyphertext)
 
     def print_cyphertext(self):
-        print self.cyphertext_str()
+        logging.info(self.cyphertext_str())
 
     # wire_handshake_four is actually a serialized jacp_pb2.HandshakeFour
     def from_wire_handshake_four(self, wire_handshake_four):

@@ -11,5 +11,5 @@ all: $(TARGETS)
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
-clean: 
-	-rm $(TARGETS)
+clean:
+	@-rm -f $(TARGETS)

@@ -9,17 +9,31 @@
 #include <click/vector.hh>
 #include "xtransport.hh"
 #include <click/xiastreamheader.hh>
+#include <click/xiafidheader.hh>
 #include "xlog.hh"
 #include "xdatagram.hh"
 #include "xstream.hh"
+#include "click/dagaddr.hpp"
 #include <click/xiasecurity.hh>  // xs_getSHA1Hash()
 #include <click/xiamigrate.hh>
+#include <click/xiarendezvous.hh>
+
+#include "taskident.hh"
 
 /*
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
 ** - see various FIXMEs in the code
 */
+
+/*
+** sequence numbers are in the range of 2 - uint32 max
+** 0 & 1 are special case values
+ */
+#define FID_NOT_FOUND 0
+#define FID_BAD_SEQ   1
+#define FID_SEQ_START 2
+#define uint32_max    0xffffffff
 
 CLICK_DECLS
 
@@ -41,10 +55,6 @@ sock::sock(
 	timer_on = false;
 	hlim = HLIM_DEFAULT;
 	full_src_dag = false;
-	if (type == SOCK_STREAM)
-		nxt_xport = CLICK_XIA_NXT_XSTREAM;
-	else
-		nxt_xport = CLICK_XIA_NXT_XDGRAM;
 	backlog = 5;
 	seq_num = 0;
 	ack_num = 0;
@@ -68,17 +78,13 @@ sock::sock(
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	port = apiport;
 	transport = trans;
 	sock_type = type;
 	hlim = HLIM_DEFAULT;
-	if (type == SOCK_STREAM)
-		nxt = CLICK_XIA_NXT_XSTREAM;
-	else
-		nxt = CLICK_XIA_NXT_XDGRAM;
 	refcount = 1;
 	xcacheSock = false;
 	id = sockid;
@@ -123,8 +129,8 @@ sock::sock() {
 	pending_recv_msg = NULL;
 	migrating = false;
 	migrateacking = false;
+	rv_modified_dag = false;
 	last_migrate_ts = 0;
-	num_migrate_tries = 0;
 	recv_pending = false;
 	refcount = 1;
 	xcacheSock = false;
@@ -135,7 +141,6 @@ sock::sock() {
 XTRANSPORT::XTRANSPORT() : _timer(this)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-	cp_xid_type("SID", &_sid_type);	// FIXME: why isn't this a constant?
 	_next_id = INITIAL_ID;
 }
 
@@ -146,30 +151,29 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	XIAPath local_addr;
 	String hostname;
 	XID local_4id;
-	Element* routing_table_elem;
 	bool is_dual_stack_router;
 	_is_dual_stack_router = false;
-    char xidString[50];
+	char xidString[50];
 
 	/* Configure tcp relevant information */
 	memset(&_tcpstat, 0, sizeof(_tcpstat));
 
 	/* _empty_note.initialize(Notifier::EMPTY_NOTIFIER, router()); */
 
-	_tcp_globals.tcp_keepidle 		= 120;
-	_tcp_globals.tcp_keepintvl 		= 120;
-	_tcp_globals.tcp_maxidle   		= 120;
-	_tcp_globals.tcp_now 			= 0;
-	_tcp_globals.so_recv_buffer_size = 0x10000;
-	_tcp_globals.tcp_mssdflt		= 1024;
-	_tcp_globals.tcp_rttdflt		= TCPTV_SRTTDFLT / PR_SLOWHZ;
-	_tcp_globals.so_flags	   	 	= 0;
-	_tcp_globals.so_idletime		= 0;
+	_tcp_globals.tcp_keepidle         = TCPTV_KEEP_IDLE;
+	_tcp_globals.tcp_keepintvl        = TCPTV_KEEPINTVL;
+	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
+	_tcp_globals.tcp_now              = 0;
+	_tcp_globals.so_recv_buffer_size  = 0x100000;
+	_tcp_globals.tcp_mssdflt          = 1500;
+	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT;
+	_tcp_globals.so_flags             = 0;
+	_tcp_globals.so_idletime          = 0;
 
 	/* TODO: window_scale and use_timestamp were being used uninitialized
 	   setting them to 0 and false respectively for now but need to revisit
 	   especially for the window scale */
-	_tcp_globals.window_scale		= 0;
+	_tcp_globals.window_scale		= 4;
 	_tcp_globals.use_timestamp		= false;
 
 	_verbosity 						= VERB_ERRORS;
@@ -182,7 +186,6 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (cp_va_kparse(conf, this, errh,
 						 "HOSTNAME", cpkP + cpkM, cpString, &hostname,
 						 "LOCAL_4ID", cpkP + cpkM, cpXID, &local_4id,
-						 "ROUTETABLENAME", cpkP + cpkM, cpElement, &routing_table_elem,
 						 "NUM_PORTS", cpkP+cpkM, cpInteger, &_num_ports,
 						 "IS_DUAL_STACK_ROUTER", 0, cpBool, &is_dual_stack_router,
 						 "IDLETIME", 0, cpUnsigned, &(_tcp_globals.so_idletime),
@@ -206,9 +209,9 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 		_tcp_globals.window_scale = TCP_MAX_WINSHIFT;
 
 
-    // temporary value, will be reset by the cache daemon
-    random_xid("SID", xidString);
-    _xcache_sid.parse(xidString);
+	// temporary value, will be reset by the cache daemon
+	random_xid("SID", xidString);
+	_xcache_sid.parse(xidString);
 
 	_local_4id = local_4id;
 	_hostname = hostname;
@@ -218,12 +221,6 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_null_4id.parse("IP:0.0.0.0");
 
 	_is_dual_stack_router = is_dual_stack_router;
-
-#if USERLEVEL
-	_routeTable = dynamic_cast<XIAXIDRouteTable*>(routing_table_elem);
-#else
-	_routeTable = reinterpret_cast<XIAXIDRouteTable*>(routing_table_elem);
-#endif
 
 	return 0;
 }
@@ -276,17 +273,8 @@ void XTRANSPORT::push(int port, Packet *p_input)
 			ProcessAPIPacket(p_in);
 			break;
 
-		case BAD_PORT: //packet from ???
-			ERROR("\n\nERROR: BAD INPUT PORT TO XTRANSPORT!!!\n\n");
-			break;
-
 		case NETWORK_PORT: //Packet from network layer
 			ProcessNetworkPacket(p_in);
-			p_in->kill();
-			break;
-
-		case XHCP_PORT:		//Packet with DHCP information
-			ProcessXhcpPacket(p_in);
 			p_in->kill();
 			break;
 
@@ -296,13 +284,35 @@ void XTRANSPORT::push(int port, Packet *p_input)
 	}
 }
 
+String XTRANSPORT::routeTableString(String xid)
+{
+	// get the type string of the XID
+	int i = xid.find_left(':');
+	assert (i != -1);
+	String typestr = xid.substring(0, i).upper();
 
+	String table = _hostname + "/xrc/n/proc/rt_" + typestr;
+	return table;
+}
+
+void XTRANSPORT::manageRoute(const XID &xid, bool create)
+{
+	String xidstr = xid.unparse();
+
+	String table = routeTableString(xidstr);
+
+	if (create) {
+		HandlerCall::call_write(table + ".add", xidstr + " " + String(DESTINED_FOR_LOCALHOST), this);
+	} else {
+		HandlerCall::call_write(table + ".remove", xidstr, this);
+	}
+}
 
 /*************************************************************
 ** HANDLER FUNCTIONS
 *************************************************************/
 // ?????????
-enum {DAG, HID, RVDAG};
+enum {DAG, HID, RVDAG, RVCDAG};
 
 int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
@@ -314,7 +324,7 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	{
 		XIAPath dag;
 		if (cp_va_kparse(conf, f, errh,
-						 "DAG", cpkP + cpkM, cpXIAPath, &dag,
+						 "ADDR", cpkP + cpkM, cpXIAPath, &dag,
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = dag;
@@ -334,32 +344,77 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 	case RVDAG:
 	{
 		XIAPath rvdag;
+		int iface;
 		if (cp_va_kparse(conf, f, errh,
+						 "IFACE", cpkP + cpkM, cpInteger, &iface,
 						 "RVDAG", cpkP + cpkM, cpXIAPath, &rvdag,
-						 cpEnd) < 0)
+						 cpEnd) < 0) {
+			click_chatter("ERROR: parsing args for rvDAG write handler");
 			return -1;
-		click_chatter("XTRANSPORT: RV DAG is now %s", f->_local_addr.unparse().c_str());
-		String local_addr_str = f->_local_addr.unparse().c_str();
-		// If a RV dag was assigned, this is a router.
-		// So assign the same RV DAG to all interfaces
+		}
+
+		// Replace intent HID in router's DAG to form new_dag
+		XIAPath new_dag = rvdag;
+		if(!new_dag.replace_intent_hid(f->_hid)) {
+			click_chatter("XTRANSPORT:RVDAG ERROR replacing intent HID in %s",
+					new_dag.unparse().c_str());
+			return -1;
+		}
+
 		for(int i=0; i<f->_num_ports; i++) {
-			if(!f->_interfaces.update_rv_dag(i, local_addr_str)) {
-				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
-				return -1;
+			// If iface=-1, assign rv_dag to all interfaces
+			if(iface == -1 || iface == i) {
+				if(!f->_interfaces.update_rv_dag(i, new_dag.unparse())) {
+					click_chatter("ERROR: Updating dag: %s to iface: %d",
+							new_dag.unparse().c_str(), i);
+					return -1;
+				}
 			}
 		}
+
+		click_chatter("XTRANSPORT: RV DAG now %s", new_dag.unparse().c_str());
+		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
+
+		break;
+	}
+	case RVCDAG:
+	{
+		XIAPath rvcdag;
+		int iface;
+		if (cp_va_kparse(conf, f, errh,
+						 "IFACE", cpkP + cpkM, cpInteger, &iface,
+						 "RVCDAG", cpkP + cpkM, cpXIAPath, &rvcdag,
+						 cpEnd) < 0) {
+			click_chatter("ERROR: parsing args for rvcDAG write handler");
+			return -1;
+		}
+
+		for(int i=0; i<f->_num_ports; i++) {
+			// If iface=-1, assign rv_control_dag to all interfaces
+			if(iface == -1 || iface == i) {
+				if(!f->_interfaces.update_rv_control_dag(i, rvcdag.unparse())) {
+					click_chatter("ERROR: Updating dag: %s to iface: %d",
+							rvcdag.unparse().c_str(), i);
+					return -1;
+				}
+			}
+		}
+
+		click_chatter("XTRANSPORT: RVCDAG is now %s", rvcdag.unparse().c_str());
+		click_chatter("XTRANSPORT: for interface (-1=all): %d", iface);
+
 		break;
 	}
 	case HID:
 	{
-		XID hid;
+		XID xid;
 		if (cp_va_kparse(conf, f, errh,
-					"HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+					"HID", cpkP + cpkM, cpXID, &xid, cpEnd) < 0)
 			return -1;
-		f->_hid = hid;
-		click_chatter("XTRANSPORT: HID assigned: %s", hid.unparse().c_str());
+		f->_hid = xid;
+		click_chatter("XTRANSPORT: HID assigned: %s", xid.unparse().c_str());
 		// Apply the same HID to all interfaces with DAG *->HID
-		String hid_dag = "RE " + hid.unparse();
+		String hid_dag = "RE " + xid.unparse();
 		click_chatter("XTRANSPORT: Assigning address for all interfaces: %s", hid_dag.c_str());
 		for(int i=0; i<f->_num_ports; i++) {
 			if(!f->_interfaces.add(i, hid_dag)) {
@@ -369,6 +424,11 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 		}
 		// Also use the HID dag as our local address until we have a network dag
 		f->_local_addr.parse(hid_dag);
+
+		// FIXME: do we want to keep this?
+		// register a FID with the same hash as the HID
+		xid.xid().type = htonl(CLICK_XIA_XID_TYPE_FID);
+		f->addRoute(xid);
 		break;
 	}
 	default:
@@ -441,6 +501,7 @@ void XTRANSPORT::add_handlers()
 	//add_write_handler("local_addr", write_param, (void *)H_MOVE);
 	add_write_handler("dag", write_param, (void *)DAG);
 	add_write_handler("rvDAG", write_param, (void *)RVDAG);
+	add_write_handler("rvcDAG", write_param, (void *)RVCDAG);
 	add_write_handler("hid", write_param, (void *)HID);
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
@@ -491,6 +552,49 @@ char *XTRANSPORT::random_xid(const char *type, char *buf)
 	sprintf(buf, RANDOM_XID_FMT, type, click_random(0, 0xffffffff));
 
 	return buf;
+}
+
+
+uint32_t XTRANSPORT::NextFIDSeqNo(sock *sk, XIAPath &dst)
+{
+	Vector<XID> fids;
+	uint32_t fid_seq = FID_NOT_FOUND;
+	dst.find_nodes_of_type(CLICK_XIA_XID_TYPE_FID, fids);
+
+	int count = fids.size();
+	if (count > 1) {
+		// we don't currently support multiple FIDs in DAGs
+		INFO("Invalid DAG: multiple FIDs not allowed");
+		fid_seq = FID_BAD_SEQ;
+
+	} else if (count == 1) {
+		XID fid = fids[0];
+		// FIXME: we shouldn't need to go through a string to do this
+		//XID sid = dst.xid(dst.find_intent_sid());
+		XID sid(dst.intent_sid_str().c_str());
+
+		XIDpair pair(fid, sid);
+
+		HashTable<XIDpair, uint32_t>::iterator it = sk->flood_sequence_numbers.find(pair);
+		if (it != sk->flood_sequence_numbers.end()) {
+			fid_seq = it->second;
+		} else {
+			while (fid_seq < FID_SEQ_START) {
+				fid_seq = click_random(0, uint32_max);
+			}
+		}
+
+		uint32_t next = fid_seq + 1;
+		if (next == 0) {
+			// handle wrapping
+			next = FID_SEQ_START;
+		}
+		sk->flood_sequence_numbers[pair] = next;
+	} else {
+		fid_seq = FID_NOT_FOUND;
+	}
+
+	return fid_seq;
 }
 
 
@@ -681,48 +785,31 @@ void XTRANSPORT::run_timer(Timer *timer)
 
 
 /*************************************************************
-** XHCP PACKET HANDLER
-*************************************************************/
-void XTRANSPORT::ProcessXhcpPacket(WritablePacket *p_in)
-{
-	WARN("IS THIS USED ANYMORE?\n");
-	XIAHeader xiah(p_in->xia_header());
-	String temp = _local_addr.unparse();
-	Vector<String> ids;
-	cp_spacevec(temp, ids);;
-	if (ids.size() < 3) {
-		String new_route((char *)xiah.payload());
-		String new_local_addr = new_route + " " + ids[1];
-		_local_addr.parse(new_local_addr);
-	}
-}
-
-
-
-/*************************************************************
 ** NETWORK PACKET HANDLER
 *************************************************************/
 void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
+	int next = xiah.nxt();
 
-	switch(xiah.nxt()) {
-		case CLICK_XIA_NXT_XCMP:
-			// pass the packet to all sockets that registered for XMCP packets
-			ProcessXcmpPacket(p_in);
-			return;
+	if (next == CLICK_XIA_NXT_XCMP) {
+		// pass the packet to all sockets that registered for XMCP packets
+		ProcessXcmpPacket(p_in);
+		return;
 
-		case CLICK_XIA_NXT_XSTREAM:
-			ProcessStreamPacket(p_in);
-			return;
+	} else if (next == CLICK_XIA_NXT_FID) {
+		FIDHeader fh(p_in);
+		next = fh.nxt();
+	}
 
-		case CLICK_XIA_NXT_XDGRAM:
-			ProcessDatagramPacket(p_in);
-			return;
+	if (next == CLICK_XIA_NXT_XSTREAM) {
+		ProcessStreamPacket(p_in);
 
-		default:
+	} else if (next == CLICK_XIA_NXT_XDGRAM){
+		ProcessDatagramPacket(p_in);
+
+	} else {
 			WARN("ProcessNetworkPacket: Unknown TransportType:%d\n", xiah.nxt());
-			break;
 	}
 }
 
@@ -734,6 +821,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 {
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
+	// FIXME: validate that last is within range of # of nodes
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 
 	sock *sk = XID2Sock(_destination_xid);  // This is to be updated for the XSOCK_STREAM type connections below
@@ -753,15 +841,25 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
 	bool set_full_dag = false;
 
+	// INFO("Inside ProcessStreamPacket");
+	XIAHeader xiah(p_in->xia_header());
+	XIAPath dst_path;
+	XIAPath src_path;
+
+	try {
+		dst_path = xiah.dst_path();
+		src_path = xiah.src_path();
+	} catch (std::range_error &e) {
+		click_chatter("XTRANSPORT::ProcessStreamPacket %s", e.what());
+		click_chatter("XTRANSPORT::ProcessStreamPacket: Bad packet dropped");
+		p_in->kill();
+		return;
+	}
 	// Is this packet arriving at a rendezvous server?
 	if (HandleStreamRawPacket(p_in)) {
 		// we handled it, no further processing is needed
 		return;
 	}
-	// INFO("Inside ProcessStreamPacket");
-	XIAHeader xiah(p_in->xia_header());
-	XIAPath dst_path = xiah.dst_path();
-	XIAPath src_path = xiah.src_path();
 
 	// NOTE: CID dags arrive here with the last ptr = the SID node,
 	//  so we can't use the last pointer as it's not pointing to the
@@ -820,11 +918,19 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			}
 
 			// First, check if this request is already in the pending queue
-			HashTable<XIDpair , struct sock*>::iterator it;
+			HashTable<XIDpair , class sock*>::iterator it;
 			it = XIDpairToConnectPending.find(xid_pair);
 
 			if (it == XIDpairToConnectPending.end()) {
 				// if this is new request, put it in the queue
+				// Check if this new request was modified by rendezvous service
+				bool rv_modified_dag = false;
+
+				XIAPath bound_dag = sk->get_src_path();
+				XIAPath pkt_dag = dst_path; // Our address that client sent
+				if (usingRendezvousDAG(bound_dag, pkt_dag)) {
+					rv_modified_dag = true;
+				}
 
 				uint8_t hop_count = -1;
 				// we have received a syn for CID,
@@ -837,23 +943,33 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					// Additionally, we may be a router which can service the request, so
 					// don't just flatten the DAG, but make sure it points to our cache daemon.
 					// FIXME: can we do this without having to convert to strings?
+					XIAPath new_addr = _local_addr;
+					new_addr.append_node(_xcache_sid);
+					new_addr.append_node(_destination_xid);
+					set_full_dag = true;
+					/*
 					String str_local_addr = _local_addr.unparse_re();
 					str_local_addr += " ";
 					str_local_addr += _xcache_sid.unparse();
 					str_local_addr += " ";
 					str_local_addr += _destination_xid.unparse();
 
-					set_full_dag = true;
 					dst_path.parse_re(str_local_addr);
+					*/
+					dst_path = new_addr;
 				}
 
 				// INFO("Socket %d Handling new SYN\n", sk->port);
 				// Prepare new sock for this connection
 				uint32_t new_id = NewID();
 				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
+
+				new_sk->initialize(ErrorHandler::default_handler());
+
 				new_sk->dst_path = src_path;
 				new_sk->src_path = dst_path;
 				new_sk->listening_sock = sk;
+				new_sk->rv_modified_dag = rv_modified_dag;
 				int iface;
 				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 					new_sk->outgoing_iface = iface;
@@ -880,8 +996,29 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 		return false;
 	}
 	INFO("DAG possibly modified by a rendezvous server");
+
 	// Find local AD as of now
 	XIAPath local_dag = local_addr();
+
+	// The AD in packet must match our current AD
+	std::string local_ad_str = local_dag.intent_ad_str();
+	std::string pkt_ad_str = pkt_dag.intent_ad_str();
+	if (pkt_ad_str != local_ad_str) {
+		INFO("AD was:%s but local AD is:%s", pkt_ad_str.c_str(),
+				local_ad_str.c_str());
+		return false;
+	}
+
+
+	// Compare our DAG in packet with the one we bound to
+	if (bound_dag.compare_except_intent_ad(pkt_dag)) {
+		//ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
+		//ERROR("Current network:%s", local_ad_str.c_str());
+		//ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		INFO("DAG not/incorrectly modified by rendezvous service");
+		return false;
+	}
+	/*
 	XID local_ad = local_dag.xid(local_dag.first_ad_node());
 	XID bound_ad = bound_dag.xid(bound_dag.first_ad_node());
 	XID packet_ad = pkt_dag.xid(pkt_dag.first_ad_node());
@@ -897,6 +1034,7 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 		ERROR("ERROR: Wrong AD in packet pkt_dag:%s", pkt_dag.unparse().c_str());
 		return false;
 	}
+	*/
 	INFO("Allowing DAG different from bound dag");
 	return true;
 }
@@ -946,6 +1084,7 @@ int XTRANSPORT::HandleStreamRawPacket(WritablePacket *p_in)
 	XIAPath dst_path = xiah.dst_path();
 	XIAPath src_path = xiah.src_path();
 
+	// FIXME: validate that last is within range of # of nodes
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
@@ -1032,6 +1171,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XUPDATEDAG:
 		Xupdatedag(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XUPDATERV:
+		Xupdaterv(_sport, id, &xia_socket_msg);
+		break;
 	case xia::XREADLOCALHOSTADDR:
 		Xreadlocalhostaddr(_sport, id, &xia_socket_msg);
 		break;
@@ -1083,6 +1225,14 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XNOTIFY:
 		Xnotify(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XMANAGEFID:
+		XmanageFID(_sport, id, &xia_socket_msg);
+		break;
+	case xia::XUPDATEDEFIFACE:
+		Xupdatedefiface(_sport, id, &xia_socket_msg);
+		break;
+	case xia::XDEFIFACE:
+		Xdefaultiface(_sport, id, &xia_socket_msg);
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -1125,6 +1275,7 @@ void XTRANSPORT::Xsocket(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	switch (sock_type) {
 	case SOCK_STREAM: {
 		sk = new XStream(this, _sport, id);
+		sk->initialize(ErrorHandler::default_handler());
 		break;
 	}
 	case SOCK_RAW:
@@ -1248,12 +1399,17 @@ void XTRANSPORT::Xgetsockopt(unsigned short _sport, uint32_t id, xia::XSocketMsg
 int XTRANSPORT::IfaceFromSIDPath(XIAPath sidPath)
 {
 	XIAPath interface_dag = sidPath;
+	if (interface_dag.remove_intent_sid_node() == false) {
+		return -1;
+	}
+	/*
 	//TODO: check dest node in sidPath is an SID
 	if(interface_dag.remove_node(interface_dag.destination_node()) != true) {
 		// TODO: XIAPath::remove_node always returns true. Remove this check
 		click_chatter("Xtransport::IfaceFromSIDPath couldn't remove node");
 		return -1;
 	}
+	*/
 	return _interfaces.getIfaceID(interface_dag.unparse());
 }
 
@@ -1278,11 +1434,7 @@ void XTRANSPORT::Xbind(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		sk->port = _sport;
 
 		//Check if binding to full DAG or just to SID only
-		Vector<XIAPath::handle_t> xids = sk->src_path.next_nodes( sk->src_path.source_node() );
-		XID front_xid = sk->src_path.xid( xids[0] );
-		struct click_xia_xid head_xid = front_xid.xid();
-		uint32_t head_xid_type = head_xid.type;
-		if (head_xid_type == _sid_type) {
+		if (sk->src_path.first_hop_is_sid()) {
 			sk->full_src_dag = false;
 		} else {
 			sk->full_src_dag = true;
@@ -1365,7 +1517,7 @@ void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /
 	UNUSED(_sport);
 	notify_listeners.push_back(id);
 
-	// we just go away and wait for XchangeAD to be called which will trigger a response on this client socket
+	// we just go away and wait for Xupdatedag to be called which will trigger a response on this client socket
 }
 
 
@@ -1402,8 +1554,11 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
-				teardown_now = false;
-				dynamic_cast<XStream *>(sk)->usrclosed();
+				// FIXME: are these the right states to mask?
+				if (sk->state > LISTEN && sk->state < CLOSED) {
+					teardown_now = false;
+					dynamic_cast<XStream *>(sk)->usrclosed();
+				}
 				break;
 			case SOCK_DGRAM:
 				break;
@@ -1458,8 +1613,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		ChangeState(tcp_conn, SYN_SENT);
 		tcp_conn->num_connect_tries++;
 
-		String str_local_addr = _local_addr.unparse_re();
-
 		// API sends a temporary DAG, if permanent not assigned by bind
 		if (x_connect_msg->has_sdag()) {
 			String sdag_string(x_connect_msg->sdag().c_str(), x_connect_msg->sdag().size());
@@ -1469,8 +1622,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		// FIXME: is it possible for us not to have a source dag
 		//   and if so, we should return an error
 		assert(tcp_conn->src_path.is_valid());
-		tcp_conn->set_nxt(LAST_NODE_DEFAULT);
-		tcp_conn->set_last(LAST_NODE_DEFAULT);
 
 		XID source_xid = tcp_conn->src_path.xid(tcp_conn->src_path.destination_node());
 		XID destination_xid = tcp_conn->dst_path.xid(tcp_conn->dst_path.destination_node());
@@ -1493,12 +1644,6 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		// Map the source XID to source port
 		XIDtoSock.set(source_xid, tcp_conn);
 
-		// Make us routable
-		addRoute(source_xid);
-		tcp_conn->usropen();
-		ChangeState(tcp_conn, SYN_SENT);
-		ChangeState(sk, SYN_SENT);
-
 		// We return EINPROGRESS no matter what. If we're in non-blocking mode, the
 		// API will pass EINPROGRESS on to the app. If we're in blocking mode, the API
 		// will wait until it gets another message from xtransport notifying it that
@@ -1506,6 +1651,12 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		x_connect_msg->set_status(xia::X_Connect_Msg::XCONNECTING);
 		tcp_conn->so_error = EINPROGRESS;
 		ReturnResult(_sport, xia_socket_msg, -1, EINPROGRESS);
+
+		// Make us routable
+		addRoute(source_xid);
+		ChangeState(tcp_conn, SYN_SENT);
+		ChangeState(sk, SYN_SENT);
+		tcp_conn->usropen();
 	}
 }
 
@@ -1644,7 +1795,7 @@ Xaccept_done:
 void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 {
 	// loop thru all the polls that are registered looking for the socket associated with id
-	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end(); it++) {
+	for (HashTable<unsigned short, PollEvent>::iterator it = poll_events.begin(); it != poll_events.end();) {
 		uint32_t pollport = it->first;
 		PollEvent pe = it->second;
 
@@ -1652,6 +1803,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 
 		// socket isn't in this poll instance, keep looking
 		if (sevent == pe.events.end()) {
+			++it;
 			continue;
 		}
 
@@ -1660,6 +1812,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 
 		// if flags_out isn't an error and doesn't match the event mask keep looking
 		if (!(flags_out & mask) && !(flags_out & (POLLHUP | POLLERR | POLLNVAL))) {
+			++it;
 			continue;
 		}
 
@@ -1681,7 +1834,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		ReturnResult(pollport, &xsm, 1, 0);
 
 		// found the socket, decrement the polling count for all the sockets in the poll instance
-		for (HashTable<uint32_t, unsigned int>::iterator pit = pe.events.begin(); pit != pe.events.end(); pit++) {
+		for (HashTable<uint32_t, unsigned int>::iterator pit = pe.events.begin(); pit != pe.events.end(); ++pit) {
 			pid = pit->first;
 
 			sock *sk = idToSock.get(pid);
@@ -1691,7 +1844,7 @@ void XTRANSPORT::ProcessPollEvent(uint32_t id, unsigned int flags_out)
 		}
 
 		// get rid of this poll event
-		poll_events.erase(it);
+		it = poll_events.erase(it);
 	}
 }
 
@@ -1704,7 +1857,7 @@ void XTRANSPORT::CancelPollEvent(unsigned short _sport)
 	HashTable<unsigned short, PollEvent>::iterator it;
 
 	// loop thru all the polls that are registered looking for the socket associated with _sport
-	for (it = poll_events.begin(); it != poll_events.end(); it++) {
+	for (it = poll_events.begin(); it != poll_events.end(); ++it) {
 		pollport = it->first;
 		pe = it->second;
 
@@ -1873,109 +2026,210 @@ void XTRANSPORT::Xpoll(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 bool XTRANSPORT::migratable_sock(sock *sk, int changed_iface)
 {
 
-    // Skip non-stream connections
-    if (sk->sock_type != SOCK_STREAM) {
-        return false;
-    }
-    // Skip inactive ports
-    if (sk->state == INACTIVE
-			|| sk->state == LISTEN
-			|| sk->state == TIME_WAIT) {
-        INFO("skipping migration for inactive/listening port");
-        INFO("src_path:%s:", sk->src_path.unparse().c_str());
-        return false;
-    }
+	// Skip non-stream connections
+	if (sk->sock_type != SOCK_STREAM) {
+		return false;
+	}
+	// Skip inactive ports
+	if (!(sk->state == SYN_RCVD
+				|| sk->state == SYN_SENT
+				|| sk->state == CONNECTED)) {
+		INFO("skipping migration for inactive/listening port");
+		INFO("src_path:%s:", sk->src_path.unparse().c_str());
+		return false;
+	}
 	INFO("migrating socket in state %d", sk->state);
-    // Skip sockets not using the interface whose dag changed
-    if(sk->outgoing_iface != changed_iface) {
-        INFO("skipping migration for unchanged interface");
-        INFO("src_path:%s:", sk->src_path.unparse().c_str());
-        INFO("out_iface:%d:", sk->outgoing_iface);
-        INFO("changed_iface:%d", changed_iface);
-        return false;
-    }
-    return true;
+	// Skip sockets not using the interface whose dag changed
+	if(sk->outgoing_iface != changed_iface) {
+		INFO("skipping migration for unchanged interface");
+		INFO("src_path:%s:", sk->src_path.unparse().c_str());
+		INFO("out_iface:%d:", sk->outgoing_iface);
+		INFO("changed_iface:%d", changed_iface);
+		return false;
+	}
+	return true;
 }
 
 bool XTRANSPORT::update_src_path(sock *sk, XIAPath &new_host_dag)
 {
-    // Retrieve dest XID from old src_path
-    XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
+	// Retrieve dest XID from old src_path
+	XID dest_xid = sk->src_path.xid(sk->src_path.destination_node());
 
-    // Append XID to the new host dag
-    XIAPath new_dag = new_host_dag;
-    INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
-    INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
-    XIAPath::handle_t hid_handle = new_dag.destination_node();
-    XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
-    new_dag.add_edge(hid_handle, xid_handle);
-    new_dag.set_destination_node(xid_handle);
-    INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
-    INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
-    sk->src_path = new_dag;
-    return true;
+	// Append XID to the new host dag
+	XIAPath new_dag = new_host_dag;
+	INFO("update_src_path: iface dag:%s", new_host_dag.unparse().c_str());
+	INFO("update_src_path: appending:%s", dest_xid.unparse().c_str());
+	new_dag.append_node(dest_xid);
+	/*
+	XIAPath::handle_t hid_handle = new_dag.destination_node();
+	XIAPath::handle_t xid_handle = new_dag.add_node(dest_xid);
+	new_dag.add_edge(hid_handle, xid_handle);
+	new_dag.set_destination_node(xid_handle);
+	*/
+	INFO("update_src_path: old src_path:%s", sk->src_path.unparse().c_str());
+	INFO("update_src_path: new src_path:%s", new_dag.unparse().c_str());
+	sk->src_path = new_dag;
+	return true;
+}
+
+void XTRANSPORT::Xupdaterv(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(_sport);
+	// Retrieve interface from user provided argument
+	xia::X_Updaterv_Msg *x_updaterv_msg = xia_socket_msg->mutable_x_updaterv();
+	sock *sk = idToSock.get(id);
+	int iface = x_updaterv_msg->interface();
+
+	// Retrieve rendezvous control dag for the interface
+	XIAInterface interface = _interfaces.getInterface(iface);
+	if (!interface.has_rv_control_dag()) {
+		return;
+	}
+
+	// Send a control message to the rendezvous service to tell new address
+	XIAPath rvControlDAG;
+	rvControlDAG.parse(interface.rv_control_dag());
+	click_chatter("Xupdaterv: RV control plane dag: %s:",
+			rvControlDAG.unparse().c_str());
+
+	XIAPath iface_dag;
+	iface_dag.parse(interface.dag());
+	// HID of this interface
+	String hid = iface_dag.intent_hid_str().c_str();
+	// Current local DAG for this interface
+	String dag = iface_dag.unparse_dag();
+	// Current timestamp as nonce against replay attacks
+	String timestamp = Timestamp::now().unparse();
+	XIASecurityBuffer rv_control_msg(900);
+	if (build_rv_control_message(rv_control_msg, hid, dag, timestamp)
+			== false) {
+		WARN("ERROR: Unable to build notification for rendezvous service");
+		return;
+	}
+
+	// Create a packet with the just the data
+	WritablePacket *just_payload_part = WritablePacket::make(256,
+			(const void *)rv_control_msg.get_buffer(),
+			rv_control_msg.size(), 1);
+
+	// Add a datagram header onto the packet
+	DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+	WritablePacket *p = NULL;
+	p = dhdr->encap(just_payload_part);
+
+	// Add the XIA header onto the packet
+	XIAHeaderEncap xiah;
+	xiah.set_hlim(sk->hlim);
+	xiah.set_dst_path(rvControlDAG);
+	//xiah.set_src_path(sk->src_path); // src_path is uninitialized
+	xiah.set_src_path(iface_dag);	// so using interface dag for now
+	xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
+	xiah.set_plen(rv_control_msg.size() + dhdr->hlen());
+	p = xiah.encap(p, false);
+	delete dhdr;
+
+	click_chatter("Xupdaterv: sending pkt to:%s\nfrom:%s",
+			rvControlDAG.unparse().c_str(), iface_dag.unparse().c_str());
+	// Send the notification to rendezvous service
+	output(NETWORK_PORT).push(p);
+}
+
+void XTRANSPORT::update_route(String xid, String table,
+		int iface, String next)
+{
+	// TODO: Add check to ensure xid is valid
+	// TODO: Add checks to ensure table is valid, e.g. rt_*
+	// TODO: Add check to ensure iface is between 0 and max interfaces
+	// TODO: Add check to ensure next is a valid XID
+	String cmd = table + ".set4";
+	String cmdargs = xid + "," + String(iface) + ","
+		+ next + "," + String(0xffff);
+	click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
+
+	// <host>/xrc/n/proc/rt_<table>.set4, "<xid>, <iface>, <next>, <flags>"
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+}
+
+void XTRANSPORT::update_default_route(String table_str,
+		int interface, String next_xid)
+{
+	update_route("-", table_str, interface, next_xid);
+}
+
+void XTRANSPORT::change_default_routes(int interface, String rhid)
+{
+	String ad_table_str = _hostname + "/xrc/n/proc/rt_AD";
+	String hid_table_str = _hostname + "/xrc/n/proc/rt_HID";
+	String ip_table_str = _hostname + "/xrc/n/proc/rt_IP";
+
+	// Set default AD to point to new RHID
+	update_default_route(ad_table_str, interface, rhid);
+
+	// Set default HID to point to new RHID
+	update_default_route(hid_table_str, interface, rhid);
+
+	// Set default 4ID to point to new RHID
+	update_default_route(ip_table_str, interface, rhid);
+}
+
+void XTRANSPORT::remove_route(String xidstr)
+{
+	String cmd = routeTableString(xidstr) + ".remove";
+	String cmdargs = xidstr;
+	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 }
 
 void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
 	UNUSED(id);
-	//String str_local_addr = _local_addr.unparse();
-	//size_t old_AD_start = str_local_addr.find_left("AD:");
-	//size_t old_AD_end = str_local_addr.find_left(" ", old_AD_start);
-	//String old_AD_str = str_local_addr.substring(old_AD_start, old_AD_end - old_AD_start);
-	//String tmp = _local_addr.unparse();
-	//Vector<String> ids;
-	//cp_spacevec(tmp, ids);
 
 	// Retrieve interface number and router's DAG from API message
+	int interface;
 	XIAPath router_dag;
-	xia::X_Updatedag_Msg *x_updatedag_msg = xia_socket_msg->mutable_x_updatedag();
-	int interface = x_updatedag_msg->interface();
+	xia::X_Updatedag_Msg *x_updatedag_msg
+		= xia_socket_msg->mutable_x_updatedag();
+
+	interface = x_updatedag_msg->interface();
 	click_chatter("XTRANSPORT:Xupdatedag Updating interface: %d", interface);
+
 	router_dag.parse(x_updatedag_msg->dag().c_str());
-	click_chatter("XTRANSPORT:Xupdatedag Router addr: %s", router_dag.unparse().c_str());
+	click_chatter("XTRANSPORT:Xupdatedag Router addr: %s",
+			router_dag.unparse().c_str());
+
 	String IP4ID_str(x_updatedag_msg->ip4id().c_str());
 	click_chatter("XTRANSPORT:Xupdatedag Router 4ID: %s (ignored unless in addr above)", IP4ID_str.c_str());
 
 	String ad_table_str = _hostname + "/xrc/n/proc/rt_AD";
 	String hid_table_str = _hostname + "/xrc/n/proc/rt_HID";
-	String ip_table_str = _hostname + "/xrc/n/proc/rt_IP";
 	String cmd;
 	String cmdargs;
 	String default_AD("-"), default_HID("-"), default_4ID("-");
 
-	// Find the old dag that we will be replacing
+	// The interface DAG that we are about to replace
 	XIAPath old_dag;
 	old_dag.parse(_interfaces.getDAG(interface));
 
-	// Retrieve AD from old DAG for this interface
-	XIAPath::handle_t h = old_dag.first_ad_node();
-	if(h != INVALID_NODE_HANDLE) {
-		XID old_ad = old_dag.xid(h);
-
-		// Delete route for the old AD
-		cmd = ad_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_ad.unparse().c_str(), this);
+	// Delete route to the old AD
+	std::string old_ad = old_dag.intent_ad_str();
+	if (old_ad.length() > CLICK_XIA_XID_ID_LEN) {    // 20 bytes
+		remove_route(old_ad.c_str());
 	}
 
-	// Retrieve RHID corresponding to the router for this interface
+	// Delete route for the old RHID
 	if(_interfaces.has_rhid(interface)) {
 		String old_rhid = _interfaces.getRHID(interface);
-
-		// Delete route for this old RHID
-		cmd = hid_table_str + ".remove";
-		HandlerCall::call_write(cmd.c_str(), old_rhid.c_str(), this);
+		remove_route(old_rhid);
 	}
 
 	// Retrieve new AD from router_dag
-	XID new_ad = router_dag.xid(router_dag.first_ad_node());
+	String new_ad(router_dag.intent_ad_str().c_str());
 
 	// Retrieve new RHID from router_dag
-	XID new_rhid = router_dag.xid(router_dag.find_intent_hid());
+	String new_rhid(router_dag.intent_hid_str().c_str());
 
 	// Add DESTINED_FOR_LOCALHOST route for new AD
 	cmd = ad_table_str + ".add";
-	cmdargs = new_ad.unparse() + " " + String(DESTINED_FOR_LOCALHOST);
+	cmdargs = new_ad + " " + String(DESTINED_FOR_LOCALHOST);
 	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
 
 	click_chatter("XTRANSPORT::Xupdatedag Added localhost route for new AD");
@@ -1983,29 +2237,11 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	// If default interface, update default_AD, default_4ID, default_HID
 	//    so they all point to new RHID
 	if(interface == _interfaces.default_interface()) {
-
-		// Set default AD to point to new RHID
-		cmd = ad_table_str + ".set4";
-		cmdargs = default_AD + ",0," + new_rhid.unparse() + "," + String(0xffff);
-		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
-		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
-
-		// Set default HID to point to new RHID
-		cmd = hid_table_str + ".set4";
-		cmdargs = default_HID + ",0," + new_rhid.unparse() + "," + String(0xffff);
-		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
-		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
-
-		// Set default AD to point to new RHID
-		cmd = ip_table_str + ".set4";
-		cmdargs = default_4ID + ",0," + new_rhid.unparse() + "," + String(0xffff);
-		click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
-		HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+		change_default_routes(interface, new_rhid);
 	}
+
 	// Add new RHID route pointing to new RHID
-	cmd = hid_table_str + ".add";
-	cmdargs = new_rhid.unparse() + " " + new_rhid.unparse();
-	HandlerCall::call_write(cmd.c_str(), cmdargs.c_str(), this);
+	update_route(new_rhid, hid_table_str, interface, new_rhid);
 
 	// Replace intent HID in router's DAG to form new_dag
 	XIAPath new_dag = router_dag;
@@ -2019,7 +2255,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	NOTICE("Iface: %d: new addr: %s", interface, new_dag.unparse().c_str());
 
 	// Add the corresponding rhid also
-	_interfaces.update_rhid(interface, new_rhid.unparse());
+	_interfaces.update_rhid(interface, new_rhid);
 
 	// Put the new DAG back into the xia_socket_msg to return to API
 	x_updatedag_msg->set_dag(new_dag.unparse().c_str());
@@ -2052,13 +2288,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in PacketRoute
 		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
 		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
-		// All the XIAXIDRouteTable elements
-		std::string routetables[5] = {"rt_AD", "rt_HID", "rt_SID", "rt_CID", "rt_IP"};
-		for(int i=0; i<5; i++) {
-			String route_table_str = _hostname + "/xrc/n/proc/" + routetables[i].c_str() + ".dag";
-			click_chatter("XTRANSPORT:Xupdatedag notifying: %s", route_table_str.c_str());
-			HandlerCall::call_write(route_table_str.c_str(), new_dag.unparse().c_str(), this);
-		}
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
@@ -2066,24 +2295,9 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	}
 
 	// Migrate sessions that can be migrated
-	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
-		uint32_t _migrateid = iter->first;
-		sock *sk = idToSock.get(_migrateid);
-        if (! migratable_sock(sk, interface)) {
-            continue;
-        }
+	migrateActiveSessions(interface, new_dag);
 
-        if (! update_src_path(sk, new_dag)) {
-            click_chatter("Migration skipped. Failed updating src path");
-            continue;
-        }
-
-		sk->migrating = true;
-		XStream *st = dynamic_cast<XStream *>(sk);
-
-		st->usrmigrate();
-	}
-
+	// Notify caller that the DAG has been updated
 	ReturnResult(_sport, xia_socket_msg);
 
 
@@ -2104,6 +2318,28 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 }
 
 
+void XTRANSPORT::migrateActiveSessions(int interface, XIAPath new_dag)
+{
+	// Migrate sessions that can be migrated
+	for (HashTable<uint32_t, sock*>::iterator iter = idToSock.begin(); iter != idToSock.end(); ++iter ) {
+		uint32_t _migrateid = iter->first;
+		sock *sk = idToSock.get(_migrateid);
+		if (! migratable_sock(sk, interface)) {
+			continue;
+		}
+
+		if (! update_src_path(sk, new_dag)) {
+			click_chatter("Migration skipped. Failed updating src path");
+			continue;
+		}
+
+		sk->migrating = true;
+		XStream *st = dynamic_cast<XStream *>(sk);
+
+		st->usrmigrate();
+	}
+
+}
 
 void XTRANSPORT::Xreadlocalhostaddr(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2138,13 +2374,15 @@ void XTRANSPORT::XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketM
 
 void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
-    UNUSED(id);
+	UNUSED(id);
 	xia::X_GetHostName_Msg *_msg = xia_socket_msg->mutable_x_gethostname();
 	_msg->set_hostname(_hostname.c_str());
 	ReturnResult(_sport, xia_socket_msg);
 }
 
 
+// Add interface DAG to list of dags being returned for getifaddrs
+// Include Rendezvous DAG for the interface as a separate entry, if exists
 void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 {
 	char iface_name[16];
@@ -2155,12 +2393,23 @@ void XTRANSPORT::_add_ifaddr(xia::X_GetIfAddrs_Msg *_msg, int interface)
 	ifaddr->set_flags(0);
 	ifaddr->set_src_addr_str(_interfaces.getDAG(interface).c_str());
 	ifaddr->set_dst_addr_str(_interfaces.getDAG(interface).c_str());
+	// TODO Add RV DAG to a new _msg->add_ifaddrs() if one is available
+	// If there is no Rendezvous DAG to add, we are done
+	if (!_interfaces.hasRVDAG(interface)) {
+		return;
+	}
+	xia::X_GetIfAddrs_Msg::IfAddr *rvifaddr = _msg->add_ifaddrs();
+	rvifaddr->set_iface_name(iface_name);
+	rvifaddr->set_flags(0);
+	rvifaddr->set_src_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_dst_addr_str(_interfaces.getRVDAG(interface).c_str());
+	rvifaddr->set_is_rv_dag(true);
 }
 
 void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
-        xia::XSocketMsg *xia_socket_msg)
+		xia::XSocketMsg *xia_socket_msg)
 {
-    UNUSED(id);
+	UNUSED(id);
 	xia::X_GetIfAddrs_Msg *_msg = xia_socket_msg->mutable_x_getifaddrs();
 
 	// Add the default interface first
@@ -2175,7 +2424,31 @@ void XTRANSPORT::Xgetifaddrs(unsigned short _sport, uint32_t id,
 	ReturnResult(_sport, xia_socket_msg);
 }
 
+void XTRANSPORT::Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg * xia_socket_msg)
+{
+	UNUSED(id);
+	UNUSED(_sport);
 
+	xia::X_UpdateDefIface_Msg *x_updatedefiface_msg =
+		xia_socket_msg->mutable_x_updatedefiface();
+	int interface = x_updatedefiface_msg->interface();
+	if (interface < 0 || interface > 4) {
+		click_chatter("ERROR: invalid default interface %d", interface);
+		return;
+	}
+	_interfaces.set_default(interface);
+	change_default_routes(interface, _interfaces.getRHID(interface));
+}
+
+void XTRANSPORT::Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	UNUSED(id);
+
+	xia::X_DefIface_Msg *_msg = xia_socket_msg->mutable_x_defiface();
+	_msg->set_interface(_interfaces.default_interface());
+
+	ReturnResult(_sport, xia_socket_msg);
+}
 
 void XTRANSPORT::Xupdatenameserverdag(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
@@ -2269,6 +2542,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 	//Find DAG info for that stream
 	if (rc == 0 && sk->sock_type == SOCK_RAW) {
 		char payload[65536];
+		assert (pktPayloadSize <= 65536);
 		memcpy(payload, x_send_msg->payload().c_str(), pktPayloadSize);
 
 		// FIXME: we should check to see that the packet isn't too big here
@@ -2325,7 +2599,7 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		int pktcontentslen = pktPayloadSize - headerlen;
 		INFO("Packet size without XIP header:%d", pktcontentslen);
 
-		WritablePacket *p = WritablePacket::make(p_in->headroom() + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
+		WritablePacket *p = WritablePacket::make(p_in->headroom() + headerlen + 1, (const void*)pktcontents, pktcontentslen, p_in->tailroom());
 		p = xiahencap.encap(p, false);
 
 		output(NETWORK_PORT).push(p);
@@ -2363,15 +2637,21 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		// Case of initial binding to only SID
 		if (sk->full_src_dag == false) {
 			sk->full_src_dag = true;
+			std::string src_xid_str = sk->src_path.intent_sid_str();
+			XIAPath new_src_path = _local_addr;
+			new_src_path.append_node(XID(src_xid_str.c_str()));
+			sk->src_path = new_src_path;
+			/*
 			String str_local_addr = _local_addr.unparse_re();
 			XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
 			String xid_string = front_xid.unparse();
 			str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 			sk->src_path.parse_re(str_local_addr);
+			*/
 		}
 
 		//Add XIA headers
-		WritablePacket *payload = WritablePacket::make(p_in->headroom() + 1, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+		WritablePacket *payload = WritablePacket::make(512, (const void*)x_send_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 		if (sk -> get_type() == SOCK_STREAM) {	// why do we need this test, we should always be a stream socket here
 			XStream *st = dynamic_cast<XStream *>(sk);
@@ -2419,7 +2699,6 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 
 	String dest(x_sendto_msg->ddag().c_str());
 	int pktPayloadSize = x_sendto_msg->payload().size();
-
 	XIAPath dst_path;
 	dst_path.parse(dest);
 
@@ -2438,13 +2717,23 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 			INFO("sk->port was %d setting to %d", sk->port, _sport);
 		}
 		sk->port = _sport;
-		String str_local_addr = _local_addr.unparse_re();
 
+		// Create a random XID
 		char xid_string[50];
 		random_xid("SID", xid_string);
+		XID new_xid(xid_string);
+
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(new_xid);
+		sk->src_path = new_addr;
+
+		/*
+		String str_local_addr = _local_addr.unparse_re();
+
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 
 		sk->src_path.parse_re(str_local_addr);
+		*/
 
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 
@@ -2455,37 +2744,59 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 	// Case of initial binding to only SID
 	if (sk->full_src_dag == false) {
 		sk->full_src_dag = true;
-		String str_local_addr = _local_addr.unparse_re();
+
 		XID front_xid = sk->src_path.xid(sk->src_path.destination_node());
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(front_xid);
+		sk->src_path = new_addr;
+		/*
+		String str_local_addr = _local_addr.unparse_re();
 		String xid_string = front_xid.unparse();
 		str_local_addr = str_local_addr + " " + xid_string; //Make source DAG _local_addr:SID
 		sk->src_path.parse_re(str_local_addr);
+		*/
 	}
 
 
+	if (sk->src_path.is_valid()) {
+		//Recalculate source path
+		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
+		XIAPath new_addr = _local_addr;
+		new_addr.append_node(source_xid);
+		sk->src_path = new_addr;
+	}
+
+	/*
 	if (sk->src_path.unparse_re().length() != 0) {
 		//Recalculate source path
 		XID	source_xid = sk->src_path.xid(sk->src_path.destination_node());
 		String str_local_addr = _local_addr.unparse_re() + " " + source_xid.unparse(); //Make source DAG _local_addr:SID
 		sk->src_path.parse(str_local_addr);
 	}
+	*/
 
 	idToSock.set(id, sk);
 	if (_sport != sk->port) {
 		ERROR("ERROR _sport %d, sk->port %d", _sport, sk->port);
 	}
 
+	// if there is a FID in the DAG, get the next sequence #
+	uint32_t fid_seq = NextFIDSeqNo(sk, dst_path);
+	if (fid_seq == FID_BAD_SEQ) {
+		// the DAG contains multiple FIDs, return an error
+		x_sendto_msg->clear_payload();
+		ReturnResult(_sport, xia_socket_msg, -1, ELOOP);
+		return;
+	}
+
 	//Add XIA headers
 	XIAHeaderEncap xiah;
 
-	xiah.set_last(LAST_NODE_DEFAULT);
 	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(dst_path);
 	xiah.set_src_path(sk->src_path);
 
-	// get rid of expensive packet push warning
-	//WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + 1, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
-	WritablePacket *just_payload_part = WritablePacket::make(256, (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
+	WritablePacket *just_payload_part = WritablePacket::make(p_in->headroom() + xiah.hdr_size(), (const void*)x_sendto_msg->payload().c_str(), pktPayloadSize, p_in->tailroom());
 
 	WritablePacket *p = NULL;
 
@@ -2496,17 +2807,31 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 		p = xiah.encap(just_payload_part, false);
 
 	} else {
-		xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
-		xiah.set_plen(pktPayloadSize);
-
-		//Add XIA Transport headers
 		DatagramHeaderEncap *dhdr = new DatagramHeaderEncap();
+		FIDHeaderEncap *fhdr = NULL;
+
+// FIXME: make this section cleaner
 		p = dhdr->encap(just_payload_part);
 
-		xiah.set_plen(pktPayloadSize + dhdr->hlen()); // XIA payload = transport header + transport-layer data
+		if (fid_seq == FID_NOT_FOUND) {
+			xiah.set_nxt(CLICK_XIA_NXT_XDGRAM);
+			xiah.set_plen(pktPayloadSize + dhdr->hlen()); // XIA payload = transport header + transport-layer data
+
+		} else {
+			// we need to insert a FID header before the Datagram header
+			fhdr = new FIDHeaderEncap(CLICK_XIA_NXT_XDGRAM, fid_seq);
+
+			p = fhdr->encap(p);
+			xiah.set_nxt(CLICK_XIA_NXT_FID);
+			xiah.set_plen(pktPayloadSize + + fhdr->hlen() + dhdr->hlen());
+		}
+
 
 		p = xiah.encap(p, false);
 		delete dhdr;
+		if (fhdr) {
+			delete fhdr;
+		}
 	}
 
 	output(NETWORK_PORT).push(p);
@@ -2583,7 +2908,6 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 		ReturnResult(_sport, xia_socket_msg, xia_socket_msg->x_recvfrom().bytes_returned());
 
 	} else if (!xia_socket_msg->blocking()) {
-
 		// we're not blocking and there's no data, so let API know immediately
 		sk->recv_pending = false;
 		ReturnResult(_sport, xia_socket_msg, -1, EWOULDBLOCK);
@@ -2599,9 +2923,51 @@ void XTRANSPORT::Xrecvfrom(unsigned short _sport, uint32_t id, xia::XSocketMsg *
 	}
 }
 
+void XTRANSPORT::XmanageFID(unsigned short _sport, uint32_t /*id*/, xia::XSocketMsg *xia_socket_msg)
+{
+	int rc = 0, ec = 0;
+
+	xia::X_ManageFID_Msg *x_fid_msg = xia_socket_msg->mutable_x_manage_fid();
+
+	bool create = x_fid_msg->create();
+	XID fid(x_fid_msg->fid().c_str());
+
+	DBG("%s: %s", create ? "create" : "remove", x_fid_msg->fid().c_str());
+
+	if (create) {
+		addRoute(fid);
+	} else {
+		delRoute(fid);
+	}
+
+	ReturnResult(_sport, xia_socket_msg, rc, ec);
+}
+
+
+/**
+ * Executes socket task, which is used by XStream to output packets.
+ */
+bool XTRANSPORT::run_task(Task* task){
+
+	bool retval = false;
+
+	TaskIdent* taskIdent = static_cast<TaskIdent*>(task); // living on the edge!
+	const uint32_t taskId = taskIdent->get_id();
+
+	sock *sk = idToSock.get(taskId);
+
+	if (sk){ // did we find a mapping?
+		retval = sk->run_task(task);
+	}
+
+	return retval;
+}
+
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XTRANSPORT)
+EXPORT_ELEMENT(sock)
 ELEMENT_REQUIRES(userlevel)
 ELEMENT_MT_SAFE(XTRANSPORT)
-ELEMENT_LIBS(-lcrypto -lssl -lprotobuf)
+ELEMENT_LIBS(-lcrypto -lssl -lprotobuf -L../../api/lib -ldagaddr)

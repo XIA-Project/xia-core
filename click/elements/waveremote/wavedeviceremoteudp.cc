@@ -40,7 +40,7 @@
 
 #include "wavedeviceremoteudp.hh"
 
-#define WAVE_MTU 99999999 // bytes, set to 1200 for the WSM waverserver version!
+#define WAVE_MTU 3072 // bytes, set to 1200 for the WSM waverserver version!
 
 #define WAVESERVER_CON_CODE 254
 #define WAVESERVER_DISC_CODE 255
@@ -150,9 +150,9 @@ a priority in [0,7].", declaration().c_str(), userPrio);
     _setTstamp = setTstamp;
 
     // buffer length
-    if (bufLen <= 0){
+    if (bufLen <= (WAVE_MTU + 6 /*wave packet plus 6-byte header*/)){
         errh->error("%s, configure(): invalid bufLen %d, please specify a \
-value larger than zero.", declaration().c_str(), bufLen);
+value of at least %d.", declaration().c_str(), bufLen, WAVE_MTU+6);
         retval = -1;
     } else
         _bufLen = bufLen;
@@ -568,8 +568,8 @@ pthread_mutex_lock(pipeMutex), strerror=%s",
             }
 
             // write the received data on the pipe
-            const int dataLen = nrcvd-2;
-            if (write(pipeFd, &rcvBuf[2], dataLen) != dataLen){
+            const int dataLen = nrcvd-6;
+            if (write(pipeFd, &rcvBuf[6], dataLen) != dataLen){
                 errh->error("%s, receiver_thread(): write(pipeFd), \
 strerror=%s", wdrInst->declaration().c_str(), strerror(errno));
             }

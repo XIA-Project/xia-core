@@ -2,6 +2,8 @@
 #ifndef XSECURITY_H
 #define XSECURITY_H
 
+#include <string>
+
 #define MAX_KEYDIR_PATH_LEN 1024
 #define MAX_PUBKEY_SIZE 2048
 #define MAX_SIGNATURE_SIZE 256
@@ -15,14 +17,17 @@
 class XIASecurityBuffer {
     public:
         XIASecurityBuffer(int initialSize);
-		XIASecurityBuffer(const char *buf, uint16_t len);
+        XIASecurityBuffer(const char *buf, uint16_t len);
         ~XIASecurityBuffer();
         bool pack(const char *data, uint16_t length);
-		bool unpack(char *data, uint16_t *length);
-		int peekUnpackLength();
+        bool pack(const char *data);
+        bool sign_and_pack(XIASecurityBuffer &payloadbuf,
+                const std::string &xid_str);
+        bool unpack(char *data, uint16_t *length);
+        int peekUnpackLength();
         char *get_buffer();
         uint16_t size();
-		uint16_t get_numEntries();
+        uint16_t get_numEntries();
     private:
         bool initialize(); // Called on first pack()
         bool extend(uint32_t length);

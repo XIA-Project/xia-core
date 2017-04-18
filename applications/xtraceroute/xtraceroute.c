@@ -35,9 +35,10 @@
 #include <signal.h>
 
 #include "Xsocket.h"
-#include "dagaddr.hpp"
 
 #include "xip.h"
+
+#define VER_STR     "xtraceroute 1.1"
 
 #define	MAXWAIT		10		// max time to wait for response, sec.
 #define	MAXPACKET	4096	// max packet size
@@ -88,12 +89,34 @@ float interval = 0.5;
 int rc = 0;
 int srcSet = 0;
 
+
+void help()
+{
+	printf("xtraceroute [-hqvV] [-m MAX HOPS] [-s PKTSIZE] host\n\n");
+
+	printf("options:\n");
+	printf("  -h, --help\n");
+	printf("     display this help\n");
+	printf("  -m MAX HOPS\n");
+	printf("     Specifies the maximum number of hops to probe. (default = 30)\n");
+	printf("  -q quiet mode\n");
+	printf("  -s PKTSIZE\n");
+	printf("     send packets of size PKTSIZE bytes\n");
+	printf("  -v verbose output\n");
+	printf("  -V  --version\n");
+	printf("     display the version number\n");
+	exit(0);
+}
+
+
 int main(int argc, char **argv)
 {
 	sockaddr_x from;
 	char **av = argv;
 	socklen_t len;
-	char s_to[1024], s_from[1024];
+	char s_to[XIA_MAX_DAG_STR_SIZE], s_from[XIA_MAX_DAG_STR_SIZE];
+
+	datalen = 64 - 8;
 
 	argc--, av++;
 	while (argc > 0 && *av[0] == '-') {
@@ -102,45 +125,65 @@ int main(int argc, char **argv)
 			if (c != argc)
 				break;
 			switch (*av[0]) {
+			case '-':
+				// see if it's a long option
+				if (strcmp(av[0], "-version") == 0) {
+					printf("%s\n", VER_STR);
+					return 0;
+				} else if  (strcmp(av[0], "-help") == 0) {
+					help();
+				}
+				break;
+			case 'm':
+				argc--, av++;
+				npackets = atoi(av[0]);
+				break;
 			case 'v':
 				pingflags |= VERBOSE;
 				break;
 			case 'q':
 				pingflags |= QUIET;
 				break;
-			case 't':
-				argc--, av++;
-				catcher_timeout = atoi(av[0]);
-				break;
 			case 's':
 				argc--, av++;
-				fromlen = sizeof(wherefrom);
-				srcSet = 1;
-				if (XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
-					printf("Error Resolving XID\n");
-					exit(-1);
-				}
+				datalen = atoi(av[0]);
+				break;
+			// case 't':
+			// 	argc--, av++;
+			// 	catcher_timeout = atoi(av[0]);
+			// 	break;
+			// case 's':
+			// 	argc--, av++;
+			// 	fromlen = sizeof(wherefrom);
+			// 	srcSet = 1;
+			// 	if (XgetDAGbyName(av[0], &wherefrom, &fromlen) < 0) {
+			// 		printf("Error Resolving XID\n");
+			// 		exit(-1);
+			// 	}
+				break;
+			case 'V':
+				printf("%s\n", VER_STR);
+				return 0;
+			case 'h':
+				help();
 				break;
 			}
 		}
 		argc--, av++;
 	}
-	if (argc < 1 || argc > 3)  {
-	  printf("%s",usage);
+	if (argc != 1) {
+		help();
 		exit(1);
 	}
 
 	len = sizeof(whereto);
-	if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
+	if (xia_pton(AF_XIA, av[0], &whereto) == 1) {
+		// we've got it
+	} else if (XgetDAGbyName(av[0], &whereto, &len) < 0) {
 	  printf("Error Resolving XID\n");
 	  exit(-1);
 	}
 
-	if (argc >= 2) {
-		datalen = atoi(av[1]);
-	} else {
-		datalen = 64 - 8;
-	}
 	if (datalen > MAXPACKET) {
 		fprintf(stderr, "traceroute: packet size too large\n");
 		exit(1);
@@ -148,9 +191,6 @@ int main(int argc, char **argv)
 	if (datalen >= sizeof(struct timeval)) {
 		// can we time 'em?
 		timing = 1;
-	}
-	if (argc >= 3) {
-		npackets = atoi(av[2]);
 	}
 
 	ident = htons(getpid() & 0xFFFF);
@@ -173,8 +213,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	Graph g(&whereto);
-	strncpy(s_to, g.dag_string().c_str(), sizeof(s_to));
+	xia_ntop(AF_XIA, &whereto, s_to, sizeof(s_to));
 	printf("TRACEROUTE (%u hops %lu bytes) to\n%s:\n\n", npackets, datalen, s_to);
 
 	setlinebuf(stdout);
@@ -197,8 +236,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		Graph gf(&from);
-		strncpy(s_from, gf.dag_string().c_str(), sizeof(s_from));
+		xia_ntop(AF_XIA, &from, s_from, sizeof(s_from));
 		pr_pack(packet, cc, s_from);
 
 
@@ -449,7 +487,7 @@ void pr_pack(u_char *buf, int cc, const char *from)
 	// 	}
 	// }
 	//
- 	//	if (timing) {
+	//	if (timing) {
 	//		printf(" time=%d ms\n", triptime);
 	// } else {
 	//		putchar('\n');

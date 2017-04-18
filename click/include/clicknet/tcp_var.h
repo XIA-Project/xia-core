@@ -39,7 +39,7 @@
  * Kernel variables for tcp.
  */
 
-#define TCP_REXMT_THRESH 3
+#define TCP_REXMT_THRESH 1 // rui was 3
 
 #define SO_FIN_AFTER_TCP_IDLE 1000
 #define SO_PLAIN_UDP 1001

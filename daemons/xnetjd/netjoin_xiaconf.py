@@ -20,6 +20,8 @@ class NetjoinXIAConf(object):
         self.key_dir = os.path.join(self.src_dir, "key")
         self.addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
         self.resolvconfpattern = re.compile('nameserver=(RE.+)')
+        self.rvpattern = re.compile('rendezvous=(.+)')
+        self.rvcpattern = re.compile('rendezvousc=(.+)')
 
 	'''
     # Return serialized SignedMessage
@@ -127,19 +129,24 @@ class NetjoinXIAConf(object):
             hid = hid[len("HID:"):]
         return (ad, hid)
 
-    def get_ns_dag(self):
-        ns_dag = None
-        resolvconfpath = os.path.join(self.conf_dir, "resolv.conf")
+    def resolvconf_entry(self, pattern):
+        resolvconfpath = os.path.join(self.conf_dir, 'resolv.conf')
         with open(resolvconfpath) as resolvconf:
             for line in resolvconf:
-                match = self.resolvconfpattern.match(line)
+                match = pattern.match(line)
                 if not match:
                     continue
+                return match.group(1)
+        return None
 
-                ns_dag = match.group(1)
-                break
+    def get_ns_dag(self):
+        return self.resolvconf_entry(self.resolvconfpattern)
 
-        return ns_dag
+    def get_rv_dag(self):
+        return self.resolvconf_entry(self.rvpattern)
+
+    def get_rv_control_dag(self):
+        return self.resolvconf_entry(self.rvcpattern)
 
     def get_swig_path(self):
         return os.path.join(self.src_dir, "api/lib")

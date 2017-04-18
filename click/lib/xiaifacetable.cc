@@ -65,25 +65,44 @@ bool XIAInterface::update_rhid(String rhid)
 
 bool XIAInterface::update_rv_dag(String rv_dag)
 {
+	// We never overwrite a known RV DAG. Start instance in home network.
+	if(_rv_dag.length() > CLICK_XIA_XID_ID_LEN) {
+		click_chatter("XIAInterface: RV DAG:%s", _rv_dag.c_str());
+		click_chatter("XIAInterface: Ignored:%s", rv_dag.c_str());
+		return true;
+	}
+
+	// If the user passed a valid DAG, update our DAG
+	if((rv_dag.length() < CLICK_XIA_XID_ID_LEN)) {
+		click_chatter("XIAInterface: ERROR: Invalid RV DAG");
+		return false;
+	}
+
 	_rv_dag = rv_dag;
+	click_chatter("XIAInterface: new RV DAG: %s", _rv_control_dag.c_str());
+
 	return true;
 }
 
 bool XIAInterface::update_rv_control_dag(String rv_control_dag)
 {
-	bool retval = false;
-	// If the user passed a valid dag, update our dag
-	if(rv_control_dag.length() > CLICK_XIA_XID_ID_LEN) {
-		_rv_control_dag = rv_control_dag;
-		retval = true;
-	} else {
-		click_chatter("XIAInterface: Provided rv_control_dag not valid, skip");
-		// If we have an old RV dag, we keep using it
-		if (has_rv_control_dag()) {
-			click_chatter("XIAInterface: Using: %s", _rv_control_dag.c_str());
-		}
+	// We never overwrite a known RV Control DAG assigned by home network.
+	if(_rv_control_dag.length() > CLICK_XIA_XID_ID_LEN) {
+		click_chatter("XIAInterface: RVC dag:%s", _rv_control_dag.c_str());
+		click_chatter("XIAInterface: Ignored:%s", rv_control_dag.c_str());
+		return true;
 	}
-	return retval;
+
+	// If the user passed a valid DAG, update our DAG
+	if(rv_control_dag.length() < CLICK_XIA_XID_ID_LEN) {
+		click_chatter("XIAInterface: ERROR: Invalid RV Control DAG");
+		return false;
+	}
+
+	_rv_control_dag = rv_control_dag;
+	click_chatter("XIAInterface: new RVC DAG: %s", _rv_control_dag.c_str());
+
+	return true;
 }
 
 XIAInterfaceTable::XIAInterfaceTable()
@@ -198,9 +217,8 @@ void XIAInterfaceTable::_insert(int iface, String dag)
 }
 
 // Erase entry. Caller makes sure entry exist.
-void XIAInterfaceTable::_erase(int iface, String dag)
+void XIAInterfaceTable::_erase(int iface, String /* dag */)
 {
 	interfaces.erase(iface);
 	numInterfaces--;
 }
-

@@ -155,7 +155,7 @@ void process(int sock)
 	tv.tv_sec = WAIT_FOR_DATA;
 	tv.tv_usec = 0;
 
-   	while (1) {
+	while (1) {
 		memset(buf, 0, sizeof(buf));
 
 		tv.tv_sec = WAIT_FOR_DATA;
@@ -182,7 +182,6 @@ void process(int sock)
 	// 	break;
 	// }
 	int count = 0;
-	printf("185\n");
 	while ((count = Xrecv(sock, buf, sizeof(buf), 0)) != 0) {
 		say("%5d received %d bytes\n", pid, count);
 		n += count;
@@ -209,6 +208,7 @@ static void reaper(int sig)
 
 void echo_stream()
 {
+	char buf[XIA_MAX_DAG_STR_SIZE];
 	int acceptor, sock;
 	char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
@@ -226,21 +226,47 @@ void echo_stream()
 		die(-1, "Unable to create a temporary SID");
 	}
 
+	// Get a list of interfaces and their corresponding addresses
+	struct ifaddrs *ifaddr, *ifa;
+	if(Xgetifaddrs(&ifaddr)) {
+		die(-1, "unable to get interface addresses\n");
+	}
+
+	// See if we can find an address with rendezvous service
+	std::string rvdagstr;
+	for(ifa=ifaddr; ifa!=NULL; ifa = ifa->ifa_next) {
+		if(ifa->ifa_addr == NULL) {
+			continue;
+		}
+		if(ifa->ifa_flags & XIFA_RVDAG) {
+			Graph rvdag((sockaddr_x *)ifa->ifa_addr);
+			rvdagstr = rvdag.dag_string();
+			break;
+		}
+	}
+
 	struct addrinfo hints, *ai;
 	bzero(&hints, sizeof(hints));
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_family = AF_XIA;
-	if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0)
-		die(-1, "getaddrinfo failure!\n");
-
-	Graph g((sockaddr_x*)ai->ai_addr);
+	if (rvdagstr.size() > XIA_XID_STR_SIZE) {
+		hints.ai_flags |= XAI_DAGHOST;
+		if(Xgetaddrinfo(rvdagstr.c_str(), sid_string, &hints, &ai)) {
+			die(-1, "getaddrinfo with rvdag failed\n");
+		}
+	} else {
+		if (Xgetaddrinfo(NULL, sid_string, &hints, &ai) != 0) {
+			die(-1, "getaddrinfo failure!\n");
+		}
+	}
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	printf("\nStream DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nStream DAG\n%s\n", buf);
 
-    if (XregisterName(STREAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", STREAM_NAME);
+	if (XregisterName(STREAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", STREAM_NAME);
 	say("registered name: \n%s\n", STREAM_NAME);
 
 	if (Xbind(acceptor, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
@@ -261,9 +287,9 @@ void echo_stream()
 			continue;
 		}
 
-		Graph g(&sa);
+		xia_ntop(AF_XIA, &sa, buf, sizeof(buf));
 		say ("Xsock %4d new session\n", sock);
-		say("peer:%s\n", g.dag_string().c_str()); 
+		say("peer:%s\n", buf);
 
 		pid_t pid = Xfork();
 
@@ -305,11 +331,11 @@ void echo_dgram()
 
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
-	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+	xia_ntop(AF_XIA, sa, buf, sizeof(buf));
+	printf("\nDatagram DAG\n%s\n", buf);
 
-    if (XregisterName(DGRAM_NAME, sa) < 0 )
-    	die(-1, "error registering name: %s\n", DGRAM_NAME);
+	if (XregisterName(DGRAM_NAME, sa) < 0 )
+		die(-1, "error registering name: %s\n", DGRAM_NAME);
 	say("registered name: \n%s\n", DGRAM_NAME);
 
 	if (Xbind(sock, (sockaddr *)sa, sizeof(sa)) < 0) {

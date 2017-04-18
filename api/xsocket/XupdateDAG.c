@@ -25,19 +25,33 @@
 
 #define MAX_RV_DAG_SIZE 1024
 
+/*!
+ * @brief update the DAG for an interface
+ *
+ * Each interface has a DAG associated with it. This API allows a user
+ * space application to change the DAG for a given interface
+ *
+ * @param sockfd a previously allocated Xsocket
+ * @param interface the interface whose DAG needs to be changed
+ * @param rdag the router's DAG
+ * @param r4id the router's 4ID
+ *
+ * @returns -1 on failure
+ * @returns 0 on success
+ */
 int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   int rc;
 
   if (!rdag) {
-    LOG("new ad is NULL!");
-    errno = EFAULT;
-    return -1;
+	LOG("new ad is NULL!");
+	errno = EFAULT;
+	return -1;
   }
 
   if (getSocketType(sockfd) == XSOCK_INVALID) {
-    LOG("The socket is not a valid Xsocket");
-    errno = EBADF;
-    return -1;
+	LOG("The socket is not a valid Xsocket");
+	errno = EBADF;
+	return -1;
   }
 
   xia::XSocketMsg xsm;
@@ -58,8 +72,8 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   // process the reply from click
   xia::XSocketMsg xsm1;
   if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
-    LOGF("Error getting status from Click: %s", strerror(errno));
-    return -1;
+	LOGF("Error getting status from Click: %s", strerror(errno));
+	return -1;
   }
   if(xsm1.type() == xia::XUPDATEDAG) {
 	  xia::X_Updatedag_Msg *msg = xsm1.mutable_x_updatedag();
@@ -73,7 +87,25 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   return 0;
 }
 
-int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
+/*!
+ * @brief update the rendezvous service of our new address
+ *
+ * When we join a new network, if there is a rendezvous service associated
+ * with the interface that migrated, we send a notification to the service
+ * of our new address.
+ *
+ * \todo require feedback response from the rendezvous service control plane
+ *
+ * This is a one time message with no feedback. So if the message is lost
+ * the rendezvous service won't be able to forward packets.
+ *
+ * @param sockfd a previously created XSocket
+ * @param interface the interface that just joined a new network or came up
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XupdateRV(int sockfd, int interface)
 {
 	int rc;
 
@@ -84,7 +116,6 @@ int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
 
 	xia::X_Updaterv_Msg *x_updaterv_msg = xsm.mutable_x_updaterv();
 	x_updaterv_msg->set_interface(interface);
-	x_updaterv_msg->set_rvdag(rv_control_dag);
 
 	if((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error asking Click transport to update RV: %s", strerror(errno));
@@ -111,13 +142,13 @@ int XupdateRV(int sockfd, int interface, const char *rv_control_dag)
 **
 */
 int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *local4ID, unsigned len4ID) {
-  	int rc;
+	int rc;
 
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
 		LOGF("The socket %d is not a valid Xsocket", sockfd);
-   	 	errno = EBADF;
-  		return -1;
- 	}
+		errno = EBADF;
+		return -1;
+	}
 
 	if (localhostDAG == NULL || local4ID == NULL) {
 		LOG("NULL pointer!");
@@ -125,15 +156,15 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 		return -1;
 	}
 
- 	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XREADLOCALHOSTADDR);
-  	unsigned seq = seqNo(sockfd);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XREADLOCALHOSTADDR);
+	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
 	xia::XSocketMsg xsm1;
 	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
@@ -170,8 +201,8 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 }
 
 
-/*!
-** @tell if this node is an XIA-IPv4 dual-stack router
+/*
+** @brief tell if this node is an XIA-IPv4 dual-stack router
 **
 **
 ** @param sockfd an Xsocket (may be of any type XSOCK_STREAM, etc...)
@@ -182,23 +213,23 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 **
 */
 int XisDualStackRouter(int sockfd) {
-  	int rc;
+	int rc;
 
- 	if (getSocketType(sockfd) == XSOCK_INVALID) {
-   	 	LOG("The socket is not a valid Xsocket");
-   	 	errno = EBADF;
-  		return -1;
- 	}
+	if (getSocketType(sockfd) == XSOCK_INVALID) {
+		LOG("The socket is not a valid Xsocket");
+		errno = EBADF;
+		return -1;
+	}
 
- 	xia::XSocketMsg xsm;
-  	xsm.set_type(xia::XISDUALSTACKROUTER);
-  	unsigned seq = seqNo(sockfd);
-  	xsm.set_sequence(seq);
+	xia::XSocketMsg xsm;
+	xsm.set_type(xia::XISDUALSTACKROUTER);
+	unsigned seq = seqNo(sockfd);
+	xsm.set_sequence(seq);
 
-  	if ((rc = click_send(sockfd, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
-  	}
+	}
 
 	xia::XSocketMsg xsm1;
 	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {

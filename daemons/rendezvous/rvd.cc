@@ -10,6 +10,7 @@ using namespace std;
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "Xkeys.h"
+#include "xia.h"
 
 #define DEFAULT_NAME "host0"
 #define APPNAME "xrendezvous"
@@ -142,8 +143,8 @@ void config(int argc, char** argv)
 
 	if(!control_plane_dag_known) {
 		// Read Data plane DAG from resolv.conf
-		if(XreadRVServerAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
-			syslog(LOG_INFO, "Data plane DAG: %s", control_plane_DAG);
+		if(XreadRVServerControlAddr(control_plane_DAG, XIA_MAX_DAG_STR_SIZE) == 0) {
+			syslog(LOG_INFO, "Control plane DAG: %s", control_plane_DAG);
 		} else {
 			// Build a DAG from scratch
 			if(buildDAGFromRandomSID(control_plane_DAG, XIA_MAX_DAG_STR_SIZE)) {
@@ -252,98 +253,62 @@ void process_data(int datasock)
 	socklen_t rdaglen = sizeof(rdag);
 	bzero(packet, RV_MAX_DATA_PACKET_SIZE);
 
+	// Read in the data packet
 	syslog(LOG_INFO, "Reading data packet");
-	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE, 0, (struct sockaddr *)&rdag, &rdaglen);
+	int retval = Xrecvfrom(datasock, packet, RV_MAX_DATA_PACKET_SIZE,
+			0, (struct sockaddr *)&rdag, &rdaglen);
 	if(retval < 0) {
 		syslog(LOG_WARNING, "WARN: No data(%s)", strerror(errno));
 		return;
 	}
 	packetlen = retval;
 	Graph g(&rdag);
-	syslog(LOG_INFO, "Packet of size:%d received from %s:", retval, g.dag_string().c_str());
-	print_packet_contents(packet, retval);
+	syslog(LOG_INFO, "Packet of size:%d received from %s:",
+			retval, g.dag_string().c_str());
+	//print_packet_contents(packet, retval);
 	click_xia *xiah = reinterpret_cast<struct click_xia *>(packet);
 	print_packet_header(xiah);
-	/*
-	syslog(LOG_INFO, "======= RAW PACKET HEADER ========");
-	syslog(LOG_INFO, "ver:%d", xiah->ver);
-	syslog(LOG_INFO, "nxt:%d", xiah->nxt);
-	syslog(LOG_INFO, "plen:%d", htons(xiah->plen));
-	syslog(LOG_INFO, "hlim:%d", xiah->hlim);
-	syslog(LOG_INFO, "dnode:%d", xiah->dnode);
-	syslog(LOG_INFO, "snode:%d", xiah->snode);
-	syslog(LOG_INFO, "last:%d", xiah->last);
-	int total_nodes = xiah->dnode + xiah->snode;
-	for(int i=0;i<total_nodes;i++) {
-		uint8_t id[20];
-		char hex_string[41];
-		bzero(hex_string, 41);
-		memcpy(id, xiah->node[i].xid.id, 20);
-		for(int j=0;j<20;j++) {
-			sprintf(&hex_string[2*j], "%02x", (unsigned int)id[j]);
-		}
-		char type[10];
-		bzero(type, 10);
-		switch (htonl(xiah->node[i].xid.type)) {
-			case CLICK_XIA_XID_TYPE_AD:
-				strcpy(type, "AD");
-				break;
-			case CLICK_XIA_XID_TYPE_HID:
-				strcpy(type, "HID");
-				break;
-			case CLICK_XIA_XID_TYPE_SID:
-				strcpy(type, "SID");
-				break;
-			case CLICK_XIA_XID_TYPE_CID:
-				strcpy(type, "CID");
-				break;
-			case CLICK_XIA_XID_TYPE_IP:
-				strcpy(type, "4ID");
-				break;
-			default:
-				sprintf(type, "%d", xiah->node[i].xid.type);
-		};
-		syslog(LOG_INFO, "%s:%s", type, hex_string);
-	}
-	*/
 
-// make the warning go away for xiah->node[0]
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
+	// Read in the destination DAG
+	// NOTE: Conversion to Graph strips out 'visited' field in the dag
+	Graph ddag;
+	ddag.from_wire_format(xiah->dnode, xiah->node);
 
-	// Starting at node at offset 0, verify it is an AD node
-	if(htonl(xiah->node[0].xid.type) != CLICK_XIA_XID_TYPE_AD) {
-		syslog(LOG_ERR, "First node in destination DAG is not an AD");
+	// Find the intent AD and HID
+	std::string intent_ad = ddag.intent_AD_str();
+	std::string intent_hid = ddag.intent_HID_str();
+	if (intent_ad.size() < CLICK_XIA_XID_ID_LEN ||
+			intent_hid.size() < CLICK_XIA_XID_ID_LEN) {
+		syslog(LOG_ERR, "intent_ad: %s.", intent_ad.c_str());
+		syslog(LOG_ERR, "intent_hid: %s.", intent_hid.c_str());
+		syslog(LOG_ERR, "intent AD or HID not found in dest dag");
 		return;
 	}
-	// Walk the destination DAG to find HID
-	char hid_str[41];
-	sha1_hash_to_hex_string(xiah->node[xiah->node[0].edge[0].idx].xid.id, 20, hid_str, 41);
 
-// done disabling the warning
-#pragma GCC diagnostic pop
+	// Find the current AD for intent hid
+	// TODO: Add check ot ensure intent_hid is in HIDtoAD
+	std::string new_ad(HIDtoAD[intent_hid]);
 
-	syslog(LOG_INFO, "DestHost = %s", hid_str);
-	Node hidNode("HID", hid_str);
-	syslog(LOG_INFO, "DestHostID = %s", hidNode.to_string().c_str());
-	std::string ad_string(HIDtoAD[hidNode.to_string()]);
-	Node adNode(ad_string);
-	//char id_hex_string[41];
-	//bzero(id_hex_string, 41);
-	//sha1_hash_to_hex_string((unsigned char *)adNode.id(), 20, id_hex_string, 41);
-	//syslog(LOG_INFO, "AD from table = %s", id_hex_string);
-	memcpy(xiah->node[0].xid.id, adNode.id(), 20);
-	xiah->last = -1;
+	// Now replace intent AD with the new AD, if changed
+	if (new_ad.compare(intent_ad)) {
+		ddag.replace_intent_AD(new_ad);
+
+		// Convert DAG back to wire format and overwrite ddag in packet
+		size_t num_nodes = ddag.fill_wire_buffer(xiah->node);
+
+		// Confirm that the new DAG size matches the DAG being replaced
+		if (num_nodes != xiah->dnode) {
+			// drop this packet and abort
+			syslog(LOG_ERR, "DAG modification resulted in size change");
+			return;
+		}
+	}
+
+	xiah->last = LAST_NODE_DEFAULT;
 	syslog(LOG_INFO, "Updated AD and last pointer in header");
 	print_packet_header(xiah);
 	syslog(LOG_INFO, "Sending the packet out on the network");
 	Xsend(datasock, packet, packetlen, 0);
-	// Find the AD->HID->SID this packet was destined to
-	// Verify HID is in table and find newAD
-	// If newAD is different from the AD in XIP header, update it
-	// If not, drop the packet
-	// Reset the next pointer in the XIP header
-	// Send packet back on the network
 }
 
 #define MAX_XID_STR_SIZE 64
@@ -395,22 +360,25 @@ void process_control_message(int controlsock)
 	bzero(dag, dagLength+1);
 	controlMsg.unpack(dag, &dagLength);
 
-	uint16_t timestampLength = controlMsg.peekUnpackLength();
-	assert(timestampLength == (uint16_t) sizeof(double));
-	double timestamp;
-	controlMsg.unpack((char *)&timestamp, &timestampLength);
+	uint16_t timestampstrLength = controlMsg.peekUnpackLength();
+	char timestampstr[timestampstrLength+1];
+	bzero(timestampstr, timestampstrLength+1);
+	controlMsg.unpack(timestampstr, &timestampstrLength);
+	double timestamp = strtod(timestampstr, NULL);
 
 	// Verify hash(pubkey) matches HID
 	if(!xs_pubkeyMatchesXID(pubkey, hid)) {
 		syslog(LOG_ERR, "ERROR: Public key does not match HID of control message sender");
 		return;
 	}
+	syslog(LOG_INFO, "Valid pubkey in control message");
 
 	// Verify signature using pubkey
 	if(!xs_isValidSignature((const unsigned char *)controlMsgBuffer, controlMsgLength, (unsigned char *)signature, signatureLength, pubkey, pubkeyLength)) {
 		syslog(LOG_ERR, "ERROR: Invalid signature");
 		return;
 	}
+	syslog(LOG_INFO, "Signature valid");
 
 	// Verify that the timestamp is newer than seen before
 	HIDtoTimestampIterator = HIDtoTimestamp.find(hid);
