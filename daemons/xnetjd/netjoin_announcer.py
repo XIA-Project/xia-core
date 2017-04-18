@@ -22,6 +22,11 @@ class NetjoinAnnouncer(object):
             logging.debug("Stopping network announcement")
             return
 
+        # Exit if the exit flag is true
+        if self.exit == True:
+            logging.debug("Announcer exiting")
+            return
+
         # Send beacon to XIANetJoin
         logging.debug("Sent beacon")
         net_descriptor = self.beacon.update_and_get_serialized_descriptor()
@@ -44,6 +49,7 @@ class NetjoinAnnouncer(object):
         self.xianetjoin = ("127.0.0.1", 9882)
         self.shutdown_event = shutdown_event
         self.net_id = net_id
+        self.exit = False
 
         # A socket for sending messages to XIANetJoin
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -51,6 +57,9 @@ class NetjoinAnnouncer(object):
         # A beacon object we will send to announce the network
         self.beacon = NetjoinBeacon(self.net_id)
         self.beacon.initialize(self.auth.get_raw_verify_key(), l2_type)
+
+    def end(self):
+        self.exit = True
 
     def get_net_id(self):
         return self.net_id
