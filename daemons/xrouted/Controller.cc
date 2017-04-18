@@ -5,20 +5,6 @@
 #include "minIni.h"
 #include "Controller.hh"
 
-
-// FIXME: put this somewhere common
-static uint32_t sockaddr_size(const sockaddr_x *s)
-{
-	// max possible size
-	size_t len = sizeof(sockaddr_x);
-
-	// subtract the space occupied by unallocated nodes
-	len -= (CLICK_XIA_ADDR_MAX_NODES - s->sx_addr.s_count) * sizeof(node_t);
-
-	return len;
-}
-
-
 // parameters which could be overwritten by controller file
 // default values are defined in the header file
 int expire_time = EXPIRE_TIME;
@@ -418,7 +404,6 @@ int Controller::sendHello()
 
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
-	hello->set_dag(&_controller_dag, sockaddr_size(&_controller_dag));
 	hello->set_flags(F_CONTROLLER);
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);

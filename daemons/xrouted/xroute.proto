@@ -80,7 +80,6 @@ message ConfigMsg {
 message HelloMsg {
 	required Node   node  = 1;
 	optional uint32 flags = 2;
-	optional bytes  dag   = 3;
 }
 
 message LSAMsg {

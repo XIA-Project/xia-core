@@ -337,7 +337,6 @@ int Router::sendHello()
 	msg.set_type(Xroute::HELLO_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 	hello->set_flags(_flags);
-	hello->set_dag(&_router_dag, sockaddr_size(&_router_dag));
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -621,9 +620,6 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	} else {
 		neighbor.HID = neighborHID;
-	}
-
-	if (msg.has_dag()) {
 	}
 
 	if (msg.has_flags()) {
