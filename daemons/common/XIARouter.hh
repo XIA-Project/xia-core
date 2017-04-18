@@ -58,6 +58,8 @@ typedef struct {
 	unsigned long  flags;
 } XIARouteEntry;
 
+typedef std::map<std::string, XIARouteEntry> XIARouteTable;
+
 class XIARouter {
 public:
 	XIARouter(const char *_rtr = "router0") { _connected = false;
