@@ -124,6 +124,36 @@ static const char *xerr_unimplemented = "This feature is not currently supported
 	return msg;
  }
 
+/*!
+ * Calculate the actual amount of smace needed by a sockaddr.
+ *
+ * Because the length of a DAG is not fixed, a sockaddr will usually not fill
+ * the entire space allocated to it. Thius function calculates the number of
+ * bytes acutally needed to store the address.
+ *
+ * @param s the sockaddr to check
+ *
+ * @returns # of bytes needed to store the address or 0 if not a valid sockaddr_x
+ */
+size_t sockaddr_size(const sockaddr_x *s)
+{
+	// do a sanity check to be sure it's a valid sockaddr
+	if (!s ||
+		s->sx_family != AF_XIA ||
+		s->sx_addr.s_count > CLICK_XIA_ADDR_MAX_NODES) {
+		return 0;
+	}
+
+	// max possible size
+	size_t len = sizeof(sockaddr_x);
+
+	// subtract the space occupied by unallocated nodes
+	len -= (CLICK_XIA_ADDR_MAX_NODES - s->sx_addr.s_count) * sizeof(node_t);
+
+	return len;
+}
+
+
 
 /*!
  * Read DAG for rendezvous server data plane from resolv.conf
