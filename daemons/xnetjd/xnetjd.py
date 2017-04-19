@@ -86,7 +86,7 @@ def main():
     # Initialize the policy module
     # For now we have one policy for all beacons.
     # TODO: Pass list of auth providers
-    policy = NetjoinPolicy()
+    policy = NetjoinPolicy(is_controller=args.controller)
 
     announcer = None
     if args.controller:
