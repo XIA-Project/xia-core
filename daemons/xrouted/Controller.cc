@@ -45,7 +45,7 @@ void Controller::purge()
 
 	if (now - _last_purge >= _settings->expire_time()) {
 		_last_purge = now;
-		map<string, time_t>::iterator iter = _timeStamp.begin();
+		TimestampList::iterator iter = _timeStamp.begin();
 
 		while (iter != _timeStamp.end())
 		{
@@ -59,7 +59,7 @@ void Controller::purge()
 			}
 		}
 
-		map<string, NodeStateEntry>::iterator iter1 = _ADNetworkTable.begin();
+		NetworkTable::iterator iter1 = _ADNetworkTable.begin();
 
 		while (iter1 != _ADNetworkTable.end())
 		{
@@ -72,7 +72,7 @@ void Controller::purge()
 			}
 		}
 
-		map<string, NeighborEntry>::iterator iter2 = _neighborTable.begin();
+		NeighborTable::iterator iter2 = _neighborTable.begin();
 
 		while (iter2 != _neighborTable.end())
 		{
@@ -85,7 +85,7 @@ void Controller::purge()
 			}
 		}
 
-		map<string, NeighborEntry>::iterator iter3 = _ADNeighborTable.begin();
+		NeighborTable::iterator iter3 = _ADNeighborTable.begin();
 
 		while (iter3 != _ADNeighborTable.end())
 		{
@@ -320,7 +320,7 @@ int Controller::sendInterDomainLSA()
 	hid->set_id(h.id(), XID_SIZE);
 	lsa->set_flags(_flags);
 
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
 		Node aa(it->second.AD);
@@ -354,7 +354,7 @@ int Controller::sendInterDomainLSA()
 	return rc;
 }
 
-int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
+int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTable)
 {
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
@@ -393,7 +393,7 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string
 		th ->set_type(thid.type());
 		th ->set_id(thid.id(), XID_SIZE);
 
-		map<string, RouteEntry>::iterator it;
+		RouteTable::iterator it;
 		for (it = routingTable.begin(); it != routingTable.end(); it++)
 		{
 			Xroute::TableEntry *e = t->add_routes();
@@ -469,7 +469,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 
 	// Rebroadcast this LSA
 	int rc = 1;
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++) {
 		sockaddr_x ddag;
 		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
@@ -509,7 +509,7 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 	entry.ad = _myAD;
 
 	// fill my neighbors into my entry in the networkTable
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++) {
 		entry.neighbor_list.push_back(it->second);
 	}
@@ -566,7 +566,7 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	entry.ad = _myAD;
 
 	// Add neighbors to network table entry
-	std::map<std::string, NeighborEntry>::iterator it;
+	NeighborTable::iterator it;
 	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++) {
 		entry.neighbor_list.push_back(it->second);
 	}
@@ -578,10 +578,10 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 }
 
 
-int Controller::processRoutingTable(std::map<std::string, RouteEntry> routingTable)
+int Controller::processRoutingTable(RouteTable routingTable)
 {
 	int rc;
-	map<string, RouteEntry>::iterator it;
+	RouteTable::iterator it;
 	for (it = routingTable.begin(); it != routingTable.end(); it++)
 	{
 		// TODO check for all published SIDs
@@ -653,7 +653,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
-		std::map<std::string, RouteEntry> ADRoutingTable;
+		RouteTable ADRoutingTable;
 		populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
 
 		// For debugging.
@@ -661,7 +661,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		// printRoutingTable(_myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
-		std::map<std::string, NodeStateEntry>::iterator it1;
+		NetworkTable::iterator it1;
 		// Iterate through ADs
 		for (it1 = _networkTable.begin(); it1 != _networkTable.end(); ++it1)
 		{
@@ -672,7 +672,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 				// Don't calculate routes for SIDs
 				continue;
 			}
-			std::map<std::string, RouteEntry> routingTable;
+			RouteTable routingTable;
 
 			// Calculate routing table for HIDs instead
 			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
@@ -689,7 +689,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		// for some reason some controllers will delete their routing table entries in
 		// populateRoutingTable when they shouldn't. This forces the entries back into the table
 		// it's the same logic from inside the loop above
-		std::map<std::string, RouteEntry> routingTable;
+		RouteTable routingTable;
 		populateRoutingTable(_myHID, _networkTable, routingTable);
 		if (routingTable.size() == 0) {
 			return 1;
@@ -719,7 +719,7 @@ int Controller::extractNeighborADs(void)
 	entry.timestamp = time(NULL);
 
 	// Add neighbors to network table entry
-	std::map<std::string, NeighborEntry>::iterator it1;
+	NeighborTable::iterator it1;
 	for (it1 = _ADNeighborTable.begin(); it1 != _ADNeighborTable.end(); ++it1)
 		entry.neighbor_list.push_back(it1->second);
 
@@ -728,11 +728,11 @@ int Controller::extractNeighborADs(void)
 }
 
 
-void Controller::populateNeighboringADBorderRouterEntries(string currHID, std::map<std::string, RouteEntry> &routingTable)
+void Controller::populateNeighboringADBorderRouterEntries(string currHID, RouteTable &routingTable)
 {
-	vector<NeighborEntry> currNeighborTable = _networkTable[currHID].neighbor_list;
+	NeighborList currNeighborTable = _networkTable[currHID].neighbor_list;
 
-	vector<NeighborEntry>::iterator it;
+	NeighborList::iterator it;
 	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); ++it) {
 		if (it->AD != _myAD) {
 			// Add HID of border routers of neighboring ADs into routing table
@@ -747,9 +747,9 @@ void Controller::populateNeighboringADBorderRouterEntries(string currHID, std::m
 }
 
 
-void Controller::populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> ADRoutingTable)
+void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutingTable)
 {
-	std::map<std::string, RouteEntry>::iterator it1;  // Iter for route table
+	RouteTable::iterator it1;  // Iter for route table
 
 	for (it1 = ADRoutingTable.begin(); it1 != ADRoutingTable.end(); it1++) {
 		string destAD = it1->second.dest;
@@ -766,12 +766,12 @@ void Controller::populateADEntries(std::map<std::string, RouteEntry> &routingTab
 
 // Run Dijkstra shortest path algorithm, and populate the next hops.
 // This code is hacky to support AD and HID. This can be rewritten better.
-void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable)
+void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkTable, RouteTable &routingTable)
 {
-	std::map<std::string, NodeStateEntry>::iterator it1;  // Iter for network table
-	std::vector<NeighborEntry>::iterator it2;             // Iter for neighbor list
+	NetworkTable::iterator it1;  // Iter for network table
+	NeighborList::iterator it2;             // Iter for neighbor list
 
-	map<std::string, NodeStateEntry> unvisited;  // Set of unvisited nodes
+	NetworkTable unvisited;  // Set of unvisited nodes
 
 	routingTable.clear();
 
@@ -950,7 +950,7 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 
 				// Dest is SID, so we search existing ports for entry with same port and HID as next hop
 				bool entryFound = false;
-				map<string, RouteEntry>::iterator it3;
+				RouteTable::iterator it3;
 				for (it3 = routingTable.begin(); it3 != routingTable.end(); it3++) {
 					if (it3->second.port == routingTable[tempHID1].port && it3->second.nextHop.find(string("HID")) != string::npos) {
 						routingTable[tempHID1].nextHop = it3->second.nextHop;
@@ -971,10 +971,10 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 }
 
 
-void Controller::printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable)
+void Controller::printRoutingTable(std::string srcHID, RouteTable &routingTable)
 {
 	syslog(LOG_INFO, "Routing table for %s", srcHID.c_str());
-	map<std::string, RouteEntry>::iterator it1;
+	RouteTable::iterator it1;
 	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
 		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
 	}
@@ -984,7 +984,7 @@ void Controller::printRoutingTable(std::string srcHID, std::map<std::string, Rou
 void Controller::printADNetworkTable()
 {
 	syslog(LOG_INFO, "Network table for %s:", _myAD.c_str());
-	std::map<std::string, NodeStateEntry>::iterator it;
+	NetworkTable::iterator it;
 	for (it = _ADNetworkTable.begin();
 			it != _ADNetworkTable.end(); it++) {
 		syslog(LOG_INFO, "%s", it->first.c_str());

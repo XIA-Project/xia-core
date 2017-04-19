@@ -40,22 +40,22 @@ protected:
 
 	int sendHello();
 	int sendInterDomainLSA();
-	int sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable);
+	int sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTable);
 
 	int processMsg(std::string msg, uint32_t iface);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
-	int processRoutingTable(std::map<std::string, RouteEntry> routingTable);
+	int processRoutingTable(RouteTable routingTable);
 
 	void purge();
 
 	int extractNeighborADs(void);
-	void populateNeighboringADBorderRouterEntries(string currHID, std::map<std::string, RouteEntry> &routingTable);
-	void populateADEntries(std::map<std::string, RouteEntry> &routingTable, std::map<std::string, RouteEntry> ADRoutingTable);
-	void populateRoutingTable(std::string srcHID, std::map<std::string, NodeStateEntry> &networkTable, std::map<std::string, RouteEntry> &routingTable);
-	void printRoutingTable(std::string srcHID, std::map<std::string, RouteEntry> &routingTable);
+	void populateNeighboringADBorderRouterEntries(string currHID, RouteTable &routingTable);
+	void populateADEntries(RouteTable &routingTable, RouteTable ADRoutingTable);
+	void populateRoutingTable(std::string srcHID, NetworkTable &networkTable, RouteTable &routingTable);
+	void printRoutingTable(std::string srcHID, RouteTable &routingTable);
 	void printADNetworkTable();
 
 protected:
@@ -71,15 +71,15 @@ protected:
 
 	std::string _dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
 
+	RouteTable    _ADrouteTable;    // dest AD -> route entry
 
-	std::map<std::string, RouteEntry> _ADrouteTable; // map DestAD to route entry
-	std::map<std::string, NeighborEntry> _neighborTable; // map neighborHID to neighbor entry
-	std::map<std::string, NodeStateEntry> _networkTable; // map DestAD to NodeState entry
+    NeighborTable _neighborTable;   // neighbor HID -> neighbor entry
+	NeighborTable _ADNeighborTable; // neighbor HID to neighbor entry for ADs
 
-	std::map<std::string, NeighborEntry> _ADNeighborTable; // map neighborHID to neighbor entry for ADs
-	std::map<std::string, NodeStateEntry> _ADNetworkTable; // map DestAD to NodeState entry for ADs
+	NetworkTable  _networkTable;    // dest HID -> node state entry
+    NetworkTable  _ADNetworkTable;  // dest AD to NodeState entry for ADs
 
-	map<string,time_t> _timeStamp;
+	TimestampList _timeStamp;
 
 	int32_t _calc_dijstra_ticks;
 

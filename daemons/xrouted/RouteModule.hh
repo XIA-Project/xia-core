@@ -16,9 +16,11 @@
 #ifndef _RouteModule_hh
 #define _RouteModule_hh
 
+#include <syslog.h>
+#include <map>
 #include <string>
 #include <vector>
-#include <pthread.h>
+
 #include "Xsocket.h"
 #include "xroute.pb.h"
 #include "Xkeys.h"
@@ -27,21 +29,16 @@
 #include "../common/XIARouter.hh"
 
 // can i eliminate these?
-#define MAX_DAG_SIZE 1024
+#define MAX_DAG_SIZE 2048
 #define MAX_XID_SIZE 64
 
-const std::string flood_fid      ("FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
-//const std::string controller_fid ("FID:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
-const std::string broadcast_fid  ("FID:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
-const std::string intradomain_sid("SID:1110000000000000000000000000000000001112");
-//const std::string controller_sid ("SID:1110000000000000000000000000000000001114");
-//const std::string local_sid      ("SID:1110000000000000000000000000000000001115");
-//const std::string lsa_sid        ("SID:9999999999999999999999999999999999999999");
+// These can hopefully go away eventually
+const std::string broadcast_fid   ("FID:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
+const std::string intradomain_sid ("SID:1110000000000000000000000000000000001112");
+const std::string global_sid      ("SID:9999999999999999999999999999999999999999");
 
-#define LOCAL_PORT 1510
-
+#define LOCAL_PORT 1510     // control port for talking to xnetjd
 #define BUFFER_SIZE 16384	// read buffer
-
 
 // routing table flag values
 #define F_HOST         0x0001 // node is a host
@@ -53,13 +50,13 @@ const std::string intradomain_sid("SID:1110000000000000000000000000000000001112"
 
 class RouteModule {
 public:
-	int run();				        // thread main loop - calls handler
-	void stop() {_enabled = false;} // stop the thread
+	int run();				          // thread main loop - calls handler
+	void stop() { _enabled = false; } // stop the thread
 
 protected:
-	bool _enabled;
-	const char *_hostname;
-	XIARouter _xr;
+	bool _enabled;              // run until false
+	const char *_hostname;      // our hostname
+	XIARouter _xr;              // click route table interface
 
 	int _broadcast_sock;		// temp, sock we receive hello's on
 	int _local_sock;			// control interface to xnetjd

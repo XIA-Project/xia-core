@@ -30,6 +30,8 @@ typedef struct {
 	uint32_t flags;         // flag
 } RouteEntry;
 
+typedef std::map<std::string, RouteEntry> RouteTable;
+
 
 typedef struct _NeighborEntry {
 	std::string AD;		// neigbor AD
