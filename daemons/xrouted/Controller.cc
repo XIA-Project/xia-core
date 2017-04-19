@@ -1,8 +1,22 @@
+/*
+** Copyright 2017 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
 
 #include <stdio.h>
 #include <sys/time.h>
 #include "dagaddr.hpp"
-#include "minIni.h"
 #include "Controller.hh"
 
 // FIXME: it would be good to eliminate all of the conversions
@@ -10,54 +24,41 @@
 //  through an additional intermediate conversion!
 
 
-// parameters which could be overwritten by controller file
-// default values are defined in the header file
-int expire_time               = EXPIRE_TIME;
-double HELLO_INTERVAL         = HELLO_INTERVAL_D;
-double LSA_INTERVAL           = LSA_INTERVAL_D;
-double SID_DISCOVERY_INTERVAL = SID_DISCOVERY_INTERVAL_D;
-double SID_DECISION_INTERVAL  = SID_DECISION_INTERVAL_D;
-double AD_LSA_INTERVAL        = AD_LSA_INTERVAL_D;
-double CALC_DIJKSTRA_INTERVAL = CALC_DIJKSTRA_INTERVAL_D;
-int UPDATE_LATENCY            = UPDATE_LATENCY_D;
-int UPDATE_CONFIG             = UPDATE_CONFIG_D;
-int MAX_HOP_COUNT             = MAX_HOP_COUNT_D;
-int MAX_SEQNUM                = MAX_SEQNUM_D;
-int SEQNUM_WINDOW             = SEQNUM_WINDOW_D;
-int ENABLE_SID_CTL            = ENABLE_SID_CTL_D;
 
 
 void Controller::purge()
 {
-	time_t last_purge = time(NULL);
-	time_t last_update_config = last_purge;
-	time_t last_update_latency = last_purge;
-	time_t now = time(NULL);
-
-	if (now -last_update_config >= UPDATE_CONFIG)
-	{
-		last_update_config = now;
-		set_controller_conf(_hostname);
-		set_sid_conf(_hostname);
-
+	// initialize if this is first time in
+	if (_last_purge == 0) {
+		_last_purge = time(NULL);
+        _last_update_config = _last_purge;
+	    _last_update_latency = _last_purge;
+        return;
 	}
 
-	if (now - last_update_latency >= UPDATE_LATENCY)
-	{
-		last_update_latency = now;
+	time_t now = time(NULL);
+
+    // reload settings from file periodicly in case they have changed
+	if (now - _last_update_config >= _settings->update_config()) {
+		_last_update_config = now;
+        _settings->reload();
+		//set_sid_conf(_hostname);
+	}
+
+	if (now - _last_update_latency >= _settings->update_latency()) {
+		_last_update_latency = now;
 		updateADPathStates(); // update latency info
 	}
 
-	if (now - last_purge >= expire_time)
-	{
-		last_purge = now;
+	if (now - _last_purge >= _settings->expire_time()) {
+		_last_purge = now;
 		map<string, time_t>::iterator iter = _timeStamp.begin();
 
 		while (iter != _timeStamp.end())
 		{
-			if (now - iter->second >= expire_time*10) {
+			if (now - iter->second >= _settings->expire_time() * 10) {
 				_xr.delRoute(iter->first);
-				last_update_latency = 0; // force update latency
+				_last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
 				_timeStamp.erase(iter++);
 			} else {
@@ -69,9 +70,9 @@ void Controller::purge()
 
 		while (iter1 != _ADNetworkTable.end())
 		{
-			if (now - iter1->second.timestamp >= expire_time*10) {
+			if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
 				syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
-				last_update_latency = 0; // force update latency
+				_last_update_latency = 0; // force update latency
 				_ADNetworkTable.erase(iter1++);
 			} else {
 				++iter1;
@@ -82,8 +83,8 @@ void Controller::purge()
 
 		while (iter2 != _neighborTable.end())
 		{
-			if (now - iter2->second.timestamp >= expire_time) {
-				last_update_latency = 0; // force update latency
+			if (now - iter2->second.timestamp >= _settings->expire_time()) {
+				_last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
 				_neighborTable.erase(iter2++);
 			} else {
@@ -95,8 +96,8 @@ void Controller::purge()
 
 		while (iter3 != _ADNeighborTable.end())
 		{
-			if (now - iter3->second.timestamp >= expire_time * 10) {
-				last_update_latency = 0; // force update latency
+			if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
+				_last_update_latency = 0; // force update latency
 				syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
 
 				_ADNetworkTable[_myAD].neighbor_list.erase(
@@ -150,7 +151,7 @@ int Controller::handler()
 		timeradd(&now, &sd_freq, &sd_fire);
 	}
 	if (timercmp(&now, &sq_fire, >=)) {
-		if (ENABLE_SID_CTL) {
+		if (_settings->enable_sid_ctl()) {
 //			querySidDecision();
 		}
 		timeradd(&now, &sq_freq, &sq_fire);
@@ -239,6 +240,8 @@ int Controller::init()
 {
 	srand (time(NULL));
 
+    _settings = new Settings(_hostname);
+
 	_flags = F_CONTROLLER; // FIXME: set any other useful flags at this time
 
 	if (getXIDs(_myAD, _myHID) < 0) {
@@ -249,12 +252,9 @@ int Controller::init()
 		exit(-1);
 	}
 
-	_lsa_seq = rand() % MAX_SEQNUM;	// LSA sequence number of this router
-	_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
-	_calc_dijstra_ticks = -8;
+	//_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 
-	_ctl_seq = 0;	// LSA sequence number of this router
-	_sid_ctl_seq = 0; // TODO: init values should be a random int
+	_calc_dijstra_ticks = -8;
 
 	_dual_router_AD = std::string("");
 	// mark if this is a dual XIA-IPv4 router
@@ -1799,7 +1799,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	_networkTable[srcHID] = entry;
 	_calc_dijstra_ticks++;
 
-	if (_calc_dijstra_ticks >= CALC_DIJKSTRA_INTERVAL || _calc_dijstra_ticks  < 0) {
+	if (_calc_dijstra_ticks >= _settings->calc_dijkstra_interval() || _calc_dijstra_ticks  < 0) {
 		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
 
 		// Calculate next hop for ADs
@@ -2045,12 +2045,12 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
-			while (networkTable[tempHID2].prevNode.compare(srcHID)!=0 && hop_count < MAX_HOP_COUNT) {
+			while (networkTable[tempHID2].prevNode.compare(srcHID)!=0 && hop_count < _settings->max_hop_count()) {
 				tempHID2 = networkTable[tempHID2].prevNode;
 				tempNextHopHID2 = networkTable[tempHID2].hid;
 				hop_count++;
 			}
-			if (hop_count < MAX_HOP_COUNT) {
+			if (hop_count < _settings->max_hop_count()) {
 				routingTable[tempHID1].dest = tempHID1;
 				routingTable[tempHID1].nextHop = tempNextHopHID2;
 				routingTable[tempHID1].flags = 0;
@@ -2079,12 +2079,12 @@ void Controller::populateRoutingTable(std::string srcHID, std::map<std::string, 
 			tempHID2 = tempHID1;
 			tempNextHopHID2 = it1->second.hid;
 			hop_count = 0;
-			while (networkTable[tempHID2].prevNode.compare(srcHID)!=0 && hop_count < MAX_HOP_COUNT) {
+			while (networkTable[tempHID2].prevNode.compare(srcHID)!=0 && hop_count < _settings->max_hop_count()) {
 				tempHID2 = networkTable[tempHID2].prevNode;
 				tempNextHopHID2 = networkTable[tempHID2].hid;
 				hop_count++;
 			}
-			if (hop_count < MAX_HOP_COUNT) {
+			if (hop_count < _settings->max_hop_count()) {
 				routingTable[tempHID1].dest = tempHID1;
 
 				// Find port of next hop
@@ -2139,50 +2139,6 @@ void Controller::printADNetworkTable()
 	}
 
 }
-
-void Controller::set_controller_conf(const char* myhostname)
-{
-	// read the controller file at etc/controller.ini
-	// set the parameters
-	char full_path[BUF_SIZE];
-	char root[BUF_SIZE];
-	char section_name[BUF_SIZE];
-	bool mysection = false; // read default section or my section
-
-	snprintf(full_path, BUF_SIZE, "%s/etc/controllers.ini", XrootDir(root, BUF_SIZE));
-	int section_index = 0;
-	while (ini_getsection(section_index, section_name, BUF_SIZE, full_path))
-	{
-		if (strcmp(section_name, myhostname) == 0) // section for me
-		{
-			mysection = true;
-			break;
-		}
-		section_index++;
-	}
-	if (mysection) {
-		strcpy(section_name, myhostname);
-	} else {
-		strcpy(section_name, "default");
-	}
-	// read the values
-	expire_time = ini_getl(section_name, "expire_time", EXPIRE_TIME, full_path);
-	HELLO_INTERVAL = ini_getf(section_name, "hello_interval", HELLO_INTERVAL_D, full_path);
-	LSA_INTERVAL = ini_getf(section_name, "LSA_interval", LSA_INTERVAL_D, full_path);
-	SID_DISCOVERY_INTERVAL = ini_getf(section_name, "SID_discovery_interval", SID_DISCOVERY_INTERVAL_D, full_path);
-	SID_DECISION_INTERVAL = ini_getf(section_name, "SID_decision_interval", SID_DECISION_INTERVAL_D, full_path);
-	AD_LSA_INTERVAL = ini_getf(section_name, "AD_LSA_interval", AD_LSA_INTERVAL_D, full_path);
-	CALC_DIJKSTRA_INTERVAL = ini_getf(section_name, "calc_Dijkstra_interval", CALC_DIJKSTRA_INTERVAL_D, full_path);
-	MAX_HOP_COUNT  = ini_getl(section_name, "max_hop_count", MAX_HOP_COUNT_D, full_path);
-	MAX_SEQNUM = ini_getl(section_name, "max_sqenum", MAX_SEQNUM_D, full_path);
-	SEQNUM_WINDOW = ini_getl(section_name, "sqenum_window", SEQNUM_WINDOW_D, full_path);
-	UPDATE_CONFIG = ini_getl(section_name, "update_config", UPDATE_CONFIG_D, full_path);
-	UPDATE_LATENCY = ini_getl(section_name, "update_latency", UPDATE_LATENCY_D, full_path);
-	ENABLE_SID_CTL = ini_getl(section_name, "enable_SID_ctl", ENABLE_SID_CTL_D, full_path);
-
-	return;
-}
-
 
 void Controller::set_sid_conf(const char* myhostname)
 {

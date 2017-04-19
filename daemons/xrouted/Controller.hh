@@ -1,3 +1,18 @@
+/*
+** Copyright 2017 Carnegie Mellon University
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**    http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
 #ifndef _controller_hh
 #define _controller_hh
 
@@ -6,24 +21,10 @@
 #include <vector>
 #include <string>
 
+#include "Settings.hh"
 #include "RouteModule.hh"
 #include "Topology.hh"
 
-#define WAKEUP_INTERVAL 0.1
-#define EXPIRE_TIME_D 60
-#define HELLO_INTERVAL_D 0.1
-#define LSA_INTERVAL_D 0.3
-#define SID_DISCOVERY_INTERVAL_D 3.0
-#define SID_DECISION_INTERVAL_D 5.0
-#define AD_LSA_INTERVAL_D 1
-#define CALC_DIJKSTRA_INTERVAL_D 4
-#define MAX_HOP_COUNT_D 50
-#define MAX_SEQNUM_D 1000000
-//#define MAX_XID_SIZE 100
-#define SEQNUM_WINDOW_D 1000
-#define UPDATE_LATENCY_D 60
-#define UPDATE_CONFIG_D 5
-#define ENABLE_SID_CTL_D 0
 
 // predefine some decision function
 #define LATENCY_FIRST  0
@@ -87,7 +88,6 @@ typedef struct ServiceLeader
 typedef struct ADPathState// The path state to an AD, network 'weather' report
 {
 	int delay; //in milliseconds (ms);
-
 	int hop_count;
 } ADPathState;
 
@@ -103,24 +103,17 @@ protected:
 	std::string _myHID;
 	Node _my_fid;
 
-	std::string _controller_sid;
+    Settings *_settings;
 
-//	char myAD[MAX_XID_SIZE]; // this router AD
-//	char myHID[MAX_XID_SIZE]; // this router HID
-//	char my4ID[MAX_XID_SIZE]; // not used
+	std::string _controller_sid;
 
 	int32_t _dual_router;   // 0: this router is not a dual XIA-IP router, 1: this router is a dual router
 	std::string _dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
-	int32_t _num_neighbors; // number of neighbor routers
-	int32_t _lsa_seq;	// LSA sequence number of this router
-	int32_t _sid_discovery_seq;    // sid discovery sequence number of this router
-	int32_t _sid_decision_seq;    // sid decision sequence number of this router
+
+    //int32_t _sid_discovery_seq;    // sid discovery sequence number of this router
+	//int32_t _sid_decision_seq;    // sid decision sequence number of this router
+
 	int32_t _calc_dijstra_ticks;
-
-	int32_t _ctl_seq;	// LSA sequence number of this router
-	int32_t _ctl_seq_recv;	// LSA sequence number of this router
-
-	int32_t _sid_ctl_seq;    // LSA sequence number of this router
 
 	std::map<std::string, RouteEntry> _ADrouteTable; // map DestAD to route entry
 	std::map<std::string, RouteEntry> _HIDrouteTable; // map DestHID to route entry
@@ -201,6 +194,10 @@ protected:
 
 	static void* updatePathThread(void* updating);
 
+	// last time we looked for stale entries
+	time_t _last_purge;
+	time_t _last_update_config;
+	time_t _last_update_latency;
 };
 
 

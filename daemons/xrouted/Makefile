@@ -5,7 +5,7 @@ VPATH=../common
 
 ROUTER_OBJS=xrouted.o Router.o
 CONTROL_OBJS=controld.o Controller.o
-COMMON_OBJS=xroute.pb.o RouteModule.o RouterConfig.o csclient.o XIARouter.o
+COMMON_OBJS=xroute.pb.o RouteModule.o RouterConfig.o csclient.o XIARouter.o Settings.o
 
 XROUTED=$(BINDIR)/xrouted
 CONTROLD=$(BINDIR)/controld
