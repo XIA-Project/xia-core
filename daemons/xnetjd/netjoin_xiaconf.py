@@ -165,8 +165,14 @@ class NetjoinXIAConf(object):
 
     def get_controller_dag(self):
         controller_dag = None
-        with open(self.__controller_dag_filepath()) as controller_dag_file:
+        cdag_filepath = self.__controller_dag_filepath()
+
+        if not os.path.exists(cdag_filepath):
+            return controller_dag
+
+        with open(cdag_filepath) as controller_dag_file:
             controller_dag = controller_dag_file.read()
+
         return controller_dag
 
     def write_controller_dag(self, controller_dag):
