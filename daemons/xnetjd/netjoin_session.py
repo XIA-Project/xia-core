@@ -438,6 +438,13 @@ class NetjoinSession(threading.Thread):
                 logging.error("Controller DAG not received in HS2")
                 return False
 
+            old_controller_dag = self.conf.get_controller_dag()
+            controller_dag_changed = False
+            if old_controller_dag != self.controller_dag:
+                logging.info("Old controller:{}".format(old_controller_dag))
+                logging.info("New controller:{}".format(self.controller_dag))
+                controller_dag_changed = True
+
             # Write the controller_dag config file to etc
             self.conf.write_controller_dag(self.controller_dag)
 
@@ -459,10 +466,12 @@ class NetjoinSession(threading.Thread):
             self.__send_xrouted_msg(config_packet)
 
             # Ask the NetjoinReceiver to announce the newly joined network
-            # TODO: CRITICAL - only start one announcer for one net_id
-            self.receiver.announce(l2_type, net_id, beacon_interval)
+            if (self.receiver.announcer == None or
+                    controller_dag_changed):
+                logging.info("No announcer or controller dag changed")
+                logging.info("So announce this network")
+                self.receiver.announce(l2_type, net_id, beacon_interval)
 
-        logging.info("Announcing the newly joined network now")
         return True
 
     # Note: we forget the last message on disabling retransmission
