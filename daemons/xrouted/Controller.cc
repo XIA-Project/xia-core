@@ -35,12 +35,6 @@ void Controller::purge()
 
 	time_t now = time(NULL);
 
-    // reload settings from file periodicly in case they have changed
-	if (now - _last_update_config >= _settings->update_config()) {
-		_last_update_config = now;
-        _settings->reload();
-	}
-
     // FIXME: do we really need all 4 of these things???
 
 	if (now - _last_purge >= _settings->expire_time()) {
@@ -140,6 +134,13 @@ int Controller::handler()
 		timeradd(&now, &l_freq, &l_fire);
 	}
 
+    // reload settings from file periodicly in case they have changed
+    time_t t = time(NULL);
+	if (t - _last_update_config >= _settings->update_config()) {
+		_last_update_config = t;
+        _settings->reload();
+	}
+
 	purge();
 
 	return 0;
@@ -220,6 +221,7 @@ int Controller::makeSockets()
 	return 0;
 }
 
+
 int Controller::init()
 {
 	srand (time(NULL));
@@ -298,13 +300,14 @@ int Controller::sendHello()
 	return rc;
 }
 
+
 int Controller::sendInterDomainLSA()
 {
 	int rc = 1;
 
 	Node a(_myAD);
 	Node h(_myHID);	// FIXME: the original code uses the AD here
-					// and never does anything with it. Making it HID for nwo
+					// and never does anything with it. Making it HID for now
 
 	Xroute::XrouteMsg msg;
 	Xroute::GlobalLSAMsg *lsa  = msg.mutable_global_lsa();
@@ -354,11 +357,13 @@ int Controller::sendInterDomainLSA()
 	return rc;
 }
 
+
 int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTable)
 {
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
-		return processRoutingTable(routingTable);
+		processRoutingTable(routingTable);
+        return 1;
 
 	} else if (nodeState->dag.sx_family != AF_XIA) {
 		// this entry was either created as a host placeholder, or
@@ -494,11 +499,11 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 	}
 
 	NeighborEntry neighbor;
-	neighbor.AD = _myAD;
-	neighbor.HID = msg.hid();
-	neighbor.port = msg.interface();
-	neighbor.cost = 1; // for now, same cost
+	neighbor.AD    = _myAD;
+	neighbor.HID   = msg.hid();
+	neighbor.port  = msg.interface();
 	neighbor.flags = flags;
+	neighbor.cost  = 1;       // for now, all link costs are the same
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
@@ -506,7 +511,7 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 	//  update my entry in the networkTable
 	NodeStateEntry entry;
 	entry.hid = _myHID;
-	entry.ad = _myAD;
+	entry.ad  = _myAD;
 
 	// fill my neighbors into my entry in the networkTable
 	NeighborTable::iterator it;
@@ -578,7 +583,7 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 }
 
 
-int Controller::processRoutingTable(RouteTable routingTable)
+void Controller::processRoutingTable(RouteTable routingTable)
 {
 	int rc;
 	RouteTable::iterator it;
@@ -596,8 +601,6 @@ int Controller::processRoutingTable(RouteTable routingTable)
 
 		_timeStamp[it->second.dest] = time(NULL);
 	}
-
-	return 1;
 }
 
 
@@ -708,23 +711,21 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 
 // Extract neighboring AD from the routing table
-int Controller::extractNeighborADs(void)
+void Controller::extractNeighborADs()
 {
-	// Update network table
-
-// FIXME: should these both be AD?????
+    // FIXME: should these both be AD?????
 	NodeStateEntry entry;
-	entry.ad = _myAD;
-	entry.hid = _myAD;
+	entry.ad        = _myAD;
+	entry.hid       = _myAD;
 	entry.timestamp = time(NULL);
 
 	// Add neighbors to network table entry
-	NeighborTable::iterator it1;
-	for (it1 = _ADNeighborTable.begin(); it1 != _ADNeighborTable.end(); ++it1)
-		entry.neighbor_list.push_back(it1->second);
+	NeighborTable::iterator it;
+	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); ++it) {
+		entry.neighbor_list.push_back(it->second);
+    }
 
 	_ADNetworkTable[_myAD] = entry;
-	return 1;
 }
 
 
@@ -734,14 +735,15 @@ void Controller::populateNeighboringADBorderRouterEntries(string currHID, RouteT
 
 	NeighborList::iterator it;
 	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); ++it) {
+
 		if (it->AD != _myAD) {
 			// Add HID of border routers of neighboring ADs into routing table
 			string neighborHID = it->HID;
-			RouteEntry &entry = routingTable[neighborHID];
-			entry.dest = neighborHID;
-			entry.nextHop = neighborHID;
-			entry.port = it->port;
-			//entry.flags = 0;
+			RouteEntry &entry  = routingTable[neighborHID];
+			entry.dest         = neighborHID;
+			entry.nextHop      = neighborHID;
+			entry.port         = it->port;
+//			entry.flags        = 0;
 		}
 	}
 }
@@ -749,17 +751,18 @@ void Controller::populateNeighboringADBorderRouterEntries(string currHID, RouteT
 
 void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutingTable)
 {
-	RouteTable::iterator it1;  // Iter for route table
+	RouteTable::iterator it;
 
-	for (it1 = ADRoutingTable.begin(); it1 != ADRoutingTable.end(); it1++) {
-		string destAD = it1->second.dest;
-		string nextHopAD = it1->second.nextHop;
+	for (it = ADRoutingTable.begin(); it != ADRoutingTable.end(); it++) {
+		string destAD    = it->second.dest;
+		string nextHopAD = it->second.nextHop;
 
 		RouteEntry &entry = routingTable[destAD];
-		entry.dest = destAD;
+
+		entry.dest    = destAD;
 		entry.nextHop = routingTable[nextHopAD].nextHop;
-		entry.port = routingTable[nextHopAD].port;
-		entry.flags = routingTable[nextHopAD].flags;
+		entry.port    = routingTable[nextHopAD].port;
+		entry.flags   = routingTable[nextHopAD].flags;
 	}
 }
 
@@ -974,9 +977,11 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 void Controller::printRoutingTable(std::string srcHID, RouteTable &routingTable)
 {
 	syslog(LOG_INFO, "Routing table for %s", srcHID.c_str());
-	RouteTable::iterator it1;
-	for ( it1=routingTable.begin() ; it1 != routingTable.end(); it1++ ) {
-		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u", (it1->second.dest).c_str(), (it1->second.nextHop).c_str(), (it1->second.port), (it1->second.flags) );
+
+	RouteTable::iterator it;
+	for (it = routingTable.begin(); it != routingTable.end(); it++) {
+		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u",
+            (it->second.dest).c_str(), (it->second.nextHop).c_str(), (it->second.port), (it->second.flags));
 	}
 }
 
@@ -984,13 +989,13 @@ void Controller::printRoutingTable(std::string srcHID, RouteTable &routingTable)
 void Controller::printADNetworkTable()
 {
 	syslog(LOG_INFO, "Network table for %s:", _myAD.c_str());
+
 	NetworkTable::iterator it;
-	for (it = _ADNetworkTable.begin();
-			it != _ADNetworkTable.end(); it++) {
+	for (it = _ADNetworkTable.begin(); it != _ADNetworkTable.end(); it++) {
 		syslog(LOG_INFO, "%s", it->first.c_str());
+
 		for (size_t i = 0; i < it->second.neighbor_list.size(); i++) {
-			syslog(LOG_INFO, "neighbor[%d]: %s", (int) i,
-					it->second.neighbor_list[i].AD.c_str());
+			syslog(LOG_INFO, "neighbor[%d]: %s", (int)i, it->second.neighbor_list[i].AD.c_str());
 		}
 	}
 

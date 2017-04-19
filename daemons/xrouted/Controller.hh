@@ -47,11 +47,11 @@ protected:
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
-	int processRoutingTable(RouteTable routingTable);
+	void processRoutingTable(RouteTable routingTable);
 
 	void purge();
 
-	int extractNeighborADs(void);
+	void extractNeighborADs(void);
 	void populateNeighboringADBorderRouterEntries(string currHID, RouteTable &routingTable);
 	void populateADEntries(RouteTable &routingTable, RouteTable ADRoutingTable);
 	void populateRoutingTable(std::string srcHID, NetworkTable &networkTable, RouteTable &routingTable);
@@ -93,9 +93,5 @@ protected:
 	time_t _last_update_config;
 //	time_t _last_update_latency;
 };
-
-
-
-
 
 #endif
