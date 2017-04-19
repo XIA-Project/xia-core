@@ -39,6 +39,9 @@ class NetjoinReceiver(threading.Thread):
 
     def announce(self, l2_type, net_id, beacon_interval):
 
+        if self.announcer != None:
+            self.announcer.stop()
+
 	self.announcer = NetjoinAnnouncer(l2_type, net_id, beacon_interval,
 		self.shutdown)
 	self.announcer.announce()
@@ -201,9 +204,6 @@ class NetjoinReceiver(threading.Thread):
             # A new session is started if client decides to join a network
             # or if an access point receives a handshake one reqest to join
             if message_type == "net_descriptor":
-                # Ignore announcements from peer routers
-                if self.announcer:
-                    continue
                 self.handle_net_descriptor(message_tuple)
 
             elif message_type == "handshake_one":
