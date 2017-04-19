@@ -28,6 +28,7 @@ UTILITIES=     \
 	xmodified  \
 	xnetstat   \
 	xping      \
+	xput       \
 	xroute     \
 	xtop       \
 	xtrace     \
@@ -75,13 +76,16 @@ $(MANDIR)/xmakehosts.1: ./xmakehosts
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "create etc/hosts.xia" ./$< -o$@
 
 $(MANDIR)/xmodified.1: ./xmodified
-	help2man -N -m $(MANUAL) -S $(SOURCE) -n "copy modified XIA source files to another host" ./$< -o$@
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "copy modified XIA source files to other hosts" ./$< -o$@
 
 $(MANDIR)/xnetstat.1: ./xnetstat
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "manage socket table" ./$< -o$@
 
 $(MANDIR)/xping.1: ./xping
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "send XCMP ECHO_REQUEST to network hosts" ./$< -o$@
+
+$(MANDIR)/xput.1: ./xput
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "copy specified file to other hosts" ./$< -o$@
 
 $(MANDIR)/xroute.1: ./xroute
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "manage XIA route tables" ./$< -o$@
