@@ -14,8 +14,9 @@ class NetjoinPolicy:
 
     JOINED, JOINING, UNJOINABLE = range(3)
 
-    def __init__(self):
+    def __init__(self, is_controller=False):
         logging.debug("Policy module initialized")
+        self.is_controller = is_controller
 
         # Beacons seen before. One set for each policy instance
         # (beacon_ID, iface) = <current state>
@@ -157,6 +158,10 @@ class NetjoinPolicy:
         #beacon = NetjoinBeacon()
         #beacon.from_serialized_net_descriptor(serialized_descriptor)
         logging.debug("Beacon: {}".format(beacon.beacon_str()))
+
+        # Controllers don't join routers
+        if self.is_controller:
+            return False
 
         # Retrieve ID of beacon so we can test against known beacons
         beacon_ID = beacon.get_ID()
