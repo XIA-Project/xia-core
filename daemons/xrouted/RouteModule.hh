@@ -25,6 +25,9 @@ const std::string intradomain_sid("SID:1110000000000000000000000000000000001112"
 
 #define LOCAL_PORT 1510
 
+#define BUFFER_SIZE 16384	// read buffer
+
+
 // routing table flag values
 #define F_HOST         0x0001 // node is a host
 #define F_CORE_ROUTER  0x0002 // node is an internal router
@@ -46,18 +49,23 @@ protected:
 	const char *_hostname;
 	XIARouter _xr;
 
-	int _broadcast_sock;
-	int _local_sock;
-	int _source_sock;
+	int _broadcast_sock;		// temp, sock we receive hello's on
+	int _local_sock;			// control interface to xnetjd
+	int _source_sock;			// socket we send messages with
+	int _recv_sock;				// socket we receive flooded messages on
 
-	sockaddr_x _broadcast_dag;
-	sockaddr_x _controller_dag;
-	sockaddr_x _source_dag;
+	sockaddr_x _broadcast_dag;	// temp, dag we receive hello's on
+	sockaddr_x _controller_dag;	// dag of the network controller
+	sockaddr_x _source_dag;		// dag os socket we send on
+	sockaddr_x _recv_dag;		// dag we receive on (same as contoller when in controller process)
 
 	RouteModule(const char *name);
 
+	int getXIDs(std::string &ad, std::string &hid);
 	int makeLocalSocket();
+	int makeSocket(Graph &g, sockaddr_x *sa);
 
+	int readMessage(char *recv_message, struct pollfd *pfd, unsigned npfds, int *iface);
 	int sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg);
 	int sendBroadcastMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_broadcast_dag, msg); };
 	int sendControllerMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_controller_dag, msg); };

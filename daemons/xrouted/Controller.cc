@@ -5,37 +5,138 @@
 #include "minIni.h"
 #include "Controller.hh"
 
+// FIXME: it would be good to eliminate all of the conversions
+//  instead of having to convert everyting to or from a protobuf
+//  through an additional intermediate conversion!
+
+
 // parameters which could be overwritten by controller file
 // default values are defined in the header file
-int expire_time = EXPIRE_TIME;
-double HELLO_INTERVAL = HELLO_INTERVAL_D;
-double LSA_INTERVAL = LSA_INTERVAL_D;
+int expire_time               = EXPIRE_TIME;
+double HELLO_INTERVAL         = HELLO_INTERVAL_D;
+double LSA_INTERVAL           = LSA_INTERVAL_D;
 double SID_DISCOVERY_INTERVAL = SID_DISCOVERY_INTERVAL_D;
-double SID_DECISION_INTERVAL = SID_DECISION_INTERVAL_D;
-double AD_LSA_INTERVAL = AD_LSA_INTERVAL_D;
+double SID_DECISION_INTERVAL  = SID_DECISION_INTERVAL_D;
+double AD_LSA_INTERVAL        = AD_LSA_INTERVAL_D;
 double CALC_DIJKSTRA_INTERVAL = CALC_DIJKSTRA_INTERVAL_D;
-int UPDATE_LATENCY = UPDATE_LATENCY_D;
-int UPDATE_CONFIG = UPDATE_CONFIG_D;
-int MAX_HOP_COUNT  = MAX_HOP_COUNT_D;
-int MAX_SEQNUM = MAX_SEQNUM_D;
-int SEQNUM_WINDOW = SEQNUM_WINDOW_D;
-int ENABLE_SID_CTL = ENABLE_SID_CTL_D;
+int UPDATE_LATENCY            = UPDATE_LATENCY_D;
+int UPDATE_CONFIG             = UPDATE_CONFIG_D;
+int MAX_HOP_COUNT             = MAX_HOP_COUNT_D;
+int MAX_SEQNUM                = MAX_SEQNUM_D;
+int SEQNUM_WINDOW             = SEQNUM_WINDOW_D;
+int ENABLE_SID_CTL            = ENABLE_SID_CTL_D;
+
+
+void Controller::purge()
+{
+	time_t last_purge = time(NULL);
+	time_t last_update_config = last_purge;
+	time_t last_update_latency = last_purge;
+	time_t now = time(NULL);
+
+	if (now -last_update_config >= UPDATE_CONFIG)
+	{
+		last_update_config = now;
+		set_controller_conf(_hostname);
+		set_sid_conf(_hostname);
+
+	}
+
+	if (now - last_update_latency >= UPDATE_LATENCY)
+	{
+		last_update_latency = now;
+		updateADPathStates(); // update latency info
+	}
+
+	if (now - last_purge >= expire_time)
+	{
+		last_purge = now;
+		map<string, time_t>::iterator iter = _timeStamp.begin();
+
+		while (iter != _timeStamp.end())
+		{
+			if (now - iter->second >= expire_time*10) {
+				_xr.delRoute(iter->first);
+				last_update_latency = 0; // force update latency
+				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
+				_timeStamp.erase(iter++);
+			} else {
+				++iter;
+			}
+		}
+
+		map<string, NodeStateEntry>::iterator iter1 = _ADNetworkTable.begin();
+
+		while (iter1 != _ADNetworkTable.end())
+		{
+			if (now - iter1->second.timestamp >= expire_time*10) {
+				syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
+				last_update_latency = 0; // force update latency
+				_ADNetworkTable.erase(iter1++);
+			} else {
+				++iter1;
+			}
+		}
+
+		map<string, NeighborEntry>::iterator iter2 = _neighborTable.begin();
+
+		while (iter2 != _neighborTable.end())
+		{
+			if (now - iter2->second.timestamp >= expire_time) {
+				last_update_latency = 0; // force update latency
+				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
+				_neighborTable.erase(iter2++);
+			} else {
+				++iter2;
+			}
+		}
+
+		map<string, NeighborEntry>::iterator iter3 = _ADNeighborTable.begin();
+
+		while (iter3 != _ADNeighborTable.end())
+		{
+			if (now - iter3->second.timestamp >= expire_time * 10) {
+				last_update_latency = 0; // force update latency
+				syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
+
+				_ADNetworkTable[_myAD].neighbor_list.erase(
+					std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
+								_ADNetworkTable[_myAD].neighbor_list.end(),
+								iter3->second),
+				_ADNetworkTable[_myAD].neighbor_list.end());
+				_ADNeighborTable.erase(iter3++);
+			} else {
+				++iter3;
+			}
+		}
+	}
+}
+
 
 void *Controller::handler()
 {
 	int rc;
-	char recv_message[10240];
-	sockaddr_x theirDAG;
-	struct timespec tspec;
-	vector<string> routers;
-	time_t last_purge = time(NULL);
-	time_t last_update_config = last_purge;
-	time_t last_update_latency = last_purge;
+	char recv_message[BUFFER_SIZE];
 	int iface;
+	struct pollfd pfds[3];
 
+	bzero(pfds, sizeof(pfds));
+	pfds[0].fd = _local_sock;
+	pfds[1].fd = _broadcast_sock;
+	pfds[2].fd = _recv_sock;
+	pfds[0].events = POLLIN;
+	pfds[1].events = POLLIN;
+	pfds[2].events = POLLIN;
+
+	// get the next incoming message
+	if ((rc = readMessage(recv_message, pfds, 3, &iface)) > 0) {
+		processMsg(string(recv_message, rc), iface);
+	}
+
+	// send any messages that need to go out
 	struct timeval now;
-
 	gettimeofday(&now, NULL);
+
 	if (timercmp(&now, &h_fire, >=)) {
 		sendHello();
 		timeradd(&now, &h_freq, &h_fire);
@@ -55,163 +156,7 @@ void *Controller::handler()
 		timeradd(&now, &sq_freq, &sq_fire);
 	}
 
-
-	struct pollfd pfd[3];
-
-	bzero(pfd, sizeof(pfd));
-	pfd[0].fd = _broadcast_sock;
-	pfd[1].fd = _controller_sock;
-	pfd[2].fd = _local_sock;
-	pfd[0].events = POLLIN;
-	pfd[1].events = POLLIN;
-	pfd[2].events = POLLIN;
-
-	tspec.tv_sec = 0;
-	tspec.tv_nsec = 500000000;
-
-	rc = Xppoll(pfd, 3, &tspec, NULL);
-	if (rc > 0) {
-		int sock = -1;
-
-		for (int i = 0; i < 3; i++) {
-			if (pfd[i].revents & POLLIN) {
-				sock = pfd[i].fd;
-				break;
-			}
-		}
-
-		memset(&recv_message[0], 0, sizeof(recv_message));
-
-		if (sock <= 0) {
-			// something weird happened
-			return 0;
-
-		} else if (sock == _local_sock) {
-			iface = 0;
-			if ((rc = recvfrom(sock, recv_message, sizeof(recv_message), 0, NULL, NULL)) < 0) {
-				syslog(LOG_WARNING, "local message receive error");
-			}
-		} else {
-			struct msghdr mh;
-			struct iovec iov;
-			struct in_pktinfo pi;
-			struct cmsghdr *cmsg;
-			struct in_pktinfo *pinfo;
-			char cbuf[CMSG_SPACE(sizeof pi)];
-
-			iov.iov_base = recv_message;
-			iov.iov_len = sizeof(recv_message);
-
-			mh.msg_name = &theirDAG;
-			mh.msg_namelen = sizeof(theirDAG);
-			mh.msg_iov = &iov;
-			mh.msg_iovlen = 1;
-			mh.msg_control = cbuf;
-			mh.msg_controllen = sizeof(cbuf);
-
-			cmsg = CMSG_FIRSTHDR(&mh);
-			cmsg->cmsg_level = IPPROTO_IP;
-			cmsg->cmsg_type = IP_PKTINFO;
-			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
-
-			mh.msg_controllen = cmsg->cmsg_len;
-
-			if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
-				perror("recvfrom");
-
-			} else {
-				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
-					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
-						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-						iface = pinfo->ipi_ifindex;
-					}
-				}
-			}
-		}
-
-		if (rc > 0) {
-			processMsg(string(recv_message, rc), iface);
-		}
-	}
-
-	time_t nowt = time(NULL);
-
-	if (nowt -last_update_config >= UPDATE_CONFIG)
-	{
-		last_update_config = nowt;
-		set_controller_conf(_hostname);
-		set_sid_conf(_hostname);
-
-	}
-
-	if (nowt - last_update_latency >= UPDATE_LATENCY)
-	{
-		last_update_latency = nowt;
-		updateADPathStates(); // update latency info
-	}
-
-	if (nowt - last_purge >= expire_time)
-	{
-		last_purge = nowt;
-		map<string, time_t>::iterator iter = _timeStamp.begin();
-
-		while (iter != _timeStamp.end())
-		{
-			if (nowt - iter->second >= expire_time*10) {
-				_xr.delRoute(iter->first);
-				last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-				_timeStamp.erase(iter++);
-			} else {
-				++iter;
-			}
-		}
-
-		map<string, NodeStateEntry>::iterator iter1 = _ADNetworkTable.begin();
-
-		while (iter1 != _ADNetworkTable.end())
-		{
-			if (nowt - iter1->second.timestamp >= expire_time*10) {
-				syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
-				last_update_latency = 0; // force update latency
-				_ADNetworkTable.erase(iter1++);
-			} else {
-				++iter1;
-			}
-		}
-
-		map<string, NeighborEntry>::iterator iter2 = _neighborTable.begin();
-
-		while (iter2 != _neighborTable.end())
-		{
-			if (nowt - iter2->second.timestamp >= expire_time) {
-				last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
-				_neighborTable.erase(iter2++);
-			} else {
-				++iter2;
-			}
-		}
-
-		map<string, NeighborEntry>::iterator iter3 = _ADNeighborTable.begin();
-
-		while (iter3 != _ADNeighborTable.end())
-		{
-			if (nowt - iter3->second.timestamp >= expire_time*10) {
-				last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
-
-				_ADNetworkTable[_myAD].neighbor_list.erase(
-					std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
-								_ADNetworkTable[_myAD].neighbor_list.end(),
-								iter3->second),
-				_ADNetworkTable[_myAD].neighbor_list.end());
-				_ADNeighborTable.erase(iter3++);
-			} else {
-				++iter3;
-			}
-		}
-	}
+	purge();
 
 	return NULL;
 }
@@ -234,7 +179,7 @@ int Controller::saveControllerDAG()
 		return -1;
 	}
 
-	xia_ntop(AF_XIA, &_controller_dag, s, sizeof(s));
+	xia_ntop(AF_XIA, &_recv_dag, s, sizeof(s));
 	fprintf(f, "%s\n", s);
 	fclose(f);
 
@@ -247,95 +192,45 @@ int Controller::makeSockets()
 	char s[MAX_DAG_SIZE];
 	Graph g;
 	Node src;
+	Node nHID(_myHID);
+	Node nAD(_myAD);
 
 	// broadcast socket - hello messages, can hopefully go away
-	_broadcast_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_broadcast_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the broadcast socket");
+	g = src * Node(broadcast_fid) * Node(intradomain_sid);
+	if ((_broadcast_sock = makeSocket(g, &_broadcast_dag)) < 0) {
 		return -1;
 	}
 
 	// controller socket - flooded & interdomain communication
-	_controller_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_controller_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the controller socket");
-		return -1;
-	}
-
-	// source socket - sending socket
-	_source_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_source_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the out socket");
-		return -1;
-	}
-
-	// get our AD and HID
-	if ( XreadLocalHostAddr(_controller_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
-		syslog(LOG_ALERT, "Unable to read local XIA address");
-		return -1;
-	}
-
-	// FIXME: these should probably be Nodes instead of strings!
-	Graph gbroad(s);
-	_myAD = gbroad.intent_AD_str();
-	_myHID = gbroad.intent_HID_str();
-
-	Node nHID(_myHID);
-
-	// make the dag we'll receive local broadcasts on
-	g = src * Node(broadcast_fid) * Node(intradomain_sid);
-
-	g.fill_sockaddr(&_broadcast_dag);
-	syslog(LOG_INFO, "Broadcast DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the broadcast receive socket
-	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to local DAG : %s", g.dag_string().c_str());
-		return -1;
-	}
-
-	// make the dag we'll receive controller messages on
 	XcreateFID(s, sizeof(s));
 	Node nFID(s);
-	//strcpy(s, controller_fid.c_str());
-	_xr.setRoute(s, -2, "", 0);
-	_controller_sid = s;
-
 	XmakeNewSID(s, sizeof(s));
-	Node ncSID(s);
+	Node rSID(s);
+	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 
-	g = (src * nHID * nFID * ncSID) + (src * nFID * ncSID);
-
-	g.fill_sockaddr(&_controller_dag);
-	syslog(LOG_INFO, "Controller DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the controller receive socket
-	if (Xbind(_controller_sock, (struct sockaddr*)&_controller_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
-
+	_controller_sid = s;
+	memcpy(&_controller_dag, &_recv_dag, sizeof(sockaddr_x));
 
 	// save the controller dag to disk so xnetj can find it
 	if (saveControllerDAG() < 0) {
 		// handle the error
 	}
 
-
-	// make the DAG we'll send with
+	// source socket - sending socket
 	XmakeNewSID(s, sizeof(s));
-	Node nAD(_myAD);
 	Node outSID(s);
 	g = src * nAD * nHID * outSID;
 
-	g.fill_sockaddr(&_source_dag);
-	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the source socket
-	if (Xbind(_source_sock, (struct sockaddr*)&_source_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+	if ((_source_sock = makeSocket(g, &_source_dag)) < 0) {
 		return -1;
 	}
+
+	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Source: %s", g.dag_string().c_str());
 
 	return 0;
 }
@@ -345,6 +240,10 @@ int Controller::init()
 	srand (time(NULL));
 
 	_flags = F_CONTROLLER; // FIXME: set any other useful flags at this time
+
+	if (getXIDs(_myAD, _myHID) < 0) {
+		exit(-1);
+	}
 
 	if (makeSockets() < 0) {
 		exit(-1);
@@ -481,18 +380,18 @@ int Controller::sendInterDomainLSA()
 
 int Controller::sendRoutingTable(NodeStateEntry *nodeState, std::map<std::string, RouteEntry> routingTable)
 {
-//	syslog(LOG_INFO, "Controller::Send-RT");
-
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
 		return processRoutingTable(routingTable);
+
 	} else if (nodeState->dag.sx_family != AF_XIA) {
-		// this entry was created for something we haven't seen yet,
-		// don't try to send a table
+		// this entry was either created as a host placeholder, or
+		// is for a router we haven't received an LSA from yet
+		// so we have no dag to send the table to
 		return 1;
+
 	} else {
 		// If destHID is not SID, send to relevant router
-		//
 		Node fad(_myAD);
 		Node fhid(_myHID);
 		Node tad(_myAD);
@@ -2472,3 +2371,4 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 
 	return rc;
 }
+

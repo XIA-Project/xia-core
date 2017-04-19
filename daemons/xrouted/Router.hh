@@ -37,18 +37,13 @@ protected:
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
 
 	// other stuff
-	int readMessage(char *recv_message, int *iface);
-	int postJoin();
+	int makeSockets();
 	void purge();
 
 protected:
 	// local addr, these should change to nodes
 	std::string _myAD;
 	std::string _myHID;
-
-	// socket and dag we recv route messages on
-	int _router_sock;
-	sockaddr_x _router_dag;
 
 	// true once we are configured to be on the network
 	bool _joined;

@@ -103,9 +103,7 @@ protected:
 	std::string _myHID;
 	Node _my_fid;
 
-	int _controller_sock;
 	std::string _controller_sid;
-
 
 //	char myAD[MAX_XID_SIZE]; // this router AD
 //	char myHID[MAX_XID_SIZE]; // this router HID
@@ -177,6 +175,7 @@ protected:
 	int processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg);
 
 
+	void purge();
 
 	int querySidDecision();
 	int processSidRoutingTable(std::map<std::string, std::map<std::string, ServiceState> > &ADSIDsTable);

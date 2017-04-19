@@ -13,8 +13,6 @@
 // does the dual router flag serve any purpose?
 // implement security!!!
 
-#define BUFFER_SIZE 16384	// read buffer
-
 
 // purge stale entries from our tables
 void Router::purge()
@@ -67,108 +65,29 @@ void Router::purge()
 	}
 }
 
-// Read in a packet from the network or control interface
-int Router::readMessage(char *recv_message, int *iface)
-{
-	int rc = -1;
-	sockaddr_x theirDAG;
-	struct pollfd pfd[3];
-	struct timespec tspec;
-
-	bzero(pfd, sizeof(pfd));
-	pfd[0].fd = _local_sock;
-	pfd[1].fd = _broadcast_sock;
-	pfd[2].fd = _router_sock;
-	pfd[0].events = POLLIN;
-	pfd[1].events = POLLIN;
-	pfd[2].events = POLLIN;
-
-	tspec.tv_sec = 0;
-	tspec.tv_nsec = 500000000;
-
-	// only poll for local sock if we haven't gotten config info from the network
-	int num_pfds = _joined ? 3 : 1;
-
-	rc = Xppoll(pfd, num_pfds, &tspec, NULL);
-	if (rc > 0) {
-			int sock = -1;
-
-		for (int i = 0; i < num_pfds; i++) {
-			if (pfd[i].revents & POLLIN) {
-				sock = pfd[i].fd;
-				break;
-			}
-		}
-
-		bzero(recv_message, BUFFER_SIZE);
-
-		if (sock <= 0) {
-			// something weird happened
-			return 0;
-
-		} else if (sock == _local_sock) {
-			// it's  a normal UDP socket
-			iface = 0;
-			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, NULL, NULL)) < 0) {
-				syslog(LOG_WARNING, "local message receive error");
-			}
-		} else {
-			// it's an Xsocket, use Xrecvmsg to get interface message came in on
-
-			struct msghdr mh;
-			struct iovec iov;
-			struct in_pktinfo pi;
-			struct cmsghdr *cmsg;
-			struct in_pktinfo *pinfo;
-			char cbuf[CMSG_SPACE(sizeof pi)];
-
-			iov.iov_base = recv_message;
-			iov.iov_len = BUFFER_SIZE;
-
-			mh.msg_name = &theirDAG;
-			mh.msg_namelen = sizeof(theirDAG);
-			mh.msg_iov = &iov;
-			mh.msg_iovlen = 1;
-			mh.msg_control = cbuf;
-			mh.msg_controllen = sizeof(cbuf);
-
-			cmsg = CMSG_FIRSTHDR(&mh);
-			cmsg->cmsg_level = IPPROTO_IP;
-			cmsg->cmsg_type = IP_PKTINFO;
-			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
-
-			mh.msg_controllen = cmsg->cmsg_len;
-
-			if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
-				perror("recvfrom");
-
-			} else {
-				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
-					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
-						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-						*iface = pinfo->ipi_ifindex;
-					}
-				}
-			}
-		}
-	}
-
-	return rc;
-}
-
 
 void *Router::handler()
 {
 	int rc;
 	char recv_message[BUFFER_SIZE];
-	vector<string> routers;
+	struct pollfd pfds[3];
 	int iface;
 
+	bzero(pfds, sizeof(pfds));
+	pfds[0].fd = _local_sock;
+	pfds[1].fd = _broadcast_sock;
+	pfds[2].fd = _recv_sock;
+	pfds[0].events = POLLIN;
+	pfds[1].events = POLLIN;
+	pfds[2].events = POLLIN;
+
+	// only poll for local sock if we haven't gotten config info from the network
+	int num_pfds = _joined ? 3 : 1;
+
 	// get the next incoming message
-	if ((rc = readMessage(recv_message, &iface)) > 0) {
+	if ((rc = readMessage(recv_message, pfds, num_pfds, &iface)) > 0) {
 		processMsg(string(recv_message, rc), iface);
 	}
-
 
 	if (_joined) {
 		// once we are initialized, purge any stale routes
@@ -193,101 +112,44 @@ void *Router::handler()
 
 
 // now that we've joined the network, set up our dags and sockets
-int Router::postJoin()
+int Router::makeSockets()
 {
 	char s[MAX_DAG_SIZE];
 	Graph g;
+
 	Node src;
+	Node nHID(_myHID);
+	Node nAD(_myAD);
 
 	// broadcast socket - hello messages, can hopefully go away
-	_broadcast_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_broadcast_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the broadcast socket");
+	g = src * Node(broadcast_fid) * Node(intradomain_sid);
+	if ((_broadcast_sock = makeSocket(g, &_broadcast_dag)) < 0) {
 		return -1;
 	}
 
 	// router socket - flooded & interdomain communication
-	_router_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_router_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the controller socket");
+	XcreateFID(s, sizeof(s));
+	Node nFID(s);
+	XmakeNewSID(s, sizeof(s));
+	Node rSID(s);
+	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
+
+	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
 
 	// source socket - sending socket
-	_source_sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
-	if (_source_sock < 0) {
-		syslog(LOG_ALERT, "Unable to create the out socket");
-		return -1;
-	}
-
-	// get our AD and HID
-	if ( XreadLocalHostAddr(_source_sock, s, MAX_DAG_SIZE, NULL, 0) < 0 ) {
-		syslog(LOG_ALERT, "Unable to read local XIA address");
-		return -1;
-	}
-
-	// FIXME: these should probably be Nodes instead of strings!
-	Graph gbroad(s);
-	_myAD = gbroad.intent_AD_str();
-	_myHID = gbroad.intent_HID_str();
-
-	Node nHID(_myHID);
-
-	// make the dag we'll receive broadcasts on
-	g = src * Node(broadcast_fid) * Node(intradomain_sid);
-
-	g.fill_sockaddr(&_broadcast_dag);
-	syslog(LOG_INFO, "Broadcast DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the broadcast receive socket
-	if (Xbind(_broadcast_sock, (struct sockaddr*)&_broadcast_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to broadcast receive DAG : %s", g.dag_string().c_str());
-		return -1;
-	}
-
-	// make the dag we'll receive controller messages on
-	XcreateFID(s, sizeof(s));
-
-	Node nFID(s);
-
 	XmakeNewSID(s, sizeof(s));
-
-	Node rSID(s);
-	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
-
-	g.fill_sockaddr(&_router_dag);
-	syslog(LOG_INFO, "Control Receiver DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the controller receive socket
-	if (Xbind(_router_sock, (struct sockaddr*)&_router_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
-		return -1;
-	}
-
-
-	// make the DAG we'll send with
-	XmakeNewSID(s, sizeof(s));
-
-	Node nAD(_myAD);
 	Node outSID(s);
 	g = src * nAD * nHID * outSID;
 
-	g.fill_sockaddr(&_source_dag);
-	syslog(LOG_INFO, "Source DAG: %s", g.dag_string().c_str());
-
-	// and bind it to the source socket
-	if (Xbind(_source_sock, (struct sockaddr*)&_source_dag, sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ALERT, "unable to bind to controller DAG : %s", g.dag_string().c_str());
+	if ((_source_sock = makeSocket(g, &_source_dag)) < 0) {
 		return -1;
 	}
 
-	if( XisDualStackRouter(_source_sock) == 1 ) {
-		_flags |= F_IP_GATEWAY;
-		syslog(LOG_DEBUG, "configured as a dual-stack router");
-	}
-
-	// we're part of the network now and can start talking
-	_joined = true;
+	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
+	syslog(LOG_INFO, "Source: %s", g.dag_string().c_str());
 
 	return 0;
 }
@@ -367,7 +229,7 @@ int Router::sendLSA()
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 
 	lsa->set_flags(_flags);
-	lsa->set_dag(&_router_dag, sockaddr_size(&_router_dag));
+	lsa->set_dag(&_recv_dag, sockaddr_size(&_recv_dag));
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -567,15 +429,36 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 
 int Router::processConfig(const Xroute::ConfigMsg &msg)
 {
-	_myAD = msg.ad();
+	std::string ad = msg.ad();
 
 	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
-	// the default AD & HID got set when xnetjoin setup our AD, reset them to fallback
+	if (!_joined) {
+		// now we can fetch our AD/HID
+		if (getXIDs(_myAD, _myHID) < 0) {
+			return -1;
+		}
+
+		makeSockets();
+
+		if (XisDualStackRouter(_source_sock) == 1) {
+			_flags |= F_IP_GATEWAY;
+			syslog(LOG_DEBUG, "configured as a dual-stack router");
+		}
+
+		// we're part of the network now and can start talking
+		_joined = true;
+
+	} else if (ad != _myAD) {
+		// FIXME: should we nuke the neighbor table?
+		// what about the routing tables in click?
+	}
+
+	// netjoin causes the default routes to be treated as if this
+	// is a host and not a router. Put them back to normal.
 	_xr.setRoute("AD:-", FALLBACK, "", 0);
 	_xr.setRoute("HID:-", FALLBACK, "", 0);
 
-	postJoin();
 	return 1;
 }
 
