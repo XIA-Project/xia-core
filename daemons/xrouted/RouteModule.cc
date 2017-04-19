@@ -12,30 +12,6 @@ RouteModule::RouteModule(const char *name)
 }
 
 
-pthread_t RouteModule::start()
-{
-	int rc;
-
-	// connect to the click route engine
-	_xr.setRouter(_hostname);
-	if ((rc = _xr.connect()) != 0) {
-		syslog(LOG_ALERT, "unable to connect to click (%d)", rc);
-		exit(-1);
-	}
-
-	makeLocalSocket();
-
-	init();
-	_enabled = true;
-
-	rc = pthread_create(&_t, NULL, run, (void*)this);
-	if (rc == 0) {
-		return _t;
-	} else {
-		return 0;
-	}
-}
-
 int RouteModule::makeSocket(Graph &g, sockaddr_x *sa)
 {
 	int sock = Xsocket(AF_XIA, SOCK_DGRAM, 0);
@@ -192,16 +168,25 @@ int RouteModule::sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg)
 	return rc;
 }
 
-void *RouteModule::run(void *inst)
+int RouteModule::run()
 {
-	RouteModule *re = (RouteModule*)inst;
-	while (re->_enabled) {
-		re->handler();
+	int rc = 0;
+
+	// connect to the click route engine
+	_xr.setRouter(_hostname);
+	if ((rc = _xr.connect()) != 0) {
+		syslog(LOG_ALERT, "unable to connect to click (%d)", rc);
+		exit(-1);
 	}
-	return NULL;
+
+	makeLocalSocket();
+
+	init();
+	_enabled = true;
+
+	while (_enabled && rc >= 0) {
+		rc = handler();
+	}
+	return rc;
 }
 
-int RouteModule::wait()
-{
-	return pthread_join(_t, NULL);
-}

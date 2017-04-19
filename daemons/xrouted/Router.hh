@@ -19,7 +19,7 @@ public:
 
 protected:
 	// class overrides
-	void *handler();
+	int handler();
 	int init();
 
 	// message handlers

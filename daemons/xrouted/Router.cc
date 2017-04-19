@@ -66,7 +66,7 @@ void Router::purge()
 }
 
 
-void *Router::handler()
+int Router::handler()
 {
 	int rc;
 	char recv_message[BUFFER_SIZE];
@@ -107,7 +107,7 @@ void *Router::handler()
 		}
 	}
 
-	return NULL;
+	return 0;
 }
 
 

@@ -152,7 +152,7 @@ protected:
 	struct timeval sd_freq, sd_fire;
 	struct timeval sq_freq, sq_fire;
 
-	void *handler();
+	int handler();
 	int init();
 	int makeSockets();
 	int saveControllerDAG();

@@ -38,14 +38,11 @@ const std::string intradomain_sid("SID:1110000000000000000000000000000000001112"
 
 class RouteModule {
 public:
-	pthread_t start();              // create a new thread and start running
-	static void *run(void *);       // thread main loop - calls handler
+	int run();				        // thread main loop - calls handler
 	void stop() {_enabled = false;} // stop the thread
-	int wait();
 
 protected:
 	bool _enabled;
-	pthread_t _t;
 	const char *_hostname;
 	XIARouter _xr;
 
@@ -73,9 +70,7 @@ protected:
 
 	// virtual functions to be defined by the subclasses
 	virtual int init() = 0;      // configure the route module
-	virtual void *handler() = 0; // called by the main loop
+	virtual int handler() = 0; // called by the main loop
 };
-
-typedef std::vector<RouteModule*> ModuleList;
 
 #endif

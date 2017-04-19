@@ -113,7 +113,7 @@ void Controller::purge()
 }
 
 
-void *Controller::handler()
+int Controller::handler()
 {
 	int rc;
 	char recv_message[BUFFER_SIZE];
@@ -158,7 +158,7 @@ void *Controller::handler()
 
 	purge();
 
-	return NULL;
+	return 0;
 }
 
 

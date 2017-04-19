@@ -7,7 +7,7 @@
 // FIXME: we need to stop LSA and Route Table broadcasts from leaving our AD
 
 RouterConfig config;
-ModuleList modules;
+Controller *c = NULL;
 
 void initLogging()
 {
@@ -23,10 +23,7 @@ void initLogging()
 
 void term(int /*signum*/)
 {
-	ModuleList::iterator it;
-	for (it = modules.begin(); it != modules.end(); it++) {
-		(*it)->stop();
-	}
+	c->stop();
 }
 
 int main(int argc, char *argv[])
@@ -54,14 +51,6 @@ int main(int argc, char *argv[])
 	// sigprocmask(SIG_BLOCK, &sigset, &oldset);
 
 
-	Controller *c = new Controller(config.hostname());
-	c->start();
-	modules.push_back(c);
-
-	// wait for everyone to quit
-	ModuleList::iterator it;
-	for (it = modules.begin(); it != modules.end(); it++) {
-		(*it)->wait();
-	}
-	return 0;
+	c = new Controller(config.hostname());
+	return c->run();
 }
