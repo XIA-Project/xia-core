@@ -27,17 +27,17 @@ Settings::Settings(const char *h)
 	snprintf(full_path, BUF_SIZE, "%s/%s", XrootDir(root, BUF_SIZE), SETTINGS_FILE);
     _settings_file = full_path;
 
-    _expire_time            = EXPIRE_TIME_D;
-    _hello_interval         = HELLO_INTERVAL_D;
-    _lsa_interval           = LSA_INTERVAL_D;
-    _sid_discovery_interval = SID_DISCOVERY_INTERVAL_D;
-    _sid_decision_interval  = SID_DECISION_INTERVAL_D;
-    _ad_lsa_interval        = AD_LSA_INTERVAL_D;
-    _calc_dijkstra_interval = CALC_DIJKSTRA_INTERVAL_D;
-    _update_latency         = UPDATE_LATENCY_D;
-    _update_config          = UPDATE_CONFIG_D;
-    _max_hop_count          = MAX_HOP_COUNT_D;
-    _enable_sid_ctl         = ENABLE_SID_CTL_D;
+    _expire_time            = EXPIRE_TIME;
+    _hello_interval         = HELLO_INTERVAL;
+    _lsa_interval           = LSA_INTERVAL;
+    _sid_discovery_interval = SID_DISCOVERY_INTERVAL;
+    _sid_decision_interval  = SID_DECISION_INTERVAL;
+    _ad_lsa_interval        = AD_LSA_INTERVAL;
+    _calc_dijkstra_interval = CALC_DIJKSTRA_INTERVAL;
+    _update_latency         = UPDATE_LATENCY;
+    _update_config          = UPDATE_CONFIG;
+    _max_hop_count          = MAX_HOP_COUNT;
+    _enable_sid_ctl         = ENABLE_SID_CTL;
 }
 
 void Settings::reload()
@@ -61,15 +61,15 @@ void Settings::reload()
 		strcpy(section_name, "default");
 	}
 
-	_expire_time             = ini_getl(section_name, "expire_time", EXPIRE_TIME_D, _settings_file.c_str());
-	_hello_interval          = ini_getf(section_name, "hello_interval", HELLO_INTERVAL_D, _settings_file.c_str());
-	_lsa_interval            = ini_getf(section_name, "LSA_interval", LSA_INTERVAL_D, _settings_file.c_str());
-	_sid_discovery_interval  = ini_getf(section_name, "SID_discovery_interval", SID_DISCOVERY_INTERVAL_D, _settings_file.c_str());
-	_sid_decision_interval   = ini_getf(section_name, "SID_decision_interval", SID_DECISION_INTERVAL_D, _settings_file.c_str());
-	_ad_lsa_interval         = ini_getf(section_name, "AD_LSA_interval", AD_LSA_INTERVAL_D, _settings_file.c_str());
-	_calc_dijkstra_interval  = ini_getf(section_name, "calc_Dijkstra_interval", CALC_DIJKSTRA_INTERVAL_D, _settings_file.c_str());
-	_max_hop_count           = ini_getl(section_name, "max_hop_count", MAX_HOP_COUNT_D, _settings_file.c_str());
-	_update_config           = ini_getl(section_name, "update_config", UPDATE_CONFIG_D, _settings_file.c_str());
-	_update_latency          = ini_getl(section_name, "update_latency", UPDATE_LATENCY_D, _settings_file.c_str());
-	_enable_sid_ctl          = ini_getl(section_name, "enable_SID_ctl", ENABLE_SID_CTL_D, _settings_file.c_str());
+	_expire_time             = ini_getl(section_name, "expire_time", EXPIRE_TIME, _settings_file.c_str());
+	_hello_interval          = ini_getf(section_name, "hello_interval", HELLO_INTERVAL, _settings_file.c_str());
+	_lsa_interval            = ini_getf(section_name, "LSA_interval", LSA_INTERVAL, _settings_file.c_str());
+	_sid_discovery_interval  = ini_getf(section_name, "SID_discovery_interval", SID_DISCOVERY_INTERVAL, _settings_file.c_str());
+	_sid_decision_interval   = ini_getf(section_name, "SID_decision_interval", SID_DECISION_INTERVAL, _settings_file.c_str());
+	_ad_lsa_interval         = ini_getf(section_name, "AD_LSA_interval", AD_LSA_INTERVAL, _settings_file.c_str());
+	_calc_dijkstra_interval  = ini_getf(section_name, "calc_Dijkstra_interval", CALC_DIJKSTRA_INTERVAL, _settings_file.c_str());
+	_max_hop_count           = ini_getl(section_name, "max_hop_count", MAX_HOP_COUNT, _settings_file.c_str());
+	_update_config           = ini_getl(section_name, "update_config", UPDATE_CONFIG, _settings_file.c_str());
+	_update_latency          = ini_getl(section_name, "update_latency", UPDATE_LATENCY, _settings_file.c_str());
+	_enable_sid_ctl          = ini_getl(section_name, "enable_SID_ctl", ENABLE_SID_CTL, _settings_file.c_str());
 }
