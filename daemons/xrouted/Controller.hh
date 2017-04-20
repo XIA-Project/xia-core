@@ -49,7 +49,9 @@ protected:
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
 	void processRoutingTable(RouteTable routingTable);
 
-	void purge();
+    void purgeStaleRoutes(time_t now);
+    void purgeStaleNeighbors(time_t now);
+    void purgeStaleADs(time_t now);
 
 	void extractNeighborADs(void);
 	void populateNeighboringADBorderRouterEntries(string currHID, RouteTable &routingTable);
@@ -71,15 +73,14 @@ protected:
 
 	std::string _dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
 
-	RouteTable    _ADrouteTable;    // dest AD -> route entry
-
     NeighborTable _neighborTable;   // neighbor HID -> neighbor entry
 	NeighborTable _ADNeighborTable; // neighbor HID to neighbor entry for ADs
 
 	NetworkTable  _networkTable;    // dest HID -> node state entry
     NetworkTable  _ADNetworkTable;  // dest AD to NodeState entry for ADs
 
-	TimestampList _timeStamp;
+	TimestampList _route_timestamp;
+	TimestampList _neighbor_timestamp;
 
 	int32_t _calc_dijstra_ticks;
 
@@ -89,7 +90,10 @@ protected:
 	struct timeval l_freq, l_fire;
 
 	// last time we looked for stale entries
-	time_t _last_purge;
+    time_t _last_purge;
+	time_t _last_route_purge;
+	time_t _last_neighbor_purge;
+    time_t _last_ad_purge;
 	time_t _last_update_config;
 //	time_t _last_update_latency;
 };

@@ -22,82 +22,98 @@
 // FIXME: it would be good to eliminate all of the conversions
 //  instead of having to convert everyting to or from a protobuf
 //  through an additional intermediate conversion!
+//
+//  make each purge section use it's own time interval
 
-void Controller::purge()
+
+// FIXME: why is there no routetable purge?
+// is it ephemeral?
+
+void Controller::purgeStaleRoutes(time_t now)
 {
-	// initialize if this is first time in
-	if (_last_purge == 0) {
-		_last_purge = time(NULL);
-        _last_update_config = _last_purge;
-//	    _last_update_latency = _last_purge;
-        return;
-	}
+    // delete any stale routes in our click routing table
+	TimestampList::iterator iter = _route_timestamp.begin();
+	while (iter != _route_timestamp.end())
+    {
+        if (now - iter->second >= _settings->expire_time() * 10) {
+            syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
+            _xr.delRoute(iter->first);
+//			_last_update_latency = 0; // force update latency
+            _route_timestamp.erase(iter++);
+        } else {
+            ++iter;
+        }
+    }
+}
 
-	time_t now = time(NULL);
+void Controller::purgeStaleNeighbors(time_t now)
+{
+    // delete any stale neighbors in our neighbor timestamp table
+	TimestampList::iterator iter = _neighbor_timestamp.begin();
+	while (iter != _neighbor_timestamp.end())
+    {
+        if (now - iter->second >= _settings->expire_time() * 10) {
+			syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
+            _xr.delRoute(iter->first);
+//			_last_update_latency = 0; // force update latency
+			_neighborTable.erase(iter->first);
+            _neighbor_timestamp.erase(iter++);
+        } else {
+            ++iter;
+        }
+    }
+}
 
-    // FIXME: do we really need all 4 of these things???
 
-	if (now - _last_purge >= _settings->expire_time()) {
-		_last_purge = now;
-		TimestampList::iterator iter = _timeStamp.begin();
+// FIXME: figure out why there are multiple AD purges
+void Controller::purgeStaleADs(time_t now)
+{
+    NetworkTable::iterator iter1 = _ADNetworkTable.begin();
+    while (iter1 != _ADNetworkTable.end())
+    {
+        if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
+            syslog(LOG_INFO, "purging AD neighbor : %s", iter1->first.c_str());
+//			_last_update_latency = 0; // force update latency
+            _xr.delRoute(iter1->first);
+            _ADNetworkTable.erase(iter1++);
+        } else {
+            ++iter1;
+        }
+    }
 
-		while (iter != _timeStamp.end())
-		{
-			if (now - iter->second >= _settings->expire_time() * 10) {
-				_xr.delRoute(iter->first);
-//				_last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging host route for : %s", iter->first.c_str());
-				_timeStamp.erase(iter++);
-			} else {
-				++iter;
-			}
-		}
+    // FIXME: how is this different from the neighbor_timestamp check?
+    NeighborTable::iterator iter2 = _neighborTable.begin();
+    while (iter2 != _neighborTable.end())
+    {
+        if (now - iter2->second.timestamp >= _settings->expire_time()) {
+//			_last_update_latency = 0; // force update latency
+            syslog(LOG_INFO, "purging neighbor : %s", iter2->first.c_str());
+            _xr.delRoute(iter2->first);
+            _neighborTable.erase(iter2++);
+        } else {
+            ++iter2;
+        }
+    }
 
-		NetworkTable::iterator iter1 = _ADNetworkTable.begin();
+    NeighborTable::iterator iter3 = _ADNeighborTable.begin();
+    while (iter3 != _ADNeighborTable.end())
+    {
+        if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
+//			_last_update_latency = 0; // force update latency
+            syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
 
-		while (iter1 != _ADNetworkTable.end())
-		{
-			if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
-				syslog(LOG_INFO, "purging neighbor : %s", iter1->first.c_str());
-//				_last_update_latency = 0; // force update latency
-				_ADNetworkTable.erase(iter1++);
-			} else {
-				++iter1;
-			}
-		}
+            _ADNetworkTable[_myAD].neighbor_list.erase(
+                std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
+                            _ADNetworkTable[_myAD].neighbor_list.end(),
+                            iter3->second),
+                            _ADNetworkTable[_myAD].neighbor_list.end());
 
-		NeighborTable::iterator iter2 = _neighborTable.begin();
-
-		while (iter2 != _neighborTable.end())
-		{
-			if (now - iter2->second.timestamp >= _settings->expire_time()) {
-//				_last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging AD network : %s", iter2->first.c_str());
-				_neighborTable.erase(iter2++);
-			} else {
-				++iter2;
-			}
-		}
-
-		NeighborTable::iterator iter3 = _ADNeighborTable.begin();
-
-		while (iter3 != _ADNeighborTable.end())
-		{
-			if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
-//				_last_update_latency = 0; // force update latency
-				syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
-
-				_ADNetworkTable[_myAD].neighbor_list.erase(
-					std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
-								_ADNetworkTable[_myAD].neighbor_list.end(),
-								iter3->second),
-				_ADNetworkTable[_myAD].neighbor_list.end());
-				_ADNeighborTable.erase(iter3++);
-			} else {
-				++iter3;
-			}
-		}
-	}
+            _xr.delRoute(iter3->first);
+            _ADNeighborTable.erase(iter3++);
+        } else {
+            ++iter3;
+        }
+    }
 }
 
 
@@ -141,7 +157,15 @@ int Controller::handler()
         _settings->reload();
 	}
 
-	purge();
+    // FIXME: figure out why purges seems crazy
+    // seems like it was never completed or tested
+	if (t - _last_purge >= _settings->expire_time()) {
+		_last_purge = t;
+
+//      purgeStaleRoutes(t);
+//      purgeStaleNeighbors(t);
+//      purgeStaleADs(t);
+    }
 
 	return 0;
 }
@@ -258,6 +282,12 @@ int Controller::init()
 	gettimeofday(&now, NULL);
 	timeradd(&now, &h_freq, &h_fire);
 	timeradd(&now, &l_freq, &l_fire);
+
+	_last_purge          = time(NULL);
+	_last_route_purge    = _last_purge;
+    _last_neighbor_purge = _last_purge;
+    _last_update_config  = _last_purge;
+//  _last_update_latency = _last_purge;
 
 	return 0;
 }
@@ -527,8 +557,7 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 		syslog(LOG_ERR, "unable to set host route: %s (%d)", neighbor.HID.c_str(), rc);
 	}
 
-	// FIXME: handle timeouts
-//	_hello_timeStamp[neighbor.HID] = time(NULL);
+	_neighbor_timestamp[neighbor.HID] = time(NULL);
 
 	return 1;
 }
@@ -579,6 +608,7 @@ int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	_networkTable[_myHID] = entry;
 	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
 
+    _neighbor_timestamp[neighborHID] = time(NULL);
 	return 1;
 }
 
@@ -599,7 +629,7 @@ void Controller::processRoutingTable(RouteTable routingTable)
 		if ((rc = _xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
-		_timeStamp[it->second.dest] = time(NULL);
+		_route_timestamp[it->second.dest] = time(NULL);
 	}
 }
 
