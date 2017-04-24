@@ -44,7 +44,9 @@ void stageControl(int sock, char *cmd)
 
     XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
 
-    vector<string> CIDs ;//= strVector(cmd);
+    //vector<string> CIDs ;//= strVector(cmd);
+    vector<string> CIDs = strVector(cmd);
+/*
     while(1){
 	if (strncmp(cmd, "stageEnd", 8) == 0) {
 	    break;
@@ -55,7 +57,7 @@ void stageControl(int sock, char *cmd)
             
         }
 	char str_arr[strlen(cmd)+1];
-	strcpy(str_arr, cmd);
+	strcpy(str_arr, cmd+10);
 	char *saveptr;
 	char *str = strtok_r(str_arr, " ", &saveptr);
 	CIDs.push_back(str);
@@ -65,7 +67,7 @@ void stageControl(int sock, char *cmd)
             break;
 	} 
     }
-   
+   */
     for (auto CID : CIDs) {
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
         //url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
@@ -129,7 +131,7 @@ void stageControl(int sock, char *cmd)
         sprintf(reply, "ready %s %s %ld", oldUrl, url,
                 SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                 SIDToProfile[remoteSID][CID].fetchStartTimestamp);
-        hearHello(sock);
+//        hearHello(sock);
         stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                         SIDToProfile[remoteSID][CID].fetchStartTimestamp << endl;
 
@@ -240,7 +242,7 @@ void *stageCmd(void *socketid)
         }
         if (strncmp(cmd, "xping", 5) == 0) {
             say("Xping to %s\n", cmd);
-            int rtt = getRTT(cmd + 6);
+            int rtt = getRTT(cmd);
             sprintf(cmd, "rtt %d", rtt);
             say("Xping Response: %s\n", cmd);
             if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
@@ -250,8 +252,21 @@ void *stageCmd(void *socketid)
         }
         say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
         if (strncmp(cmd, "stage", 5) == 0) {
-            say("Receive a stage message: %s\n", cmd);
-            stageControl(sock, cmd + 6);
+            say("Receive a stage message: %s\n", cmd+6);
+
+            char cmd1[XIA_MAXBUF];
+			char * start, *end;
+			start = cmd;
+			while((end = strstr(start+6, "stage")) > 0){
+				n = end - start;
+				printf("n = %d\n", n);
+				strncpy(cmd1, start, end - start);
+				start = end;
+				*(cmd1+(end-start))=0;
+				say("Successfully devide command . CMD: %s\n",cmd1);
+				stageControl(sock, cmd1 + 6);
+			}
+            stageControl(sock, start + 6);
         }
     }
 

@@ -13,7 +13,6 @@ pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t startStage = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t stageMutex = PTHREAD_MUTEX_INITIALIZER;
 //pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t xcacheLock = PTHREAD_MUTEX_INITIALIZER;
 
 struct chunkProfile {
     int fetchState;
@@ -45,14 +44,37 @@ void stageControl(int sock, char *cmd)
 
     XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
 
+    //vector<string> CIDs ;//= strVector(cmd);
     vector<string> CIDs = strVector(cmd);
-
+/*
+    while(1){
+	if (strncmp(cmd, "stageEnd", 8) == 0) {
+	    break;
+	}
+	say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
+	if (strncmp(cmd, "stageCont", 9) == 0) {
+            say("Receive a stage message: %s\n", cmd);
+            
+        }
+	char str_arr[strlen(cmd)+1];
+	strcpy(str_arr, cmd+10);
+	char *saveptr;
+	char *str = strtok_r(str_arr, " ", &saveptr);
+	CIDs.push_back(str);
+	int n;
+	if (( n = Xrecv(sock, cmd, XIA_MAXBUF, 0))  < 0) {
+            warn("socket error while waiting for data, closing connection\n");
+            break;
+	} 
+    }
+   */
     for (auto CID : CIDs) {
+		if(SIDToProfile[remoteSID][CID].fetchState == READY) continue;
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
         //url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
 		Graph g((char*)CID.c_str());
 		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
-	
+		
         SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
         SIDToProfile[remoteSID][CID].fetchFinishTimestamp = 0;
     }
@@ -73,49 +95,51 @@ void stageControl(int sock, char *cmd)
             //pthread_mutex_unlock(&bufLock);
             //pthread_exit(NULL);
         }*/
-		int retry=5;
-		while(retry--){
-			
-			if ((ret = XfetchChunk(&xcache, &buf, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
-				//die(-1, "XfetchChunk Failed\n");
-				say("unable to request chunks, retrying");
+		if(SIDToProfile[remoteSID][CID].fetchState != READY){
+			int retry=5;
+			while(retry--){
+				if ((ret = XfetchChunk(&xcache, &buf, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
+					//die(-1, "XfetchChunk Failed\n");
+					say("unable to request chunks, retrying");
+				}
+				else break;
 			}
-			else break;
+			if(ret < 0)
+				die(-1, "unable to request chunks\n");
+			
+			if (XputChunk(&xcache, (const char* )buf, ret, &SIDToProfile[remoteSID][CID].newDag) < 0) {
+				die(-1,"unable to put chunks\n");
+				//pthread_exit(NULL);
+			}
+			if (SIDToProfile[remoteSID][CID].fetchFinishTimestamp == 0) {
+				SIDToProfile[remoteSID][CID].fetchFinishTimestamp = now_msec();
+			}
+			SIDToProfile[remoteSID][CID].fetchState = READY;
 		}
-		if(ret < 0)
-			die(-1, "unable to request chunks\n");
-		
-        if (XputChunk(&xcache, (const char* )buf, ret, &SIDToProfile[remoteSID][CID].newDag) < 0) {
-            die(-1,"unable to put chunks\n");
-            //pthread_exit(NULL);
-        }
-        if (SIDToProfile[remoteSID][CID].fetchFinishTimestamp == 0) {
-            SIDToProfile[remoteSID][CID].fetchFinishTimestamp = now_msec();
-        }
-        SIDToProfile[remoteSID][CID].fetchState = READY;
         //add the lock and unlock action    --Lwy   1.16
         char reply[XIA_MAX_BUF] = "";
-		//dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
+        //dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
 		Graph g(&SIDToProfile[remoteSID][CID].newDag);
 		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].newDag);
 		strcpy(url, g.http_url_string().c_str());
+		
 		
 		char oldUrl[256];
 		//dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
 		Graph oldg(&SIDToProfile[remoteSID][CID].oldDag);
 		oldg.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
 		strcpy(oldUrl, oldg.http_url_string().c_str());
-		
+	
         memset(reply, 0 ,sizeof(reply));
         sprintf(reply, "ready %s %s %ld", oldUrl, url,
                 SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                 SIDToProfile[remoteSID][CID].fetchStartTimestamp);
-        hearHello(sock);
+//        hearHello(sock);
         stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                         SIDToProfile[remoteSID][CID].fetchStartTimestamp << endl;
 
         // Send chunk ready message to state manager.
-        sendStreamCmd(sock, reply); 
+        sendStreamCmd(sock, reply);
         say("xsend return ----- xsend return ---- xsend return ----  %s", CID.c_str());
         //pthread_mutex_unlock(&profileLock);
 
@@ -135,39 +159,34 @@ void stageControl(int sock, char *cmd)
 
     return;
 }
+
 void preStage(int sock, char *cmd)
 {
-    //pthread_mutex_lock(&timeLock);
-    //SIDToTime[remoteSID] = now_msec();
-    //pthread_mutex_unlock(&timeLock);
-
     char remoteAD[MAX_XID_SIZE];
     char remoteHID[MAX_XID_SIZE];
     char remoteSID[MAX_XID_SIZE];
-
-    //XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
-
+	
+	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
+	
     vector<string> CIDs = strVector(cmd);
 
     for (auto CID : CIDs) {
         SIDToProfile[remoteSID][CID].fetchState = BLANK;
-		//url_to_dag(&SIDToProfile[remoteSID][CID].oldDag, (char*)CID.c_str(), CID.size());
-        Graph g((char*)CID.c_str());
+		Graph g((char*)CID.c_str());
 		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
 		
-		SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
+        SIDToProfile[remoteSID][CID].fetchStartTimestamp = 0;
         SIDToProfile[remoteSID][CID].fetchFinishTimestamp = 0;
     }
 
     // send the chunk ready msg one by one
     char url[256];
-    //char buf[CHUNKSIZE];
 	void *buf;// = (char*)malloc(CHUNKSIZE);
     int ret;
     for (auto CID : CIDs) {
-        /*if (SIDToProfile[remoteSID][CID].fetchStartTimestamp == 0) {
+        if (SIDToProfile[remoteSID][CID].fetchStartTimestamp == 0) {
             SIDToProfile[remoteSID][CID].fetchStartTimestamp = now_msec();
-        }*/
+        }
 		
         /*if ((ret = XfetchChunk(&xcache, buf, CHUNKSIZE, XCF_BLOCK, &SIDToProfile[remoteSID][CID].oldDag, sizeof(SIDToProfile[remoteSID][CID].oldDag))) < 0) {
             die(-1,"unable to request chunks\n");
@@ -186,7 +205,7 @@ void preStage(int sock, char *cmd)
 		if(ret < 0)
 			die(-1, "unable to request chunks\n");
 		
-        /*if (XputChunk(&xcache, (const char* )buf, ret, &SIDToProfile[remoteSID][CID].newDag) < 0) {
+        if (XputChunk(&xcache, (const char* )buf, ret, &SIDToProfile[remoteSID][CID].newDag) < 0) {
             die(-1,"unable to put chunks\n");
             //pthread_exit(NULL);
         }
@@ -195,40 +214,32 @@ void preStage(int sock, char *cmd)
         }
         SIDToProfile[remoteSID][CID].fetchState = READY;
         //add the lock and unlock action    --Lwy   1.16
-        char reply[XIA_MAX_BUF] = "";
-        dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
+        //char reply[XIA_MAX_BUF] = "";
+        //dag_to_url(url, 256, &SIDToProfile[remoteSID][CID].newDag);
+		Graph g(&SIDToProfile[remoteSID][CID].newDag);
+		g.fill_sockaddr(&SIDToProfile[remoteSID][CID].newDag);
+		strcpy(url, g.http_url_string().c_str());
+		
+		
 	char oldUrl[256];
-	dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
-        memset(reply, 0 ,sizeof(reply));
-        sprintf(reply, "ready %s %s %ld", oldUrl, url,
-                SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
-                SIDToProfile[remoteSID][CID].fetchStartTimestamp);
-        hearHello(sock);
-        stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
+	//dag_to_url(oldUrl, 256, &SIDToProfile[remoteSID][CID].oldDag);
+	Graph oldg(&SIDToProfile[remoteSID][CID].oldDag);
+	oldg.fill_sockaddr(&SIDToProfile[remoteSID][CID].oldDag);
+	strcpy(oldUrl, oldg.http_url_string().c_str());
+      
+    stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                         SIDToProfile[remoteSID][CID].fetchStartTimestamp << endl;
 
-        // Send chunk ready message to state manager.
-        sendStreamCmd(sock, reply); 
-        say("xsend return ----- xsend return ---- xsend return ----  %s", CID.c_str());
-        //pthread_mutex_unlock(&profileLock);
 
-        // Determine the intervals to check the state of current chunk.
-        //usleep(SCAN_DELAY_MSEC * 1000); // chenren: check timing issue
-		*/
     }
 	free(buf);
-//pthread_mutex_lock(&profileLock);
     //SIDToProfile.erase(remoteSID);
-//pthread_mutex_unlock(&profileLock);
-//pthread_mutex_lock(&bufLock);
-//SIDToBuf.erase(remoteSID);
-//pthread_mutex_unlock(&bufLock);
-//pthread_mutex_lock(&timeLock);
-//SIDToTime.erase(remoteSID);
-//pthread_mutex_unlock(&timeLock);
-	
+
     return;
 }
+
+
+
 // TODO: paralize getting chunks for each SID, i.e. fair scheduling
 // read the CID from the stage buffer, execute staging, and update profile
 /*
@@ -314,7 +325,7 @@ void *stageCmd(void *socketid)
         }
         if (strncmp(cmd, "xping", 5) == 0) {
             say("Xping to %s\n", cmd);
-            int rtt = getRTT(cmd + 6);
+            int rtt = getRTT(cmd);
             sprintf(cmd, "rtt %d", rtt);
             say("Xping Response: %s\n", cmd);
             if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
@@ -324,12 +335,38 @@ void *stageCmd(void *socketid)
         }
         say("Successfully receive stage command from stage manager. CMD: %s\n",cmd);
         if (strncmp(cmd, "stage", 5) == 0) {
-            say("Receive a stage message: %s\n", cmd);
-            stageControl(sock, cmd + 6);
+            say("Receive a stage message: %s\n", cmd+6);
+
+            char cmd1[XIA_MAXBUF];
+			char * start, *end;
+			start = cmd;
+			while((end = strstr(start+6, "stage")) > 0){
+				n = end - start;
+				printf("n = %d\n", n);
+				strncpy(cmd1, start, end - start);
+				start = end;
+				*(cmd1+(end-start))=0;
+				say("Successfully devide command . CMD: %s\n",cmd1);
+				stageControl(sock, cmd1 + 6);
+			}
+            stageControl(sock, start + 6);
         }
-		if (strncmp(cmd, "prestage", 8) == 0) {
+		else if (strncmp(cmd, "prestage", 8) == 0) {
             say("Receive a prestage message: %s\n", cmd);
-            preStage(sock, cmd + 9);
+			
+			char cmd1[XIA_MAXBUF];
+			char * start, *end;
+			start = cmd;
+			while((end = strstr(start+9, "prestage")) > 0){
+				n = end - start;
+				printf("n = %d\n", n);
+				strncpy(cmd1, start, end - start);
+				start = end;
+				*(cmd1+(end-start))=0;
+				say("Successfully devide command . CMD: %s\n",cmd1);
+				preStage(sock, cmd1 + 9);
+			}
+            preStage(sock, start + 9);
         }
     }
 
