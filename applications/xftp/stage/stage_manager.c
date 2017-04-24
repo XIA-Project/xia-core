@@ -14,11 +14,12 @@ struct chunkProfile {
 
 int rttWifi = -1, rttInt = -1;
 long timeWifi = 0, timeInt = 0;
-int chunkToStage = 3, alreadyStage = 0;
+int chunkToStage = 3, alreadyStage = 0, pendingStage = 0;
 
-map<int, vector<string> > SIDToDAGs;
-map<int, map<string, chunkProfile> > SIDToProfile;
-map<int, int> fetchIndex;
+vector<string> allDAGs;
+map<string, chunkProfile> CIDToProfile;
+//map<int, int> fetchIndex;
+int fetchIndex;
 
 bool netStageOn = true;
 int thread_c = 0;
@@ -30,6 +31,8 @@ pthread_mutex_t dagVecLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t stageMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t StageControl = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t fetchLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t chunkMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t responseMutex = PTHREAD_MUTEX_INITIALIZER;
 
 long timeStamp;
 ofstream connetTime("connetTime.log");
@@ -67,11 +70,11 @@ void regHandler(int sock, char *cmd)
         pthread_mutex_lock(&profileLock);
         dag = strtok_r(cmd_arr, " ", &saveptr);
 
-        SIDToDAGs[sock].push_back(dag);
-        SIDToProfile[sock][dag] = chunkProfile(string(dag), BLANK);
+        allDAGs.push_back(dag);
+        CIDToProfile[dag] = chunkProfile(string(dag), BLANK);
         while ((dag = strtok_r(NULL, " ", &saveptr)) != NULL) {
-            SIDToDAGs[sock].push_back(dag);
-            SIDToProfile[sock][dag] = chunkProfile(dag, BLANK);
+            allDAGs.push_back(dag);
+            CIDToProfile[dag] = chunkProfile(dag, BLANK);
             say("DAG: %s\n", dag);
         }
         say("++++++++++++++++++++++++++++++++The remoteSID is %d\n", sock);
@@ -82,7 +85,7 @@ void regHandler(int sock, char *cmd)
 
     else if (strncmp(cmd, "reg done", 8) == 0) {
         pthread_mutex_lock(&stageMutex);
-        fetchIndex[sock] = 0;
+        fetchIndex = 0;
         pthread_mutex_unlock(&stageMutex);
         pthread_mutex_unlock(&StageControl);
         say("Receive the reg done command\n");
@@ -96,36 +99,43 @@ int delegationHandler(int sock, char *cmd)
 
     string tmp;
     pthread_mutex_lock(&dagVecLock);
-    auto iter = find(SIDToDAGs[sock].begin(), SIDToDAGs[sock].end(), cmd);
-    if (!netStageOn || iter == SIDToDAGs[sock].end()) { // not register
+//say("In delegationHandler.\nThe command is %s\n", cmd);
+    auto iter = find(allDAGs.begin(), allDAGs.end(), cmd);
+    if (!netStageOn || iter == allDAGs.end()) { // not register
         tmp = cmd;
         pthread_mutex_unlock(&dagVecLock);
     }
     else {
-        auto dis = distance(SIDToDAGs[sock].begin(), iter);
+        auto dis = distance(allDAGs.begin(), iter);
         pthread_mutex_unlock(&dagVecLock);
-        //SIDToDAGs[sock].erase();
+        //allDAGs.erase();
         while (true) {
+//say("In delegationHandler while.\nThe command is %s\n", cmd);
             pthread_mutex_lock(&profileLock);
-	    //if(SIDToProfile[sock][cmd].state == BLANK){
-	    //    SIDToProfile[sock][cmd].state = READY;
-            //    SIDToProfile[sock][cmd].dag = cmd;
-            //}
-            if (SIDToProfile[sock][cmd].state == READY) {
-                //SIDToProfile[sock][cmd].state = IGNORE;
+            if (CIDToProfile[cmd].state == READY) {
+                //CIDToProfile[cmd].state = IGNORE;
+				pthread_mutex_unlock(&StageControl);
                 break;
                 say("DAG: %s change into IGNORE!\n", cmd);
             }
+			if(CIDToProfile[cmd].state == BLANK){
+	    	    CIDToProfile[cmd].state = READY;
+				pthread_mutex_unlock(&fetchLock);
+				break;
+            //    CIDToProfile[cmd].dag = cmd;
+            }
             pthread_mutex_unlock(&profileLock);
         }
-        tmp = SIDToProfile[sock][cmd].dag;
-        //SIDToProfile[sock].erase(cmd);
+        tmp = CIDToProfile[cmd].dag;
+        //CIDToProfile.erase(cmd);
         pthread_mutex_unlock(&profileLock);
+////say("In delegationHandler. stageMutex\nThe command is %s\n", cmd);
         pthread_mutex_lock(&stageMutex);
-        fetchIndex[sock] = dis;
+        fetchIndex = dis;
         alreadyStage--;
         pthread_mutex_unlock(&stageMutex);
     }
+//say("In delegationHandler. send\nThe command is %s\n", cmd);
     if (send(sock, tmp.c_str(), tmp.size(), 0) < 0) {
         warn("socket error while sending data, closing connetTime\n");
         return -1;
@@ -141,7 +151,7 @@ void *clientCmd(void *socketid)
     int n;
 
     pthread_mutex_lock(&stageMutex);
-    fetchIndex[sock] = 0;
+    fetchIndex = 0;
     pthread_mutex_unlock(&stageMutex);
     while (1) {
         memset(cmd, 0, sizeof(cmd));
@@ -163,9 +173,10 @@ void *clientCmd(void *socketid)
             //pthread_mutex_unlock(&StageControl);
         }
         else if (strncmp(cmd, "fetch", 5) == 0) {
-            pthread_mutex_lock(&fetchLock);
+            
             say("Receive a chunk request\n");
-	    pthread_mutex_unlock(&StageControl);
+			pthread_mutex_lock(&fetchLock);
+	    	
             char dag[256] = ""; 
             sscanf(cmd, "fetch %s Time:%ld" ,dag, &timeWifi);
             if (delegationHandler(sock, dag) < 0) {
@@ -183,15 +194,80 @@ void *clientCmd(void *socketid)
     }
     close(sock);
     say("Socket closed\n");
-    pthread_mutex_lock(&profileLock);
-    SIDToProfile.erase(sock);
-    pthread_mutex_unlock(&profileLock);
-    pthread_mutex_lock(&dagVecLock);
-    SIDToDAGs.erase(sock);
-    pthread_mutex_unlock(&dagVecLock);
+    //pthread_mutex_lock(&profileLock);
+    //CIDToProfile.erase(sock);
+    //pthread_mutex_unlock(&profileLock);
+    //pthread_mutex_lock(&dagVecLock);
+    //allDAGs.erase(sock);
+    //pthread_mutex_unlock(&dagVecLock);
     pthread_exit(NULL);
 }
+void *stageChunk(void * lastSock){
+say("*********************************Before while loop of stageChunk\n");
+	//pthread_mutex_lock(&chunkMutex);
+	int netStageSock = ((int*)lastSock)[0];
+	int needStage = ((int*)lastSock)[1];
+	int chunkToRecv = ((int*)lastSock)[2];
+	char reply[XIA_MAX_BUF] = {0};
+	int cnt=0;
+	while(1) {
+		//if(chunkToRecv <= cnt) continue;
+		//pthread_mutex_lock(&responseMutex);
+		//sayHello(netStageSock, "READY TO RECEIVE!\n");
+		memset(reply,0,sizeof(reply));
+say("*********************************In while loop of stageChunk 1\n");
+		
+		if (Xrecv(netStageSock, reply, sizeof(reply), 0) <= 0) {
+			Xclose(netStageSock);
+			die(-1, "Unable to communicate with the server\n");
+		}
+		char reply1[XIA_MAX_BUF] = {0};
+		char * start, *end;
+		int n;
+		start = reply;
+		while((end=strstr(start +6,"ready"))>0){
+			n=end-start;
+			printf("n=%d\n",n);
+			strncpy(reply1,start,n);
+			start=end;
+			reply1[n]=0;
+			say("*********************************In while loop of stageChunk 2\n");
+			char oldDag[256];
+			char newDag[256];
+			sscanf(reply1, "%*s %s %s %ld", oldDag, newDag, &timeInt);
+			updateStageArg();
+			say("*********************************In while loop of stageChunk 3\n");
+			say("cmd: %s\n", reply1);
+			pthread_mutex_lock(&profileLock);
+			say("*********************************In while loop of stageChunk 4\n");
+			CIDToProfile[oldDag].dag = newDag;
+			CIDToProfile[oldDag].state = READY;
+			CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
+			managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
+			pthread_mutex_unlock(&profileLock);
+		}
+			say("*********************************In while loop of stageChunk 2\n");
+			char oldDag[256];
+			char newDag[256];
+			sscanf(start, "%*s %s %s %ld", oldDag, newDag, &timeInt);
+			updateStageArg();
+			say("*********************************In while loop of stageChunk 3\n");
+			say("cmd: %s\n", start);
+			pthread_mutex_lock(&profileLock);
+			say("*********************************In while loop of stageChunk 4\n");
+			CIDToProfile[oldDag].dag = newDag;
+			CIDToProfile[oldDag].state = READY;
+			CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
+			managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
+			pthread_mutex_unlock(&profileLock);
+			//cnt++;
+			//pthread_mutex_unlock(&responseMutex);
 
+	}
+	//pthread_mutex_unlock(&chunkMutex);
+say("*********************************Exit while loop of stageChunk\n");
+	pthread_exit(NULL);
+}
 // WORKING version
 // TODO: scheduling
 // control plane: figure out the right DAGs to stage, change the stage state from BLANK to PENDING to READY
@@ -201,7 +277,7 @@ void *stageData(void *)
     int thread_id = thread_c;
     cerr << "Thread id " << thread_id << ": " << "Is launched\n";
     cerr << "Current " << getAD() << endl;
-
+	int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
     char stageAD[MAX_XID_SIZE];
@@ -230,6 +306,12 @@ void *stageData(void *)
         netStageOn = false;
         pthread_exit(NULL);
     }
+    pthread_t thread_stageData;
+	int *lastSock = new int[2];
+	lastSock[0] = netStageSock;
+	//lastSock[1] = static_cast<int>(needStage.size());
+	lastSock[2] = chunkToRecv;
+	pthread_create(&thread_stageData, NULL, stageChunk, (void*)lastSock);
     //pthread_mutex_unlock(&StageControl);
     // TODO: need to handle the case that new SID joins dynamically
     // TODO: handle no in-net staging service
@@ -255,25 +337,27 @@ void *stageData(void *)
         }
         set<string> needStage;
         pthread_mutex_lock(&dagVecLock);
-        for (auto pair : SIDToDAGs) {
-            int sock = pair.first;
-            vector<string>& dags = pair.second;
-            say("Handling the sock: %d\n", sock);
+        //for (auto pair : allDAGs) {
+            //int sock = pair.first;
+            vector<string>& dags = allDAGs;//pair.second;
+            //say("Handling the sock: %d\n", sock);
             pthread_mutex_lock(&profileLock);
             pthread_mutex_lock(&stageMutex);
-            int beg = fetchIndex[sock];
-            fetchIndex[sock] = -1;
+            int beg = fetchIndex;
+            fetchIndex = -1;
             say("AlreadyStage: %d chunkToStage: %d\n",alreadyStage, chunkToStage);
             if (alreadyStage >= chunkToStage || beg == -1){
-               pthread_mutex_unlock(&stageMutex);
-               pthread_mutex_unlock(&profileLock); 
-               break;
+                pthread_mutex_unlock(&stageMutex);
+                pthread_mutex_unlock(&profileLock); 
+				pthread_mutex_unlock(&dagVecLock);
+                continue;
             }
-            for (int i = beg, j = 0; j < chunkToStage - alreadyStage && j < 3 && i < int(dags.size()); ++i) {
-                say("Before needStage: i = %d, beg = %d, dag = %s State: %d\n",i, beg, dags[i].c_str(),SIDToProfile[sock][dags[i]].state);
-                if (SIDToProfile[sock][dags[i]].state == BLANK) {
+			int needchunk = chunkToStage - alreadyStage;
+            for (int i = beg, j = 0; j < needchunk && j < 3 && i < int(dags.size()); ++i) {
+                say("Before needStage: i = %d, beg = %d, dag = %s State: %d\n",i, beg, dags[i].c_str(),CIDToProfile[dags[i]].state);
+                if (CIDToProfile[dags[i]].state == BLANK) {
                     say("needStage: i = %d, beg = %d, dag = %s\n",i, beg, dags[i].c_str());
-                    SIDToProfile[sock][dags[i]].state = PENDING;
+                    CIDToProfile[dags[i]].state = PENDING;
                     needStage.insert(dags[i]);
                     j++;
                 }
@@ -283,20 +367,35 @@ void *stageData(void *)
             pthread_mutex_unlock(&profileLock);
             say("Size of NeedStage: %d", needStage.size());
             if (needStage.size() == 0) {
-                break;
+				pthread_mutex_unlock(&dagVecLock);
+                continue;
             }
             char cmd[XIA_MAX_BUF] = {0};
-            char reply[XIA_MAX_BUF] = {0};
-
-            sprintf(cmd, "stage");
+            //char reply[XIA_MAX_BUF] = {0};
+/*			pthread_mutex_lock(&responseMutex);
+            sprintf(cmd, "stage cont ");
             for (auto dag : needStage) {
                 //say("needStage: %s\n", dag.c_str());
-                SIDToProfile[sock][dag].stageStartTimestemp = now_msec();
-                sprintf(cmd, "%s %s", cmd, dag.c_str());
+                CIDToProfile[dag].stageStartTimestemp = now_msec();
+                sprintf(cmd, "stageCont %s\0", dag.c_str());
+				sendStreamCmd(netStageSock, cmd);
             }
-
-            sendStreamCmd(netStageSock, cmd);
-            for (int i = 0; i < static_cast<int>(needStage.size()); ++i) {
+	    sprintf(cmd, "stageEnd");
+*/
+	    sprintf(cmd, "stage");
+            for (auto dag : needStage) {
+                //say("needStage: %s\n", dag.c_str());
+                CIDToProfile[dag].stageStartTimestemp = now_msec();
+                sprintf(cmd, "%s %s",cmd, dag.c_str());
+            }
+	    sendStreamCmd(netStageSock, cmd);
+		chunkToRecv += needStage.size();
+		//pthread_mutex_lock(&responseMutex);
+            //sendStreamCmd(netStageSock, cmd);
+		//pthread_mutex_unlock(&responseMutex);
+			
+	    //if(chunkToStage - alreadyStage > 0)pthread_mutex_unlock(&StageControl);
+            /*for (int i = 0; i < static_cast<int>(needStage.size()); ++i) {
                 sayHello(netStageSock, "READY TO RECEIVE!\n");
                 memset(reply,0,sizeof(reply));
                 if (Xrecv(netStageSock, reply, sizeof(reply), 0) < 0) {
@@ -309,17 +408,18 @@ void *stageData(void *)
                 updateStageArg();
                 say("cmd: %s\n", reply);
                 pthread_mutex_lock(&profileLock);
-                SIDToProfile[sock][oldDag].dag = newDag;
-                SIDToProfile[sock][oldDag].state = READY;
-                SIDToProfile[sock][oldDag].stageFinishTimestemp = now_msec();
-                managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << SIDToProfile[sock][oldDag].stageFinishTimestemp - SIDToProfile[sock][oldDag].stageStartTimestemp << " ms." << endl;
+                CIDToProfile[oldDag].dag = newDag;
+                CIDToProfile[oldDag].state = READY;
+                CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
+                managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
                 pthread_mutex_unlock(&profileLock);
             }
+			*/
+		pthread_mutex_unlock(&dagVecLock);
         }
-        pthread_mutex_unlock(&dagVecLock);
-	
-    }
-    pthread_exit(NULL);
+        
+    //}
+    //pthread_exit(NULL);
 }
 int main()
 {
