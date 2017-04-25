@@ -119,6 +119,7 @@ int delegationHandler(int sock, char *cmd)
             if (CIDToProfile[cmd].state == READY) {
                 //CIDToProfile[cmd].state = IGNORE;
 				pthread_mutex_unlock(&StageControl);
+				pthread_mutex_unlock(&preStageControl);
                 break;
                 say("DAG: %s change into IGNORE!\n", cmd);
             }
@@ -277,7 +278,7 @@ void *stageData(void *)
     thread_c++;
     int thread_id = thread_c;
     cerr << "Thread id " << thread_id << ": " << "Is launched\n";
-    cerr << "Current " << getAD() << endl;
+    cerr << "Current " << getAD2(0) << endl;
 	int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
@@ -285,11 +286,11 @@ void *stageData(void *)
     char stageHID[MAX_XID_SIZE];
 
 //netStageSock is used to communicate with stage server.
-    getNewAD(myAD);
+    getNewAD2(0, myAD);
     //Connect to the Stage Server
-    int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
+    int netStageSock = registerMulStageService(0, getStageServiceName2(0));
     //Rtt of wireless
-    rttWifi = getRTT(getStageServiceName());
+    rttWifi = getRTT(getStageServiceName2(0));
     char rttCMD[100] = "";
     //Ask the Stage server to get the Rtt of Internet
     sprintf(rttCMD, "xping %s", getXftpName());
@@ -346,6 +347,7 @@ void *stageData(void *)
 			pthread_mutex_unlock(&stopMutex);
 			continue;
 		}
+		pthread_mutex_unlock(&stopMutex);
         set<string> needStage;
         pthread_mutex_lock(&dagVecLock);
         //for (auto pair : allDAGs) {
@@ -399,8 +401,8 @@ void *preStageData(void *)
 {
     thread_c++;
     int thread_id = thread_c;
-    cerr << "Thread id " << thread_id << ": " << "Is launched\n";
-    cerr << "Current " << getAD2(1) << endl;
+    cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
+    cerr << "preStageData Current " << getAD2(1) << endl;
 	int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
@@ -409,18 +411,18 @@ void *preStageData(void *)
 	int PreStageChunk = 0;
     getNewAD2(1, myAD);
     //Connect to the Stage Server
-    int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
-
-    say("++++++++++++++++++++++++++++++++++++The current netStageSock is %d\n", netStageSock);
+    //int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
+	int netStageSock = registerMulStageService(1, getStageServiceName2(1));
+    say("+++++++++++++++++++++++++++In preStageData, the current netStageSock is %d\n", netStageSock);
     if (netStageSock == -1) {
         say("netStageOn is false!\n");
         netStageOn = false;
         pthread_exit(NULL);
     }
     while (1) {
-        say("*********************************Before while loop of stageData\n");
+        say("*********************************Before while loop of preStageData\n");
         pthread_mutex_lock(&preStageControl);
-        say("*********************************In while loop of stageData\n");
+        say("*********************************In while loop of preStageData\n");
         if(!isConnect2()){
             long newStamp = now_msec();
             connetTime << lastSSID << " disconnect. Last: " << newStamp - timeStamp << "ms." << endl;
@@ -429,7 +431,7 @@ void *preStageData(void *)
         if (lastSSID2 != currSSID2) {
             connetTime << currSSID2 << "Connect." << endl;
             timeStamp = now_msec();
-            say("Thread id: %d Network changed, create another thread to continue!\n");
+            say("Thread id: %d Network changed, create another thread to continue preStage data!\n");
             lastSSID2 = currSSID2;
             pthread_t newThread_stageDataNew;
             //pthread_mutex_unlock(&StageControl);

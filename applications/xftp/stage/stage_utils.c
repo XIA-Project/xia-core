@@ -235,11 +235,10 @@ string getAD2(int iface)
 	struct ifaddrs *ifa=NULL;
 	struct ifaddrs *ifaddr = NULL;
 	
-	
-	if( Xgetifaddrs(&ifaddr) < 0){
-		die(-1, "Xgetifaddrs failed");
-	}
 	while(1){
+		if( Xgetifaddrs(&ifaddr) < 0){
+			die(-1, "Xgetifaddrs failed");
+		}
 		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {  
 			if (ifa->ifa_addr == NULL)  
 				continue;  
