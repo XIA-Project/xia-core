@@ -65,6 +65,7 @@
 #define PENDING 1 // chunk is being fetched/prefetched
 #define READY 2	// chunk is available in the local/network cache
 #define IGNORE 3
+#define PREFETCH 4	// chunk is available in the local/network cache
 
 #define NS_LOOKUP_RETRY_NUM 30
 #define NS_LOOKUP_WAIT_MSEC 1000
