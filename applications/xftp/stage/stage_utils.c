@@ -1,6 +1,6 @@
 #include "stage_utils.h"
 
-int verbose = 0;
+int verbose = 1;
 
 void say(const char *fmt, ...)
 {
@@ -239,26 +239,30 @@ string getAD2(int iface)
 	if( Xgetifaddrs(&ifaddr) < 0){
 		die(-1, "Xgetifaddrs failed");
 	}
+	while(1){
+		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {  
+			if (ifa->ifa_addr == NULL)  
+				continue;  
+			//printf("interface: %s \n", ifa->ifa_name); 
+			if(iface == 0 && strcmp(ifa->ifa_name, "iface0")==0) if1 = ifa;//"wlp6s0"
+			if(iface == 1 && strcmp(ifa->ifa_name, "iface1")==0 ) if1 = ifa;//"wlan0"
+			if(iface == 2 && strcmp(ifa->ifa_name, "iface2")==0 ) if1 = ifa;
+			if(iface == 3 && strcmp(ifa->ifa_name, "iface3")==0 ) if1 = ifa;
+		}
 	
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {  
-		if (ifa->ifa_addr == NULL)  
-			continue;  
-		printf("interface: %s \n", ifa->ifa_name); 
-		if(iface == 0 && strcmp(ifa->ifa_name, "iface0")==0) if1 = ifa;//"wlp6s0"
-		if(iface == 1 && strcmp(ifa->ifa_name, "iface1")==0 ) if1 = ifa;//"wlan0"
-		if(iface == 2 && strcmp(ifa->ifa_name, "iface2")==0 ) if1 = ifa;
-		if(iface == 3 && strcmp(ifa->ifa_name, "iface3")==0 ) if1 = ifa;
+		Graph g((sockaddr_x *) if1->ifa_addr);
+		char sdag[5000];
+		strcpy(sdag, g.dag_string().c_str());
+		char *ads = strstr(sdag, "AD:");	// first occurrence
+		if(ads==NULL) continue;	
+		char *hids = strstr(sdag, "HID:");
+		if(hids==NULL) continue;
+		char *ad_end = strstr(ads, " ");
+		if(ad_end==NULL) continue;
+		*ad_end = 0;
+		return string(ads);
 	}
-	
-	Graph g((sockaddr_x *) if1->ifa_addr);
-	char sdag[5000];
-	strcpy(sdag, g.dag_string().c_str());
-	char *ads = strstr(sdag, "AD:");	// first occurrence
-	char *hids = strstr(sdag, "HID:");
-	char *ad_end = strstr(ads, " ");
-	*ad_end = 0;
 		
-	return string(ads);	
 		
 
 	//return;
