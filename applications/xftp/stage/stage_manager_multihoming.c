@@ -1,7 +1,7 @@
 #include "stage_utils.h"
 
 using namespace std;
-string lastSSID, currSSID;
+string lastSSID, currSSID, lastSSID2, currSSID2;
 //TODO: better to rename in case of mixing up with the chunkProfile struct in server   --Lwy   1.16
 struct chunkProfile {
     int state;
@@ -334,16 +334,16 @@ void *stageData(void *)
             pthread_t thread_stageDataNew;
             pthread_mutex_unlock(&StageControl);
 			
-			pthread_mutex_lock(stopMutex);
+			pthread_mutex_lock(&stopMutex);
 			stopFlag = 0;
-			pthread_mutex_unlock(stopMutex);
+			pthread_mutex_unlock(&stopMutex);
 			
             pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
-		pthread_mutex_lock(stopMutex);
+		pthread_mutex_lock(&stopMutex);
 		if(stopFlag == 1){
-			pthread_mutex_unlock(stopMutex);
+			pthread_mutex_unlock(&stopMutex);
 			continue;
 		}
         set<string> needStage;
@@ -437,9 +437,9 @@ void *preStageData(void *)
             pthread_create(&newThread_stageDataNew, NULL, preStageData, NULL);
             pthread_exit(NULL);
         }
-		pthread_mutex_lock(stopMutex);
+		pthread_mutex_lock(&stopMutex);
 		stopFlag = 1;
-		pthread_mutex_unlock(stopMutex);
+		pthread_mutex_unlock(&stopMutex);
 		
         set<string> needStage;
         pthread_mutex_lock(&dagVecLock);
