@@ -43,6 +43,7 @@ message NeighborEntry {
 	required XID hid     = 2;
 	required uint32 port = 3;
 	required uint32 cost = 4;
+	optional XID sid     = 5;
 }
 
 message QueryEntry {
@@ -75,6 +76,7 @@ message DiscoveryEntry {
 message ConfigMsg {
 	required string ad             = 1;
 	required string controller_dag = 2;
+	optional string broadcast_sid  = 3;
 }
 
 message HelloMsg {
