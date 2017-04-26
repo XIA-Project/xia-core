@@ -6,4 +6,6 @@ xregister
 xnetcat
 xrendezvous
 xcache
-controld
+xcontrold
+xhostd
+

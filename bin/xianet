@@ -382,6 +382,7 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
+			./xhostd -h $host $LOG_FLAGS &
 			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
