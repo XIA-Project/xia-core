@@ -260,6 +260,13 @@ int Controller::init()
 		exit(-1);
 	}
 
+
+    for (int i = 0; i < 4; i++) {
+        char el[256];
+        sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
+        _xr.rawWrite(el, "ad", _myAD);
+    }
+
 	//_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
 
 	_calc_dijstra_ticks = -8;

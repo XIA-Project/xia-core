@@ -47,6 +47,7 @@ protected:
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
+	int processSIDRequest(Xroute::XrouteMsg &msg);
 	void processRoutingTable(RouteTable routingTable);
 
     void purgeStaleRoutes(time_t now);

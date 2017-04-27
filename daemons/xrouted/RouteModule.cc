@@ -125,7 +125,9 @@ int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned np
 
 		} else if (sock == _local_sock) {
 			*iface = FALLBACK;
-			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, NULL, NULL)) < 0) {
+            socklen_t sz = sizeof(sockaddr_in);
+
+			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, (sockaddr*)&_local_sa, &sz)) < 0) {
 				syslog(LOG_WARNING, "local message receive error");
 			}
 		} else {
@@ -177,6 +179,19 @@ int RouteModule::sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg)
 	msg.SerializeToString(&message);
 
 	rc = Xsendto(_source_sock, message.c_str(), message.length(), 0, (sockaddr*)dest, sizeof(sockaddr_x));
+	if (rc < 0) {
+		syslog(LOG_WARNING, "unable to send %s msg: %s", Xroute::msg_type_Name(msg.type()).c_str(), strerror(errno));
+	}
+	return rc;
+}
+
+int RouteModule::sendMessage(sockaddr *dest, const Xroute::XrouteMsg &msg)
+{
+	int rc;
+	string message;
+	msg.SerializeToString(&message);
+
+	rc = sendto(_source_sock, message.c_str(), message.length(), 0, dest, sizeof(sockaddr));
 	if (rc < 0) {
 		syslog(LOG_WARNING, "unable to send %s msg: %s", Xroute::msg_type_Name(msg.type()).c_str(), strerror(errno));
 	}

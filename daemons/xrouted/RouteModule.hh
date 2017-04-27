@@ -68,6 +68,10 @@ protected:
 	sockaddr_x _source_dag;		// dag os socket we send on
 	sockaddr_x _recv_dag;		// dag we receive on (same as contoller when in controller process)
 
+    std::string _recv_sid;      // SID bound to the router's listening socket
+
+    sockaddr_in _local_sa;
+
 	RouteModule(const char *name);
 
 	int getXIDs(std::string &ad, std::string &hid);
@@ -76,9 +80,10 @@ protected:
 
 	int readMessage(char *recv_message, struct pollfd *pfd, unsigned npfds, int *iface);
 	int sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg);
+	int sendMessage(sockaddr *dest, const Xroute::XrouteMsg &msg);
 	int sendBroadcastMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_broadcast_dag, msg); };
 	int sendControllerMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_controller_dag, msg); };
-//	int sendLocalMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_local_dag, msg); };
+	int sendLocalMessage(const Xroute::XrouteMsg &msg) { return sendMessage((sockaddr*)&_local_sa, msg); };
 
 	// virtual functions to be defined by the subclasses
 	virtual int init() = 0;      // configure the route module
