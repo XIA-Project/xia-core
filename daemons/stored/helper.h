@@ -7,8 +7,8 @@
 #include "config.h"
 #include "wrapper.h"
 
-#include "proto/chunk.pb.h"
-#include "proto/operation.pb.h"
+#include "chunk.pb.h"
+#include "operation.pb.h"
 
 typedef struct _Buffer {
     size_t len;

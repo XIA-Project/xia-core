@@ -33,10 +33,10 @@
 *.su
 
 # Executabel files
-mstore
-mstore-test
-stored
 store-test
+stored
+stored-test
+stored-test-batch
 
 # Library source files
 mongo-c-driver-1.4.2*

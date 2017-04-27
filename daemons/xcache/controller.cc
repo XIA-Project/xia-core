@@ -18,6 +18,14 @@
 #include "xcache_sock.h"
 #include "cid.h"
 
+#include <sys/time.h>
+#include "store.h"
+#include "helper.h"
+#include "wrapper.h"
+
+#include "chunk.pb.h"
+#include "operation.pb.h"
+
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
 #define MAX_XID_SIZE 100
@@ -615,6 +623,59 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
+void store_chunk(std::string cid, time_t ttl, std::string data) {
+
+    Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
+
+	syslog(LOG_INFO, "ttl: %zu", ttl);
+
+    // Chunk
+    Chunk chunk;
+    chunk.set_cid(cid);
+    chunk.set_sid("empty_sid_holder");
+
+    chunk.set_content(data.c_str());
+
+    chunk.set_initial_seq(0);   // TODO: to be filled
+    chunk.set_ttl(30000);
+
+    // now
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    long int now_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
+
+    chunk.set_created_time(now_ms);
+    chunk.set_accessed_time(now_ms);
+
+    // print_chunk(chunk);
+
+    // Operation
+    Operation *operation = new Operation();
+    operation->set_op(OP_POST);
+    operation->set_cid(chunk.cid());
+    operation->set_allocated_chunk(&chunk);
+
+    // Serialize
+    buffer->len = operation->ByteSize();
+    std::string data_str;
+    operation->SerializeToString(&data_str);
+
+    buffer->data = (uint8_t *)malloc_w(buffer->len);
+    memcpy(buffer->data, data_str.c_str(), buffer->len);
+
+    printf("Get %zu serialized bytes (post operation)\n", buffer->len);
+
+    // socket
+    int sockfd = connect_to(HOST, PORT);
+
+    // send request, don't read response
+    write_socket(sockfd, buffer);
+    close(sockfd);
+
+    free_buffer(buffer);
+
+}
+
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
@@ -630,6 +691,10 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		release_meta(meta);
 		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 	} else {
+
+        // FIXME: fast implementation here, store meta to stored (mongo) as well
+        store_chunk(cid, ttl, cmd->data());
+
 		/*
 		 * New object - Allocate a meta
 		 */
@@ -646,6 +711,7 @@ printf("store:length: %lu", meta->get_length());
 		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
 			return RET_FAILED;
 		}
+
 	}
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -819,6 +885,7 @@ void xcache_controller::process_req(xcache_req *req)
 	switch(req->type) {
 	case xcache_cmd::XCACHE_CACHE:
 	{
+		syslog(LOG_INFO, "XCACHE_CACHE");
 		xcache_meta *meta = acquire_meta(req->cid);
 		if (meta) {
 			std::string chunk((const char *)req->data, req->datalen);
@@ -830,6 +897,7 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 
 	case xcache_cmd::XCACHE_STORE:
+		syslog(LOG_INFO, "XCACHE_STORE");
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
@@ -837,6 +905,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_FETCHCHUNK:
+		syslog(LOG_INFO, "XCACHE_FETCHCHUNK");
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
 		syslog(LOG_INFO, "xcache_fetch_content returned %d", ret);
@@ -846,6 +915,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_READ:
+		syslog(LOG_INFO, "XCACHE_READ");
 		cmd = (xcache_cmd *)req->data;
 		ret = chunk_read(&resp, cmd);
 		if(ret == RET_SENDRESP) {
@@ -854,10 +924,12 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
+		syslog(LOG_INFO, "XCACHE_SENDCHUNK");
 		send_content_remote(req, (sockaddr_x *)req->data);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
+		syslog(LOG_INFO, "XCACHE_EVICT");
 		cmd = (xcache_cmd *)req->data;
 		ret = evict(&resp, cmd);
 		if(ret >= 0) {
@@ -918,6 +990,8 @@ void *xcache_controller::garbage_collector(void *arg)
 		meta_map *map = ctrl->get_meta_map();
 		map->walk();
 	}
+
+    return NULL;
 }
 
 void xcache_controller::run(void)

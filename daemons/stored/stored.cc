@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "store.h"
 
@@ -13,8 +14,8 @@
 #include "wrapper.h"
 #include "helper.h"
 
-#include "proto/chunk.pb.h"
-#include "proto/operation.pb.h"
+#include "chunk.pb.h"
+#include "operation.pb.h"
 
 static volatile bool running = true;
 sem_t sem;
@@ -47,14 +48,14 @@ void operation_handler(int clientfd) {
     // get len
     size_t len = read_len(clientfd);
     if(len == 0) {
-        printf("Error while reading socket\n");
+        syslog(LOG_DEBUG, "Error while reading socket\n");
         return;
     }
 
     // get content
     uint8_t *content = read_content(clientfd, len);
     if(content == NULL) {
-        printf("Error found while reading content\n");
+        syslog(LOG_DEBUG, "Error found while reading content\n");
         return;
     }
 
@@ -71,7 +72,7 @@ void operation_handler(int clientfd) {
     } else if(operation.op() == OP_POST) {
         operation_post_handler(clientfd, operation.chunk());
     } else {
-        printf("Error: unseen operation\n");
+        syslog(LOG_DEBUG, "Error: unseen operation\n");
     }
 
     // free
@@ -86,7 +87,7 @@ void operation_get_handler(int clientfd, const char *cid) {
 
     // not found
     if(chunk == NULL) {
-        printf("Requested chunk not found\n");
+        syslog(LOG_DEBUG, "Requested chunk not found\n");
         return;
     }
 
@@ -118,7 +119,7 @@ void *worker(void *clientfd_p) {
 
     // run job
     sem_wait_w(&sem);
-    printf("Connected\n");
+    syslog(LOG_DEBUG, "Connected\n");
     operation_handler(clientfd);
     sem_post_w(&sem);
 
@@ -145,7 +146,7 @@ void init() {
 
 void deinit() {
 
-    printf("shutting down...");
+    syslog(LOG_DEBUG, "shutting down...");
 
     sem_destroy(&sem);
     db_deinit();
@@ -170,7 +171,7 @@ int main(int argc, char **argv) {
 
     // start listening
     listenfd = listen_on_w(PORT);
-    printf("Listening on %d...\n", PORT);
+    syslog(LOG_DEBUG, "Listening on %d...\n", PORT);
 
     while(true) {
 

@@ -9,8 +9,8 @@
 #include "store.h"
 #include "helper.h"
 
-#include "proto/chunk.pb.h"
-#include "proto/operation.pb.h"
+#include "chunk.pb.h"
+#include "operation.pb.h"
 
 void db_post_test() {
 

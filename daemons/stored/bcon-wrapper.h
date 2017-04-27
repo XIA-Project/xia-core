@@ -6,7 +6,7 @@
 #include <mongoc.h>
 #include <stdbool.h>
 
-#include "proto/chunk.pb.h"
+#include "chunk.pb.h"
 #include "wrapper.h"
 
 // bson parsers
