@@ -227,6 +227,10 @@ int Host::processMsg(std::string msg_str, uint32_t iface)
 			rc = processConfig(msg.config());
 			break;
 
+        case Xroute::SID_REQUEST_MSG:
+			rc = processSIDRequest(msg);
+            break;
+
 		default:
 			syslog(LOG_INFO, "unknown routing message type");
 			break;
@@ -269,6 +273,16 @@ int Host::processConfig(const Xroute::ConfigMsg &msg)
 	_xr.setRoute("HID:-", FALLBACK, "", 0);
 
 	return 1;
+}
+
+
+int Host::processSIDRequest(Xroute::XrouteMsg &msg)
+{
+    Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
+    r->set_sid(_recv_sid);
+
+
+    return sendLocalMessage(msg);
 }
 
 

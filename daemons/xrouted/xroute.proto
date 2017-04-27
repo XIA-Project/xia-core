@@ -1,201 +1,208 @@
 /*
-** xrouted message definitions
-*/
+ ** xrouted message definitions
+ */
 
 package Xroute;
 //syntax = "proto2";
 
 enum constants {
-	XROUTE_PROTO_VERSION = 1;
+  XROUTE_PROTO_VERSION = 1;
 }
 
 message XID {
-	required uint32 type = 1; // should use the XID type values from xia.h
-	required bytes  id   = 2; // must be 20 bytes long
+  required uint32 type = 1; // should use the XID type values from xia.h
+  required bytes  id   = 2; // must be 20 bytes long
 }
 
 message Node {
-	required XID    ad    = 1;
-	required XID    hid   = 2;
-	optional XID    sid   = 3;
-	optional uint32 flags = 4;
+  required XID    ad    = 1;
+  required XID    hid   = 2;
+  optional XID    sid   = 3;
+  optional uint32 flags = 4;
 }
 
 message TableEntry {
-	required XID    xid       = 1;
-	required XID    next_hop  = 2;
-	optional uint32 interface = 3;
-	optional uint32 flags     = 4;
+  required XID    xid       = 1;
+  required XID    next_hop  = 2;
+  optional uint32 interface = 3;
+  optional uint32 flags     = 4;
 }
 
 message SIDTableItem {
-	required XID    sid = 1;
-	required uint32 weight = 2;
+  required XID    sid = 1;
+  required uint32 weight = 2;
 }
 
 message SIDTableEntry {
-	required XID          ad   = 1;
-	repeated SIDTableItem sids = 2;
+  required XID          ad   = 1;
+  repeated SIDTableItem sids = 2;
 }
 
 message NeighborEntry {
-	required XID ad      = 1;
-	required XID hid     = 2;
-	required uint32 port = 3;
-	required uint32 cost = 4;
-	optional XID sid     = 5;
+  required XID ad      = 1;
+  required XID hid     = 2;
+  required uint32 port = 3;
+  required uint32 cost = 4;
+  optional XID sid     = 5;
 }
 
 message QueryEntry {
-	required XID    ad       = 1;
-	required uint32 latency  = 2;
-	required uint32 capacity = 3;
+  required XID    ad       = 1;
+  required uint32 latency  = 2;
+  required uint32 capacity = 3;
 }
 
 message QueryAnswer {
-	required XID    ad         = 1;
-	required uint32 percentage = 2;
+  required XID    ad         = 1;
+  required uint32 percentage = 2;
 
-	// these 2 don't seem to be used right now
-	optional uint32 capacity   = 3;
-	optional uint32 latency    = 4;
+  // these 2 don't seem to be used right now
+  optional uint32 capacity   = 3;
+  optional uint32 latency    = 4;
 }
 
 message DiscoveryEntry {
-	required XID    ad              = 1;
-	required XID    sid             = 2;
-	required uint32 capacity        = 3;
-	required uint32 capacity_factor = 4;
-	required uint32 link_factor     = 5;
-	required uint32 priority        = 6;
-	required string leader_addr     = 7;	// FIXME: lose the string format
-	required uint32 arch_type       = 8;
-	required uint32 seq             = 9;	// FIXME: do I need to keep this?
+  required XID    ad              = 1;
+  required XID    sid             = 2;
+  required uint32 capacity        = 3;
+  required uint32 capacity_factor = 4;
+  required uint32 link_factor     = 5;
+  required uint32 priority        = 6;
+  required string leader_addr     = 7;	// FIXME: lose the string format
+  required uint32 arch_type       = 8;
+  required uint32 seq             = 9;	// FIXME: do I need to keep this?
 }
 
 message ConfigMsg {
-	required string ad             = 1;
-	required string controller_dag = 2;
-	optional string broadcast_sid  = 3;
+  required string ad             = 1;
+  required string controller_dag = 2;
+  optional string broadcast_sid  = 3;
+}
+
+message SIDRequestMsg {
+  optional string sid = 1;
 }
 
 message HelloMsg {
-	required Node   node  = 1;
-	optional uint32 flags = 2;
+  required Node   node  = 1;
+  optional uint32 flags = 2;
 }
 
 message LSAMsg {
-	required Node          node  = 1;
-	required bytes         dag   = 2;
-	optional uint32        flags = 3;
-	repeated NeighborEntry peers = 4;
+  required Node          node  = 1;
+  required bytes         dag   = 2;
+  optional uint32        flags = 3;
+  repeated NeighborEntry peers = 4;
 }
 
 message HostJoinMsg {
-	required string hid       = 1;
-	required uint32 interface = 2;
-	optional uint32 flags     = 3;
+  required string hid       = 1;
+  required uint32 interface = 2;
+  optional uint32 flags     = 3;
 }
 
 // FIXME: make this use the XID type at some point
 message HostLeaveMsg {
-	required string hid = 1;
+  required string hid = 1;
 }
 
 message TableUpdateMsg {
-	required Node       from   = 1;
-	required Node       to     = 2;
-	repeated TableEntry routes = 3;
+  required Node       from   = 1;
+  required Node       to     = 2;
+  repeated TableEntry routes = 3;
 }
 
 message SIDTableUpdateMsg {
-	required Node          from = 1;
-	required Node          to   = 2;
-	repeated SIDTableEntry ads  = 3;
+  required Node          from = 1;
+  required Node          to   = 2;
+  repeated SIDTableEntry ads  = 3;
 }
 
 message GlobalLSAMsg {
-	required Node   from       = 1;
-	required uint32 flags      = 2;
-	repeated NeighborEntry neighbors = 3;
+  required Node   from       = 1;
+  required uint32 flags      = 2;
+  repeated NeighborEntry neighbors = 3;
 }
 
 message KeepAliveMsg {
-	required Node   from     = 1;
-	required XID    sid      = 2;
-	required uint32 capacity = 3;
-	required uint32 delay    = 4;
+  required Node   from     = 1;
+  required XID    sid      = 2;
+  required uint32 capacity = 3;
+  required uint32 delay    = 4;
 }
 
 message DecisionQueryMsg {
-	required XID        ad   = 1;
-	required XID        hid  = 2;
-	required XID        sid  = 3;
-	required uint32     rate = 4;
-	repeated QueryEntry ads  = 5;
+  required XID        ad   = 1;
+  required XID        hid  = 2;
+  required XID        sid  = 3;
+  required uint32     rate = 4;
+  repeated QueryEntry ads  = 5;
 }
 
 message DecisionAnswerMsg {
-	required XID         ad   = 1;
-	required XID         hid  = 2;
-	required XID         sid  = 3;
-	repeated QueryAnswer sids = 4;
+  required XID         ad   = 1;
+  required XID         hid  = 2;
+  required XID         sid  = 3;
+  repeated QueryAnswer sids = 4;
 }
 
 message SIDDiscoveryMsg {
-	required XID            ad           = 1;
-	required XID            hid          = 2;
-	repeated DiscoveryEntry entries      = 3;
+  required XID            ad           = 1;
+  required XID            hid          = 2;
+  repeated DiscoveryEntry entries      = 3;
 }
 
 
 enum msg_type {
-	// local machine messages from xnetjd
-	CONFIG_MSG              = 1;
-	HOST_JOIN_MSG           = 2;
+  // local machine messages from xnetjd
+  CONFIG_MSG              = 1;
+  HOST_JOIN_MSG           = 2;
 
-	// router -> router messages
-	HELLO_MSG               = 3; // still needed?
+  // router -> router messages
+  HELLO_MSG               = 3; // still needed?
 
-	// router -> controller messages
-	LSA_MSG                 = 4;
+  // router -> controller messages
+  LSA_MSG                 = 4;
 
-	// controller -> router messages
-	TABLE_UPDATE_MSG        = 5;
-	SID_TABLE_UPDATE_MSG    = 6;
+  // controller -> router messages
+  TABLE_UPDATE_MSG        = 5;
+  SID_TABLE_UPDATE_MSG    = 6;
 
-	// controller -> controller messages
-	GLOBAL_LSA_MSG          = 7;
+  // controller -> controller messages
+  GLOBAL_LSA_MSG          = 7;
 
-	// host -> router messages
-	HOST_LEAVE_MSG          = 8;
+  // host -> router messages
+  HOST_LEAVE_MSG          = 8;
 
-	// unknown messages
-	SID_DISCOVERY_MSG       = 9;
-	SID_MANAGE_KA_MSG       = 10; // keep alive msg to service controller
-	SID_RE_DISCOVERY_MSG    = 11; // send to service controller
-	SID_DECISION_QUERY_MSG  = 12;
-	SID_DECISION_ANSWER_MSG = 13;
-	AD_PATH_STATE_PING_MSG  = 14;
-	AD_PATH_STATE_PONG_MSG  = 15;
+  // unknown messages
+  SID_DISCOVERY_MSG       = 9;
+  SID_MANAGE_KA_MSG       = 10; // keep alive msg to service controller
+  SID_RE_DISCOVERY_MSG    = 11; // send to service controller
+  SID_DECISION_QUERY_MSG  = 12;
+  SID_DECISION_ANSWER_MSG = 13;
+  AD_PATH_STATE_PING_MSG  = 14;
+  AD_PATH_STATE_PONG_MSG  = 15;
+
+  SID_REQUEST_MSG         = 16;
 }
 
 message XrouteMsg {
-	required uint32   version = 1;
-	required msg_type type    = 2;
+  required uint32   version = 1;
+  required msg_type type    = 2;
 
-	oneof payload {
-		ConfigMsg         config           = 3;
-		HostJoinMsg       host_join        = 4;
-		HelloMsg          hello            = 5;
-		LSAMsg            lsa              = 6;
-		TableUpdateMsg    table_update     = 7;
-		SIDTableUpdateMsg sid_table_update = 8;
-		GlobalLSAMsg      global_lsa       = 9;
-		HostLeaveMsg      host_leave       = 10;
-		KeepAliveMsg      keep_alive       = 11;
-		DecisionQueryMsg  sid_query        = 12;
-		DecisionAnswerMsg sid_answer       = 13;
-		SIDDiscoveryMsg   sid_discovery    = 14;
-	}
+  oneof payload {
+    ConfigMsg         config           = 3;
+    HostJoinMsg       host_join        = 4;
+    HelloMsg          hello            = 5;
+    LSAMsg            lsa              = 6;
+    TableUpdateMsg    table_update     = 7;
+    SIDTableUpdateMsg sid_table_update = 8;
+    GlobalLSAMsg      global_lsa       = 9;
+    HostLeaveMsg      host_leave       = 10;
+    KeepAliveMsg      keep_alive       = 11;
+    DecisionQueryMsg  sid_query        = 12;
+    DecisionAnswerMsg sid_answer       = 13;
+    SIDDiscoveryMsg   sid_discovery    = 14;
+    SIDRequestMsg     sid_request      = 15;
+  }
 }

@@ -40,6 +40,7 @@ protected:
 	int processMsg(std::string msg, uint32_t iface);
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processConfig(const Xroute::ConfigMsg &msg);
+	int processSIDRequest(Xroute::XrouteMsg &msg);
 
 	int sendHello();
 

@@ -141,6 +141,7 @@ int Router::makeSockets()
 	if ((_broadcast_sock = makeSocket(g, &_broadcast_dag)) < 0) {
 		return -1;
 	}
+	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
 
 	// router socket - flooded & interdomain communication
 	XcreateFID(s, sizeof(s));
@@ -152,6 +153,8 @@ int Router::makeSockets()
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
+    _recv_sid = std::string(s);
+	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
 
 	// source socket - sending socket
 	XmakeNewSID(s, sizeof(s));
@@ -161,9 +164,6 @@ int Router::makeSockets()
 	if ((_source_sock = makeSocket(g, &_source_dag)) < 0) {
 		return -1;
 	}
-
-	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
-	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
 	syslog(LOG_INFO, "Source: %s", g.dag_string().c_str());
 
 	return 0;
@@ -320,6 +320,10 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			rc = processConfig(msg.config());
 			break;
 
+        case Xroute::SID_REQUEST_MSG:
+			rc = processSIDRequest(msg);
+            break;
+
 		default:
 			syslog(LOG_INFO, "unknown routing message type");
 			break;
@@ -474,7 +478,23 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	_xr.setRoute("AD:-", FALLBACK, "", 0);
 	_xr.setRoute("HID:-", FALLBACK, "", 0);
 
+    for (int i = 0; i < 4; i++) {
+        char el[256];
+        sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
+        _xr.rawWrite(el, "ad", _myAD);
+    }
+
 	return 1;
+}
+
+
+int Router::processSIDRequest(Xroute::XrouteMsg &msg)
+{
+    Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
+    r->set_sid(_recv_sid);
+
+
+    return sendLocalMessage(msg);
 }
 
 

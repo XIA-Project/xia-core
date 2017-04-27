@@ -47,6 +47,7 @@ protected:
 	int processConfig(const Xroute::ConfigMsg &msg);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
 	int processHostLeave(const Xroute::HostLeaveMsg& msg);
+	int processSIDRequest(Xroute::XrouteMsg& msg);
 
 	int processRoutingTable(const Xroute::XrouteMsg& msg);
 	int processSidRoutingTable(const Xroute::XrouteMsg& msg);
