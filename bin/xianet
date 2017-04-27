@@ -31,7 +31,7 @@ SCRIPT=""
 NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
 
-ALL_PROCESSES="click xrouted controld xnetjd xcache xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xcontrold xnetjd xcache xnameservice xstats xstatserver"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -169,7 +169,7 @@ setup()
 				RENDEZVOUS=1
 				;;
 			S)
-				ROUTER=controld
+				ROUTER=xcontrold
 				ROUTER_TYPE="--controller"
 				;;
 			t)
@@ -355,13 +355,13 @@ router()
 			;;
 		"stop")
 			kill_service $host xrouted
-			kill_service $host controld
+			kill_service $host xcontrold
 			kill_service $host "xnetjd"
 			kill_service $host "xcache"
 			;;
 		"check")
 			check_service $host xrouted
-			check_service $host controld
+			check_service $host xcontrold
 			check_service $host "xnetjd"
 			check_service $host "xcache"
 			;;
