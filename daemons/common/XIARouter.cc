@@ -148,6 +148,14 @@ std::string XIARouter::itoa(signed i)
 	return s;
 }
 
+int XIARouter::rawWrite(const std::string &element, const std::string &cmd, const std::string &data)
+{
+    if ((_cserr == _cs.write(element, cmd, data)))
+        return XR_CLICK_ERROR;
+
+    return XR_OK;
+}
+
 int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
 {
 	string xidtype;

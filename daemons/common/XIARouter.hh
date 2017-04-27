@@ -97,6 +97,9 @@ public:
 	int selectiveDelRoute(const std::string &xid, const std::string &index);
 
 	const char *cserror();
+
+    int rawWrite(const std::string &element, const std::string &cmd, const std::string &data);
+
 private:
 	bool _connected;
 	std::string _router;
