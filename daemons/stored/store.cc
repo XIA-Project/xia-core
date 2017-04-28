@@ -261,7 +261,7 @@ void db_check_and_mark_ttl_expired_chunk(Connection *connection,
 
     // mark it if it's expired
     now = time(NULL);
-    syslog(LOG_INFO, "now = %zu, ttl = %"PRIu32", created_time = %zu\n", now, ttl, created_time);
+    printf("now = %zu, ttl = %"PRIu32", created_time = %zu\n", now, ttl, created_time);
     if(created_time + ttl <= now) {
         db_mark_chunk(connection, cid);
         syslog(LOG_INFO, "marked (ttl expired): cid = %*s, ttl = %u, created_time = %ld\n",

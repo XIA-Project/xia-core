@@ -25,8 +25,8 @@ all: protobuf $(XCACHE)
 protobuf:
 	$(MAKE) -C $(PROTO_DIR)
 
-$(XCACHE): $(SOURCES) $(DEPS)
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
+$(XCACHE): $(SOURCES)
+	$(CC) -o $@ $(CFLAGS) $^ $(DEPS) $(LDFLAGS)
 
 clean:
 	@-rm -f $(XCACHE)

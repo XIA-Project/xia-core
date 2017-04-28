@@ -9,26 +9,26 @@ A store implementation using MongoDB in C
 ## Install
 
 ```
-> ./setup.sh
+> ./install.sh
 > make
 ```
 
 ## Run Cache Daemon
 
 ```
-> ./store
+> ./stored
 ```
 
-## Run Example
+## Run Test - Cache Daemon API (Single)
 
 ```
-> ./mstore
+> ./stored-test
 ```
 
-## Run Test - Cache Daemon API
+## Run Test - Cache Daemon API (Batch)
 
 ```
-Usage: ./mstore-test [OPTIONS]
+Usage: ./stored-test-batch [OPTIONS]
   -p            Amount of put operations in total.
   -t            Number of threads.
   -s            Chunk size (byte).
@@ -42,9 +42,6 @@ Usage: ./mstore-test [OPTIONS]
 > ./store-test
 ```
 
-## Result
+## Issue
 
-## Todo
-
-- implement garbage collector thread
-- memory leak testing
+- CID length is 20 bytes while MongoDB key length is 24 bytes [see this](https://mongodb.github.io/node-mongodb-native/api-bson-generated/objectid.html)

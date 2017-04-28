@@ -637,7 +637,7 @@ void chunk_store(std::string cid, time_t ttl, std::string data) {
     chunk.set_content(data.c_str());
 
     chunk.set_initial_seq(0);   // TODO: to be filled
-    chunk.set_ttl(3000);
+    chunk.set_ttl(10);
 
     // now
     struct timeval now;

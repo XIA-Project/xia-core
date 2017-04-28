@@ -25,7 +25,7 @@ Buffer *generate_post_operation_serialized() {
 
     // Chunk
     Chunk chunk;
-    chunk.set_cid("c3e9ce27e198605616ef547a");
+    chunk.set_cid("141231aae4dd0f613b0a70d87d63dfa3e91d5cc7");
     chunk.set_sid("5a9f884a931a2c8f161c2473");
 
     chunk.set_content((const char *)malloc_w(400));
@@ -70,7 +70,7 @@ Buffer *generate_get_operation_serialized() {
     // Operation
     Operation *operation = new Operation();
     operation->set_op(OP_GET);
-    operation->set_cid("c3e9ce27e198605616ef547a");
+    operation->set_cid("141231aae4dd0f613b0a70d87d63dfa3e91d5cc7");
 
     // Serialize
     buffer->len = operation->ByteSize();
