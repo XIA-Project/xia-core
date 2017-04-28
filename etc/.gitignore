@@ -5,4 +5,5 @@ sidmap.conf
 hosts.xia
 RHID.cred
 controller_dag
+domains.conf
 

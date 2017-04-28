@@ -21,6 +21,7 @@
 #include "../common/XIARouter.hh"
 #include "Router.hh"
 #include "dagaddr.hpp"
+#include "minIni.h"
 
 // FIXME:
 // import sid routehandler?
@@ -67,7 +68,8 @@ void Router::purge()
 		TimestampList::iterator iter = _neighbor_timestamp.begin();
 		while (iter !=  _neighbor_timestamp.end()) {
 
-			if (now - iter->second >= NEIGHBOR_EXPIRE_TIME) {
+            time_t t = iter->second;
+            if ((t != 0) && (now - t >= NEIGHBOR_EXPIRE_TIME)) {
 				syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
 				_xr.delRoute(iter->first);
 				_neighborTable.erase(iter->first);
@@ -167,6 +169,66 @@ int Router::makeSockets()
 	syslog(LOG_INFO, "Source: %s", g.dag_string().c_str());
 
 	return 0;
+}
+
+
+int Router::getNeighborADs()
+{
+	char s[2048];
+
+	if (XrootDir(s, sizeof(s)) == NULL) {
+		// FIXME: handle error
+		return -1;
+	}
+    strncat(s, "/etc/domains.conf", sizeof(s));
+
+    minIni ini(s);
+
+    int i = 0;
+    while (true) {
+        std::string sect = ini.getsection(i);
+        if (sect.size() == 0) {
+            break;
+        }
+        if (sect != _myAD) {
+            int port = ini.getl(sect, "port", FALLBACK);
+            std::string dag = ini.gets(sect, "dag");
+
+            if (port == FALLBACK) {
+                // FIXME: validate port
+                printf("ERROR: port not set!\n");
+            }
+            if (dag == "") {
+                printf("ERROR: port not set!\n");
+            }
+
+	        NeighborEntry neighbor;
+	        neighbor.AD        = sect;
+            neighbor.HID       = sect;
+            neighbor.port      = port;
+            neighbor.flags     = 0;
+            neighbor.cost      = 1;
+            neighbor.timestamp = 0;
+            neighbor.dag       = dag;
+	        _neighborTable[neighbor.AD] = neighbor;
+
+            // Update network table
+            NodeStateEntry entry;
+            entry.hid = _myHID;
+            entry.ad = _myAD;
+
+            // Add neighbors to network table entry
+            NeighborTable::iterator it;
+            for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
+                entry.neighbor_list.push_back(it->second);
+
+ //           _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
+
+        }
+        i++;
+    }
+
+    return 0;
 }
 
 

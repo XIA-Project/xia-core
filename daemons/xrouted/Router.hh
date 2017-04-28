@@ -55,6 +55,7 @@ protected:
 	// other stuff
 	int makeSockets();
 	void purge();
+    int getNeighborADs();
 
 protected:
 	// local addr, these should change to nodes

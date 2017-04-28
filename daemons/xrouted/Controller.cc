@@ -18,6 +18,7 @@
 #include <sys/time.h>
 #include "dagaddr.hpp"
 #include "Controller.hh"
+#include "minIni.h"
 
 // FIXME: it would be good to eliminate all of the conversions
 //  instead of having to convert everyting to or from a protobuf
@@ -52,7 +53,8 @@ void Controller::purgeStaleNeighbors(time_t now)
 	TimestampList::iterator iter = _neighbor_timestamp.begin();
 	while (iter != _neighbor_timestamp.end())
     {
-        if (now - iter->second >= _settings->expire_time() * 10) {
+        time_t t = iter->second;
+        if ((t != 0) && (now - t >= _settings->expire_time() * 10)) {
 			syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
             _xr.delRoute(iter->first);
 //			_last_update_latency = 0; // force update latency
@@ -171,7 +173,7 @@ int Controller::handler()
 }
 
 
-int Controller::saveControllerDAG()
+int Controller::getNeighborADs()
 {
 	char s[2048];
 
@@ -179,8 +181,60 @@ int Controller::saveControllerDAG()
 		// FIXME: handle error
 		return -1;
 	}
+    strncat(s, "/etc/domains.conf", sizeof(s));
 
-	strncat(s, "/etc/controller_dag", sizeof(s));
+    minIni ini(s);
+
+    int i = 0;
+    while (true) {
+        std::string sect = ini.getsection(i);
+        if (sect.size() == 0) {
+            break;
+        }
+        if (sect != _myAD) {
+            int port = ini.getl(sect, "port", FALLBACK);
+            std::string dag = ini.gets(sect, "dag");
+
+            if (port == FALLBACK) {
+                // FIXME: validate port
+                printf("ERROR: port not set!\n");
+            }
+            if (dag == "") {
+                printf("ERROR: port not set!\n");
+            }
+
+	        NeighborEntry neighbor;
+	        neighbor.AD        = sect;
+            neighbor.HID       = sect;
+            neighbor.port      = port;
+            neighbor.flags     = 0;
+            neighbor.cost      = 1;
+            neighbor.timestamp = 0;
+            neighbor.dag       = dag;
+	        _ADNeighborTable[neighbor.AD] = neighbor;
+
+            _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
+
+        }
+        i++;
+    }
+
+    return 0;
+}
+
+
+int Controller::saveControllerDAG()
+{
+    char root[2048];
+	char s[2048];
+
+	if (XrootDir(root, sizeof(root)) == NULL) {
+		// FIXME: handle error
+		return -1;
+	}
+
+    // save the controller dag to a file to be used by xnetjd
+	snprintf(s, sizeof(s), "%s/etc/controller_dag", root);
 
 	FILE *f = fopen(s, "w");
 
@@ -193,7 +247,64 @@ int Controller::saveControllerDAG()
 	fprintf(f, "%s\n", s);
 	fclose(f);
 
+    // creat a conf file to share with other ADs
+    strncat(root, "/etc/domains.conf", sizeof(root));
+
+    struct stat st;
+    if (stat(root, &st) < 0) {
+        // conf file doesn't exist yet, stick in a header comment
+        f = fopen(root, "w");
+	    if (f == NULL) {
+            // FIXME: handle error
+		    return -1;
+	    }
+
+        fprintf(f, "# domains.conf\n");
+        fprintf(f, "# Copy or append this file to the edge router of neighboring ADs.\n");
+        fprintf(f, "# Change the port value in the copied file to the port on the\n");
+        fprintf(f, "#   edge router that is connected to this AD.\n\n");
+        fclose(f);
+    }
+
+    minIni ini(root);
+
+    std::string d = "DAG 0 - " + _myAD + " 1 - " + _myHID + " 2 - " + getControllerSID();
+
+    ini.put(_myAD, "dag", d);
+    ini.put(_myAD, "port", FALLBACK);
+
 	return 0;
+}
+
+
+std::string Controller::getControllerSID()
+{
+	char s[2048];
+    std::string dag = "";
+
+    if (_controller_sid == "") {
+
+        // try to read from the domains.conf file
+        if (XrootDir(s, sizeof(s)) != NULL) {
+            strncat(s, "/etc/domains.conf", sizeof(s));
+            minIni ini(s);
+
+           dag = ini.gets(_myAD, "dag");
+
+            if (dag != "") {
+                size_t i = dag.find("SID:");
+                _controller_sid = dag.substr(i);
+            }
+        }
+
+        if (_controller_sid == "") {
+            // we still haven't found it, make a new one
+            XmakeNewSID(s, sizeof(s));
+            _controller_sid = s;
+        }
+    }
+
+    return _controller_sid;
 }
 
 
@@ -214,14 +325,12 @@ int Controller::makeSockets()
 	// controller socket - flooded & interdomain communication
 	XcreateFID(s, sizeof(s));
 	Node nFID(s);
-	XmakeNewSID(s, sizeof(s));
-	Node rSID(s);
+	Node rSID(getControllerSID());
 	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
-	_controller_sid = s;
 	memcpy(&_controller_dag, &_recv_dag, sizeof(sockaddr_x));
 
 	// save the controller dag to disk so xnetj can find it
@@ -260,6 +369,7 @@ int Controller::init()
 		exit(-1);
 	}
 
+    getNeighborADs();
 
     for (int i = 0; i < 4; i++) {
         char el[256];
@@ -307,7 +417,7 @@ int Controller::sendHello()
 
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
-	//Node n_sid(_controller_sid);
+	//Node n_sid(getControllerSID());
 
 	Xroute::XrouteMsg msg;
 	Xroute::HelloMsg *hello = msg.mutable_hello();
@@ -379,11 +489,16 @@ int Controller::sendInterDomainLSA()
 		n->set_cost(it->second.cost);
 	}
 
+
+    // FIXME: add sequence # back for interdomain messages
+
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
 		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
-		g.fill_sockaddr(&ddag);
+		//Graph g = Node() * Node(it->second.AD) * Node(getControllerSID());
+		//g.fill_sockaddr(&ddag);
+
+        xia_pton(AF_XIA, it->second.dag.c_str(), &ddag);
 
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
 
@@ -514,7 +629,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 	NeighborTable::iterator it;
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++) {
 		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(_controller_sid);
+		Graph g = Node() * Node(it->second.AD) * Node(getControllerSID());
 		g.fill_sockaddr(&ddag);
 
 		int temprc = sendMessage(&ddag, xmsg);
@@ -629,7 +744,7 @@ void Controller::processRoutingTable(RouteTable routingTable)
 		// TODO check for all published SIDs
 		// TODO do this for xrouted as well
 		// Ignore SIDs that we publish
-		if (it->second.dest == _controller_sid) {
+		if (it->second.dest == getControllerSID()) {
 			continue;
 		}
 

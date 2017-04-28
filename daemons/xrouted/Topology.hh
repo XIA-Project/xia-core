@@ -40,6 +40,7 @@ typedef struct _NeighborEntry {
 	int32_t cost; 		// link cost
 	time_t timestamp;   // last time updating this entry
 	uint32_t flags;		// host,router, controller
+    std::string dag;    // controller dag, if neighbor is an AD, not used for hosts
 	bool operator==(const struct _NeighborEntry& ne) const {
 		return AD == ne.AD && HID == ne.HID && port == ne.port && cost == ne.cost;
 	}
