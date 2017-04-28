@@ -5,6 +5,7 @@
 #include <bson.h>
 #include <mongoc.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include "proto/chunk.pb.h"
 #include "proto/operation.pb.h"

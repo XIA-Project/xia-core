@@ -100,7 +100,7 @@ uint8_t *read_content(int clientfd, size_t len) {
 
     while(true) {
 
-        n_read = recv(clientfd, buffer, left, 0);
+        n_read = recv(clientfd, buffer, BUFFER_SIZE, 0);
 
         if(n_read == -1) {
             printf("Error in reading content\n");

@@ -153,7 +153,7 @@ void db_update_accessed_time(Connection *connection, const char *cid) {
     // update
     if (!mongoc_collection_update(collection,
                 MONGOC_UPDATE_NONE, query, update, NULL, &error)) {
-        printf("Error: %s\n", error.message);
+        syslog(LOG_ERR, "Error: %s\n", error.message);
     }
 
     // release
@@ -165,7 +165,7 @@ void db_update_accessed_time(Connection *connection, const char *cid) {
 bool db_post(Chunk chunk) {
 
     if(!isValidChecksum(chunk)) {
-        printf("Invalid chunk with wrong checksum\n");
+        syslog(LOG_INFO, "Invalid chunk with wrong checksum\n");
         return false;
     }
 
@@ -180,7 +180,7 @@ bool db_post(Chunk chunk) {
     if (!mongoc_collection_insert(collection, MONGOC_INSERT_NONE, doc, NULL, &error)) {
         bson_destroy (doc);
         release_connection(connection);
-        printf("%s\n", error.message);
+        syslog(LOG_INFO, "%s\n", error.message);
         return false;
     }
 
@@ -241,29 +241,30 @@ void db_check_and_mark_ttl_expired_chunk(Connection *connection,
     // get ttl
     ttl = get_ttl_from_doc(doc);
     if(ttl == 0) {
-        printf("Error in accessing ttl, skip\n");
+        syslog(LOG_ERR, "Error in accessing ttl, skip\n");
         return;
     }
 
     // get created_time
     created_time = get_created_time_from_doc(doc);
     if(created_time < 0) {
-        printf("Error in accessing created_time, skip\n");
+        syslog(LOG_ERR, "Error in accessing created_time, skip\n");
         return;
     }
 
     // get cid
     cid = get_cid_from_doc(doc);
     if(cid == NULL) {
-        printf("Error in accessing cid, skip\n");
+        syslog(LOG_ERR, "Error in accessing cid, skip\n");
         return;
     }
 
     // mark it if it's expired
     now = time(NULL);
+    syslog(LOG_INFO, "now = %zu, ttl = %"PRIu32", created_time = %zu\n", now, ttl, created_time);
     if(created_time + ttl <= now) {
         db_mark_chunk(connection, cid);
-        printf("marked (ttl expired): cid = %*s, ttl = %u, created_time = %ld\n",
+        syslog(LOG_INFO, "marked (ttl expired): cid = %*s, ttl = %u, created_time = %ld\n",
                 SHA1_LENGTH, cid, ttl, created_time);
     }
 
@@ -277,16 +278,17 @@ void db_scan_and_mark_old_chunk(Connection *connection) {
     int64_t count = get_collection_count(connection);
 
     if(count < 0) {
-        printf("Error in counting documents in collection\n");
+        syslog(LOG_ERR, "Error in counting documents in collection\n");
         return;
     }
 
     if(count < (int64_t)GARBAGE_COLLECTION_THRESHOLD) {
+        syslog(LOG_INFO, "Chunk count doesn't reach the threshold for clean up");
         return;
     }
 
     pivot_accessed_time = get_pivot_accessed_time(connection, count);
-    printf("pivot accessed_time = %ld\n", pivot_accessed_time);
+    syslog(LOG_INFO, "pivot accessed_time = %ld\n", pivot_accessed_time);
 
     db_mark_chunk_accessed_time_before(connection, pivot_accessed_time);
 
@@ -306,9 +308,9 @@ time_t get_pivot_accessed_time(Connection *connection, int64_t count) {
 
     // print for debug
     int64_t i;
-    printf("%"PRId64" documents counted.\n", count);
+    syslog(LOG_INFO, "%"PRId64" documents counted.\n", count);
     for(i=0; i<count; i++) {
-        printf("time = %ld\n", accessed_times[i]);
+        syslog(LOG_INFO, "time = %ld\n", accessed_times[i]);
     }
 
     int64_t index = count * GARBAGE_COLLECTION_PERCENTAGE / 100;
@@ -357,11 +359,11 @@ void db_mark_chunk_accessed_time_before(Connection *connection, time_t pivot_acc
     while(mongoc_cursor_next(cursor, &doc)) {
         cid = get_cid_from_doc(doc);
         if(cid == NULL) {
-            printf("Error in accessing cid, skip\n");
+            syslog(LOG_ERR, "Error in accessing cid, skip\n");
             return;
         }
         db_mark_chunk(connection, cid);
-        printf("marked: cid = %*s (accessed time too old)\n", SHA1_LENGTH, cid);
+        syslog(LOG_INFO, "marked: cid = %*s (accessed time too old)\n", SHA1_LENGTH, cid);
     }
 
     // release
@@ -405,7 +407,7 @@ time_t *get_accessed_times(Connection *connection, int64_t count) {
 
         time_t accessed_time = get_accessed_time_from_doc(doc);
         if(accessed_time < 0) {
-            printf("Error in accessing accessed_time\n");
+            syslog(LOG_ERR, "Error in accessing accessed_time\n");
             return NULL;
         }
 
@@ -440,7 +442,7 @@ void db_mark_chunk(Connection *connection, const char *cid) {
     // update
     if (!mongoc_collection_update(collection,
                 MONGOC_UPDATE_NONE, query, update, NULL, &error)) {
-        printf("Error: %s\n", error.message);
+        syslog(LOG_ERR, "Error: %s\n", error.message);
     }
 
     // release
@@ -476,12 +478,12 @@ void db_delete_marked_chunk(Connection *connection) {
         return;
     }
 
-    printf("Garbage collector is deleting %ld chunk items\n", count);
+    syslog(LOG_INFO, "Garbage collector is deleting %ld chunk items\n", count);
 
     // update
     if (!mongoc_collection_remove(collection,
                 MONGOC_REMOVE_NONE, doc, NULL, &error)) {
-        printf("Error: %s\n", error.message);
+        syslog(LOG_ERR, "Error: %s\n", error.message);
     }
 
     // release

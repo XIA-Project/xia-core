@@ -623,7 +623,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-void store_chunk(std::string cid, time_t ttl, std::string data) {
+void chunk_store(std::string cid, time_t ttl, std::string data) {
 
     Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
 
@@ -637,7 +637,7 @@ void store_chunk(std::string cid, time_t ttl, std::string data) {
     chunk.set_content(data.c_str());
 
     chunk.set_initial_seq(0);   // TODO: to be filled
-    chunk.set_ttl(30000);
+    chunk.set_ttl(3000);
 
     // now
     struct timeval now;
@@ -663,7 +663,7 @@ void store_chunk(std::string cid, time_t ttl, std::string data) {
     buffer->data = (uint8_t *)malloc_w(buffer->len);
     memcpy(buffer->data, data_str.c_str(), buffer->len);
 
-    printf("Get %zu serialized bytes (post operation)\n", buffer->len);
+    syslog(LOG_INFO, "Posting %zu serialized bytes (post operation) to store\n", buffer->len);
 
     // socket
     int sockfd = connect_to(HOST, PORT);
@@ -693,7 +693,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 	} else {
 
         // FIXME: fast implementation here, store meta to stored (mongo) as well
-        store_chunk(cid, ttl, cmd->data());
+        chunk_store(cid, ttl, cmd->data());
 
 		/*
 		 * New object - Allocate a meta
