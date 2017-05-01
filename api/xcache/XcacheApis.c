@@ -57,7 +57,7 @@ static int get_connected_socket(void)
 	}
 
 	if(get_xcache_sock_name(sock_name, 512) < 0) {
-		Xclose(sock);
+		close(sock);
 		return -1;
 	}
 
@@ -67,11 +67,10 @@ static int get_connected_socket(void)
 
 	if(connect(sock, (struct sockaddr *)&xcache_addr, sizeof(xcache_addr)) < 0) {
 		printf("%s:%d error:%s\n", __FILE__, __LINE__, strerror(errno));
-		Xclose(sock);
+		close(sock);
 		return -1;
 	}
 
-	Xclose(sock);
 	return sock;
 }
 
