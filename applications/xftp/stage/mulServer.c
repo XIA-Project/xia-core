@@ -9,6 +9,7 @@
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
+#include "stage_utils.h"
 
 #define MAX_XID_SIZE 100
 #define NAME "www_s.multihong_server.aaa.xia"
@@ -21,47 +22,7 @@ char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 		die(-1, "Unable to create a temporary SID");
 	}
 */
-int verbose = 1;	// display all messages
-/*
-** write the message to stdout unless in quiet mode
-*/
-void say(const char *fmt, ...)
-{
-	if (verbose) {
-		va_list args;
 
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
-	}
-}
-
-/*
-** always write the message to stdout
-*/
-void warn(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-
-}
-
-/*
-** write the message to stdout, and exit the app
-*/
-void die(int ecode, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stdout, fmt, args);
-	va_end(args);
-	fprintf(stdout, "exiting\n");
-	exit(ecode);
-}
 
 void *server(void *socketid){
 	int sock = *((int *)socketid);
@@ -134,7 +95,7 @@ int registerReceiver()
 	
 	sockaddr_x *dag = (sockaddr_x*)ai->ai_addr;
 	string newName = string(NAME) + "." + getAD();
-	if (XregisterName(newNAME.c_str(), dag) < 0 )
+	if (XregisterName(newName.c_str(), dag) < 0 )
 		die(-1, "error registering name: %s\n", NAME);
 
 	if (Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0) {
