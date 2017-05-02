@@ -623,6 +623,62 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
+void chunk_retrieve(std::string cid) {
+
+    Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
+
+    // Operation
+    Operation *operation = new Operation();
+    operation->set_op(OP_GET);
+    operation->set_cid(cid);
+
+    // Serialize
+    buffer->len = operation->ByteSize();
+    std::string data_str;
+    operation->SerializeToString(&data_str);
+
+    buffer->data = (uint8_t *)malloc_w(buffer->len);
+    memcpy(buffer->data, data_str.c_str(), buffer->len);
+
+    printf("Get %zu serialized bytes (get operation)\n", buffer->len);
+
+    // socket
+    int sockfd = connect_to(HOST, PORT);
+
+    // send request
+    write_socket(sockfd, buffer);
+
+    // read response
+    // get len
+    size_t len = read_len(sockfd);
+    if(len == 0) {
+        // not found
+        printf("chunk not found\n");
+        free_buffer(buffer);
+        return;
+    }
+
+    // get content
+    uint8_t *content = read_content(sockfd, len);
+    close(sockfd);
+
+    if(content == NULL) {
+        // not found
+        printf("Error in reading content\n");
+        free_buffer(buffer);
+        return;
+    }
+
+    std::string content_str(content, content + len);
+    Chunk chunk;
+    chunk.ParseFromString(content_str);
+    print_chunk(chunk);
+
+    // free
+    free_buffer(buffer);
+
+}
+
 void chunk_store(std::string cid, time_t ttl, std::string data) {
 
     Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
