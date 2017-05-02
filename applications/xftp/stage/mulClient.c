@@ -229,10 +229,10 @@ int connectToServer(struct ifaddrs *ifa)
 **
 ** The parameter and return code are there to satisify the thread library
 */
-void *mainLoop(void * ifaddr)
+void *mainLoop(void * ifa0)
 {
 	
-	int iface = *((int *)ifaddr);	
+	int iface = *((int *)ifa0);	
 	struct ifaddrs *ifa=NULL;
 	struct ifaddrs *ifaddr = NULL;
 	
@@ -273,11 +273,12 @@ void *mainLoop(void * ifaddr)
 void *watch_network(void * ifa)
 {
 	int iface = *((int *)ifa);
-	char *old_ad = getAD2(iface);
+	char old_ad[512];
+	strcpy(old_ad, getAD2(iface).c_str());
 	while(true){
 		say("old AD = %s\n",old_ad);
 		getNewAD2(iface, old_ad);
-		old_ad = getAD2(iface);
+		strcpy(old_ad, getAD2(iface).c_str());
 		say("new AD = %s\n",old_ad);
 		pthread_t client;
 		pthread_create(&client, NULL, mainLoop, ifa);
