@@ -321,7 +321,7 @@ void getNewAD2(int iface, char *old_ad)
 		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {  
 			if (ifa->ifa_addr == NULL)  
 				continue;  
-			printf("interface: %s \n", ifa->ifa_name); 
+			//printf("interface: %s \n", ifa->ifa_name); 
 			if(iface == 0 && strcmp(ifa->ifa_name, "iface0")==0) if1 = ifa;//"wlp6s0"
 			if(iface == 1 && strcmp(ifa->ifa_name, "iface1")==0 ) if1 = ifa;//"wlan0"
 			if(iface == 2 && strcmp(ifa->ifa_name, "iface2")==0 ) if1 = ifa;
@@ -332,13 +332,16 @@ void getNewAD2(int iface, char *old_ad)
 		char sdag[5000];
 		strcpy(sdag, g.dag_string().c_str());
 		char *ads = strstr(sdag, "AD:");	// first occurrence
+		if(ads == NULL)continue;		
 		char *hids = strstr(sdag, "HID:");
+		if(hids == NULL)continue;
 		char *ad_end = strstr(ads, " ");
 		*ad_end = 0;
 		strcpy(new_ad, ads);		
 		
 		if (strcmp(new_ad, old_ad) != 0) { 
 cerr<<"AD changed!"<<endl;
+cerr<<"AD not changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			
 			return;
