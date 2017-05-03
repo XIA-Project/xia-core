@@ -196,10 +196,13 @@ int Router::getNeighborADs()
 
             if (port == FALLBACK) {
                 // FIXME: validate port
-                printf("ERROR: port not set!\n");
+                syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
+                continue;
             }
+
             if (dag == "") {
-                printf("ERROR: port not set!\n");
+                syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
+                continue;
             }
 
 	        NeighborEntry neighbor;
@@ -209,21 +212,14 @@ int Router::getNeighborADs()
             neighbor.flags     = 0;
             neighbor.cost      = 1;
             neighbor.timestamp = 0;
-            neighbor.dag       = dag;
-	        _neighborTable[neighbor.AD] = neighbor;
 
-            // Update network table
-            NodeStateEntry entry;
-            entry.hid = _myHID;
-            entry.ad = _myAD;
+            if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
+                syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
+                continue;
+            }
 
-            // Add neighbors to network table entry
-            NeighborTable::iterator it;
-            for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
-                entry.neighbor_list.push_back(it->second);
-
- //           _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
-
+            _neighborTable[neighbor.AD] = neighbor;
+            _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
         }
         i++;
     }
@@ -330,9 +326,12 @@ int Router::sendLSA()
 
 		n->set_cost(it->second.cost);
 		n->set_port(it->second.port);
-	}
 
-	return sendMessage(&_controller_dag, msg);
+        if (it->second.AD != _myAD) {
+            n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
+        }
+	}
+    return sendMessage(&_controller_dag, msg);
 }
 
 // handle the incoming messages
@@ -492,6 +491,7 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 	neighbor.port = msg.interface();
 	neighbor.cost = 1; // for now, same cost
 	neighbor.flags = flags;
+    bzero(&neighbor.dag, sizeof(sockaddr_x));
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
@@ -533,18 +533,16 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	} else if (ad != _myAD) {
 		// FIXME: should we nuke the neighbor table?
 		// what about the routing tables in click?
-	}
+    }
 
-	// netjoin causes the default routes to be treated as if this
-	// is a host and not a router. Put them back to normal.
-	_xr.setRoute("AD:-", FALLBACK, "", 0);
-	_xr.setRoute("HID:-", FALLBACK, "", 0);
-
-    for (int i = 0; i < 4; i++) {
+    // FIXME: can we get the correct # of interfaces for looping?
+    for (int i = 0; i < 8; i++) {
         char el[256];
         sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
-        _xr.rawWrite(el, "ad", _myAD);
+        _xr.rawWrite(el, "add", _myAD);
     }
+
+    getNeighborADs();
 
 	return 1;
 }
@@ -596,22 +594,13 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	neighbor.port = iface;
 	neighbor.flags = flags;
 	neighbor.cost = 1; // for now, same cost
+    bzero(&neighbor.dag, sizeof(sockaddr_x));
 
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);
 	_neighborTable[internal ? neighbor.HID : neighbor.AD] = neighbor;
 
 	_neighbor_timestamp[internal ? neighbor.HID : neighbor.AD] = time(NULL);
-
-	// Update network table
-	NodeStateEntry entry;
-	entry.hid = _myHID;
-	entry.ad = _myAD;
-
-	// Add neighbors to network table entry
-	NeighborTable::iterator it;
-	for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
-		entry.neighbor_list.push_back(it->second);
 
 	// FIXME: hack until xnetjd deals with hid hello routes
 	_xr.setRoute(neighborHID, iface, neighborHID, flags);

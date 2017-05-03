@@ -197,10 +197,13 @@ int Controller::getNeighborADs()
 
             if (port == FALLBACK) {
                 // FIXME: validate port
-                printf("ERROR: port not set!\n");
+                syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
+                continue;
             }
+
             if (dag == "") {
-                printf("ERROR: port not set!\n");
+                syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
+                continue;
             }
 
 	        NeighborEntry neighbor;
@@ -210,11 +213,14 @@ int Controller::getNeighborADs()
             neighbor.flags     = 0;
             neighbor.cost      = 1;
             neighbor.timestamp = 0;
-            neighbor.dag       = dag;
-	        _ADNeighborTable[neighbor.AD] = neighbor;
 
+            if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
+                syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
+                continue;
+            }
+
+            _neighborTable[neighbor.AD] = neighbor;
             _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
-
         }
         i++;
     }
@@ -371,10 +377,10 @@ int Controller::init()
 
     getNeighborADs();
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 8; i++) {
         char el[256];
         sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
-        _xr.rawWrite(el, "ad", _myAD);
+        _xr.rawWrite(el, "add", _myAD);
     }
 
 	//_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
@@ -462,6 +468,9 @@ int Controller::sendInterDomainLSA()
 	Xroute::XID          *ad   = from->mutable_ad();
 	Xroute::XID          *hid  = from->mutable_hid();
 
+
+    // FIXME: include my DAG!
+
 	msg.set_type(Xroute::GLOBAL_LSA_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 	ad ->set_type(a.type());
@@ -487,6 +496,8 @@ int Controller::sendInterDomainLSA()
 
 		n->set_port(it->second.port);
 		n->set_cost(it->second.cost);
+
+	    n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
 	}
 
 
@@ -494,15 +505,10 @@ int Controller::sendInterDomainLSA()
 
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
-		sockaddr_x ddag;
-		//Graph g = Node() * Node(it->second.AD) * Node(getControllerSID());
-		//g.fill_sockaddr(&ddag);
-
-        xia_pton(AF_XIA, it->second.dag.c_str(), &ddag);
-
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
+		syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", 0, it->second.AD.c_str());
 
-		int temprc = sendMessage(&ddag, msg);
+		int temprc = sendMessage(&it->second.dag, msg);
 		rc = (temprc < rc)? temprc : rc;
 	}
 
@@ -794,6 +800,15 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
+
+            bzero(&neighbor.dag, sizeof(sockaddr_x));
+            if (n.has_dag()) {
+                memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
+
+            } else {
+                syslog(LOG_WARNING, "dag missing!\n");
+                continue;
+            }
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
 		}
@@ -865,7 +880,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 // Extract neighboring AD from the routing table
 void Controller::extractNeighborADs()
 {
-    // FIXME: should these both be AD?????
 	NodeStateEntry entry;
 	entry.ad        = _myAD;
 	entry.hid       = _myAD;
