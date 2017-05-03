@@ -143,7 +143,7 @@ void stageControl(int sock, char *cmd)
         // Determine the intervals to check the state of current chunk.
         //usleep(SCAN_DELAY_MSEC * 1000); // chenren: check timing issue
     }
-	free(buf);
+	//free(buf);
 //pthread_mutex_lock(&profileLock);
     SIDToProfile.erase(remoteSID);
 //pthread_mutex_unlock(&profileLock);
