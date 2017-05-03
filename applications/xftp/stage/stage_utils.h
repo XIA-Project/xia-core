@@ -89,6 +89,7 @@ int XmyReadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *lo
 // format: STAGE_SERVER_NAME.getAD()
 const char *getStageServiceName();
 const char *getStageServiceName2(int iface);
+const char *getStageServiceName3(string AD);
 // format: STAGE_MANAGER_NAME.getHID()
 const char *getStageManagerName();
 

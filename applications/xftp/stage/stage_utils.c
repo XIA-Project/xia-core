@@ -56,6 +56,11 @@ const char *getStageServiceName2(int iface)
 	return string2char(string(STAGE_SERVER_NAME) + "." + getAD2(iface));
 }
 
+const char *getStageServiceName3(string AD)
+{
+	return string2char(string(STAGE_SERVER_NAME) + "." + AD);
+}
+
 const char *getStageManagerName()
 {
 	return string2char(string(STAGE_MANAGER_NAME) + "." + getHID());

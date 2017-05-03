@@ -208,8 +208,13 @@ int connectToServer(struct ifaddrs *ifa)
 	
 	//if (Xgetaddrinfo(MUL_SERVER1, NULL, NULL, &sai) != 0)
 	//	die(-1, "unable to lookup name %s\n", MUL_SERVER1);
-	if (XgetDAGbyName(NAME, &dag, &daglen) < 0)
-		die(-1, "unable to locate: %s\n", NAME);
+	int iface = 0;
+	if(strcmp(ifa->ifa_name, "iface0")==0)iface = 0;
+	if(strcmp(ifa->ifa_name, "iface1")==0)iface = 1;
+	string newName = string(NAME) + "." + getAD2(iface);
+	say("XgetDAGbyName : %s\n", newName.c_str() );
+	if (XgetDAGbyName(newName.c_str(), &dag, &daglen) < 0)
+		die(-1, "unable to locate: %s\n", newName.c_str());
 	
 	if (Xconnect(ssock, (struct sockaddr *)&dag, sizeof(sockaddr_x)) < 0)
 		die(-3, "unable to connect to the destination dag\n");
@@ -274,12 +279,19 @@ void *watch_network(void * ifa)
 {
 	int iface = *((int *)ifa);
 	char old_ad[512];
-	strcpy(old_ad, getAD2(iface).c_str());
+	int flag = 0;
+	memset(old_ad, 0, sizeof(old_ad));
+	//strcpy(old_ad, getAD2(iface).c_str());
 	while(true){
 		say("old AD = %s\n",old_ad);
 		getNewAD2(iface, old_ad);
+		
 		strcpy(old_ad, getAD2(iface).c_str());
 		say("new AD = %s\n",old_ad);
+		if(iface ==0 && flag == 0){
+			flag = 1;
+			//continue;
+		}
 		pthread_t client;
 		pthread_create(&client, NULL, mainLoop, ifa);
 	}
