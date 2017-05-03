@@ -383,7 +383,7 @@ void *stageData(void *)
 			continue;
 		}
 		int needchunk = chunkToStage - alreadyStage;
-		for (int i = beg, j = 0; j < needchunk && j < 3 && i < int(dags.size()); ++i) {
+		for (int i = beg, j = 0; j < needchunk && i < int(dags.size()); ++i) {
 			say("Before needStage: i = %d, beg = %d, dag = %s State: %d\n",i, beg, dags[i].c_str(),CIDToProfile[dags[i]].state);
 			if (CIDToProfile[dags[i]].state == BLANK || CIDToProfile[dags[i]].state == PREFETCH) {
 				say("needStage: i = %d, beg = %d, dag = %s\n",i, beg, dags[i].c_str());
@@ -400,15 +400,24 @@ void *stageData(void *)
 			pthread_mutex_unlock(&dagVecLock);
 			continue;
 		}
+		
 		char cmd[XIA_MAX_BUF] = {0};
-
+		int cnt=0;
 	    sprintf(cmd, "stage");
 		for (auto dag : needStage) {
-			//say("needStage: %s\n", dag.c_str());
 			CIDToProfile[dag].stageStartTimestemp = now_msec();
 			sprintf(cmd, "%s %s",cmd, dag.c_str());
+			cnt++;
+			if(cnt == 3){
+				cnt = 0;
+				sendStreamCmd(netStageSock, cmd);
+				memset(cmd, 0, sizeof(cmd));
+				sprintf(cmd, "stage");
+			}
 		}
-	    sendStreamCmd(netStageSock, cmd);
+		if(strlen(cmd) > 8)
+			sendStreamCmd(netStageSock, cmd);
+		
 		chunkToRecv += needStage.size();
 		pthread_mutex_unlock(&dagVecLock);
     }
