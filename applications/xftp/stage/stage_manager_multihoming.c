@@ -23,7 +23,7 @@ int fetchIndex;
 
 bool netStageOn = true;
 int thread_c = 0;
-int HANDOFFTIME = 5;
+int HANDOFFTIME = 6;
 int HANDOFFPOLICY = 0;
 // TODO: this is not easy to manage in a centralized manner because we can have multiple threads for staging data due to mobility and we should have a pair of mutex and cond for each thread
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
@@ -48,7 +48,7 @@ void getConfig(int argc, char** argv)
         opterr = 0;
 
         while ((c = getopt(argc, argv, "h:c:")) != -1) {
-                switch (h) {
+                switch (c) {
                         case 'c':
                         	HANDOFFTIME = atoi(optarg);
                         	break;
@@ -139,12 +139,12 @@ int delegationHandler(int sock, char *cmd)
                 break;
                 say("DAG: %s change into IGNORE!\n", cmd);
             }
-			if(CIDToProfile[cmd].state == BLANK){
+			/*if(CIDToProfile[cmd].state == BLANK){
 	    	    CIDToProfile[cmd].state = READY;
 				pthread_mutex_unlock(&fetchLock);
 				break;
             //    CIDToProfile[cmd].dag = cmd;
-            }
+            }*/
             pthread_mutex_unlock(&profileLock);
         }
         tmp = CIDToProfile[cmd].dag;
@@ -354,13 +354,14 @@ void *stageData(void *)
 			pthread_mutex_lock(&stopMutex);
 			stopFlag = 0;
 			pthread_mutex_unlock(&stopMutex);
-			
+			getNewAD2(0, myAD);
             pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
 		pthread_mutex_lock(&stopMutex);
 		if(stopFlag == 1){
 			pthread_mutex_unlock(&stopMutex);
+			pthread_mutex_unlock(&StageControl);
 			continue;
 		}
 		pthread_mutex_unlock(&stopMutex);
@@ -425,9 +426,9 @@ void *preStageData(void *)
     char stageAD[MAX_XID_SIZE];
     char stageHID[MAX_XID_SIZE];
 
-	strcpy(AD1, "");
-	strcpy(AD2, "");
-    getNewAD2(1, myAD);
+	strcpy(AD1, "AD:7f52fea9c60233a5a67e5a768cbe5044209349a5");
+	strcpy(AD2, "AD:f9fb1dc16840464cea54d64cc99e740857365ce5");
+    getNewAD2(0, myAD);
 	strcpy(myAD, getAD2(0).c_str());
 	cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
     cerr << "preStageData Current " << getAD2(0) << endl;
@@ -435,6 +436,7 @@ void *preStageData(void *)
     string serviceAD = "";
 	if(strcmp(myAD, AD1) == 0)serviceAD = AD2;
 	if(strcmp(myAD, AD2) == 0)serviceAD = AD1;
+	say("serviceAD = \n%s\n", serviceAD);
 	int netStageSock = registerMulStageService(0, getStageServiceName3(serviceAD));
     say("+++++++++++++++++++++++++++In preStageData, the current netStageSock is %d\n", netStageSock);
     if (netStageSock == -1) {
@@ -442,17 +444,20 @@ void *preStageData(void *)
         netStageOn = false;
         pthread_exit(NULL);
     }
-   
 
-        say("*********************************---------------preStageData\n");
-        if(!isConnect2()){
-            long newStamp = now_msec();
-            connetTime << lastSSID << " disconnect. Last: " << newStamp - timeStamp << "ms." << endl;
-        }
+    pthread_mutex_lock(&stopMutex);
+	stopFlag = 1;
+	pthread_mutex_unlock(&stopMutex);
+
+	while(1){
+		say("*********************************---------------before preStageData lock\n");	
+		pthread_mutex_lock(&preStageControl);
+        say("*********************************---------------after  preStageData lock\n");
+        if(strcmp(myAD, getAD2(0).c_str()) != 0){
+			pthread_exit(NULL);
+		}
 		
-		pthread_mutex_lock(&stopMutex);
-		stopFlag = 1;
-		pthread_mutex_unlock(&stopMutex);
+		
 		
         set<string> needStage;
         pthread_mutex_lock(&dagVecLock);
@@ -461,13 +466,13 @@ void *preStageData(void *)
 		pthread_mutex_lock(&profileLock);
 		pthread_mutex_lock(&stageMutex);
 		int beg = fetchIndex;
-		fetchIndex = -1;
+		//fetchIndex = -1;
 		say("AlreadyStage: %d chunkToStage: %d\n",alreadyStage, chunkToStage);
-		if (alreadyStage + PreStageChunk >= chunkToStage || beg == -1){
+		if (alreadyStage >= chunkToStage || beg == -1){
 			pthread_mutex_unlock(&stageMutex);
 			pthread_mutex_unlock(&profileLock); 
 			pthread_mutex_unlock(&dagVecLock);
-			pthread_exit(NULL);
+			continue;
 		}
 		int needchunk = chunkToStage - alreadyStage ;
 		for (int i = beg, j = 0; j < needchunk && i < int(dags.size()); ++i) {
@@ -479,7 +484,7 @@ void *preStageData(void *)
 				j++;
 			}
 		}
-		alreadyStage += needStage.size();
+		//alreadyStage += needStage.size();
 		pthread_mutex_unlock(&stageMutex);
 		pthread_mutex_unlock(&profileLock);
 		say("Size of NeedStage: %d", needStage.size());
@@ -505,6 +510,7 @@ void *preStageData(void *)
 			sendStreamCmd(netStageSock, cmd);
 		chunkToRecv += needStage.size();
 		pthread_mutex_unlock(&dagVecLock);
+	}
     pthread_exit(NULL);
 }
 
@@ -516,6 +522,7 @@ void *handoffPolicy(void *){
 			say("handoffPolicy: 0\n");
 			char old_ad[512];
 			memset(old_ad, 0, sizeof(old_ad));
+usleep(2 * 1000 * 1000);
 			//strcpy(old_ad, getAD2(0).c_str());
 			while(true){
 				say("old AD = %s\n",old_ad);
@@ -524,6 +531,7 @@ void *handoffPolicy(void *){
 				say("new AD = %s\n",old_ad);
 				usleep(HANDOFFTIME * 1000 * 1000);
 				pthread_t Thread_preStageData;
+				pthread_mutex_unlock(&preStageControl);
 				pthread_create(&Thread_preStageData, NULL, preStageData, NULL);
 			}
 			break;
@@ -549,8 +557,8 @@ int main(int argc, char **argv)
     pthread_t thread_stageData;
     pthread_create(&thread_stageData, NULL, stageData, NULL);
 	
-	pthread_t thread_preStageData;
-    pthread_create(&thread_preStageData, NULL, preStageData, NULL);
+	//pthread_t thread_preStageData;
+    //pthread_create(&thread_preStageData, NULL, preStageData, NULL);
 	pthread_t thread_handoffPolicy;
     pthread_create(&thread_handoffPolicy, NULL, handoffPolicy, NULL);
 //say("after stageData");
