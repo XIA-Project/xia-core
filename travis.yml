@@ -1,10 +1,16 @@
 language: cpp
+dist: xenial
 
-before_install:
+script:
     - sudo apt-get update -qq
     - sudo apt-get install -qq git libxml2 libxml2-dev libssl-dev libprotobuf-dev protobuf-compiler python-protobuf python-networkx python-nacl python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+    - ./configure && make
 
-script: ./configure && make
+branches:
+    only:
+        - v2-routing
 
+ notifications:
+    slack: xia-cmu:i6KX0DyBuYJQUf5c5RUu4AOZ
 
 
