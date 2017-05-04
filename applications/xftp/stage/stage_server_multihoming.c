@@ -13,7 +13,7 @@ pthread_mutex_t bufLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t startStage = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t stageMutex = PTHREAD_MUTEX_INITIALIZER;
 //pthread_mutex_t timeLock = PTHREAD_MUTEX_INITIALIZER;
-
+//pthread_mutex_unlock(&profileLock);
 struct chunkProfile {
     int fetchState;
     long fetchStartTimestamp;
@@ -25,7 +25,7 @@ struct chunkProfile {
 ofstream stageServerTime("stageServerTime.log");
 // Used by different service to communicate with each other.
 map<string, chunkProfile> CIDProfile;   // stage state
-map<string, vector<sockaddr_x> > SIDToBuf; // chunk buffer to stage
+//map<string, vector<sockaddr_x> > SIDToBuf; // chunk buffer to stage
 //map<string, long> SIDToTime; // timestamp last seen
 
 // TODO: non-blocking fasion -- stage manager can send another stage request before get a ready response
@@ -68,6 +68,7 @@ void stageControl(int sock, char *cmd)
 	} 
     }
    */
+    pthread_mutex_lock(&profileLock);
     for (auto CID : CIDs) {
 		if(CIDProfile[CID].fetchState == READY) continue;
         CIDProfile[CID].fetchState = BLANK;
@@ -146,9 +147,10 @@ void stageControl(int sock, char *cmd)
         // Determine the intervals to check the state of current chunk.
         //usleep(SCAN_DELAY_MSEC * 1000); // chenren: check timing issue
     }
+	pthread_mutex_unlock(&profileLock);
 	//free(buf);
 //pthread_mutex_lock(&profileLock);
-    CIDProfile.erase(remoteSID);
+    //CIDProfile.erase(remoteSID);
 //pthread_mutex_unlock(&profileLock);
 //pthread_mutex_lock(&bufLock);
 //SIDToBuf.erase(remoteSID);
@@ -169,7 +171,7 @@ void preStage(int sock, char *cmd)
 	XgetRemoteAddr(sock, remoteAD, remoteHID, remoteSID); // get stage manager's remoteSID
 	
     vector<string> CIDs = strVector(cmd);
-
+	pthread_mutex_lock(&profileLock);
     for (auto CID : CIDs) {
         CIDProfile[CID].fetchState = BLANK;
 		Graph g((char*)CID.c_str());
@@ -232,7 +234,8 @@ void preStage(int sock, char *cmd)
 
 
     }
-	free(buf);
+	pthread_mutex_unlock(&profileLock);
+	//free(buf);
     //CIDProfile.erase(remoteSID);
 
     return;
