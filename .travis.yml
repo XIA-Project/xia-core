@@ -19,6 +19,7 @@ before_script:
   - sudo ldconfig
 
 script:
+  -  cd ..
   - ./configure
   - make
 
