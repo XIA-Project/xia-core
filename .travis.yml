@@ -11,7 +11,6 @@ before_script:
   - sudo apt-get remove libprotobuf-dev protobuf-compiler
   - sudo apt-get remove libprotobuf-lite8 libprotoc8
   - sudo apt-get remove python-protobuf
-  - sudo pip uninstall protobuf
   - wget http://launchpad.net/ubuntu/+archive/primary/+files/protobuf_2.6.1.orig.tar.gz
   - tar xvzf protobuf_2.6.1.orig.tar.gz
   - cd protobuf-2.6.1/
