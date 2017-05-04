@@ -1,9 +1,11 @@
 language: cpp
 dist: xenial
 
-script:
+before_script:
     - sudo apt-get update -qq
-    - sudo apt-get install -qq git libxml2 libxml2-dev libssl-dev libprotobuf-dev protobuf-compiler python-protobuf python-networkx python-nacl python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+    - sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev libprotobuf-dev protobuf-compiler python-protobuf python-networkx python-nacl python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+
+script:
     - ./configure && make
 
 branches:
