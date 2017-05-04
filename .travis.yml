@@ -5,12 +5,10 @@ os: linux
 
 before_script:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev libprotobuf-dev protobuf-compiler python-protobuf python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+  - sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
   - sudo pip install pynacl
   - sudo pip install networkx
-  - sudo apt-get remove libprotobuf-dev protobuf-compiler
-  - sudo apt-get remove libprotobuf-lite8 libprotoc8
-  - sudo apt-get remove python-protobuf
+    #- sudo apt-get remove libprotobuf-lite8 libprotoc8
   - wget http://launchpad.net/ubuntu/+archive/primary/+files/protobuf_2.6.1.orig.tar.gz
   - tar xvzf protobuf_2.6.1.orig.tar.gz
   - cd protobuf-2.6.1/
@@ -21,7 +19,8 @@ before_script:
   - sudo ldconfig
 
 script:
-  - ./configure && make
+  - ./configure
+  - make
 
 branches:
   only:
