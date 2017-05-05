@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #define GET_SSID_LIST "iwlist wlp6s0 scanning"
-string cmd == "iwlist ";
+string cmd = "iwlist ";
 ofstream getWifiInfo("getWifiInfo.log");
 void getConfig(int argc, char** argv)
 {
@@ -14,19 +14,15 @@ void getConfig(int argc, char** argv)
         while ((c = getopt(argc, argv, "i:")) != -1) {
                 switch (c) {
                         case 'i':
-                        	if ((CHUNKSIZE = atoi(optarg)) != 0) {
-                            	CHUNKSIZE *= 1024;
-                       		}
-							cmd += 
+				cmd += optarg;
                         	break;
-                        
                         default:
                                 break;
                 }
         }
 }
 int main(int argc, char** argv){
-	if (argc!=2) die("need a interface");
+	if (argc!=2) die(-1, "need a interface");
 	getConfig(argc, argv);
 	string result;
 	cmd += " scanning";
