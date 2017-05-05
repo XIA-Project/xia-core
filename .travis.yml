@@ -11,7 +11,10 @@ script: ./configure && make
 notifications:
   slack:
     secure: "HQwY2BJc3SCnomb36jGOKWMLm+78mDA+8selGBCzCNdbu3fKD9SvZUifVsV1eSe8Eckw8wCak40eDtLWgbBb1uxkbf9GllCBxUvfX9vxotiMVNcMeAkS/5z8DwE4Yw0hIak70AVbV72q6N3dvtk8J56NsiZAcJG8goKbz6jEP20="
-#  email:
-#    - xia-dev@cs.cmu.edu
+  email:
+    recipients: xia-dev@cs.cmu.edu
+    # options always/never/change
+    on_success: always
+    on_failure: always
 
 
