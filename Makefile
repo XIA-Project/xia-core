@@ -12,7 +12,7 @@ CLEANDIRS=$(addsuffix .build, $(MAKEDIRS) doc)
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-.PHONY: all config clean test fresh tags doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
+.PHONY: all config clean test deps fresh tags doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
 
 #### BUILD RULES
@@ -79,7 +79,11 @@ $(CLEANDIRS):
 doc:
 	-make -C doc doc
 
+# get required packages
+deps:
+	@tools/getdeps
 
+# build project-wide ctags file
 tags:
 	find . -name \*."h*" -print -o -name \*."c*" -print | grep -v experiments | xargs ctags --file-scope=no
 
