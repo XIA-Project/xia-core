@@ -31,9 +31,10 @@ int main(int argc, char** argv){
 		//string result;
 		//string cmd = "iwlist wlp6s0 scanning";
 		printf("cmd = %s\n", cmd.c_str());
+		getWifiInfo << "Time" << now_msec() << endl;
 		result = execSystem(cmd);
 
-		getWifiInfo << result << endl << "time" << now_msec() << endl;
+		getWifiInfo << result << endl;
 	}
 	return 0;
 }
