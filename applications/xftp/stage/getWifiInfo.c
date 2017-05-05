@@ -14,6 +14,7 @@ void getConfig(int argc, char** argv)
         while ((c = getopt(argc, argv, "i:")) != -1) {
                 switch (c) {
                         case 'i':
+				printf("optarg = %s\n", optarg);
 				cmd += optarg;
                         	break;
                         default:
@@ -22,14 +23,16 @@ void getConfig(int argc, char** argv)
         }
 }
 int main(int argc, char** argv){
-	if (argc!=2) die(-1, "need a interface");
+	if (argc!=3) die(-1, "need a interface");
 	getConfig(argc, argv);
 	string result;
 	cmd += " scanning";
 	while(true){
 		//string result;
 		//string cmd = "iwlist wlp6s0 scanning";
+		printf("cmd = %s\n", cmd.c_str());
 		result = execSystem(cmd);
+
 		getWifiInfo << result << endl << "time" << now_msec() << endl;
 	}
 	return 0;
