@@ -240,8 +240,7 @@ void db_check_and_mark_ttl_expired_chunk(Connection *connection,
 
     // get ttl
     ttl = get_ttl_from_doc(doc);
-    if(ttl == 0) {
-        syslog(LOG_ERR, "Error in accessing ttl, skip\n");
+    if(ttl <= 0) {
         return;
     }
 

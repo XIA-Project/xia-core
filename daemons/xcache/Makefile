@@ -11,14 +11,14 @@ VPATH=../common
 XCACHE=$(BINDIR)/xcache
 
 # source / obj
-SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
+SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc stores/mongodb.cc \
 	policy_manager.cc XIARouter.cc csclient.cc
 DEPS=$(PROTO_DIR)/chunk.pb.cc $(PROTO_DIR)/operation.pb.cc $(STORED_DIR)/wrapper.cc $(STORED_DIR)/helper.cc
 OBJS=$(SOURCES:.cc=.o)
 
 # flags
 LDFLAGS+=$(LIBS) -lprotobuf -lcrypto
-CFLAGS+=-I$(APIDIR)/xcache -I$(VPATH) -I../../click/include -I$(APIDIR)/xsocket/minini -I$(PROTO_DIR) -I$(STORED_DIR)
+CFLAGS+=-I$(APIDIR)/xcache -I$(VPATH) -I../../click/include -I$(APIDIR)/xsocket/minini -I$(PROTO_DIR) -I$(STORED_DIR) -g
 
 all: protobuf $(XCACHE)
 

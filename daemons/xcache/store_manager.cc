@@ -18,5 +18,5 @@ int xcache_store_manager::store(xcache_meta *meta, const std::string *data)
 
 xcache_store_manager::xcache_store_manager()
 {
-	store_vector.push_back(new DiskStore());
+	store_vector.push_back(new MongodbStore());
 }

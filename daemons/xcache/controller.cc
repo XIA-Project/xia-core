@@ -18,14 +18,6 @@
 #include "xcache_sock.h"
 #include "cid.h"
 
-#include <sys/time.h>
-#include "store.h"
-#include "helper.h"
-#include "wrapper.h"
-
-#include "chunk.pb.h"
-#include "operation.pb.h"
-
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
 #define MAX_XID_SIZE 100
@@ -38,7 +30,6 @@ enum {
 	RET_REMOVEFD,
 	RET_ENQUEUE,
 };
-
 
 static int send_response(int fd, const char *buf, size_t len)
 {
@@ -623,115 +614,6 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
-void chunk_retrieve(std::string cid) {
-
-    Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
-
-    // Operation
-    Operation *operation = new Operation();
-    operation->set_op(OP_GET);
-    operation->set_cid(cid);
-
-    // Serialize
-    buffer->len = operation->ByteSize();
-    std::string data_str;
-    operation->SerializeToString(&data_str);
-
-    buffer->data = (uint8_t *)malloc_w(buffer->len);
-    memcpy(buffer->data, data_str.c_str(), buffer->len);
-
-    printf("Get %zu serialized bytes (get operation)\n", buffer->len);
-
-    // socket
-    int sockfd = connect_to(HOST, PORT);
-
-    // send request
-    write_socket(sockfd, buffer);
-
-    // read response
-    // get len
-    size_t len = read_len(sockfd);
-    if(len == 0) {
-        // not found
-        printf("chunk not found\n");
-        free_buffer(buffer);
-        return;
-    }
-
-    // get content
-    uint8_t *content = read_content(sockfd, len);
-    close(sockfd);
-
-    if(content == NULL) {
-        // not found
-        printf("Error in reading content\n");
-        free_buffer(buffer);
-        return;
-    }
-
-    std::string content_str(content, content + len);
-    Chunk chunk;
-    chunk.ParseFromString(content_str);
-    print_chunk(chunk);
-
-    // free
-    free_buffer(buffer);
-
-}
-
-void chunk_store(std::string cid, time_t ttl, std::string data) {
-
-    Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
-
-	syslog(LOG_INFO, "ttl: %zu", ttl);
-
-    // Chunk
-    Chunk chunk;
-    chunk.set_cid(cid);
-    chunk.set_sid("empty_sid_holder");
-
-    chunk.set_content(data.c_str());
-
-    chunk.set_initial_seq(0);   // TODO: to be filled
-    chunk.set_ttl(10);
-
-    // now
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    long int now_ms = now.tv_sec * 1000 + now.tv_usec / 1000;
-
-    chunk.set_created_time(now_ms);
-    chunk.set_accessed_time(now_ms);
-
-    // print_chunk(chunk);
-
-    // Operation
-    Operation *operation = new Operation();
-    operation->set_op(OP_POST);
-    operation->set_cid(chunk.cid());
-    operation->set_allocated_chunk(&chunk);
-
-    // Serialize
-    buffer->len = operation->ByteSize();
-    std::string data_str;
-    operation->SerializeToString(&data_str);
-
-    buffer->data = (uint8_t *)malloc_w(buffer->len);
-    memcpy(buffer->data, data_str.c_str(), buffer->len);
-
-    syslog(LOG_INFO, "Posting %zu serialized bytes (post operation) to store\n", buffer->len);
-
-    // socket
-    int sockfd = connect_to(HOST, PORT);
-
-    // send request, don't read response
-    write_socket(sockfd, buffer);
-    close(sockfd);
-
-    free_buffer(buffer);
-
-}
-
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
@@ -749,8 +631,6 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 	} else {
 
         // FIXME: fast implementation here, store meta to stored (mongo) as well
-        chunk_store(cid, ttl, cmd->data());
-
 		/*
 		 * New object - Allocate a meta
 		 */

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define HOST                "127.0.0.1"
-#define PORT                5353
+#define PORT                1599
 #define LISTEN_BACKLOG      1024
 #define MAX_CONNECTION      3
 #define BUFFER_SIZE         256
