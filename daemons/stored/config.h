@@ -12,6 +12,7 @@
 
 #define OP_GET              0
 #define OP_POST             1
+#define OP_CHECK            2
 
 #define MONGODB_URL         "mongodb://localhost:27017?maxpoolsize=10&minpoolsize=1" 
 #define MONGODB_DB          "cache"
@@ -23,5 +24,8 @@
 #define GARBAGE_COLLECTION_TIME_PERIOD  3   // second
 #define GARBAGE_COLLECTION_THRESHOLD    10
 #define GARBAGE_COLLECTION_PERCENTAGE   50
+
+#define SUCCEED_RESPONSE    "SUCCEED"
+#define EXISTS_RESPONSE     "EXISTS"
 
 #endif

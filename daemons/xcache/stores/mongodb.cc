@@ -15,9 +15,7 @@ void set_post_operation(Operation *operation, Chunk *chunk);
 void set_get_operation(Operation *operation, std::string cid);
 
 int send_operation(Operation *operation);
-
-Chunk read_get_response(int sockfd);
-int read_post_response(int sockfd);
+std::string read_response(int sockfd);
 
 MongodbStore::MongodbStore() {
     syslog(LOG_INFO, "MongodbStore::init");
@@ -39,26 +37,29 @@ int MongodbStore::store(xcache_meta *meta, const std::string *data) {
     set_post_operation(operation, chunk);
 
     int sockfd = send_operation(operation);
-    return read_post_response(sockfd);
+    std::string response = read_response(sockfd);
+
+    return response.compare(SUCCEED_RESPONSE) == 0;
 
 }
 
 /*
- * get: encrypt the query cid into a operation object, then retrieve the result
+ * get: encrypt the query cid into an operation object, then retrieve the result
  * from the mongodb interface (blocking).
  */
 std::string MongodbStore::get(xcache_meta *meta) {
 
-    syslog(LOG_INFO, "MongodbStore::get");
+    syslog(LOG_INFO, "MongodbStore::get, cid=%s", meta->get_cid().c_str());
 
     Operation *operation = new Operation();
     set_get_operation(operation, meta->get_cid());
     try {
         int sockfd = send_operation(operation);
-        Chunk chunk = read_get_response(sockfd);
+        Chunk chunk;
+        chunk.ParseFromString(read_response(sockfd));
         return chunk.content();
     } catch(int e) {
-        return "";
+        throw e;
     }
 
 }
@@ -118,21 +119,18 @@ int send_operation(Operation *operation) {
     write_socket(sockfd, buffer);
     free_buffer(buffer);
 
-    // FIXME: tmp
-    close(sockfd);
-
     return sockfd;
 
 }
 
-Chunk read_get_response(int sockfd) {
+std::string read_response(int sockfd) {
 
     // read response
     // get len
     size_t len = read_len(sockfd);
     if(len == 0) {
         // not found
-        syslog(LOG_INFO, "Error: chunk not found\n");
+        syslog(LOG_INFO, "Error: empty response\n");
         throw -1;
     }
 
@@ -147,17 +145,8 @@ Chunk read_get_response(int sockfd) {
     }
 
     std::string content_str(content, content + len);
-    Chunk chunk;
-    chunk.ParseFromString(content_str);
+    return content_str;
 
-    return chunk;
-
-}
-
-int read_post_response(int sockfd) {
-    // TODO
-    close(sockfd);
-    return 0;
 }
 
 std::string MongodbStore::get_partial(xcache_meta *meta, off_t off, size_t len)

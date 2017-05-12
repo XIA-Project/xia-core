@@ -23,11 +23,18 @@ public:
 	/**
 	 * Select a content store to store this data and actually store it.
 	 * @param meta:   Metadata of the object to be stored
-	 * @param data:   Data to be stored.
+	 * @param data:   Data to be stored
 	 * @returns >= 0: On successfully storing the data
 	 * @returns < 0:  On failure
 	 */
 	int store(xcache_meta *meta, const std::string *data);
+
+    /**
+     * Retrieve a cached content from one of the stores.
+	 * @param meta:   Key
+     * @returns:      Cached content
+     */
+    std::string get(xcache_meta *meta);
 };
 
 #endif

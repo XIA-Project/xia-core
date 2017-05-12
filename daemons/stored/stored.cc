@@ -106,7 +106,20 @@ void operation_get_handler(int clientfd, const char *cid) {
 }
 
 void operation_post_handler(int clientfd, Chunk chunk) {
+
     db_post(chunk);
+
+    // parse response into proper buffer
+    Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
+    std::string ack_msg = SUCCEED_RESPONSE;
+    buffer->len = ack_msg.length();
+    buffer->data = (uint8_t *)malloc_w(buffer->len);
+    memcpy(buffer->data, ack_msg.c_str(), buffer->len);
+
+    // write to the client socket
+    write_socket(clientfd, buffer);
+    free_buffer(buffer);
+
 }
 
 /* Worker Flow */

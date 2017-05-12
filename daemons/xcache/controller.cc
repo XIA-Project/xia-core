@@ -210,24 +210,14 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	IGNORE_PARAM(cmd);
 	syslog(LOG_INFO, "Fetching content %s from local\n", expected_cid.id_string().c_str());
 
-	meta = acquire_meta(cid);
-	if(!meta) {
+	try {
+		meta = new xcache_meta(cid);
+		data = store_manager.get(meta);
+	} catch(int e) {
+        // We could not find the content locally
 		syslog(LOG_WARNING, "meta not found");
-		/* We could not find the content locally */
 		return RET_FAILED;
 	}
-
-	if(meta->state() != AVAILABLE) {
-		release_meta(meta);
-		return RET_FAILED;
-	}
-
-	syslog(LOG_INFO, "Getting data by calling meta->get()\n");
-
-	// touch the object to move it back to the front of the queue
-	meta->fetch(true);
-	data = meta->get();
-	meta->fetch(false);
 
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -236,11 +226,9 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_ttl(meta->ttl());
 	}
 
-	syslog(LOG_INFO, "Releasing meta\n");
-	release_meta(meta);
 	syslog(LOG_INFO, "Fetching content from local DONE\n");
-
 	return RET_OK;
+
 }
 
 int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,

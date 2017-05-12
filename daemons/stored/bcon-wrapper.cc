@@ -61,7 +61,10 @@ void chunk2bson(bson_t *doc, Chunk chunk) {
     bson_init(doc);
 
     bson_oid_init_from_string(&oid, chunk.cid().c_str());
+
+    // NOTE: bson object_id takes 24 bytes hex string, so cid is stored in a separte field
     BSON_APPEND_OID (doc, "_id", &oid);
+    BSON_APPEND_UTF8(doc, "cid", chunk.cid().c_str());
     BSON_APPEND_UTF8(doc, "sid", chunk.sid().c_str());
 
     BSON_APPEND_INT64(doc, "len", chunk.content().size());

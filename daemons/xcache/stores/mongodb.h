@@ -9,6 +9,7 @@ public:
 	MongodbStore();
 	int store(xcache_meta *meta, const std::string *data);
 	std::string get(xcache_meta *meta);
+	int check(xcache_meta *meta);
 	std::string get_partial(xcache_meta *meta, off_t off, size_t len);
 	int remove(xcache_meta *meta);
 	void print(void);
