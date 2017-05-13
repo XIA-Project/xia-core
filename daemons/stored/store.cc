@@ -125,6 +125,11 @@ Chunk *db_get(const char *cid) {
     // parse bson return back to chunk
     Chunk *chunk = bson2chunk(doc, cid);
 
+    // if collision: should return as not found
+    if(strcmp(chunk->cid().c_str(), cid) != 0) {
+        chunk = NULL;
+    }
+
     bson_destroy(query);
     mongoc_cursor_destroy(cursor);
     release_connection(connection);
