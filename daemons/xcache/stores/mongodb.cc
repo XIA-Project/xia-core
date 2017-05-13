@@ -17,7 +17,8 @@ void set_get_operation(Operation *operation, std::string cid);
 int send_operation(Operation *operation);
 std::string read_response(int sockfd);
 
-MongodbStore::MongodbStore() {
+MongodbStore::MongodbStore()
+{
     syslog(LOG_INFO, "MongodbStore::init");
 }
 
@@ -26,7 +27,8 @@ MongodbStore::MongodbStore() {
  * object, then send this operation object to mongodb interface using domain
  * socket (blocking).
  */
-int MongodbStore::store(xcache_meta *meta, const std::string *data) {
+int MongodbStore::store(xcache_meta *meta, const std::string *data)
+{
 
     syslog(LOG_INFO, "MongodbStore::store");
 
@@ -47,7 +49,8 @@ int MongodbStore::store(xcache_meta *meta, const std::string *data) {
  * get: encrypt the query cid into an operation object, then retrieve the result
  * from the mongodb interface (blocking).
  */
-std::string MongodbStore::get(xcache_meta *meta) {
+std::string MongodbStore::get(xcache_meta *meta)
+{
 
     syslog(LOG_INFO, "MongodbStore::get, cid=%s", meta->get_cid().c_str());
 
@@ -64,7 +67,8 @@ std::string MongodbStore::get(xcache_meta *meta) {
 
 }
 
-void set_chunk(Chunk *chunk, xcache_meta *meta, const std::string *data) {
+void set_chunk(Chunk *chunk, xcache_meta *meta, const std::string *data)
+{
 
     // Chunk
     chunk->set_cid(meta->get_cid().c_str());
@@ -84,7 +88,8 @@ void set_chunk(Chunk *chunk, xcache_meta *meta, const std::string *data) {
 
 }
 
-void set_post_operation(Operation *operation, Chunk *chunk) {
+void set_post_operation(Operation *operation, Chunk *chunk)
+{
 
     // Operation
     operation->set_op(OP_POST);
@@ -93,7 +98,8 @@ void set_post_operation(Operation *operation, Chunk *chunk) {
 
 }
 
-void set_get_operation(Operation *operation, std::string cid) {
+void set_get_operation(Operation *operation, std::string cid)
+{
 
     // Operation
     operation->set_op(OP_GET);
@@ -101,7 +107,8 @@ void set_get_operation(Operation *operation, std::string cid) {
 
 }
 
-int send_operation(Operation *operation) {
+int send_operation(Operation *operation)
+{
 
     Buffer *buffer = (Buffer *)malloc_w(sizeof(Buffer));
 
@@ -123,7 +130,8 @@ int send_operation(Operation *operation) {
 
 }
 
-std::string read_response(int sockfd) {
+std::string read_response(int sockfd)
+{
 
     // read response
     // get len
@@ -133,6 +141,7 @@ std::string read_response(int sockfd) {
         syslog(LOG_INFO, "Error: empty response\n");
         throw -1;
     }
+    syslog(LOG_INFO, "response content len = %zu", len);
 
     // get content
     uint8_t *content = read_content(sockfd, len);
@@ -145,6 +154,7 @@ std::string read_response(int sockfd) {
     }
 
     std::string content_str(content, content + len);
+    syslog(LOG_INFO, "string: %s", content_str.c_str());
     return content_str;
 
 }
@@ -165,3 +175,4 @@ void MongodbStore::print(void)
 {
     syslog(LOG_INFO, "MongodbStore::print");
 }
+

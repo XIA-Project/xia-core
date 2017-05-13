@@ -7,8 +7,8 @@
 #include <stdbool.h>
 #include <syslog.h>
 
-#include "proto/chunk.pb.h"
-#include "proto/operation.pb.h"
+#include "chunk.pb.h"
+#include "operation.pb.h"
 
 #include "config.h"
 #include "wrapper.h"

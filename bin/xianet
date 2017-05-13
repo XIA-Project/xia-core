@@ -345,20 +345,20 @@ router()
 			./xrouted -h $host $LOG_FLAGS &
 			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
-            # ./stored -h $host $LOG_FLAGS &
+			./stored &
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xrouted"
 			kill_service $host "xnetjd"
 			kill_service $host "xcache"
-			# kill_service $host "stored"
+			kill_service "stored"
 			;;
 		"check")
 			check_service $host "xrouted"
 			check_service $host "xnetjd"
 			check_service $host "xcache"
-			# check_service $host "stored"
+			check_service "stored"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -379,18 +379,18 @@ host()
 		"start")
 			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
 			./xcache -h $host $LOG_FLAGS &
-            # ./stored -h $host $LOG_FLAGS &
+            ./stored &
 			sleep 0.5
 			;;
 		"stop")
 			kill_service $host "xnetjd"
 			kill_service $host "xcache"
-			# kill_service $host "stored"
+			kill_service "stored"
 			;;
 		"check")
 			check_service $host "xnetjd"
 			check_service $host "xcache"
-			# check_service $host "stored"
+			check_service "stored"
 			;;
 		*)
 			echo "unrecognized action: $action"

@@ -105,8 +105,7 @@ Chunk *bson2chunk(const bson_t *doc, const char *cid) {
     bson_iter_find(&iter, "len");
     uint32_t len  = bson_iter_int64(&iter);
 
-    char *content_holder;
-    content_holder = (char *)malloc_w(len);
+    char *content_holder = (char *)malloc_w(len);
 
     // content
     bson_subtype_t subtype;
@@ -115,7 +114,7 @@ Chunk *bson2chunk(const bson_t *doc, const char *cid) {
     bson_iter_binary(&iter, &subtype, &len_saved,
             (const uint8_t **) (&content_holder));
 
-    chunk->set_content(content_holder);
+    chunk->set_content(content_holder, len);
 
     printf("len saved = %u\n", len_saved);
     unsigned i;
