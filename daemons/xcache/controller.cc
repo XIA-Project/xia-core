@@ -153,7 +153,8 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			syslog(LOG_WARNING, "Xrecv returned 0");
 			break;
 		}
-		syslog(LOG_DEBUG, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+		syslog(LOG_DEBUG, "sock: %d recvd = %d, to_recv = %d\n",
+				sock, recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);
@@ -288,7 +289,9 @@ void *xcache_controller::__fetch_content(void *__args)
 						       args->cmd, args->flags);
 		if (ret == RET_FAILED) {
 			syslog(LOG_ERR, "Remote content fetch failed: %d", ret);
-			args->resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+			if (args->flags & XCF_BLOCK) {
+				args->resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+			}
 		}
 	}
 
