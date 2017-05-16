@@ -5,6 +5,7 @@
 #include <bson.h>
 #include <mongoc.h>
 #include <stdbool.h>
+#include <syslog.h>
 
 #include "chunk.pb.h"
 #include "wrapper.h"

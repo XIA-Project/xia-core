@@ -59,6 +59,8 @@ void operation_handler(int clientfd) {
         return;
     }
 
+    syslog(LOG_INFO, "Received content length: %zu", len);
+
     // unpack operation
     std::string content_str(content, content + len);
 
@@ -106,6 +108,8 @@ void operation_get_handler(int clientfd, const char *cid) {
 }
 
 void operation_post_handler(int clientfd, Chunk chunk) {
+
+    syslog(LOG_INFO, "POST REQUEST, len=%zu", chunk.content().size());
 
     db_post(chunk);
 

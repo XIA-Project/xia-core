@@ -72,7 +72,9 @@ void set_chunk(Chunk *chunk, xcache_meta *meta, const std::string *data)
 
     // Chunk
     chunk->set_cid(meta->get_cid().c_str());
-    chunk->set_content(data->c_str());
+    chunk->set_content(data->c_str(), data->size());
+
+    syslog(LOG_INFO, "new content len: %zu", chunk->content().size());
 
     chunk->set_sid(meta->dest_sid());
     chunk->set_initial_seq(meta->seq());

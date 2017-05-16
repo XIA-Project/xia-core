@@ -9,34 +9,11 @@
 
 void print_chunk(Chunk chunk) {
 
-    unsigned i;
-
     printf("[Chunk]\n");
     printf("\tcid = %.*s\n", SHA1_LENGTH, chunk.cid().c_str());
     printf("\tsid = %.*s\n", SHA1_LENGTH, chunk.sid().c_str());
     printf("\tcontent = %.*s (%zu)\n", (int)chunk.content().length(), chunk.content().c_str(), chunk.content().length());
-    printf("\t");
-    for(i=0;i<chunk.content().length();i++) {
-        printf("[%02x] ", chunk.content().at(i));
-    }
-    printf("\n");
     printf("\tttl = %u, initial_seq = %u\n", chunk.ttl(), chunk.initial_seq());
-
-}
-
-void print_buffer(unsigned len, uint8_t *buffer) {
-
-    unsigned i;
-
-    printf("> %d,\t", len);
-    for(i=0; i<len; i++) {
-        if(i % 20 == 0) {
-            printf("\n");
-        }
-        printf("[%02x]  ", buffer[i]);
-    }
-
-    printf("\n");
 
 }
 
@@ -119,8 +96,6 @@ uint8_t *read_content(int clientfd, size_t len) {
         }
 
     }
-
-    print_buffer(n_read_total, buffer);
 
     printf("Read %d bytes for content\n", n_read_total);
     return content;
