@@ -6,6 +6,12 @@
 # do this or flack will install into /
 cd ~
 
+# Import the MongoDB GPG public key
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
+
+# add the MongoDB repository details to APT
+echo "deb http://repo.mongodb.org/apt/ubuntu "$(lsb_release -sc)"/mongodb-org/3.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list
+
 # make sure os is up to date
 sudo apt-get update
 sudo apt-get -y upgrade
@@ -17,6 +23,7 @@ sudo apt-get install -y python-tk python-dev python-setuptools
 sudo apt-get install -y swig
 sudo apt-get install -y python-argparse
 sudo apt-get install -y python-pygame
+sudo apt-get install -y mongodb-org
 
 # for some reason this won't install via apt-get on the GENI ubuntu 11 nodes
 sudo easy_install requests
