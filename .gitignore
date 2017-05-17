@@ -90,3 +90,7 @@ applications/video-use-case/src/xia_manifest_urls_dash2.txt
 arada/pdrtestip/pdrtestipclient
 arada/pdrtestip/pdrtestipserver
 arada/waveserveripudp/waveserveripudp
+
+mongo-c*
+protobuf[_-]*
+
