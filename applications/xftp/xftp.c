@@ -43,6 +43,12 @@ char name[256];
 int global_flags = 0;
 double totalElapseTime = 0.0;
 XcacheHandle h;
+int chunks_arrived = 0;
+int chunks_requested = 0;
+bool nonblocking = false;
+std::vector<Graph> chunks;
+pthread_mutex_t chunkstatus = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t chunks_ready = PTHREAD_COND_INITIALIZER;
 
 /*
 ** display cmd line options and exit
@@ -52,6 +58,8 @@ void help(const char *name)
 	printf("\n%s (%s)\n", TITLE, VERSION);
 	printf("usage: %s [-v] [-n name]\n", name);
 	printf("where:\n");
+	printf(" -c : cache content locally after fetching\n");
+	printf(" -b : fetch content without blocking (implies -c)\n");
 	printf(" -v : verbose mode\n");
 	printf(" -n : remote service name (default = %s)\n", NAME);
 	printf("\n");
@@ -69,7 +77,7 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "chn:v")) != -1) {
+	while ((c = getopt(argc, argv, "chn:vb")) != -1) {
 		switch (c) {
 			case 'v':
 				verbose = 1;
@@ -78,6 +86,10 @@ void getConfig(int argc, char** argv)
 				strcpy(name, optarg);
 				break;
 			case 'c':
+				global_flags = XCF_CACHE;
+				break;
+			case 'b':
+				nonblocking = true;
 				global_flags = XCF_CACHE;
 				break;
 			case '?':
@@ -180,6 +192,19 @@ int retrieveChunk(FILE *fd, char *url)
 		Graph g(token);
 		g.fill_sockaddr(&addr);
 
+		if (nonblocking) {
+			ret = XfetchChunk(&h, &buf, global_flags, &addr, sizeof(addr));
+			if (ret < 0) {
+				die(-1, "XfetchChunk Failed with %d\n", ret);
+			}
+			pthread_mutex_lock(&chunkstatus);
+			chunks_requested++;
+			pthread_mutex_unlock(&chunkstatus);
+			chunks.push_back(g);
+			token = strtok_r(NULL, " ", &saveptr);
+			continue;
+		}
+
         gettimeofday(&t1, NULL);
 		if ((ret = XfetchChunk(&h, &buf, XCF_BLOCK | global_flags, &addr, sizeof(addr))) < 0) {
 		 	die(-1, "XfetchChunk Failed\n");
@@ -215,6 +240,10 @@ int getFile(int sock, const char *fin, const char *fout)
 	char reply[5120];
 	int status = 0;
 
+	if (nonblocking) {
+		chunks_arrived = 0;
+		chunks_requested = 0;
+	}
 	// send the file request
 	sprintf(cmd, "get %s",  fin);
 	sendCmd(sock, cmd);
@@ -246,6 +275,31 @@ int getFile(int sock, const char *fin, const char *fout)
 			break;
 		}
 	}
+	// When all chunks are ready, fetch them
+	if (nonblocking) {
+		pthread_mutex_lock(&chunkstatus);
+		// Wait until chunks_arrived == chunks_requested
+		while(chunks_arrived != chunks_requested) {
+			// FIXME change to pthread_cond_timedwait so we can time out
+			pthread_cond_wait(&chunks_ready, &chunkstatus);
+		}
+		pthread_mutex_unlock(&chunkstatus);
+
+		// Then fetch them all and write to file
+		nonblocking = false; // Will block; chunk is in cache now
+		std::vector<Graph>::iterator it;
+		for (it = chunks.begin(); it !=chunks.end(); it++) {
+			Graph g(*it);
+			if (retrieveChunk(f, (char *)g.http_url_string().c_str()) < 0) {
+				warn("error retreiving: %s\n", g.http_url_string().c_str());
+				status= -1;
+				break;
+			}
+		}
+		chunks_arrived = 0;
+		chunks_requested = 0;
+		chunks.clear();
+	}
 
 	fclose(f);
 
@@ -262,15 +316,30 @@ int getFile(int sock, const char *fin, const char *fout)
 // FIXME: does this ever get called???
 void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
 {
-	int rc;
-	void *buf;
+	//int rc;
+	//void *buf;
 
 	printf("Received Chunk Arrived Event\n");
+	Graph g(addr);
+	printf("From %s\n", g.dag_string().c_str());
+	//chunks.push_back(Graph(addr));
 
+	pthread_mutex_lock(&chunkstatus);
+	chunks_arrived++;
+	printf("%d chunks have arrived so far\n", chunks_arrived);
+	if (chunks_arrived == chunks_requested) {
+		printf("Chunks arrived: %d, requested %d\n", chunks_arrived,
+				chunks_requested);
+		pthread_cond_broadcast(&chunks_ready);
+	}
+	pthread_mutex_unlock(&chunkstatus);
+
+	/*
 	rc = XfetchChunk(h, &buf, XCF_BLOCK | global_flags, addr, addrlen);
 
 	printf("XfetchChunk returned %d\n", rc);
 	free(buf);
+	*/
 }
 
 int initializeClient(const char *name)
