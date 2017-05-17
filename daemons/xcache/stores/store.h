@@ -97,7 +97,8 @@ public:
  * All the stores are implemented as separate c++ classes. The corresponding
  * header files must be included here.
  */
-#include "memht.h"
-#include "disk.h"
+// #include "memht.h"
+// #include "disk.h"
+#include "mongodb.h"
 
 #endif

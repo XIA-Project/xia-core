@@ -31,7 +31,6 @@ enum {
 	RET_ENQUEUE,
 };
 
-
 static int send_response(int fd, const char *buf, size_t len)
 {
 	int ret = 0;
@@ -211,24 +210,14 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	IGNORE_PARAM(cmd);
 	syslog(LOG_INFO, "Fetching content %s from local\n", expected_cid.id_string().c_str());
 
-	meta = acquire_meta(cid);
-	if(!meta) {
+	try {
+		meta = new xcache_meta(cid);
+		data = store_manager.get(meta);
+	} catch(int e) {
+        // We could not find the content locally
 		syslog(LOG_WARNING, "meta not found");
-		/* We could not find the content locally */
 		return RET_FAILED;
 	}
-
-	if(meta->state() != AVAILABLE) {
-		release_meta(meta);
-		return RET_FAILED;
-	}
-
-	syslog(LOG_INFO, "Getting data by calling meta->get()\n");
-
-	// touch the object to move it back to the front of the queue
-	meta->fetch(true);
-	data = meta->get();
-	meta->fetch(false);
 
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -237,11 +226,9 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_ttl(meta->ttl());
 	}
 
-	syslog(LOG_INFO, "Releasing meta\n");
-	release_meta(meta);
 	syslog(LOG_INFO, "Fetching content from local DONE\n");
-
 	return RET_OK;
+
 }
 
 int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,
@@ -630,6 +617,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		release_meta(meta);
 		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 	} else {
+
+        // FIXME: fast implementation here, store meta to stored (mongo) as well
 		/*
 		 * New object - Allocate a meta
 		 */
@@ -646,6 +635,7 @@ printf("store:length: %lu", meta->get_length());
 		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
 			return RET_FAILED;
 		}
+
 	}
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -819,6 +809,7 @@ void xcache_controller::process_req(xcache_req *req)
 	switch(req->type) {
 	case xcache_cmd::XCACHE_CACHE:
 	{
+		syslog(LOG_INFO, "XCACHE_CACHE");
 		xcache_meta *meta = acquire_meta(req->cid);
 		if (meta) {
 			std::string chunk((const char *)req->data, req->datalen);
@@ -830,6 +821,7 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 
 	case xcache_cmd::XCACHE_STORE:
+		syslog(LOG_INFO, "XCACHE_STORE");
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
@@ -837,6 +829,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_FETCHCHUNK:
+		syslog(LOG_INFO, "XCACHE_FETCHCHUNK");
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
 		syslog(LOG_INFO, "xcache_fetch_content returned %d", ret);
@@ -846,6 +839,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_READ:
+		syslog(LOG_INFO, "XCACHE_READ");
 		cmd = (xcache_cmd *)req->data;
 		ret = chunk_read(&resp, cmd);
 		if(ret == RET_SENDRESP) {
@@ -854,10 +848,12 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
+		syslog(LOG_INFO, "XCACHE_SENDCHUNK");
 		send_content_remote(req, (sockaddr_x *)req->data);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
+		syslog(LOG_INFO, "XCACHE_EVICT");
 		cmd = (xcache_cmd *)req->data;
 		ret = evict(&resp, cmd);
 		if(ret >= 0) {
@@ -918,6 +914,8 @@ void *xcache_controller::garbage_collector(void *arg)
 		meta_map *map = ctrl->get_meta_map();
 		map->walk();
 	}
+
+    return NULL;
 }
 
 void xcache_controller::run(void)
