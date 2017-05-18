@@ -1,9 +1,15 @@
 # XIA Config reader
 import os
 import re
+import sys
 import socket
 import hashlib
 import binascii
+
+srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+sys.path.append(os.path.join(srcdir, "bin"))
+import xiapyutils
+
 '''
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
@@ -12,8 +18,8 @@ from Crypto.PublicKey import RSA
 from netjoin_message_pb2 import SignedMessage
 
 class NetjoinXIAConf(object):
-    def __init__(self, hostname=socket.gethostname()):
-        self.hostname = hostname.split('.')[0]
+    def __init__(self, hostname=xiapyutils.getxiaclickhostname()):
+        self.hostname = hostname
         cwd = os.getcwd()
         self.src_dir = cwd[:cwd.rindex('xia-core')+len('xia-core')]
         self.conf_dir = os.path.join(self.src_dir, "etc")
