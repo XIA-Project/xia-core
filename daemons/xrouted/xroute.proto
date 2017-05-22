@@ -80,6 +80,11 @@ message ConfigMsg {
   optional string broadcast_sid  = 3;
 }
 
+message ForeignADMsg {
+  required uint32 iface = 1;
+  required string ad    = 2;
+}
+
 message SIDRequestMsg {
   optional string sid = 1;
 }
@@ -155,36 +160,38 @@ message SIDDiscoveryMsg {
 
 
 enum msg_type {
-  // local machine messages from xnetjd
-  CONFIG_MSG              = 1;
-  HOST_JOIN_MSG           = 2;
-
   // router -> router messages
-  HELLO_MSG               = 3; // still needed?
+  HELLO_MSG               = 1;
 
   // router -> controller messages
-  LSA_MSG                 = 4;
+  LSA_MSG                 = 2;
 
   // controller -> router messages
-  TABLE_UPDATE_MSG        = 5;
-  SID_TABLE_UPDATE_MSG    = 6;
+  TABLE_UPDATE_MSG        = 3;
+  SID_TABLE_UPDATE_MSG    = 4;
 
   // controller -> controller messages
-  GLOBAL_LSA_MSG          = 7;
+  GLOBAL_LSA_MSG          = 5;
 
   // host -> router messages
-  HOST_LEAVE_MSG          = 8;
+  HOST_LEAVE_MSG          = 6;
 
   // unknown messages
-  SID_DISCOVERY_MSG       = 9;
-  SID_MANAGE_KA_MSG       = 10; // keep alive msg to service controller
-  SID_RE_DISCOVERY_MSG    = 11; // send to service controller
-  SID_DECISION_QUERY_MSG  = 12;
-  SID_DECISION_ANSWER_MSG = 13;
-  AD_PATH_STATE_PING_MSG  = 14;
-  AD_PATH_STATE_PONG_MSG  = 15;
+  SID_DISCOVERY_MSG       = 7;
+  SID_MANAGE_KA_MSG       = 8; // keep alive msg to service controller
+  SID_RE_DISCOVERY_MSG    = 9; // send to service controller
+  SID_DECISION_QUERY_MSG  = 10;
+  SID_DECISION_ANSWER_MSG = 11;
+  AD_PATH_STATE_PING_MSG  = 12;
+  AD_PATH_STATE_PONG_MSG  = 13;
 
-  SID_REQUEST_MSG         = 16;
+  SID_REQUEST_MSG         = 14;
+
+  // local machine messages from xnetjd
+  CONFIG_MSG              = 15;
+  HOST_JOIN_MSG           = 16;
+  FOREIGN_AD_MSG          = 17;
+
 }
 
 message XrouteMsg {
@@ -192,8 +199,6 @@ message XrouteMsg {
   required msg_type type    = 2;
 
   oneof payload {
-    ConfigMsg         config           = 3;
-    HostJoinMsg       host_join        = 4;
     HelloMsg          hello            = 5;
     LSAMsg            lsa              = 6;
     TableUpdateMsg    table_update     = 7;
@@ -205,5 +210,8 @@ message XrouteMsg {
     DecisionAnswerMsg sid_answer       = 13;
     SIDDiscoveryMsg   sid_discovery    = 14;
     SIDRequestMsg     sid_request      = 15;
+    ConfigMsg         config           = 16;
+    ForeignADMsg      foreign          = 17;
+    HostJoinMsg       host_join        = 18;
   }
 }

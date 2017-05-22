@@ -36,7 +36,7 @@ void Router::purge()
 	if (_last_route_purge == 0) {
 		_last_route_purge = time(NULL);
 		_last_neighbor_purge = time(NULL);
-        return;
+		return;
 	}
 
 	time_t now = time(NULL);
@@ -68,8 +68,8 @@ void Router::purge()
 		TimestampList::iterator iter = _neighbor_timestamp.begin();
 		while (iter !=  _neighbor_timestamp.end()) {
 
-            time_t t = iter->second;
-            if ((t != 0) && (now - t >= NEIGHBOR_EXPIRE_TIME)) {
+		    time_t t = iter->second;
+		    if ((t != 0) && (now - t >= NEIGHBOR_EXPIRE_TIME)) {
 				syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
 				_xr.delRoute(iter->first);
 				_neighborTable.erase(iter->first);
@@ -89,6 +89,7 @@ int Router::handler()
 	char recv_message[BUFFER_SIZE];
 	struct pollfd pfds[3];
 	int iface;
+	bool local;
 
 	bzero(pfds, sizeof(pfds));
 	pfds[0].fd = _local_sock;
@@ -102,8 +103,8 @@ int Router::handler()
 	int num_pfds = _joined ? 3 : 1;
 
 	// get the next incoming message
-	if ((rc = readMessage(recv_message, pfds, num_pfds, &iface)) > 0) {
-		processMsg(string(recv_message, rc), iface);
+	if ((rc = readMessage(recv_message, pfds, num_pfds, &iface, &local)) > 0) {
+		processMsg(string(recv_message, rc), iface, local);
 	}
 
 	if (_joined) {
@@ -155,7 +156,7 @@ int Router::makeSockets()
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
-    _recv_sid = std::string(s);
+	_recv_sid = std::string(s);
 	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
 
 	// source socket - sending socket
@@ -180,51 +181,51 @@ int Router::getNeighborADs()
 		// FIXME: handle error
 		return -1;
 	}
-    strncat(s, "/etc/domains.conf", sizeof(s));
+	strncat(s, "/etc/domains.conf", sizeof(s));
 
-    minIni ini(s);
+	minIni ini(s);
 
-    int i = 0;
-    while (true) {
-        std::string sect = ini.getsection(i);
-        if (sect.size() == 0) {
-            break;
-        }
-        if (sect != _myAD) {
-            int port = ini.getl(sect, "port", FALLBACK);
-            std::string dag = ini.gets(sect, "dag");
+	int i = 0;
+	while (true) {
+		std::string sect = ini.getsection(i);
+		if (sect.size() == 0) {
+		    break;
+		}
+		if (sect != _myAD) {
+		    int port = ini.getl(sect, "port", FALLBACK);
+		    std::string dag = ini.gets(sect, "dag");
 
-            if (port == FALLBACK) {
-                // FIXME: validate port
-                syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
-                continue;
-            }
+		    if (port == FALLBACK) {
+		        // FIXME: validate port
+		        syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
+		        continue;
+		    }
 
-            if (dag == "") {
-                syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
-                continue;
-            }
+		    if (dag == "") {
+		        syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
+		        continue;
+		    }
 
-	        NeighborEntry neighbor;
-	        neighbor.AD        = sect;
-            neighbor.HID       = sect;
-            neighbor.port      = port;
-            neighbor.flags     = 0;
-            neighbor.cost      = 1;
-            neighbor.timestamp = 0;
+		    NeighborEntry neighbor;
+		    neighbor.AD        = sect;
+		    neighbor.HID       = sect;
+		    neighbor.port      = port;
+		    neighbor.flags     = 0;
+		    neighbor.cost      = 1;
+		    neighbor.timestamp = 0;
 
-            if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
-                syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
-                continue;
-            }
+		    if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
+		        syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
+		        continue;
+		    }
 
-            _neighborTable[neighbor.AD] = neighbor;
-            _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
-        }
-        i++;
-    }
+		    _neighborTable[neighbor.AD] = neighbor;
+		    _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
+		}
+		i++;
+	}
 
-    return 0;
+	return 0;
 }
 
 
@@ -327,15 +328,15 @@ int Router::sendLSA()
 		n->set_cost(it->second.cost);
 		n->set_port(it->second.port);
 
-        if (it->second.AD != _myAD) {
-            n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
-        }
+		if (it->second.AD != _myAD) {
+		    n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
+		}
 	}
-    return sendMessage(&_controller_dag, msg);
+	return sendMessage(&_controller_dag, msg);
 }
 
 // handle the incoming messages
-int Router::processMsg(std::string msg_str, uint32_t iface)
+int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 {
 	int rc = 0;
 	Xroute::XrouteMsg msg;
@@ -359,6 +360,12 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			rc = processHello(msg.hello(), iface);
 			break;
 
+		case Xroute::FOREIGN_AD_MSG:
+		    if (local) {
+		        rc = processForeign(msg.foreign());
+		    }
+			break;
+
 		case Xroute::TABLE_UPDATE_MSG:
 			rc = processRoutingTable(msg);
 			break;
@@ -371,19 +378,22 @@ int Router::processMsg(std::string msg_str, uint32_t iface)
 			rc = processHostLeave(msg.host_leave());
 			break;
 
-		// FIXME: validate these came on control interface?
 		case Xroute::HOST_JOIN_MSG:
 			// process the incoming host-register message
-			rc = processHostRegister(msg.host_join());
-			break;
+		    if (local) {
+			    rc = processHostRegister(msg.host_join());
+		    }
+		    break;
 
 		case Xroute::CONFIG_MSG:
-			rc = processConfig(msg.config());
+		    if (local) {
+			    rc = processConfig(msg.config());
+		    }
 			break;
 
-        case Xroute::SID_REQUEST_MSG:
+		case Xroute::SID_REQUEST_MSG:
 			rc = processSIDRequest(msg);
-            break;
+		    break;
 
 		default:
 			syslog(LOG_INFO, "unknown routing message type");
@@ -491,7 +501,7 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 	neighbor.port = msg.interface();
 	neighbor.cost = 1; // for now, same cost
 	neighbor.flags = flags;
-    bzero(&neighbor.dag, sizeof(sockaddr_x));
+	bzero(&neighbor.dag, sizeof(sockaddr_x));
 
 	// Add host to neighbor table so info can be sent to controller
 	_neighborTable[neighbor.HID] = neighbor;
@@ -503,6 +513,29 @@ int Router::processHostRegister(const Xroute::HostJoinMsg& msg)
 	}
 
 	_neighbor_timestamp[neighbor.HID] = time(NULL);
+
+	return 1;
+}
+
+
+int Router::processForeign(const Xroute::ForeignADMsg &msg)
+{
+	if (msg.ad() == _myAD) {
+		return 0;
+	}
+
+	// add it to the neighbor table
+	NeighborEntry neighbor;
+
+	neighbor.AD    = msg.ad();
+	neighbor.port  = msg.iface();
+	neighbor.flags = 0;
+	neighbor.cost  = 1; // for now, same cost
+	bzero(&neighbor.dag, sizeof(sockaddr_x));
+
+	// Index by HID if neighbor in same domain or by AD otherwise
+	_neighborTable[neighbor.AD] = neighbor;
+	_neighbor_timestamp[neighbor.AD] = time(NULL);
 
 	return 1;
 }
@@ -533,16 +566,16 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	} else if (ad != _myAD) {
 		// FIXME: should we nuke the neighbor table?
 		// what about the routing tables in click?
-    }
+	}
 
-    // FIXME: can we get the correct # of interfaces for looping?
-    for (int i = 0; i < 8; i++) {
-        char el[256];
-        sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
-        _xr.rawWrite(el, "add", _myAD);
-    }
+	// FIXME: can we get the correct # of interfaces for looping?
+	for (int i = 0; i < 8; i++) {
+		char el[256];
+		sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
+		_xr.rawWrite(el, "add", _myAD);
+	}
 
-    getNeighborADs();
+	getNeighborADs();
 
 	return 1;
 }
@@ -550,11 +583,11 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 
 int Router::processSIDRequest(Xroute::XrouteMsg &msg)
 {
-    Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
-    r->set_sid(_recv_sid);
+	Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
+	r->set_sid(_recv_sid);
 
 
-    return sendLocalMessage(msg);
+	return sendLocalMessage(msg);
 }
 
 
@@ -594,7 +627,7 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 	neighbor.port = iface;
 	neighbor.flags = flags;
 	neighbor.cost = 1; // for now, same cost
-    bzero(&neighbor.dag, sizeof(sockaddr_x));
+	bzero(&neighbor.dag, sizeof(sockaddr_x));
 
 	// Index by HID if neighbor in same domain or by AD otherwise
 	bool internal = (neighbor.AD == _myAD);

@@ -38,13 +38,14 @@ protected:
 	int init();
 
 	// message handlers
-	int processMsg(std::string msg, uint32_t iface);
+	int processMsg(std::string msg, uint32_t iface, bool local);
 
 	int sendHello();
 	int sendLSA();
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 
 	int processConfig(const Xroute::ConfigMsg &msg);
+	int processForeign(const Xroute::ForeignADMsg &msg);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
 	int processHostLeave(const Xroute::HostLeaveMsg& msg);
 	int processSIDRequest(Xroute::XrouteMsg& msg);

@@ -97,7 +97,7 @@ int RouteModule::makeLocalSocket()
 }
 
 
-int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned npfds, int *iface)
+int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned npfds, int *iface, bool *local)
 {
 	int rc = -1;
 	sockaddr_x theirDAG;
@@ -110,11 +110,15 @@ int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned np
 	if (rc > 0) {
 		int sock = -1;
 
-		for (int i = 0; i < 3; i++) {
+		for (unsigned i = 0; i < npfds; i++) {
 			if (pfd[i].revents & POLLIN) {
 				sock = pfd[i].fd;
 				break;
 			}
+		}
+
+		if (local) {
+		    *local = (sock == _local_sock);
 		}
 
 		memset(&recv_message[0], 0, BUFFER_SIZE);
@@ -125,7 +129,7 @@ int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned np
 
 		} else if (sock == _local_sock) {
 			*iface = FALLBACK;
-            socklen_t sz = sizeof(sockaddr_in);
+		    socklen_t sz = sizeof(sockaddr_in);
 
 			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, (sockaddr*)&_local_sa, &sz)) < 0) {
 				syslog(LOG_WARNING, "local message receive error");

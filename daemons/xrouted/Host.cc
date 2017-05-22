@@ -34,7 +34,7 @@ void Host::purge()
 	// initialize if this is first time in
 	if (_last_neighbor_purge == 0) {
 		_last_neighbor_purge = time(NULL);
-        return;
+	    return;
 	}
 
 	time_t now = time(NULL);
@@ -227,9 +227,9 @@ int Host::processMsg(std::string msg_str, uint32_t iface)
 			rc = processConfig(msg.config());
 			break;
 
-        case Xroute::SID_REQUEST_MSG:
+	    case Xroute::SID_REQUEST_MSG:
 			rc = processSIDRequest(msg);
-            break;
+	        break;
 
 		default:
 			syslog(LOG_INFO, "unknown routing message type");
@@ -278,11 +278,11 @@ int Host::processConfig(const Xroute::ConfigMsg &msg)
 
 int Host::processSIDRequest(Xroute::XrouteMsg &msg)
 {
-    Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
-    r->set_sid(_recv_sid);
+	Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
+	r->set_sid(_recv_sid);
 
 
-    return sendLocalMessage(msg);
+	return sendLocalMessage(msg);
 }
 
 
