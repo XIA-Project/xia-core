@@ -23,7 +23,7 @@ int fetchIndex;
 
 bool netStageOn = true;
 int thread_c = 0;
-int HANDOFFTIME = 6;
+int HANDOFFTIME = 4;
 int HANDOFFPOLICY = 0;
 // TODO: this is not easy to manage in a centralized manner because we can have multiple threads for staging data due to mobility and we should have a pair of mutex and cond for each thread
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
@@ -295,7 +295,7 @@ void *stageData(void *)
     int thread_id = thread_c;
     cerr << "Thread id " << thread_id << ": " << "Is launched\n";
     cerr << "Current " << getAD2(0) << endl;
-	int chunkToRecv=0;
+	//int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
     char stageAD[MAX_XID_SIZE];
@@ -328,7 +328,7 @@ void *stageData(void *)
 	int *lastSock = new int[2];
 	lastSock[0] = netStageSock;
 	//lastSock[1] = static_cast<int>(needStage.size());
-	lastSock[2] = chunkToRecv;
+	//lastSock[2] = chunkToRecv;
 	pthread_create(&thread_stageData, NULL, stageChunk, (void*)lastSock);
     //pthread_mutex_unlock(&StageControl);
     // TODO: need to handle the case that new SID joins dynamically
@@ -418,7 +418,7 @@ void *stageData(void *)
 		if(strlen(cmd) > 8)
 			sendStreamCmd(netStageSock, cmd);
 		
-		chunkToRecv += needStage.size();
+		//chunkToRecv += needStage.size();
 		pthread_mutex_unlock(&dagVecLock);
     }
         
@@ -434,11 +434,11 @@ void *preStageData(void *)
     char myHID[MAX_XID_SIZE];
     char stageAD[MAX_XID_SIZE];
     char stageHID[MAX_XID_SIZE];
-	
+	int preStageChunk=0;
 	string	lastSSID = getSSID();
-	strcpy(AD1, "AD:7f52fea9c60233a5a67e5a768cbe5044209349a5");
-	strcpy(AD2, "AD:f9fb1dc16840464cea54d64cc99e740857365ce5");
-    //getNewAD2(0, myAD);
+	strcpy(AD1, "AD:eeca210b7f1b89ab3fcc0faaeaa6294019dfe3c7");
+	strcpy(AD2, "AD:1485bec55d328966cda60b51bc82054b375c2761");
+    getNewAD2(0, myAD);
 	strcpy(myAD, getAD2(0).c_str());
 	cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
     cerr << "preStageData Current " << getAD2(0) << endl;
@@ -446,7 +446,7 @@ void *preStageData(void *)
     string serviceAD = "";
 	if(strcmp(myAD, AD1) == 0)serviceAD = AD2;
 	if(strcmp(myAD, AD2) == 0)serviceAD = AD1;
-	say("serviceAD = \n%s\n", serviceAD);
+	say("serviceAD = \n%s\n", serviceAD.c_str());
 	int netStageSock = registerMulStageService(0, getStageServiceName3(serviceAD));
     say("+++++++++++++++++++++++++++In preStageData, the current netStageSock is %d\n", netStageSock);
     if (netStageSock == -1) {
@@ -484,13 +484,13 @@ void *preStageData(void *)
 		int beg = fetchIndex;
 		//fetchIndex = -1;
 		say("AlreadyStage: %d chunkToStage: %d\n",alreadyStage, chunkToStage);
-		if (alreadyStage >= chunkToStage || beg == -1){
+		if (alreadyStage+preStageChunk >= chunkToStage || beg == -1){
 			pthread_mutex_unlock(&stageMutex);
 			pthread_mutex_unlock(&profileLock); 
 			pthread_mutex_unlock(&dagVecLock);
-			break;
+			continue;
 		}
-		int needchunk = chunkToStage - alreadyStage ;
+		int needchunk = chunkToStage - alreadyStage - preStageChunk ;
 		for (int i = beg, j = 0; j < needchunk && i < int(dags.size()); ++i) {
 			say("Before needStage: i = %d, beg = %d, dag = %s State: %d\n",i, beg, dags[i].c_str(),CIDToProfile[dags[i]].state);
 			if (CIDToProfile[dags[i]].state == BLANK) {
@@ -501,6 +501,7 @@ void *preStageData(void *)
 			}
 		}
 		//alreadyStage += needStage.size();
+		preStageChunk += needStage.size();
 		pthread_mutex_unlock(&stageMutex);
 		pthread_mutex_unlock(&profileLock);
 		say("Size of NeedStage: %d", needStage.size());
@@ -524,9 +525,8 @@ void *preStageData(void *)
 		}
 		if(strlen(cmd) > 8)
 			sendStreamCmd(netStageSock, cmd);
-		chunkToRecv += needStage.size();
+		
 		pthread_mutex_unlock(&dagVecLock);
-		pthread_exit(NULL);
 	}
     pthread_exit(NULL);
 }
@@ -548,7 +548,7 @@ void *handoffPolicy(void *){
 				say("new AD = %s\n",old_ad);
 				usleep(HANDOFFTIME * 1000 * 1000);
 				pthread_t Thread_preStageData;
-				pthread_mutex_unlock(&preStageControl);
+				//pthread_mutex_unlock(&preStageControl);
 				pthread_create(&Thread_preStageData, NULL, preStageData, NULL);
 			}
 			break;

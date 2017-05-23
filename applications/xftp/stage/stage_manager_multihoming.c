@@ -434,9 +434,8 @@ void *preStageData(void *)
     char myHID[MAX_XID_SIZE];
     char stageAD[MAX_XID_SIZE];
     char stageHID[MAX_XID_SIZE];
-
-	strcpy(AD1, "AD:7f52fea9c60233a5a67e5a768cbe5044209349a5");
-	strcpy(AD2, "AD:f9fb1dc16840464cea54d64cc99e740857365ce5");
+	strcpy(AD1, "AD:eeca210b7f1b89ab3fcc0faaeaa6294019dfe3c7");
+	strcpy(AD2, "AD:1485bec55d328966cda60b51bc82054b375c2761");
     getNewAD2(0, myAD);
 	strcpy(myAD, getAD2(0).c_str());
 	cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";

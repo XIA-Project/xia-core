@@ -42,4 +42,4 @@ multihoming_server:
 disconnection:
 	$(CC) $(CFLAGS) disconnection.c stage_utils.o -o disconnection $(LDFLAGS)
 clean:
-	rm -f getWifiInfo stage_server stage_manager xftp_adv_server xftp_adv_client xping testXping switchAP AP multihoming_client multihoming_server disconnection stage_manager_multihoming stage_server_multihoming mulServer mulClient
+	rm -f getWifiInfo stage_server stage_manager xftp_adv_server xftp_adv_client xping testXping switchAP AP multihoming_client multihoming_server disconnection stage_manager_multihoming stage_server_multihoming mulServer mulClient stage_manager_soft stage_server_soft
