@@ -195,6 +195,8 @@ int Controller::getNeighborADs()
 		if (sect != _myAD) {
 			std::string dag = ini.gets(sect, "dag");
 
+            syslog(LOG_INFO, "%s is a known neighbor AD", sect.c_str());
+
 			if (dag == "") {
 				syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
 				continue;
@@ -683,6 +685,8 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		return 0;
 	}
 
+    syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+
 	DAGMap::iterator i = _knownADs.find(msg.ad());
 
 	// only add directly connected ADs if configured to do so
@@ -826,6 +830,8 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 				syslog(LOG_WARNING, "dag missing!\n");
 				continue;
 			}
+
+            syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
 		}
@@ -1221,7 +1227,7 @@ int Controller::processMsg(std::string msg_str, uint32_t iface, bool local)
 		case Xroute::HOST_JOIN_MSG:
 			if (local) {
 				rc = processHostRegister(msg.host_join());
-			}
+		    }
 			break;
 
 		case Xroute::HOST_LEAVE_MSG:

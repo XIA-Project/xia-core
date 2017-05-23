@@ -471,6 +471,8 @@ int Router::processForeign(const Xroute::ForeignADMsg &msg)
 	// add it to the neighbor table
 	NeighborEntry neighbor;
 
+    syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+
 	neighbor.AD    = msg.ad();
 	neighbor.port  = msg.iface();
 	neighbor.flags = 0;
