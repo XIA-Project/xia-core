@@ -182,7 +182,7 @@ int Controller::getNeighborADs()
 		// FIXME: handle error
 		return -1;
 	}
-	strncat(s, "/etc/domains.conf", sizeof(s));
+	strncat(s, "/etc/neighbors.conf", sizeof(s));
 
 	minIni ini(s);
 
@@ -264,7 +264,6 @@ int Controller::saveControllerDAG()
 	std::string d = "DAG 0 - " + _myAD + " 1 - " + _myHID + " 2 - " + getControllerSID();
 
 	ini.put(_myAD, "dag", d);
-	ini.put(_myAD, "port", FALLBACK);
 
 	return 0;
 }
