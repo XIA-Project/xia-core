@@ -1,7 +1,7 @@
 include ../../../xia.mk
 CFLAGS+=-g -I../../../click/include/click -std=c++11
 LDFLAGS+=$(LIBS) -lpthread -lprotobuf
-all: stage_utils.o getWifiInfo ftpServer ftpClient mulServer mulClient stageManager stage_manager_multihoming stageServer stage_server_multihoming xping testXping switchAP AP multihoming_client multihoming_server disconnection
+all: stage_utils.o getWifiInfo ftpServer ftpClient mulServer mulClient stageManager stage_manager_multihoming stage_manager_soft stageServer stage_server_multihoming stage_server_soft xping testXping switchAP AP multihoming_client multihoming_server disconnection
 	rm stage_utils.o
 stage_utils.o:
 	$(CC) $(CFLAGS) -c stage_utils.c
@@ -19,10 +19,14 @@ stageManager:
 	$(CC) $(CFLAGS) stage_manager.c stage_utils.o -o stage_manager $(LDFLAGS)
 stage_manager_multihoming:
 	$(CC) $(CFLAGS) stage_manager_multihoming.c stage_utils.o -o stage_manager_multihoming $(LDFLAGS)
+stage_manager_soft:
+	$(CC) $(CFLAGS) stage_manager_soft.c stage_utils.o -o stage_manager_soft $(LDFLAGS)
 stageServer:
 	$(CC) $(CFLAGS) stage_server.c stage_utils.o -o stage_server $(LDFLAGS)
 stage_server_multihoming:
 	$(CC) $(CFLAGS) stage_server_multihoming.c stage_utils.o -o stage_server_multihoming $(LDFLAGS)
+stage_server_soft:
+	$(CC) $(CFLAGS) stage_server_soft.c stage_utils.o -o stage_server_soft $(LDFLAGS)
 xping:
 	$(CC) $(CFLAGS) xping.c -o xping $(LDFLAGS)
 testXping:
