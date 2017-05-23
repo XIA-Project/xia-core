@@ -231,7 +231,7 @@ int getFile(int sock, const char *fin, const char *fout)
 	say("Chunk Count = %d\n", count);
 
 	FILE *f = fopen(fout, "w");
-	//gettimeofday(&t1, NULL);
+	gettimeofday(&t1, NULL);
 	offset = 0;
 	while (offset < count) {
 		sprintf(cmd, "block %d", offset);
@@ -248,16 +248,19 @@ int getFile(int sock, const char *fin, const char *fout)
 			break;
 		}
 	}
-	//gettimeofday(&t1, NULL);
+	gettimeofday(&t2, NULL);
 	fclose(f);
 
 	if (status < 0) {
 		unlink(fin);
 	}
-
+    double elapsedTime;
+	elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
+    elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 	say("Received file %s\n", fout);
 	//say("Total elapsedTime: %f\n", totalElapseTime);
-	printf("Total elapsedTime: %f\n", totalElapseTime);
+	//printf("Total elapsedTime: %f\n", totalElapseTime);
+printf("Total elapsedTime: %f\n", elapsedTime);
 	sendCmd(sock, "done");
 	return status;
 }

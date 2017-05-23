@@ -98,12 +98,12 @@ static int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 
 	// Assign a SID with corresponding keys (unless assigned by bind already)
 	if(!isSIDAssigned(sockfd)) {
-		LOG("Xconnect: generating key pair for random SID\n");
+		//LOG("Xconnect: generating key pair for random SID\n");
 		if(XmakeNewSID(src_SID, sizeof(src_SID))) {
 			LOG("Unable to create a new SID with key pair");
 			return -1;
 		}
-		LOGF("Generated SID:%s:", src_SID);
+		//LOGF("Generated SID:%s:", src_SID);
 
 		// Convert SID to a default DAG
 		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
@@ -115,7 +115,7 @@ static int _connStream(int sockfd, const sockaddr *addr, socklen_t addrlen)
 		Graph src_g(sa);
 
 		// Include the source DAG in message to xtransport
-		LOGF("Xconnect: random DAG:%s:\n", src_g.dag_string().c_str());
+		//LOGF("Xconnect: random DAG:%s:\n", src_g.dag_string().c_str());
 		x_connect_msg->set_sdag(src_g.dag_string().c_str());
 		Xfreeaddrinfo(ai);
 		setSIDAssigned(sockfd);

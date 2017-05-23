@@ -481,7 +481,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 {
 	xcache_cmd cmd;
 
-	fprintf(stderr, "Inside %s\n", __func__);
+	//fprintf(stderr, "Inside %s\n", __func__);
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
@@ -493,7 +493,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 		/* Error in Sending chunk */
 		return -1;
 	}
-	fprintf(stderr, "Command sent to xcache successfully\n");
+	//fprintf(stderr, "Command sent to xcache successfully\n");
 
 	if(flags & XCF_BLOCK) {
 		size_t to_copy;
