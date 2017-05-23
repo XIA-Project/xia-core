@@ -36,14 +36,14 @@ void Controller::purgeStaleRoutes(time_t now)
 	TimestampList::iterator iter = _route_timestamp.begin();
 	while (iter != _route_timestamp.end())
 	{
-	    if (now - iter->second >= _settings->expire_time() * 10) {
-	        syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
-	        _xr.delRoute(iter->first);
+		if (now - iter->second >= _settings->expire_time() * 10) {
+			syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
+			_xr.delRoute(iter->first);
 //			_last_update_latency = 0; // force update latency
-	        _route_timestamp.erase(iter++);
-	    } else {
-	        ++iter;
-	    }
+			_route_timestamp.erase(iter++);
+		} else {
+			++iter;
+		}
 	}
 }
 
@@ -53,16 +53,16 @@ void Controller::purgeStaleNeighbors(time_t now)
 	TimestampList::iterator iter = _neighbor_timestamp.begin();
 	while (iter != _neighbor_timestamp.end())
 	{
-	    time_t t = iter->second;
-	    if ((t != 0) && (now - t >= _settings->expire_time() * 10)) {
+		time_t t = iter->second;
+		if ((t != 0) && (now - t >= _settings->expire_time() * 10)) {
 			syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
-	        _xr.delRoute(iter->first);
+			_xr.delRoute(iter->first);
 //			_last_update_latency = 0; // force update latency
 			_neighborTable.erase(iter->first);
-	        _neighbor_timestamp.erase(iter++);
-	    } else {
-	        ++iter;
-	    }
+			_neighbor_timestamp.erase(iter++);
+		} else {
+			++iter;
+		}
 	}
 }
 
@@ -73,48 +73,48 @@ void Controller::purgeStaleADs(time_t now)
 	NetworkTable::iterator iter1 = _ADNetworkTable.begin();
 	while (iter1 != _ADNetworkTable.end())
 	{
-	    if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
-	        syslog(LOG_INFO, "purging AD neighbor : %s", iter1->first.c_str());
+		if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
+			syslog(LOG_INFO, "purging AD neighbor : %s", iter1->first.c_str());
 //			_last_update_latency = 0; // force update latency
-	        _xr.delRoute(iter1->first);
-	        _ADNetworkTable.erase(iter1++);
-	    } else {
-	        ++iter1;
-	    }
+			_xr.delRoute(iter1->first);
+			_ADNetworkTable.erase(iter1++);
+		} else {
+			++iter1;
+		}
 	}
 
 	// FIXME: how is this different from the neighbor_timestamp check?
 	NeighborTable::iterator iter2 = _neighborTable.begin();
 	while (iter2 != _neighborTable.end())
 	{
-	    if (now - iter2->second.timestamp >= _settings->expire_time()) {
+		if (now - iter2->second.timestamp >= _settings->expire_time()) {
 //			_last_update_latency = 0; // force update latency
-	        syslog(LOG_INFO, "purging neighbor : %s", iter2->first.c_str());
-	        _xr.delRoute(iter2->first);
-	        _neighborTable.erase(iter2++);
-	    } else {
-	        ++iter2;
-	    }
+			syslog(LOG_INFO, "purging neighbor : %s", iter2->first.c_str());
+			_xr.delRoute(iter2->first);
+			_neighborTable.erase(iter2++);
+		} else {
+			++iter2;
+		}
 	}
 
 	NeighborTable::iterator iter3 = _ADNeighborTable.begin();
 	while (iter3 != _ADNeighborTable.end())
 	{
-	    if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
+		if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
 //			_last_update_latency = 0; // force update latency
-	        syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
+			syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
 
-	        _ADNetworkTable[_myAD].neighbor_list.erase(
-	            std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
-	                        _ADNetworkTable[_myAD].neighbor_list.end(),
-	                        iter3->second),
-	                        _ADNetworkTable[_myAD].neighbor_list.end());
+			_ADNetworkTable[_myAD].neighbor_list.erase(
+				std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
+							_ADNetworkTable[_myAD].neighbor_list.end(),
+							iter3->second),
+							_ADNetworkTable[_myAD].neighbor_list.end());
 
-	        _xr.delRoute(iter3->first);
-	        _ADNeighborTable.erase(iter3++);
-	    } else {
-	        ++iter3;
-	    }
+			_xr.delRoute(iter3->first);
+			_ADNeighborTable.erase(iter3++);
+		} else {
+			++iter3;
+		}
 	}
 }
 
@@ -125,6 +125,7 @@ int Controller::handler()
 	char recv_message[BUFFER_SIZE];
 	int iface;
 	struct pollfd pfds[3];
+	bool local;
 
 	bzero(pfds, sizeof(pfds));
 	pfds[0].fd = _local_sock;
@@ -135,8 +136,8 @@ int Controller::handler()
 	pfds[2].events = POLLIN;
 
 	// get the next incoming message
-	if ((rc = readMessage(recv_message, pfds, 3, &iface)) > 0) {
-		processMsg(string(recv_message, rc), iface);
+	if ((rc = readMessage(recv_message, pfds, 3, &iface, &local)) > 0) {
+		processMsg(string(recv_message, rc), iface, local);
 	}
 
 	// send any messages that need to go out
@@ -156,7 +157,7 @@ int Controller::handler()
 	time_t t = time(NULL);
 	if (t - _last_update_config >= _settings->update_config()) {
 		_last_update_config = t;
-	    _settings->reload();
+		_settings->reload();
 	}
 
 	// FIXME: figure out why purges seems crazy
@@ -187,42 +188,28 @@ int Controller::getNeighborADs()
 
 	int i = 0;
 	while (true) {
-	    std::string sect = ini.getsection(i);
-	    if (sect.size() == 0) {
-	        break;
-	    }
-	    if (sect != _myAD) {
-	        int port = ini.getl(sect, "port", FALLBACK);
-	        std::string dag = ini.gets(sect, "dag");
+		std::string sect = ini.getsection(i);
+		if (sect.size() == 0) {
+			break;
+		}
+		if (sect != _myAD) {
+			std::string dag = ini.gets(sect, "dag");
 
-	        if (port == FALLBACK) {
-	            // FIXME: validate port
-	            syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
-	            continue;
-	        }
+			if (dag == "") {
+				syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
+				continue;
+			}
 
-	        if (dag == "") {
-	            syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
-	            continue;
-	        }
+			sockaddr_x sx;
 
-	        NeighborEntry neighbor;
-	        neighbor.AD        = sect;
-	        neighbor.HID       = sect;
-	        neighbor.port      = port;
-	        neighbor.flags     = 0;
-	        neighbor.cost      = 1;
-	        neighbor.timestamp = 0;
+			if (xia_pton(AF_XIA, dag.c_str(), &sx) <= 0) {
+				syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
+				continue;
+			}
 
-	        if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
-	            syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
-	            continue;
-	        }
-
-	        _neighborTable[neighbor.AD] = neighbor;
-	        _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
-	    }
-	    i++;
+			_knownADs[sect] = sx;
+		}
+		i++;
 	}
 
 	return 0;
@@ -245,7 +232,7 @@ int Controller::saveControllerDAG()
 	FILE *f = fopen(s, "w");
 
 	if (f == NULL) {
-	    // FIXME: handle error
+		// FIXME: handle error
 		return -1;
 	}
 
@@ -258,18 +245,18 @@ int Controller::saveControllerDAG()
 
 	struct stat st;
 	if (stat(root, &st) < 0) {
-	    // conf file doesn't exist yet, stick in a header comment
-	    f = fopen(root, "w");
-	    if (f == NULL) {
-	        // FIXME: handle error
-		    return -1;
-	    }
+		// conf file doesn't exist yet, stick in a header comment
+		f = fopen(root, "w");
+		if (f == NULL) {
+			// FIXME: handle error
+			return -1;
+		}
 
-	    fprintf(f, "# domains.conf\n");
-	    fprintf(f, "# Copy or append this file to the edge router of neighboring ADs.\n");
-	    fprintf(f, "# Change the port value in the copied file to the port on the\n");
-	    fprintf(f, "#   edge router that is connected to this AD.\n\n");
-	    fclose(f);
+		fprintf(f, "# domains.conf\n");
+		fprintf(f, "# Copy or append this file to the edge router of neighboring ADs.\n");
+		fprintf(f, "# Change the port value in the copied file to the port on the\n");
+		fprintf(f, "#   edge router that is connected to this AD.\n\n");
+		fclose(f);
 	}
 
 	minIni ini(root);
@@ -290,24 +277,24 @@ std::string Controller::getControllerSID()
 
 	if (_controller_sid == "") {
 
-	    // try to read from the domains.conf file
-	    if (XrootDir(s, sizeof(s)) != NULL) {
-	        strncat(s, "/etc/domains.conf", sizeof(s));
-	        minIni ini(s);
+		// try to read from the domains.conf file
+		if (XrootDir(s, sizeof(s)) != NULL) {
+			strncat(s, "/etc/domains.conf", sizeof(s));
+			minIni ini(s);
 
-	       dag = ini.gets(_myAD, "dag");
+		   dag = ini.gets(_myAD, "dag");
 
-	        if (dag != "") {
-	            size_t i = dag.find("SID:");
-	            _controller_sid = dag.substr(i);
-	        }
-	    }
+			if (dag != "") {
+				size_t i = dag.find("SID:");
+				_controller_sid = dag.substr(i);
+			}
+		}
 
-	    if (_controller_sid == "") {
-	        // we still haven't found it, make a new one
-	        XmakeNewSID(s, sizeof(s));
-	        _controller_sid = s;
-	    }
+		if (_controller_sid == "") {
+			// we still haven't found it, make a new one
+			XmakeNewSID(s, sizeof(s));
+			_controller_sid = s;
+		}
 	}
 
 	return _controller_sid;
@@ -378,9 +365,9 @@ int Controller::init()
 	getNeighborADs();
 
 	for (int i = 0; i < 8; i++) {
-	    char el[256];
-	    sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
-	    _xr.rawWrite(el, "add", _myAD);
+		char el[256];
+		sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
+		_xr.rawWrite(el, "add", _myAD);
 	}
 
 	//_sid_discovery_seq = rand()%MAX_SEQNUM;  // sid discovery seq number of this router
@@ -497,7 +484,7 @@ int Controller::sendInterDomainLSA()
 		n->set_port(it->second.port);
 		n->set_cost(it->second.cost);
 
-	    n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
+		n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
 	}
 
 
@@ -521,7 +508,7 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
 		processRoutingTable(routingTable);
-	    return 1;
+		return 1;
 
 	} else if (nodeState->dag.sx_family != AF_XIA) {
 		// this entry was either created as a host placeholder, or
@@ -691,6 +678,37 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 }
 
 
+int Controller::processForeign(const Xroute::ForeignADMsg &msg)
+{
+	if (msg.ad() == _myAD) {
+		return 0;
+	}
+
+	DAGMap::iterator i = _knownADs.find(msg.ad());
+
+	// only add directly connected ADs if configured to do so
+	// peers of configured ADs will be added in the processGlobalLSA process
+	if (i != _knownADs.end()) {
+
+		// add it to the neighbor table
+		NeighborEntry neighbor;
+
+		neighbor.AD    = msg.ad();
+		neighbor.port  = msg.iface();
+		neighbor.flags = 0;
+		neighbor.cost  = 1; // for now, same cost
+		memcpy(&neighbor.dag, &i->second, sizeof(sockaddr_x));
+
+		// Index by AD so we know to treat it differently
+		// FIXME: should this be a separate table?
+		_neighborTable[neighbor.AD] = neighbor;
+		_neighbor_timestamp[neighbor.AD] = time(NULL);
+	}
+
+	return 1;
+}
+
+
 int Controller::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 {
 	string neighborAD, neighborHID, neighborSID;
@@ -801,14 +819,14 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
 
-	        bzero(&neighbor.dag, sizeof(sockaddr_x));
-	        if (n.has_dag()) {
-	            memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
+			bzero(&neighbor.dag, sizeof(sockaddr_x));
+			if (n.has_dag()) {
+				memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
 
-	        } else {
-	            syslog(LOG_WARNING, "dag missing!\n");
-	            continue;
-	        }
+			} else {
+				syslog(LOG_WARNING, "dag missing!\n");
+				continue;
+			}
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
 		}
@@ -1147,7 +1165,7 @@ void Controller::printRoutingTable(std::string srcHID, RouteTable &routingTable)
 	RouteTable::iterator it;
 	for (it = routingTable.begin(); it != routingTable.end(); it++) {
 		syslog(LOG_INFO, "Dest=%s, NextHop=%s, Port=%d, Flags=%u",
-	        (it->second.dest).c_str(), (it->second.nextHop).c_str(), (it->second.port), (it->second.flags));
+			(it->second.dest).c_str(), (it->second.nextHop).c_str(), (it->second.port), (it->second.flags));
 	}
 }
 
@@ -1168,7 +1186,7 @@ void Controller::printADNetworkTable()
 }
 
 
-int Controller::processMsg(std::string msg_str, uint32_t iface)
+int Controller::processMsg(std::string msg_str, uint32_t iface, bool local)
 {
 	int rc = 0;
 	Xroute::XrouteMsg msg;
@@ -1202,10 +1220,18 @@ int Controller::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		case Xroute::HOST_JOIN_MSG:
-			rc = processHostRegister(msg.host_join());
+			if (local) {
+				rc = processHostRegister(msg.host_join());
+			}
 			break;
 
 		case Xroute::HOST_LEAVE_MSG:
+			break;
+
+		case Xroute::FOREIGN_AD_MSG:
+			if (local) {
+				rc = processForeign(msg.foreign());
+			}
 			break;
 
 		default:

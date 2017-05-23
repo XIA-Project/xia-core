@@ -46,6 +46,8 @@ typedef struct _NeighborEntry {
 	}
 } NeighborEntry;
 
+typedef std::map<std::string, sockaddr_x> DAGMap;
+
 typedef std::vector<NeighborEntry> NeighborList;
 typedef std::map<std::string, NeighborEntry> NeighborTable;
 

@@ -173,62 +173,6 @@ int Router::makeSockets()
 }
 
 
-int Router::getNeighborADs()
-{
-	char s[2048];
-
-	if (XrootDir(s, sizeof(s)) == NULL) {
-		// FIXME: handle error
-		return -1;
-	}
-	strncat(s, "/etc/domains.conf", sizeof(s));
-
-	minIni ini(s);
-
-	int i = 0;
-	while (true) {
-		std::string sect = ini.getsection(i);
-		if (sect.size() == 0) {
-		    break;
-		}
-		if (sect != _myAD) {
-		    int port = ini.getl(sect, "port", FALLBACK);
-		    std::string dag = ini.gets(sect, "dag");
-
-		    if (port == FALLBACK) {
-		        // FIXME: validate port
-		        syslog(LOG_WARNING, "ERROR: neighbor port not set!\n");
-		        continue;
-		    }
-
-		    if (dag == "") {
-		        syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
-		        continue;
-		    }
-
-		    NeighborEntry neighbor;
-		    neighbor.AD        = sect;
-		    neighbor.HID       = sect;
-		    neighbor.port      = port;
-		    neighbor.flags     = 0;
-		    neighbor.cost      = 1;
-		    neighbor.timestamp = 0;
-
-		    if (xia_pton(AF_XIA, dag.c_str(), &neighbor.dag) <= 0) {
-		        syslog(LOG_WARNING, "ERROR: unable to parse neighbor dag");
-		        continue;
-		    }
-
-		    _neighborTable[neighbor.AD] = neighbor;
-		    _xr.setRoute(neighbor.AD, port, neighbor.AD, neighbor.flags);
-		}
-		i++;
-	}
-
-	return 0;
-}
-
-
 int Router::init()
 {
 	_joined = false; // we're not part of a network yet
@@ -574,8 +518,6 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 		sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
 		_xr.rawWrite(el, "add", _myAD);
 	}
-
-	getNeighborADs();
 
 	return 1;
 }

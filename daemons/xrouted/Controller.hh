@@ -42,17 +42,18 @@ protected:
 	int sendInterDomainLSA();
 	int sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTable);
 
-	int processMsg(std::string msg, uint32_t iface);
+	int processMsg(std::string msg, uint32_t iface, bool locaL);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
 	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
 	int processSIDRequest(Xroute::XrouteMsg &msg);
+	int processForeign(const Xroute::ForeignADMsg &msg);
 	void processRoutingTable(RouteTable routingTable);
 
-    void purgeStaleRoutes(time_t now);
-    void purgeStaleNeighbors(time_t now);
-    void purgeStaleADs(time_t now);
+	void purgeStaleRoutes(time_t now);
+	void purgeStaleNeighbors(time_t now);
+	void purgeStaleADs(time_t now);
 
 	void extractNeighborADs(void);
 	void populateNeighboringADBorderRouterEntries(string currHID, RouteTable &routingTable);
@@ -61,11 +62,11 @@ protected:
 	void printRoutingTable(std::string srcHID, RouteTable &routingTable);
 	void printADNetworkTable();
 
-    int getNeighborADs();
-    std::string getControllerSID();
+	int getNeighborADs();
+	std::string getControllerSID();
 
 protected:
-    Settings *_settings;
+	Settings *_settings;
 
 	uint32_t _flags;
 	bool _dual_router;
@@ -77,27 +78,29 @@ protected:
 
 	std::string _dual_router_AD; // AD (with dual router) -- default AD for 4ID traffic
 
-    NeighborTable _neighborTable;   // neighbor HID -> neighbor entry
+	NeighborTable _neighborTable;   // neighbor HID -> neighbor entry
 	NeighborTable _ADNeighborTable; // neighbor HID to neighbor entry for ADs
 
 	NetworkTable  _networkTable;    // dest HID -> node state entry
-    NetworkTable  _ADNetworkTable;  // dest AD to NodeState entry for ADs
+	NetworkTable  _ADNetworkTable;  // dest AD to NodeState entry for ADs
 
 	TimestampList _route_timestamp;
 	TimestampList _neighbor_timestamp;
 
+	DAGMap _knownADs;
+
 	int32_t _calc_dijstra_ticks;
 
 	// FIXME: improve these guys
-    // next time the hello or lsa should be sent
+	// next time the hello or lsa should be sent
 	struct timeval h_freq, h_fire;
 	struct timeval l_freq, l_fire;
 
 	// last time we looked for stale entries
-    time_t _last_purge;
+	time_t _last_purge;
 	time_t _last_route_purge;
 	time_t _last_neighbor_purge;
-    time_t _last_ad_purge;
+	time_t _last_ad_purge;
 	time_t _last_update_config;
 //	time_t _last_update_latency;
 };
