@@ -17,6 +17,7 @@ from netjoin_beacon import NetjoinBeacon
 from netjoin_message_pb2 import NetjoinMessage
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_xiaconf import NetjoinXIAConf
+from netjoin_xrouted import NetjoinXrouted
 from netjoin_dsrc_handler import NetjoinDSRCHandler
 from netjoin_ethernet_handler import NetjoinEthernetHandler
 from netjoin_handshake_one import NetjoinHandshakeOne
@@ -55,6 +56,7 @@ class NetjoinSession(threading.Thread):
         self.auth = auth
         self.beacon_id = beacon_id
         self.policy = policy
+        self.xrouted = NetjoinXrouted()
         self.is_router = is_router
         self.controller_dag = None
         self.l2_handler = None    # Created on receiving beacon or handshake1
@@ -327,12 +329,6 @@ class NetjoinSession(threading.Thread):
         # Now we are waiting for handshake 4 confirmation message
         self.state = self.HS_4_WAIT
 
-    def __send_xrouted_msg(self, packet):
-        rsockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        router_addr = ('127.0.0.1', 1510)   # From xrouted/RouteModule.hh
-        rsockfd.sendto(packet, router_addr)
-        rsockfd.close()
-
     def handle_handshake_three(self, message_tuple):
         message, interface, mymac, theirmac = message_tuple
 
@@ -377,15 +373,7 @@ class NetjoinSession(threading.Thread):
             else:
                 logging.info("Route set up for {}".format(client_hid))
             # Inform local xrouted about this HID registration
-            xrmsg = xroute_pb2.XrouteMsg()
-            xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
-            xrmsg.type = xroute_pb2.HOST_JOIN_MSG
-            xrmsg.host_join.flags = flags
-            xrmsg.host_join.hid = client_hid
-            xrmsg.host_join.interface = interface
-            register_packet = xrmsg.SerializeToString()
-
-            self.__send_xrouted_msg(register_packet)
+            self.xrouted.send_host_join(client_hid, interface, flags)
 
         # Tell client that gateway side configuration is now complete
         logging.info("Sending handshake four")
@@ -456,14 +444,8 @@ class NetjoinSession(threading.Thread):
             assert(net_id is not None)
 
             # Inform local xrouted that NetJoin is complete
-            xrmsg = xroute_pb2.XrouteMsg()
-            xrmsg.version = xroute_pb2.XROUTE_PROTO_VERSION
-            xrmsg.type = xroute_pb2.CONFIG_MSG
             ad = "AD:{}".format(self.conf.raw_ad_to_hex(net_id))
-            xrmsg.config.ad = ad
-            xrmsg.config.controller_dag = self.controller_dag
-            config_packet = xrmsg.SerializeToString()
-            self.__send_xrouted_msg(config_packet)
+            self.xrouted.send_config(ad, self.controller_dag)
 
             # Ask the NetjoinReceiver to announce the newly joined network
             if (self.receiver.announcer == None or
