@@ -434,10 +434,11 @@ void *preStageData(void *)
     char myHID[MAX_XID_SIZE];
     char stageAD[MAX_XID_SIZE];
     char stageHID[MAX_XID_SIZE];
-
+	
+	string	lastSSID = getSSID();
 	strcpy(AD1, "AD:7f52fea9c60233a5a67e5a768cbe5044209349a5");
 	strcpy(AD2, "AD:f9fb1dc16840464cea54d64cc99e740857365ce5");
-    getNewAD2(0, myAD);
+    //getNewAD2(0, myAD);
 	strcpy(myAD, getAD2(0).c_str());
 	cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
     cerr << "preStageData Current " << getAD2(0) << endl;
@@ -457,21 +458,27 @@ void *preStageData(void *)
     pthread_mutex_lock(&stopMutex);
 	stopFlag = 1;
 	pthread_mutex_unlock(&stopMutex);
-
+	
+	
 	while(1){
 		say("*********************************---------------before preStageData lock\n");	
-		pthread_mutex_lock(&preStageControl);
+		//pthread_mutex_lock(&preStageControl);
         say("*********************************---------------after  preStageData lock\n");
+        string currSSID = getSSID();
+        if (lastSSID != currSSID) {
+			pthread_mutex_lock(&stopMutex);
+			stopFlag = 0;
+			pthread_mutex_unlock(&stopMutex);
+            pthread_exit(NULL);
+        }
         if(strcmp(myAD, getAD2(0).c_str()) != 0){
 			pthread_exit(NULL);
-		}
-		
-		
+		}		
 		
         set<string> needStage;
         pthread_mutex_lock(&dagVecLock);
 		vector<string>& dags = allDAGs;//pair.second;
-		//say("Handling the sock: %d\n", sock);
+	
 		pthread_mutex_lock(&profileLock);
 		pthread_mutex_lock(&stageMutex);
 		int beg = fetchIndex;
@@ -481,7 +488,7 @@ void *preStageData(void *)
 			pthread_mutex_unlock(&stageMutex);
 			pthread_mutex_unlock(&profileLock); 
 			pthread_mutex_unlock(&dagVecLock);
-			continue;
+			break;
 		}
 		int needchunk = chunkToStage - alreadyStage ;
 		for (int i = beg, j = 0; j < needchunk && i < int(dags.size()); ++i) {
@@ -519,6 +526,7 @@ void *preStageData(void *)
 			sendStreamCmd(netStageSock, cmd);
 		chunkToRecv += needStage.size();
 		pthread_mutex_unlock(&dagVecLock);
+		pthread_exit(NULL);
 	}
     pthread_exit(NULL);
 }
@@ -531,7 +539,7 @@ void *handoffPolicy(void *){
 			say("handoffPolicy: 0\n");
 			char old_ad[512];
 			memset(old_ad, 0, sizeof(old_ad));
-usleep(2 * 1000 * 1000);
+		usleep(2 * 1000 * 1000);
 			//strcpy(old_ad, getAD2(0).c_str());
 			while(true){
 				say("old AD = %s\n",old_ad);
