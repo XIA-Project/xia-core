@@ -195,7 +195,7 @@ int Controller::getNeighborADs()
 		if (sect != _myAD) {
 			std::string dag = ini.gets(sect, "dag");
 
-            syslog(LOG_INFO, "%s is a known neighbor AD", sect.c_str());
+			syslog(LOG_INFO, "%s is a known neighbor AD", sect.c_str());
 
 			if (dag == "") {
 				syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
@@ -209,7 +209,7 @@ int Controller::getNeighborADs()
 				continue;
 			}
 
-			_knownADs[sect] = sx;
+			_trustedADs[sect] = sx;
 		}
 		i++;
 	}
@@ -685,13 +685,13 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		return 0;
 	}
 
-    syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+	syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
 
-	DAGMap::iterator i = _knownADs.find(msg.ad());
+	DAGMap::iterator i = _trustedADs.find(msg.ad());
 
 	// only add directly connected ADs if configured to do so
 	// peers of configured ADs will be added in the processGlobalLSA process
-	if (i != _knownADs.end()) {
+	if (i != _trustedADs.end()) {
 
 		// add it to the neighbor table
 		NeighborEntry neighbor;
@@ -823,15 +823,19 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 			neighbor.timestamp = time(NULL);
 
 			bzero(&neighbor.dag, sizeof(sockaddr_x));
-			if (n.has_dag()) {
+			if (n.has_dag() && n.dag().length() != 0) {
+				memset(&neighbor.dag, 0, sizeof(sockaddr_x));
 				memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
 
 			} else {
-				syslog(LOG_WARNING, "dag missing!\n");
-				continue;
+				// FIXME: make sure it's in the trustedADs table
+				memcpy(&neighbor.dag, &(_trustedADs[neighbor.AD]), sizeof(sockaddr_x));
+//				syslog(LOG_WARNING, "dag missing!\n");
+//				continue;
 			}
 
-            syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
+			syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
+
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
 		}
@@ -1227,7 +1231,7 @@ int Controller::processMsg(std::string msg_str, uint32_t iface, bool local)
 		case Xroute::HOST_JOIN_MSG:
 			if (local) {
 				rc = processHostRegister(msg.host_join());
-		    }
+			}
 			break;
 
 		case Xroute::HOST_LEAVE_MSG:

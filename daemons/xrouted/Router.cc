@@ -474,6 +474,7 @@ int Router::processForeign(const Xroute::ForeignADMsg &msg)
     syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
 
 	neighbor.AD    = msg.ad();
+	neighbor.HID   = msg.ad();
 	neighbor.port  = msg.iface();
 	neighbor.flags = 0;
 	neighbor.cost  = 1; // for now, same cost

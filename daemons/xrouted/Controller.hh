@@ -87,7 +87,7 @@ protected:
 	TimestampList _route_timestamp;
 	TimestampList _neighbor_timestamp;
 
-	DAGMap _knownADs;
+	DAGMap _trustedADs;
 
 	int32_t _calc_dijstra_ticks;
 
