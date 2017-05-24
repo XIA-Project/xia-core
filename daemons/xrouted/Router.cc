@@ -494,10 +494,19 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
 	if (!_joined) {
+        syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+
 		// now we can fetch our AD/HID
 		if (getXIDs(_myAD, _myHID) < 0) {
 			return -1;
 		}
+
+        if (_myAD == "") {
+            _myAD = ad;
+        } else if (_myAD != ad) {
+            // this is BAD!
+            syslog(LOG_ERR, "AD from xnetj differs from system AD!");
+        }
 
 		makeSockets();
 
