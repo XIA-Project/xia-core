@@ -250,7 +250,7 @@ class NetjoinPolicy:
 
             # If not our home network, tell xrouted about it and return False
             if self.home_xip_network != beacon_from_network:
-                logging.info("Informing xrouted of a foreign network")
+                logging.debug("Informing xrouted of a foreign network")
                 ad_hex_str = self.conf.raw_ad_to_hex(beacon_from_network)
                 beacon_ad_str = "AD:{}".format(ad_hex_str)
                 self.xrouted.send_foreign_ad(iface, beacon_ad_str)
