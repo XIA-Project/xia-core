@@ -58,6 +58,9 @@ class XIAPath { public:
     // get the handle of the destination node
     handle_t destination_node() const;
 
+	// Check if there is an intent AD in the address
+	bool has_intent_ad() const;
+
 	// Get the intent AD as a string
 	std::string intent_ad_str() const;
 

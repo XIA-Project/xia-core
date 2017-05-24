@@ -2318,7 +2318,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	HandlerCall::call_write(xlc_xcmp_handler_str.c_str(), new_dag.unparse().c_str(), this);
 
 	// If default interface:
-	if(interface == _interfaces.default_interface()) {
+	if(interface == _interfaces.default_interface() ||
+			!_local_addr.has_intent_ad()) {
 		// XCMP in RoutingCore
 		String xrc_str = _hostname + "/xrc/x.dag";
 		HandlerCall::call_write(xrc_str.c_str(), new_dag.unparse().c_str(), this);

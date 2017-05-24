@@ -144,6 +144,12 @@ XIAPath::destination_node() const
     return g.final_intent_index();
 }
 
+bool
+XIAPath::has_intent_ad() const
+{
+	return g.has_intent_AD();
+}
+
 std::string
 XIAPath::intent_ad_str() const
 {
