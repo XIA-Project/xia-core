@@ -12,7 +12,7 @@ CLEANDIRS=$(addsuffix .build, $(MAKEDIRS) doc)
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-.PHONY: all config clean test fresh doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
+.PHONY: all config clean test deps fresh tags doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
 
 #### BUILD RULES
@@ -65,6 +65,7 @@ xia.env:
 #### CLEAN RULES
 clean: trickclean $(CLEANDIRS)
 	@-rm -f click/Makefile
+	@-rm -f tags
 	@-rm -f xia.mk
 
 # touch xia.mk so that we don't get a ton of warnings that it doesn't exist when cleaning
@@ -77,6 +78,14 @@ $(CLEANDIRS):
 # documents
 doc:
 	-make -C doc doc
+
+# get required packages
+deps:
+	@tools/getdeps
+
+# build project-wide ctags file
+tags:
+	find . -name \*."h*" -print -o -name \*."c*" -print | grep -v experiments | xargs ctags --file-scope=no
 
 #### print out the value of a variable such as CFLAGS
 dump-% :
