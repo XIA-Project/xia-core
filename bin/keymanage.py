@@ -4,7 +4,7 @@ import re
 import os
 import os.path
 import sys
-import clickcontrol
+import xiapyutils
 
 try:
     import psutil
@@ -20,7 +20,7 @@ class KeyManager:
     _xid_pattern = re.compile("([a-zA-Z]+:[0-9a-fA-F]{40})")
 
     def _srcdir(self):
-        return clickcontrol.get_srcdir()
+        return xiapyutils.xia_srcdir()
 
     def get_keydir(self):
         return os.path.join(self._srcdir(), self._keydirname);

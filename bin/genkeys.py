@@ -19,10 +19,11 @@ import os
 import re
 import stat
 import hashlib
+import xiapyutils
 from subprocess import check_call
 
 # Directory where all the keys will be dumped
-keydir = 'key'
+keydir = os.path.join(xiapyutils.xia_srcdir(), 'key')
 
 def generate_rsa_key():
     private = None
