@@ -2229,6 +2229,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	xia::X_Updatedag_Msg *x_updatedag_msg
 		= xia_socket_msg->mutable_x_updatedag();
 
+	bool is_router = x_updatedag_msg->is_router();
+
 	interface = x_updatedag_msg->interface();
 	click_chatter("XTRANSPORT:Xupdatedag Updating interface: %d", interface);
 
@@ -2276,7 +2278,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 	// If default interface, update default_AD, default_4ID, default_HID
 	//    so they all point to new RHID
-	if(interface == _interfaces.default_interface()) {
+	if(interface == _interfaces.default_interface() && !is_router) {
 		change_default_routes(interface, new_rhid);
 	}
 

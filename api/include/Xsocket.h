@@ -165,7 +165,8 @@ extern int XcreateFID(char *fid, int len);
 extern int XremoveFID(const char *fid);
 
 /* internal only functions */
-extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
+extern int XupdateDAG(int sockfd, int interface, const char *rdag,
+		const char *r4id, bool is_router);
 extern int XupdateRV(int sockfd, int interface);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);

@@ -39,7 +39,8 @@
  * @returns -1 on failure
  * @returns 0 on success
  */
-int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
+int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id,
+		bool is_router) {
   int rc;
 
   if (!rdag) {
@@ -60,6 +61,7 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   xsm.set_sequence(seq);
 
   xia::X_Updatedag_Msg *x_updatedag_msg = xsm.mutable_x_updatedag();
+  x_updatedag_msg->set_is_router(is_router);
   x_updatedag_msg->set_interface(interface);
   x_updatedag_msg->set_dag(rdag);
   x_updatedag_msg->set_ip4id(r4id);
