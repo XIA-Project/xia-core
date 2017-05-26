@@ -55,7 +55,7 @@ def write_key_files(basename, privkey, pubkey):
 
 def remove_key_files(key):
 	os.remove(os.path.join(keydir, key))
-	os.remove(os.path.join(keydir, 'key'+'.pub'))
+	os.remove(os.path.join(keydir, key+'.pub'))
 
 def create_new_address():
 	# Create a new key pair
