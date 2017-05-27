@@ -145,6 +145,15 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
 		strcpy(req, g.http_url_string().c_str());
 		
         fetchTime = end_time - start_time;
+		
+		memset(cmd, 0, sizeof(cmd));
+		sprintf(cmd, "time");
+		//sscanf(cmd, "time %ld", &timeWifi);
+		sprintf(cmd, "%s %ld", cmd, fetchTime);
+		say("CMD is :%s\n", cmd);
+		if (send(stageManagerSock, cmd, strlen(cmd), 0) < 0) {
+			die(-1, "send cmd fail! cmd is %s", cmd);
+		}
         //------------//logFile << i <<" Chunk. Running time is: " << end_time - start_time << " ms. req: " << req << endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
         fwrite((char*)data, 1, len, fd);
