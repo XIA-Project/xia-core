@@ -155,6 +155,7 @@ string getSSID()
 	}
 	return ssid;
 }
+
 string getSSID2()
 {
 	string ssid = execSystem(GETSSID_CMD2);
@@ -183,6 +184,114 @@ bool isConnect2()
 {
 	string ssid = execSystem(GETSSID_CMD2);
 	return !ssid.empty();
+}
+int disconnect_SSID(int interface){
+say("in disconnect_SSID\n");
+	string result;
+	string cmd="";
+
+	cmd += "iw ";
+	if(interface == 1){
+		cmd += INTERFACE1;
+	}
+	else if(interface == 2){
+		cmd += INTERFACE2;
+	}
+	else
+		return -1;
+	cmd += "disconnect";
+say("cmd = %s\n", cmd.c_str());
+	result = execSystem(cmd);
+	say("disconnect to SSID: %s\n", result.c_str());
+	return 0;
+}
+
+int connect_SSID(int interface, char * ssid, int freq){
+say("in connect_SSID\n");
+	string result;
+	string cmd1,cmd2;
+    interface++;
+	cmd1 = "iw ";
+	if(interface == 1){
+		cmd1 += INTERFACE1;
+	}
+	else if(interface == 2){
+		cmd1 += INTERFACE2;
+	}
+	else
+		return -1;
+	cmd1 += "connect ";
+	cmd1 += ssid;
+	cmd1 += " ";
+	cmd1 += itoa(freq);
+
+say("cmd1 = %s\n", cmd1.c_str());
+	result = execSystem(cmd1);
+	say("connect to SSID: %s\n", result.c_str());
+cmd2 = "iw dev ";
+	if(interface == 1){
+		cmd2 += INTERFACE1;
+	}
+	else if(interface == 2){
+		cmd2 += INTERFACE2;
+	}
+	else
+		return -1;
+	cmd2 += "link";
+say("cmd2 = %s\n", cmd2.c_str());
+	int looptime=0;
+	while(1){
+	++looptime;
+	result = execSystem(cmd2);
+        say("check SSID: %s\n", result.c_str());
+	    if(result != "Not connected."){
+		say("connected!\n");
+		break;
+	    }
+	usleep(10 * 1000);
+	
+	if (looptime>=5){
+		connect_SSID(interface,ssid);
+	}
+	}
+	result = execSystem("date '+%c%N'");
+        printf("connect time: %s\n", result.c_str());
+	return 0;
+}
+int disconnect(int interface){
+	long begin_time, end_time, total_time;
+	int rtn;
+	interface++;
+	//pthread_mutex_lock(disconnectTime);
+	begin_time = now_msec();
+	printf("-------------disconnect begin at %ld \n", begin_time);
+	rtn = disconnect_SSID(interface);
+	//usleep(DISCONNECT_TIME * 1000);
+	end_time = now_msec();
+	say("-------------disconnect end at %ld \n", end_time);
+	total_time = end_time - begin_time;
+	printf("-------------disconnect using time = %ld \n", total_time);
+}
+int connect(int interface, int n_ssid, int freq){
+	char ssid[128];
+	if(n_ssid == 0){
+		strcpy(ssid, "XIA_Tenda_2");
+	}else if(n_ssid == 1){
+		strcpy(ssid, "XIA-TP-LINK_2.4G");
+	}else {
+		strcpy(ssid, "XIA-TP-LINK_5G");
+	}
+	int rtn;
+	long begin_time, end_time, total_time;
+	//pthread_mutex_lock(encounterTime);
+	begin_time = now_msec();
+	printf("-------------connect begin at %ld \n", begin_time);
+	rtn = connect_SSID(interface, ssid, freq);
+	//usleep(CONNECT_TIME * 1000);
+	end_time = now_msec();
+	say("-------------connect end at %ld \n", end_time);
+	total_time = end_time - begin_time;
+	printf("-------------connect using time = %ld \n", total_time);
 }
 
 int XmyReadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID)
