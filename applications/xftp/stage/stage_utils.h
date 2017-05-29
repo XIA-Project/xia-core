@@ -127,6 +127,12 @@ string getHID();
 void getNewAD(char *old_ad);
 void getNewAD2(int iface, char *old_ad);
 
+//connect to wireless network
+int connect(int interface, int n_ssid, int freq);
+int disconnect(int interface);
+int connect_SSID(int interface, char * ssid, int freq);
+int disconnect_SSID(int interface);
+
 // get the SSID name from "iwgetid -r" command; app level approach
 string netConnStatus(string lastSSID);
 
