@@ -24,7 +24,7 @@ int fetchIndex;
 bool netStageOn = true;
 int thread_c = 0;
 int HANDOFFTIME = 4;
-int HANDOFFPOLICY = 0;
+int HANDOFFPOLICY = 1;
 // TODO: this is not easy to manage in a centralized manner because we can have multiple threads for staging data due to mobility and we should have a pair of mutex and cond for each thread
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t dagVecLock = PTHREAD_MUTEX_INITIALIZER;
@@ -35,7 +35,21 @@ pthread_mutex_t fetchLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t chunkMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t responseMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t stopMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t handoffModeMutex = PTHREAD_MUTEX_INITIALIZER;
 int stopFlag = 0;
+
+pthread_cond_t handoffCond=PTHREAD_COND_INITIALIZER;
+int handoffMode = 0;
+pthread_mutex_t fetchFlagMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t handoffFlagMutex = PTHREAD_MUTEX_INITIALIZER;
+
+int CONNECT_TIME = 8 * 1000;
+int SOFTSTAGE_TIME = 4 * 1000;
+int DISCONNECT_TIME = 0 * 1000;
+int netsize = 1;
+int FREQ[2] = 0;
+pthread_mutex_t encounterTime = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t disconnectTime = PTHREAD_MUTEX_INITIALIZER;
 
 long timeStamp;
 ofstream connetTime("connetTime.log");
@@ -47,13 +61,26 @@ void getConfig(int argc, char** argv)
         int c;
         opterr = 0;
 
-        while ((c = getopt(argc, argv, "h:c:")) != -1) {
+        while ((c = getopt(argc, argv, "h:c:d:n:s:f:F:")) != -1) {
                 switch (c) {
-                        case 'c':
-                        	HANDOFFTIME = atoi(optarg);
-                        	break;
+						case 'c':
+							CONNECT_TIME = 1000 * atoi(optarg);
+							break;
+						case 'd':
+							DISCONNECT_TIME = 1000 * atoi(optarg);
+							break;
+						case 's':
+							SOFTSTAGE_TIME = 1000 * atoi(optarg);
+							break;
+						case 'n':
+							netsize = atoi(optarg);
+							break;
                         case 'h':
 							HANDOFFPOLICY = atoi(optarg);
+						case 'f':
+							FREQ[0] = atoi(optarg);
+						case 'F':
+							FREQ[1] = atoi(optarg);
                         default:
                                 break;
                 }
@@ -139,12 +166,6 @@ int delegationHandler(int sock, char *cmd)
                 break;
                 say("DAG: %s change into IGNORE!\n", cmd);
             }
-			/*if(CIDToProfile[cmd].state == BLANK){
-	    	    CIDToProfile[cmd].state = READY;
-				pthread_mutex_unlock(&fetchLock);
-				break;
-            //    CIDToProfile[cmd].dag = cmd;
-            }*/
             pthread_mutex_unlock(&profileLock);
         }
         tmp = CIDToProfile[cmd].dag;
@@ -157,10 +178,17 @@ int delegationHandler(int sock, char *cmd)
         pthread_mutex_unlock(&stageMutex);
     }
 //say("In delegationHandler. send\nThe command is %s\n", cmd);
+	if(HANDOFFPOLICY == 1){
+		pthread_mutex_lock(&handoffModeMutex);
+		while(handoffMode == 2) pthread_cond_wait(&handoffCond, &handoffModeMutex);
+		handoffMode = 1;
+		pthread_mutex_unlock(&handoffModeMutex);
+	}
     if (send(sock, tmp.c_str(), tmp.size(), 0) < 0) {
         warn("socket error while sending data, closing connetTime\n");
         return -1;
     }
+	
     say("End of delegationHandler\n");
     return 0;
 }
@@ -194,7 +222,6 @@ void *clientCmd(void *socketid)
             //pthread_mutex_unlock(&StageControl);
         }
         else if (strncmp(cmd, "fetch", 5) == 0) {
-            
             say("Receive a chunk request\n");
 			pthread_mutex_lock(&fetchLock);
 	    	
@@ -207,6 +234,12 @@ void *clientCmd(void *socketid)
             //pthread_mutex_unlock(&StageControl);
         }
         else if (strncmp(cmd, "time", 4) == 0) {
+			if(HANDOFFPOLICY == 1){
+				pthread_mutex_lock(&handoffModeMutex);
+				if(handoffMode == 1)handoffMode = 0;
+				pthread_mutex_unlock(&handoffModeMutex);
+				pthread_cond_signal(&handoffCond);
+			}
             say("Get Time! cmd: %s\n", cmd);
             sscanf(cmd, "time %ld", &timeWifi);
             updateStageArg();
@@ -531,7 +564,16 @@ void *preStageData(void *)
     pthread_exit(NULL);
 }
 
-
+void * time_control(void *){
+    while(1){
+		for(int i = 0; i < netsize; ++i){
+			usleep(CONNECT_TIME * 1000 / netsize);
+			pthread_mutex_unlock(&encounterTime);
+			//pthread_mutex_unlock(&disconnectTime);
+		}
+		//usleep(DISCONNECT_TIME * 1000);
+    }
+}
 void *handoffPolicy(void *){
 	switch (HANDOFFPOLICY) 
 	{
@@ -539,7 +581,7 @@ void *handoffPolicy(void *){
 			say("handoffPolicy: 0\n");
 			char old_ad[512];
 			memset(old_ad, 0, sizeof(old_ad));
-		usleep(2 * 1000 * 1000);
+			usleep(2 * 1000 * 1000);
 			//strcpy(old_ad, getAD2(0).c_str());
 			while(true){
 				say("old AD = %s\n",old_ad);
@@ -553,6 +595,33 @@ void *handoffPolicy(void *){
 			}
 			break;
 		case 1:
+			pthread_t thread_time;
+			pthread_create(&thread_time, NULL, time_control, NULL);
+			while (1) {
+				for(int j = 0; j < 2; ++j){
+					for(int i = 0; i < netsize; ++i){
+						connect(0, j, FREQ[j]);
+						
+						pthread_mutex_lock(&handoffModeMutex);
+						if(handoffMode == 2)handoffMode = 0;
+						pthread_mutex_unlock(&handoffModeMutex);
+						pthread_cond_signal(&handoffCond);
+
+						pthread_mutex_lock(encounterTime);						
+						pthread_t Thread_preStageData;
+						pthread_create(&Thread_preStageData, NULL, preStageData, NULL);
+						
+						pthread_mutex_lock(&handoffModeMutex);
+						while(handoffMode == 1) pthread_cond_wait(&handoffCond, &handoffModeMutex);
+						handoffMode = 2;
+						pthread_mutex_unlock(&handoffModeMutex);
+						//pthread_mutex_lock(disconnectTime);
+						disconnect(0);
+						
+					}
+				}
+			}
+			
 		default:
 			break;
     }
