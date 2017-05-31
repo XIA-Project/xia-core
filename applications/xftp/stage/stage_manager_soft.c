@@ -47,7 +47,7 @@ int CONNECT_TIME = 8 * 1000;
 int SOFTSTAGE_TIME = 4 * 1000;
 int DISCONNECT_TIME = 0 * 1000;
 int netsize = 1;
-int FREQ[2] = 0;
+int FREQ[2];
 pthread_mutex_t encounterTime = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t disconnectTime = PTHREAD_MUTEX_INITIALIZER;
 
@@ -600,14 +600,14 @@ void *handoffPolicy(void *){
 			while (1) {
 				for(int j = 0; j < 2; ++j){
 					for(int i = 0; i < netsize; ++i){
-						connect(0, j, FREQ[j]);
+						Connect1(0, j, FREQ[j]);
 						
 						pthread_mutex_lock(&handoffModeMutex);
 						if(handoffMode == 2)handoffMode = 0;
 						pthread_mutex_unlock(&handoffModeMutex);
 						pthread_cond_signal(&handoffCond);
 
-						pthread_mutex_lock(encounterTime);						
+						pthread_mutex_lock(&encounterTime);						
 						pthread_t Thread_preStageData;
 						pthread_create(&Thread_preStageData, NULL, preStageData, NULL);
 						
@@ -616,7 +616,7 @@ void *handoffPolicy(void *){
 						handoffMode = 2;
 						pthread_mutex_unlock(&handoffModeMutex);
 						//pthread_mutex_lock(disconnectTime);
-						disconnect(0);
+						Disconnect1(0);
 						
 					}
 				}

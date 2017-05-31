@@ -4,8 +4,8 @@
 #define SCAN_INTERVAL 10
 #define MAX_SIZE 1024 * 10
 
-#define INTERFACE1 "wlp6s0 "
-#define INTERFACE2 "wlan0 "
+//#define INTERFACE1 "wlp6s0 "
+//#define INTERFACE2 "wlan0 "
 
 #define GET_SSID_LIST "iwlist wlp6s0 scanning | grep -E '(\\\"[a-zA-Z0-9 _-.]*\\\")|(Signal level=-?[0-9]* dBm)' -o"
 #define CLOSE_NETWORK_MANAGER "service network-manager stop"

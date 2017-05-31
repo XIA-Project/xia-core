@@ -52,6 +52,9 @@
 //#define GETSSID_CMD "iwgetid -r"
 #define GETSSID_CMD "iwconfig wlp1s0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
 #define GETSSID_CMD2 "iwconfig wlan0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
+
+#define INTERFACE1 "wlp1s0"
+#define INTERFACE2 "wlp1s0"
 //#define GETSSID_CMD "iwconfig wlp6s0 | grep '\\\"[a-zA-Z\\_0-9.]*\\\"' -o"
 #define PURGE_DELAY_SEC 10
 #define MGT_DELAY_SEC 10
@@ -66,7 +69,6 @@
 #define READY 2	// chunk is available in the local/network cache
 #define IGNORE 3
 #define PREFETCH 4	// chunk is available in the local/network cache
-
 #define NS_LOOKUP_RETRY_NUM 30
 #define NS_LOOKUP_WAIT_MSEC 1000
 
@@ -128,10 +130,12 @@ void getNewAD(char *old_ad);
 void getNewAD2(int iface, char *old_ad);
 
 //connect to wireless network
-int connect(int interface, int n_ssid, int freq);
-int disconnect(int interface);
-int connect_SSID(int interface, char * ssid, int freq);
-int disconnect_SSID(int interface);
+int Hello();
+int Connect_SSID(int interface, char * ssid, int freq);
+int Disconnect_SSID(int interface);
+int Connect1(int interface, int n_ssid, int freq);
+int Disconnect1(int interface);
+
 
 // get the SSID name from "iwgetid -r" command; app level approach
 string netConnStatus(string lastSSID);
