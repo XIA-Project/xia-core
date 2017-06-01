@@ -277,6 +277,17 @@ class NetjoinSession(threading.Thread):
                 logging.error("Failed updating Nameserver DAG in XIA Stack")
             logging.info("Nameserver DAG updated")
 
+            # If router, add AD into the XARP Table
+            if self.is_router:
+                ad = Graph(router_dag).intent_AD_str()
+                if len(ad) < 40:
+                    logging.error("Intent AD not found")
+                    return
+                if click.setADInXARPTable(ad) == False:
+                    logging.error("Failed adding {} to XARP".format(ad))
+                    return
+                logging.info("Added {} to XARP tables".format(ad))
+
             # Set the Rendezvous DAG into Click
             router_rv_dag = netjoin_h2.router_rv_dag()
             if router_rv_dag:

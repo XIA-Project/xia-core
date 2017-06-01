@@ -155,6 +155,11 @@ def configure_click(click, config):
                     click.assignRVDAG(hostname, hosttype, router_rv_dag)
                     click.assignRVControlDAG(hostname, hosttype, rvc_dag)
 
+                # Add AD to the XARP tables on all line cards
+                if click.setADInXARPTable(ad) == False:
+                    print "Error adding AD to XARP tables"
+                    sys.exit(-1)
+
         # Write resolv.conf contents
         if len(resolvconf_lines) > 0:
             # TODO: error out if a dag is not available for hostname

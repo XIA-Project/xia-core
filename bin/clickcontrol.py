@@ -19,6 +19,7 @@ import re
 import sys
 import socket
 import xiapyutils
+from addrconf import AddrConf
 
 # Number of interfaces for each host type
 numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter8Port':8, 'XIARouter2Port':2}
@@ -239,6 +240,21 @@ class ClickControl:
     # TODO: Add setRVControlDAG function here.
     def setRVControlDAG(self, interface, control_plane_dag):
         print "setRVControlDAG called, but ignored"
+
+    # Set XARP entry
+    def setADInXARPTable(self, xid):
+        if not xid.startswith('AD:'):
+            print 'ClickControl.setADXARPEntry invalid AD {}'.format(xid)
+            return False
+
+        addrconf = AddrConf()
+        hosttype = addrconf.hosttype()
+        hostname = addrconf.hostname()
+        for i in range(numIfaces[hosttype]):
+            cmd = '{}/xlc{}/xarpr.ad {}'.format(hostname, i, xid)
+            if not self.writeCommand(cmd):
+                return False
+        return True
 
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost
