@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import socket
 
 def getxiaclickhostname():
     return ''.join(char for char in socket.gethostname().split('.')[0] if char.isalnum())
+
+def xia_srcdir():
+    return os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]

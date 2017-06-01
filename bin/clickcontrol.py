@@ -33,13 +33,9 @@ adInDagPattern = re.compile('RE\s+(AD:\w+)')
 xiaconstantsclick = 'etc/click/xia_constants.click'
 xiaconstantpattern = re.compile('define\((\$\w+)\s+([-\w]+)\)')
 
-# Pattern to help us find the source directory we are running from
-srcdirpattern = re.compile('.+\/.*xia-core')
-
 # Find the source directory 'xia-core' for this source tree
 def get_srcdir():
-    match = srcdirpattern.match(os.getcwd())
-    return match.group(0)
+    return xiapyutils.xia_srcdir()
 
 def getxiaconstants():
     global xiaconstantsclick
