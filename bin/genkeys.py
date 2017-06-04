@@ -19,10 +19,11 @@ import os
 import re
 import stat
 import hashlib
+import xiapyutils
 from subprocess import check_call
 
 # Directory where all the keys will be dumped
-keydir = 'key'
+keydir = os.path.join(xiapyutils.xia_srcdir(), 'key')
 
 def generate_rsa_key():
     private = None
@@ -54,7 +55,7 @@ def write_key_files(basename, privkey, pubkey):
 
 def remove_key_files(key):
 	os.remove(os.path.join(keydir, key))
-	os.remove(os.path.join(keydir, 'key'+'.pub'))
+	os.remove(os.path.join(keydir, key+'.pub'))
 
 def create_new_address():
 	# Create a new key pair

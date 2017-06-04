@@ -271,17 +271,19 @@ XStream::tcp_input(WritablePacket *p)
 				get_transport()->_tcpstat.tcps_rcvbyte += ti.ti_len;
 
 				/* Drop TCP/IP hdrs and TCP opts, add data to recv queue. */
-				WritablePacket *copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+				char *pkt = (char *) malloc(ti.ti_len);
+				assert(pkt);
+				memcpy(pkt, (char *)thdr.payload(), ti.ti_len);
 
 				/* _q_recv.push() corresponds to the tcp_reass function whose purpose is
 				 * to put all data into the TCPQueue for both possible reassembly and
 				 * in-order presentation to the "application socket" which in the
 				 * TCPget_transport is the stateless pull port. */
-				if (_q_recv.push(copy, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
+				if (_q_recv.push(pkt, ti.ti_len, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
 					//debug_output(VERB_ERRORS, "Fast Path segment push into q_recv FAILED");
-					if (copy != NULL){ // cleanup is important!
-						copy->kill();
-						copy = NULL;
+					if(pkt != NULL) {
+						free(pkt);
+						pkt = NULL;
 					}
 				} else if (!_q_recv.is_empty() && has_pullable_data()){
 					// If the reassembly queue has data, a gap should have just been
@@ -307,9 +309,12 @@ XStream::tcp_input(WritablePacket *p)
 	// DRB
 	//print_tcpstats(p, "tcp_input (sp)");
 	/* 438 TCP "Slow Path" processing begins here */
-	WritablePacket *copy = NULL;
-	if (ti.ti_len){
-    copy = WritablePacket::make(0, (const void*)thdr.payload(), (uint32_t)ti.ti_len, 0);
+	char *pkt = NULL;
+	uint32_t pktlen = ti.ti_len;
+	if (pktlen){
+		pkt = (char *)malloc(pktlen);
+		assert(pkt);
+		memcpy(pkt, (char*)thdr.payload(), ti.ti_len);
 	}
 
 	int win = so_recv_buffer_space();
@@ -515,8 +520,9 @@ XStream::tcp_input(WritablePacket *p)
 		}
 
 		//printf("becareful 465\n");
-		if (copy != NULL){
-			copy->pull(todrop);
+		if (pkt != NULL){
+			memmove(pkt, pkt+todrop, pktlen-todrop);
+			pktlen = pktlen-todrop;
 		}
 		ti.ti_seq += todrop;
 		ti.ti_len -= todrop;
@@ -572,7 +578,8 @@ XStream::tcp_input(WritablePacket *p)
 			get_transport()->_tcpstat.tcps_rcvbyteafterwin += todrop;
 		}
 		//printf("becareful 535\n");
-		copy->pull(todrop);
+		memmove(pkt, pkt+todrop, pktlen-todrop);
+		pktlen = pktlen-todrop;
 		ti.ti_len -= todrop;
 		tiflags &= ~(XTH_PUSH|XTH_FIN);
 	}
@@ -850,11 +857,12 @@ XStream::tcp_input(WritablePacket *p)
 				tcp_set_state(TCPS_TIME_WAIT);
 				tp->t_timer[TCPT_2MSL] = 2 * TCPTV_MSL;
 
-				if (_q_recv.push(copy, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
+				assert(pktlen == ti.ti_len);
+				if (_q_recv.push(pkt, pktlen, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
 					//debug_output(VERB_ERRORS, "TCPClosing segment push into reassembly Queue FAILED");
-					if (copy != NULL){ // cleanup is important!
-						copy->kill();
-						copy = NULL;
+					if (pkt != NULL) {
+						free(pkt);
+						pkt = NULL;
 					}
 				} else if (!_q_recv.is_empty() && has_pullable_data()){
 					tp->rcv_nxt = _q_recv.last_nxt();
@@ -931,12 +939,13 @@ step6:
 		 */
 
 		// if this is a duplicate segment, push will return a negative value
-		if (_q_recv.push(copy, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
+		assert(pktlen == ti.ti_len);
+		if (_q_recv.push(pkt, pktlen, ti.ti_seq, ti.ti_seq + ti.ti_len) < 0){
 
 			//debug_output(VERB_ERRORS, "TCPClosing segment push into reassembly Queue FAILED");
-			if (copy != NULL){ // cleanup is important!
-				copy->kill();
-				copy = NULL;
+			if (pkt) {
+				free(pkt);
+				pkt = NULL;
 			}
 		} else if (! _q_recv.is_empty() && has_pullable_data()){
 
@@ -949,8 +958,9 @@ step6:
 		// TODO len calculation @Harald: What exactly needs to be done?
 		//len = ti.ti_len;
 	} else{
-		if (copy != NULL){
-			copy -> kill();
+		if (pkt != NULL){
+			free(pkt);
+			pkt = NULL;
 		}
 		// p->kill();		// don't know why comment this in order to prevent deadlock
 		tiflags &= ~XTH_FIN;
@@ -1017,8 +1027,9 @@ dropafterack:
 	}
 
 	//printf("becareful 913\n");
-	if (copy != NULL){
-		copy -> kill();
+	if (pkt != NULL){
+		free(pkt);
+		pkt = NULL;
 	}
 	if (p != NULL){
 		p->kill();
@@ -1047,8 +1058,9 @@ dropwithreset:
 
 drop:
 	//debug_output(VERB_TCP, "[%s] tcpcon::input drop", SPKRNAME);
-	if (copy != NULL){
-		copy -> kill();
+	if (pkt != NULL){
+		free(pkt);
+		pkt = NULL;
 	}
 	if (p != NULL){
 		p->kill();
@@ -2255,12 +2267,12 @@ int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 			break;
 		}
 
-		WritablePacket *p = _q_recv.pull_front();
-		size_t data_size = p->length();
-		memcpy((void*)(&buf[bytes_pulled]), (const void*)p->data(), data_size);
+		uint32_t plen;
+		char *p = _q_recv.pull_front(&plen);
+		size_t data_size = plen;
+		memcpy((void*)(&buf[bytes_pulled]), (const void*)p, data_size);
 		bytes_pulled += data_size;
-
-		p->kill();
+		free(p);
 	}
 
 	bytes_returned = min(bytes_requested, bytes_pulled);
@@ -2434,8 +2446,10 @@ TCPQueue::~TCPQueue() {}
  * -3 means it's a duplicate packet.
  */
 int
-TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
+TCPQueue::push(char* p, uint32_t plen, tcp_seq_t seq, tcp_seq_t seq_nxt)
 {
+	uint32_t pktlen = plen;
+
 	// we need a proper packet, non-zero length please
 	if (p == NULL or !SEQ_GT(seq_nxt, seq)){
 		return -1;
@@ -2468,7 +2482,7 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 
 	/* CASE 1: Queue is empty */
 	if (!_q_first){
-		qe = new TCPQueueElt(p, seq, seq_nxt);
+		qe = new TCPQueueElt(p, pktlen, seq, seq_nxt);
 		if (!qe) { return -2; }
 		_q_first = _q_last = _q_tail = qe;
 		qe->nxt = NULL;
@@ -2491,7 +2505,7 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 		}
 
 		/* enqueue after _q_tail */
-		qe = new TCPQueueElt(p, seq, seq_nxt);
+		qe = new TCPQueueElt(p, pktlen, seq, seq_nxt);
 		_q_tail->nxt = qe;
 
 		/* CASE 2b: PERFECT TAIL INSERT (we got a segment with the next expected seq number) */
@@ -2530,14 +2544,14 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 		/* If the packet overlaps with _q_first trim qe at end of packet */
 		int overlap = (int)(seq_nxt - first());
 		if (overlap > 0){
-			if ((unsigned)overlap > p->length()) { return -2; }
-			p->take(overlap);
+			if ((unsigned)overlap > pktlen) { return -2; }
+			pktlen = pktlen - overlap;
 			//debug_output(VERB_TCPQUEUE, "[%s] Tail overlap [%d] bytes", _con->SPKRNAME, overlap);
 			seq_nxt -= overlap; // note seq_nxt has changed
 			assert(seq_nxt == first());
 		}
 
-		qe = new TCPQueueElt(p, seq, seq_nxt);
+		qe = new TCPQueueElt(p, pktlen, seq, seq_nxt);
 		qe->nxt = _q_first;
 		_q_first = qe;
 
@@ -2591,9 +2605,10 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 	// Test for overlap of front of packet with wrk
 	int overlap = (int) (wrk->seq_nxt - seq);
 	if (overlap > 0){
-		if ((unsigned)overlap > p->length()) { return -2; }
+		if ((unsigned)overlap > pktlen) { return -2; }
 		//debug_output(VERB_TCPQUEUE, "[%s] head overlap [%d] bytes", _con->SPKRNAME, overlap);
-		p->pull(overlap);
+		memmove(p, p+overlap, pktlen-overlap);
+		pktlen = pktlen-overlap;
 		seq += overlap;
 	}
 
@@ -2601,15 +2616,15 @@ TCPQueue::push(WritablePacket * p, tcp_seq_t seq, tcp_seq_t seq_nxt)
 	if (wrk->nxt){
 		overlap = (int) (seq_nxt - wrk->nxt->seq);
 		if (overlap > 0){
-			if ((unsigned)overlap > p->length()) { return -2; }
+			if ((unsigned)overlap > pktlen) { return -2; }
 			//debug_output(VERB_TCPQUEUE, "[%s] Tail overlap [%d] bytes", _con->SPKRNAME, overlap);
-			p->take(overlap);
+			pktlen = pktlen-overlap;
 			seq_nxt -= overlap;
 		}
 	}
 
 	/* enqueue qe right after wrk */
-	qe = new TCPQueueElt(p, seq, seq_nxt);
+	qe = new TCPQueueElt(p, pktlen, seq, seq_nxt);
 	if (wrk->nxt){
 		qe->nxt = wrk->nxt;
 	}
@@ -2641,10 +2656,11 @@ TCPQueue::loop_last()
 	//debug_output(VERB_TCPQUEUE, "Looped _q_last to [%u]", last());
 }
 
-WritablePacket *
-TCPQueue::pull_front()
+char *
+TCPQueue::pull_front(uint32_t *len)
 {
-	WritablePacket	*p = NULL;
+	char	*p = NULL;
+	*len = 0;
 	TCPQueueElt 	*e = NULL;
 
 	// CASE 1: The queue is empty, nothing to pull
@@ -2675,6 +2691,7 @@ TCPQueue::pull_front()
 
 	e = _q_first;
 	p = e->_p;
+	*len = e->_plen;
 
 	// _q_first becomes either the next QElt or NULL because of how push()
 	// assigns _q_first->nxt

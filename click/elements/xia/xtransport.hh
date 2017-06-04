@@ -153,6 +153,7 @@ private:
 	void remove_route(String xidstr);
 	void update_route(String xid, String table, int iface, String next);
 	void update_default_route(String table_str, int interface, String next_xid);
+	void change_default_routes(int interface, String rhid);
 
 	/* TCP related fields */
     tcp_globals *globals()  { return &_tcp_globals; }

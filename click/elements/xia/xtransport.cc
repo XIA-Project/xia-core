@@ -1012,9 +1012,10 @@ bool XTRANSPORT::usingRendezvousDAG(XIAPath bound_dag, XIAPath pkt_dag)
 
 	// Compare our DAG in packet with the one we bound to
 	if (bound_dag.compare_except_intent_ad(pkt_dag)) {
-		ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
-		ERROR("Current network:%s", local_ad_str.c_str());
-		ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		//ERROR("Bound to network:%s", bound_dag.intent_ad_str().c_str());
+		//ERROR("Current network:%s", local_ad_str.c_str());
+		//ERROR("Wrong AD in packet:%s", pkt_ad_str.c_str());
+		INFO("DAG not/incorrectly modified by rendezvous service");
 		return false;
 	}
 	/*
@@ -2155,6 +2156,22 @@ void XTRANSPORT::update_default_route(String table_str,
 	update_route("-", table_str, interface, next_xid);
 }
 
+void XTRANSPORT::change_default_routes(int interface, String rhid)
+{
+	String ad_table_str = _hostname + "/xrc/n/proc/rt_AD";
+	String hid_table_str = _hostname + "/xrc/n/proc/rt_HID";
+	String ip_table_str = _hostname + "/xrc/n/proc/rt_IP";
+
+	// Set default AD to point to new RHID
+	update_default_route(ad_table_str, interface, rhid);
+
+	// Set default HID to point to new RHID
+	update_default_route(hid_table_str, interface, rhid);
+
+	// Set default 4ID to point to new RHID
+	update_default_route(ip_table_str, interface, rhid);
+}
+
 void XTRANSPORT::remove_route(String xidstr)
 {
 	String cmd = routeTableString(xidstr) + ".remove";
@@ -2184,7 +2201,6 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 	String ad_table_str = _hostname + "/xrc/n/proc/rt_AD";
 	String hid_table_str = _hostname + "/xrc/n/proc/rt_HID";
-	String ip_table_str = _hostname + "/xrc/n/proc/rt_IP";
 	String cmd;
 	String cmdargs;
 	String default_AD("-"), default_HID("-"), default_4ID("-");
@@ -2221,13 +2237,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	// If default interface, update default_AD, default_4ID, default_HID
 	//    so they all point to new RHID
 	if(interface == _interfaces.default_interface()) {
-
-		// Set default AD to point to new RHID
-		update_default_route(ad_table_str, interface, new_rhid);
-		// Set default HID to point to new RHID
-		update_default_route(hid_table_str, interface, new_rhid);
-		// Set default 4ID to point to new RHID
-		update_default_route(ip_table_str, interface, new_rhid);
+		change_default_routes(interface, new_rhid);
 	}
 
 	// Add new RHID route pointing to new RHID
@@ -2427,6 +2437,7 @@ void XTRANSPORT::Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocke
 		return;
 	}
 	_interfaces.set_default(interface);
+	change_default_routes(interface, _interfaces.getRHID(interface));
 }
 
 void XTRANSPORT::Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)

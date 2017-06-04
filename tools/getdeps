@@ -1,0 +1,26 @@
+#!/bin/bash
+
+sudo apt-get update -qq
+sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+
+sudo pip install pynacl
+
+rel=$(lsb_release -d)
+
+if [[ "$rel" =~ "14" ]]; then
+    sudo pip install networkx
+    wget http://launchpad.net/ubuntu/+archive/primary/+files/protobuf_2.6.1.orig.tar.gz
+    tar xvzf protobuf_2.6.1.orig.tar.gz
+    cd protobuf-2.6.1/
+    ./configure
+    make
+    sudo make install
+    sudo pip install protobuf==2.6.1
+    sudo ldconfig
+    cd ..
+else
+    sudo apt-get install -y python-networkx
+    sudo apt-get install -y libprotobuf-dev protobuf-compiler python-protobuf
+fi
+
+

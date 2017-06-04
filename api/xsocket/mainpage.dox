@@ -81,6 +81,10 @@ socket API manipulates DAGs as strings in a particular format; creating and
 working with DAGs in this string format can be tedious. This library provides
 an object-oriented API (in C++ and Python) for creating and manipulating DAGs.
 
+DAGs are managed using 2 C++ classes:
+- Node - contains methods for managing a single XID
+- Graph - contains methods for manipulating DAGs
+
 <h3>Creating a DAG</h3>
 
 Here we describe building a DAG from the ground up. Most simple DAGs can be

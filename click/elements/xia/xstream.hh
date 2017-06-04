@@ -89,15 +89,17 @@ class TCPQueue {
 
 	class TCPQueueElt {
 	public:
-		TCPQueueElt(WritablePacket *p, tcp_seq_t s, tcp_seq_t n) {
+		TCPQueueElt(char *p, uint32_t plen, tcp_seq_t s, tcp_seq_t n) {
 			_p = p;
+			_plen = plen;
 			seq = s;
 			seq_nxt = n;
 			nxt = NULL;
 		}
 
 		~TCPQueueElt() {};
-		WritablePacket 	*_p;
+		char 	*_p;
+		uint32_t _plen;
 		TCPQueueElt 	*nxt;
 		tcp_seq_t		seq;
 		tcp_seq_t		seq_nxt;
@@ -108,9 +110,9 @@ public:
 	TCPQueue(){};
 	~TCPQueue();
 
-	int push(WritablePacket *p, tcp_seq_t seq, tcp_seq_t seq_nxt);
+	int push(char *p, uint32_t plen, tcp_seq_t seq, tcp_seq_t seq_nxt);
 	void loop_last();
-	WritablePacket *pull_front();
+	char *pull_front(uint32_t *len);
 
 	// @Harald: Aren't all of these seq num arithmetic operations unsafe from
 	// wraparound ?
