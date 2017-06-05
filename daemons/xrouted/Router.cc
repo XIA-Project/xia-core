@@ -116,7 +116,7 @@ int Router::handler()
 		gettimeofday(&now, NULL);
 
 		if (timercmp(&now, &h_fire, >=)) {
-			sendHello();
+//			sendHello();
 			timeradd(&now, &h_freq, &h_fire);
 		}
 		if (timercmp(&now, &l_fire, >=)) {
@@ -530,6 +530,11 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 		sprintf(el, "%s/xlc%d/xarpr", _hostname, i);
 		_xr.rawWrite(el, "add", _myAD);
 	}
+
+	_xr.setRoute("AD:-",  -7, "", 0x11111111);
+	_xr.setRoute("HID:-", -7, "", 0x11111111);
+	_xr.setRoute("SID:-", -7, "", 0x11111111);
+	_xr.setRoute("IP:-",  -7, "", 0x11111111);
 
 	return 1;
 }
