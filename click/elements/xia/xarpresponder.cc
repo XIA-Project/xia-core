@@ -248,13 +248,16 @@ int XARPResponder::write_param(const String &conf, Element *e, void *vparam, Err
         if (cp_va_kparse(conf, ar, errh,
                     "XID", cpkP + cpkM, cpXID, &xid, cpEnd) < 0)
             return -1;
-		// Remove entry for old XID from XID->MAC table, if any
-		for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it) {
-			if(ar->_my_xid == it->xida) {
-				ar->_v.erase(it);
-				break;
-			}
-		}
+//		don't delete existing entries in the table so that we can have HID and AD entries
+//		this shouldn't be a problem since routers and controllers will never switch ADs or HIDs
+//		while running
+//		// Remove entry for old XID from XID->MAC table, if any
+//		for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it) {
+//			if(ar->_my_xid == it->xida) {
+//				ar->_v.erase(it);
+//				break;
+//			}
+//		}
 		// Assign the new XID
         ar->_my_xid = xid;
 		// Add new entry for this XID to the XID->MAC table
