@@ -62,7 +62,7 @@ protected:
 	void printRoutingTable(std::string srcHID, RouteTable &routingTable);
 	void printADNetworkTable();
 
-	int getNeighborADs();
+	int getTrustedADs();
 	std::string getControllerSID();
 
 protected:

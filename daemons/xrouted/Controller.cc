@@ -145,7 +145,7 @@ int Controller::handler()
 	gettimeofday(&now, NULL);
 
 	if (timercmp(&now, &h_fire, >=)) {
-		sendHello();
+//		sendHello();
 		timeradd(&now, &h_freq, &h_fire);
 	}
 	if (timercmp(&now, &l_fire, >=)) {
@@ -174,7 +174,7 @@ int Controller::handler()
 }
 
 
-int Controller::getNeighborADs()
+int Controller::getTrustedADs()
 {
 	char s[2048];
 
@@ -182,7 +182,7 @@ int Controller::getNeighborADs()
 		// FIXME: handle error
 		return -1;
 	}
-	strncat(s, "/etc/neighbors.conf", sizeof(s));
+	strncat(s, "/etc/trusted.conf", sizeof(s));
 
 	minIni ini(s);
 
@@ -195,10 +195,10 @@ int Controller::getNeighborADs()
 		if (sect != _myAD) {
 			std::string dag = ini.gets(sect, "dag");
 
-			syslog(LOG_INFO, "%s is a known neighbor AD", sect.c_str());
+			syslog(LOG_INFO, "%s is a trusted neighbor AD", sect.c_str());
 
 			if (dag == "") {
-				syslog(LOG_WARNING, "ERROR: neighbor dag not set!\n");
+				syslog(LOG_WARNING, "ERROR: trusted neighbor dag not set!\n");
 				continue;
 			}
 
@@ -243,7 +243,7 @@ int Controller::saveControllerDAG()
 	fclose(f);
 
 	// creat a conf file to share with other ADs
-	strncat(root, "/etc/domains.conf", sizeof(root));
+	strncat(root, "/etc/controller.conf", sizeof(root));
 
 	struct stat st;
 	if (stat(root, &st) < 0) {
@@ -254,10 +254,10 @@ int Controller::saveControllerDAG()
 			return -1;
 		}
 
-		fprintf(f, "# domains.conf\n");
-		fprintf(f, "# Copy or append this file to the edge router of neighboring ADs.\n");
-		fprintf(f, "# Change the port value in the copied file to the port on the\n");
-		fprintf(f, "#   edge router that is connected to this AD.\n\n");
+		fprintf(f, "# controller.conf\n");
+		fprintf(f, "# Copy or append this file to the trusted.conf file in neighbor ADs.\n");
+		fprintf(f, "# The controller dag in this file will continue to be used across xia\n");
+		fprintf(f, "# restarts. \n");
 		fclose(f);
 	}
 
@@ -278,9 +278,9 @@ std::string Controller::getControllerSID()
 
 	if (_controller_sid == "") {
 
-		// try to read from the domains.conf file
+		// try to read from the controller.conf file
 		if (XrootDir(s, sizeof(s)) != NULL) {
-			strncat(s, "/etc/domains.conf", sizeof(s));
+			strncat(s, "/etc/controller.conf", sizeof(s));
 			minIni ini(s);
 
 		   dag = ini.gets(_myAD, "dag");
@@ -363,7 +363,7 @@ int Controller::init()
 		exit(-1);
 	}
 
-	getNeighborADs();
+	getTrustedADs();
 
 	for (int i = 0; i < 8; i++) {
 		char el[256];
@@ -473,6 +473,8 @@ int Controller::sendInterDomainLSA()
 		Node aa(it->second.AD);
 		Node hh(it->second.HID);
 
+		printf("adding %s to lsa\n", it->second.HID.c_str());
+
 		Xroute::NeighborEntry *n = lsa->add_neighbors();
 		ad  = n->mutable_ad();
 		hid = n->mutable_hid();
@@ -494,10 +496,18 @@ int Controller::sendInterDomainLSA()
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
 		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
-		syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", 0, it->second.AD.c_str());
+		syslog(LOG_NOTICE, "send inter-AD LSA[%d] to %s", 0, it->second.AD.c_str());
 
-		int temprc = sendMessage(&it->second.dag, msg);
-		rc = (temprc < rc)? temprc : rc;
+		try {
+			char foo[2048];
+			xia_ntop(AF_XIA, &it->second.dag, foo, sizeof(foo));
+			syslog(LOG_NOTICE, "ID DAG= %s", foo);
+
+			int temprc = sendMessage(&it->second.dag, msg);
+			rc = (temprc < rc)? temprc : rc;
+		} catch (std::exception e) {
+			syslog(LOG_NOTICE, "missing/invalid dag for %s\n", it->second.AD.c_str());
+		}
 	}
 
 	return rc;
@@ -508,6 +518,7 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 {
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
+		printf("populate 1\n");
 		processRoutingTable(routingTable);
 		return 1;
 
@@ -515,6 +526,7 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 		// this entry was either created as a host placeholder, or
 		// is for a router we haven't received an LSA from yet
 		// so we have no dag to send the table to
+		printf("send empty return\n");
 		return 1;
 
 	} else {
@@ -547,6 +559,7 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 		RouteTable::iterator it;
 		for (it = routingTable.begin(); it != routingTable.end(); it++)
 		{
+			printf("adding %s to rt table\n", it->second.dest.c_str());
 			Xroute::TableEntry *e = t->add_routes();
 			Node dest(it->second.dest);
 			Node nexthop(it->second.nextHop);
@@ -581,7 +594,8 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 	//Xroute::XID xsid = msg.node().sid();
 
 	entry.ad  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
-	entry.hid = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	//entry.hid = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+	entry.hid = entry.ad;
 	//string srcSID = Node(xsid.type(), xsid.id().c_str(), 0).to_string();
 
 	// First, filter out the LSA originating from myself
@@ -594,7 +608,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		_dual_router_AD = entry.ad;
 	}
 
-	//syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), numNeighbors);
+	syslog(LOG_NOTICE, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), msg.neighbors_size());
 	entry.timestamp = time(NULL);
 
 	for (int i = 0; i < msg.neighbors_size(); i++) {
@@ -605,13 +619,30 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		xad  = n.ad();
 		xhid = n.hid();
 
-		neighbor.AD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
-		neighbor.HID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
 
+		neighbor.AD  = Node(xad.type(),  xad.id().c_str(),  0).to_string();
+		//neighbor.HID = Node(xhid.type(), xhid.id().c_str(), 0).to_string();
+		neighbor.HID = neighbor.AD;
+
+		if (neighbor.AD == _myAD) {
+			continue;
+		}
+
+		// FIXME: why do we get a port that isn't in our domain. what do we expect to do with it???
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
-		//syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
+		// FIXME: perhaps dag should be required in this case?
+		if (n.has_dag() && n.dag().length() != 0) {
+			memset(&neighbor.dag, 0, sizeof(sockaddr_x));
+			memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
+		} else {
+			// see if dag is in our local table
+			// will this ever happen???
+			printf("doesn't have dag!!!!!!!!\n");
+		}
+
+		syslog(LOG_NOTICE, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -620,15 +651,15 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 
 	// Rebroadcast this LSA
 	int rc = 1;
-	NeighborTable::iterator it;
-	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++) {
-		sockaddr_x ddag;
-		Graph g = Node() * Node(it->second.AD) * Node(getControllerSID());
-		g.fill_sockaddr(&ddag);
-
-		int temprc = sendMessage(&ddag, xmsg);
-		rc = (temprc < rc)? temprc : rc;
-	}
+//	NeighborTable::iterator it;
+//	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++) {
+//		sockaddr_x ddag;
+//		Graph g = Node() * Node(it->second.AD) * Node(getControllerSID());
+//		g.fill_sockaddr(&ddag);
+//
+//		int temprc = sendMessage(&ddag, xmsg);
+//		rc = (temprc < rc)? temprc : rc;
+//	}
 	return rc;
 }
 
@@ -775,6 +806,16 @@ void Controller::processRoutingTable(RouteTable routingTable)
 			continue;
 		}
 
+		if (it->second.dest.length() == 0) {
+			printf("!!!!!!! empty entry\n");
+			continue;
+		}
+
+		if (it->second.nextHop.length() == 0) {
+			printf("!!!!!!!!!!!!!no next hop!\n");
+		}
+
+		syslog(LOG_WARNING, "setting route: %s %u %s %08x", it->second.dest.c_str(), it->second.port, it->second.nextHop.c_str(), it->second.flags);
 		if ((rc = _xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
@@ -808,6 +849,8 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	bzero(&entry.dag, sizeof(sockaddr_x));
 	memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
 
+	printf("processlsa\n");
+
 	for (uint32_t i = 0; i < numNeighbors; i++) {
 		NeighborEntry neighbor;
 		Xroute::NeighborEntry n = msg.peers(i);
@@ -819,6 +862,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
+		printf("processing neighbor %s %s for %s\n", neighbor.AD.c_str(), neighbor.HID.c_str(), entry.hid.c_str());
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
 
@@ -834,7 +878,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 //				continue;
 			}
 
-			syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
+			syslog(LOG_NOTICE, "putting %s into neighborAD table\n", neighbor.AD.c_str());
 
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
@@ -851,11 +895,13 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 		// Calculate next hop for ADs
 		RouteTable ADRoutingTable;
+		printf("_ADNetworkTable size = %d\n", _ADNetworkTable.size());
 		populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
+		printf("ad routing table size after %d\n", ADRoutingTable.size());
 
 		// For debugging.
-		// printADNetworkTable();
-		// printRoutingTable(_myAD, ADRoutingTable);
+		printADNetworkTable();
+		printRoutingTable(_myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		NetworkTable::iterator it1;
@@ -877,7 +923,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 			//extractNeighborADs(routingTable);
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
-			//printRoutingTable(it1->second.hid, routingTable);
+			printRoutingTable(it1->second.hid, routingTable);
 
 			sendRoutingTable(&it1->second, routingTable);
 		}
@@ -894,6 +940,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
 		populateADEntries(routingTable, ADRoutingTable);
+		printf("populate 2\n");
 		processRoutingTable(routingTable);
 		// END HACK
 
@@ -926,10 +973,14 @@ void Controller::populateNeighboringADBorderRouterEntries(string currHID, RouteT
 {
 	NeighborList currNeighborTable = _networkTable[currHID].neighbor_list;
 
+	printf("populateneighboringadborderrouterentries\n");
+
 	NeighborList::iterator it;
 	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); ++it) {
 
 		if (it->AD != _myAD) {
+
+			printf("creating neighbor entry for %s:%s on %s\n", it->AD.c_str(), it->HID.c_str(), currHID.c_str());
 			// Add HID of border routers of neighboring ADs into routing table
 			string neighborHID = it->HID;
 			RouteEntry &entry  = routingTable[neighborHID];
@@ -946,6 +997,8 @@ void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutin
 {
 	RouteTable::iterator it;
 
+	printf("populate ad entries\n");
+
 	for (it = ADRoutingTable.begin(); it != ADRoutingTable.end(); it++) {
 		string destAD    = it->second.dest;
 		string nextHopAD = it->second.nextHop;
@@ -956,6 +1009,8 @@ void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutin
 		entry.nextHop = routingTable[nextHopAD].nextHop;
 		entry.port    = routingTable[nextHopAD].port;
 		entry.flags   = routingTable[nextHopAD].flags;
+
+		printf("adding  %s with %s\n", destAD.c_str(), it->second.nextHop.c_str());
 	}
 }
 
@@ -966,6 +1021,8 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 {
 	NetworkTable::iterator it1;  // Iter for network table
 	NeighborList::iterator it2;             // Iter for neighbor list
+
+	printf("populate for %s\n", srcHID.c_str());
 
 	NetworkTable unvisited;  // Set of unvisited nodes
 
@@ -979,7 +1036,7 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 		if (it1->second.neighbor_list.size() == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
 			networkTable.erase(it1++);
 		} else {
-			//syslog(LOG_DEBUG, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
+			syslog(LOG_NOTICE, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
 			++it1;
 		}
 	}
@@ -1004,6 +1061,7 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 		currXID = (it2->AD == _myAD) ? it2->HID : it2->AD;
 
 		if (networkTable.find(currXID) != networkTable.end()) {
+			printf("network table contains %s\n", currXID.c_str());
 			// there is an entry for this neighbor in the network table already
 			// just update the cost to get there and set previous node to the one we are currently doing neighbors for
 			// FIXME: variable names are confusing here
@@ -1013,6 +1071,7 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 			networkTable[currXID].prevNode = srcHID;
 
 		} else {
+			printf("new entry!\n");
 			// We have an endhost or a router we haven't seen an LSA from yet
 			// make an entry for it in the network table and add a route to the source node to it
 
@@ -1031,6 +1090,7 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 			entry.cost = neighbor.cost;
 			entry.prevNode = neighbor.HID;
 			bzero(&entry.dag, sizeof(sockaddr_x));
+			printf("prev node = %s\n", entry.prevNode.c_str());
 
 			networkTable[currXID] = entry;
 		}
@@ -1100,6 +1160,9 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 				tempNextHopHID2 = networkTable[tempHID2].hid;
 				hop_count++;
 			}
+
+			printf("temp HID = %s\n", tempHID2.c_str());
+			printf("temp next hop = %s\n", tempNextHopHID2.c_str());
 			if (hop_count < _settings->max_hop_count()) {
 				routingTable[tempHID1].dest = tempHID1;
 				routingTable[tempHID1].nextHop = tempNextHopHID2;
@@ -1155,6 +1218,8 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 						break;
 					}
 				}
+
+				printf("next hop is now %s\n", routingTable[tempHID1].nextHop.c_str());
 				if (!entryFound) {
 					// Delete SID entry from routingTable
 
