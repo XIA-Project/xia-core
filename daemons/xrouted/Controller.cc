@@ -473,8 +473,6 @@ int Controller::sendInterDomainLSA()
 		Node aa(it->second.AD);
 		Node hh(it->second.HID);
 
-		printf("adding %s to lsa\n", it->second.HID.c_str());
-
 		Xroute::NeighborEntry *n = lsa->add_neighbors();
 		ad  = n->mutable_ad();
 		hid = n->mutable_hid();
@@ -495,18 +493,13 @@ int Controller::sendInterDomainLSA()
 
 	for (it = _ADNeighborTable.begin(); it != _ADNeighborTable.end(); it++)
 	{
-		//syslog(LOG_INFO, "send inter-AD LSA[%d] to %s", _lsa_seq, it->second.AD.c_str());
-		syslog(LOG_NOTICE, "send inter-AD LSA[%d] to %s", 0, it->second.AD.c_str());
+		//syslog(LOG_INFO, "send inter-AD LSA with %lu entries to %s", _ADNeighborTable.size(), it->second.AD.c_str());
 
 		try {
-			char foo[2048];
-			xia_ntop(AF_XIA, &it->second.dag, foo, sizeof(foo));
-			syslog(LOG_NOTICE, "ID DAG= %s", foo);
-
 			int temprc = sendMessage(&it->second.dag, msg);
 			rc = (temprc < rc)? temprc : rc;
 		} catch (std::exception e) {
-			syslog(LOG_NOTICE, "missing/invalid dag for %s\n", it->second.AD.c_str());
+			syslog(LOG_WARNING, "missing/invalid dag for %s\n", it->second.AD.c_str());
 		}
 	}
 
@@ -518,7 +511,6 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 {
 	if (nodeState == NULL || nodeState->hid == _myHID) {
 		// If destHID is self, process immediately
-		printf("populate 1\n");
 		processRoutingTable(routingTable);
 		return 1;
 
@@ -526,7 +518,6 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 		// this entry was either created as a host placeholder, or
 		// is for a router we haven't received an LSA from yet
 		// so we have no dag to send the table to
-		printf("send empty return\n");
 		return 1;
 
 	} else {
@@ -559,7 +550,6 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 		RouteTable::iterator it;
 		for (it = routingTable.begin(); it != routingTable.end(); it++)
 		{
-			printf("adding %s to rt table\n", it->second.dest.c_str());
 			Xroute::TableEntry *e = t->add_routes();
 			Node dest(it->second.dest);
 			Node nexthop(it->second.nextHop);
@@ -608,7 +598,7 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		_dual_router_AD = entry.ad;
 	}
 
-	syslog(LOG_NOTICE, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), msg.neighbors_size());
+	//syslog(LOG_INFO, "inter-AD LSA from %s, %d neighbors", entry.ad.c_str(), msg.neighbors_size());
 	entry.timestamp = time(NULL);
 
 	for (int i = 0; i < msg.neighbors_size(); i++) {
@@ -628,7 +618,6 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 			continue;
 		}
 
-		// FIXME: why do we get a port that isn't in our domain. what do we expect to do with it???
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
@@ -639,10 +628,9 @@ int Controller::processInterdomainLSA(const Xroute::XrouteMsg& xmsg)
 		} else {
 			// see if dag is in our local table
 			// will this ever happen???
-			printf("doesn't have dag!!!!!!!!\n");
 		}
 
-		syslog(LOG_NOTICE, "neighbor[%d] = %s", i, neighbor.AD.c_str());
+		//syslog(LOG_INFO, "neighbor[%d] = %s", i, neighbor.AD.c_str());
 
 		entry.neighbor_list.push_back(neighbor);
 	}
@@ -716,8 +704,6 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
-
 	DAGMap::iterator i = _trustedADs.find(msg.ad());
 
 	// only add directly connected ADs if configured to do so
@@ -737,6 +723,20 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		// FIXME: should this be a separate table?
 		_neighborTable[neighbor.AD] = neighbor;
 		_neighbor_timestamp[neighbor.AD] = time(NULL);
+
+		_ADNeighborTable[neighbor.AD] = neighbor;
+
+// FIXME: do i need this block?
+		NodeStateEntry entry;
+		entry.hid = _myHID;
+
+	    // Add neighbors to network table entry
+	    NeighborTable::iterator it;
+	    for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
+ 			entry.neighbor_list.push_back(it->second);
+
+		_networkTable[_myHID] = entry;
+// end FIXME
 	}
 
 	return 1;
@@ -807,15 +807,14 @@ void Controller::processRoutingTable(RouteTable routingTable)
 		}
 
 		if (it->second.dest.length() == 0) {
-			printf("!!!!!!! empty entry\n");
 			continue;
 		}
 
 		if (it->second.nextHop.length() == 0) {
-			printf("!!!!!!!!!!!!!no next hop!\n");
+			continue;
 		}
 
-		syslog(LOG_WARNING, "setting route: %s %u %s %08x", it->second.dest.c_str(), it->second.port, it->second.nextHop.c_str(), it->second.flags);
+		//syslog(LOG_INFO, "setting route: %s %u %s %08x", it->second.dest.c_str(), it->second.port, it->second.nextHop.c_str(), it->second.flags);
 		if ((rc = _xr.setRoute(it->second.dest, it->second.port, it->second.nextHop, it->second.flags)) != 0)
 			syslog(LOG_ERR, "error setting route %d", rc);
 
@@ -849,8 +848,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	bzero(&entry.dag, sizeof(sockaddr_x));
 	memcpy(&entry.dag, msg.dag().c_str(), msg.dag().length());
 
-	printf("processlsa\n");
-
 	for (uint32_t i = 0; i < numNeighbors; i++) {
 		NeighborEntry neighbor;
 		Xroute::NeighborEntry n = msg.peers(i);
@@ -862,7 +859,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
-		printf("processing neighbor %s %s for %s\n", neighbor.AD.c_str(), neighbor.HID.c_str(), entry.hid.c_str());
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
 
@@ -872,13 +868,16 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 				memcpy(&neighbor.dag, n.dag().c_str(), n.dag().length());
 
 			} else {
-				// FIXME: make sure it's in the trustedADs table
-				memcpy(&neighbor.dag, &(_trustedADs[neighbor.AD]), sizeof(sockaddr_x));
-//				syslog(LOG_WARNING, "dag missing!\n");
-//				continue;
+				DAGMap::iterator d = _trustedADs.find(neighbor.AD);
+				if (d != _trustedADs.end()) {
+					memcpy(&neighbor.dag, &(_trustedADs[neighbor.AD]), sizeof(sockaddr_x));
+				} else
+					// maybe do a better check here
+					// no dag in the lsa and not in our trusted list so skip
+					continue;
 			}
 
-			syslog(LOG_NOTICE, "putting %s into neighborAD table\n", neighbor.AD.c_str());
+			//syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
 
 			_ADNeighborTable[neighbor.AD] = neighbor;
 			_ADNeighborTable[neighbor.AD].HID = neighbor.AD; // make the algorithm work
@@ -895,13 +894,11 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 		// Calculate next hop for ADs
 		RouteTable ADRoutingTable;
-		printf("_ADNetworkTable size = %d\n", _ADNetworkTable.size());
 		populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
-		printf("ad routing table size after %d\n", ADRoutingTable.size());
 
 		// For debugging.
-		printADNetworkTable();
-		printRoutingTable(_myAD, ADRoutingTable);
+		//printADNetworkTable();
+		//printRoutingTable(_myAD, ADRoutingTable);
 
 		// Calculate next hop for routers
 		NetworkTable::iterator it1;
@@ -920,7 +917,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 			// Calculate routing table for HIDs instead
 			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
 
-			//extractNeighborADs(routingTable);
+			extractNeighborADs();
 			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 			populateADEntries(routingTable, ADRoutingTable);
 			printRoutingTable(it1->second.hid, routingTable);
@@ -940,7 +937,6 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 
 		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
 		populateADEntries(routingTable, ADRoutingTable);
-		printf("populate 2\n");
 		processRoutingTable(routingTable);
 		// END HACK
 
@@ -973,14 +969,11 @@ void Controller::populateNeighboringADBorderRouterEntries(string currHID, RouteT
 {
 	NeighborList currNeighborTable = _networkTable[currHID].neighbor_list;
 
-	printf("populateneighboringadborderrouterentries\n");
-
 	NeighborList::iterator it;
 	for (it = currNeighborTable.begin(); it != currNeighborTable.end(); ++it) {
 
 		if (it->AD != _myAD) {
 
-			printf("creating neighbor entry for %s:%s on %s\n", it->AD.c_str(), it->HID.c_str(), currHID.c_str());
 			// Add HID of border routers of neighboring ADs into routing table
 			string neighborHID = it->HID;
 			RouteEntry &entry  = routingTable[neighborHID];
@@ -997,8 +990,6 @@ void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutin
 {
 	RouteTable::iterator it;
 
-	printf("populate ad entries\n");
-
 	for (it = ADRoutingTable.begin(); it != ADRoutingTable.end(); it++) {
 		string destAD    = it->second.dest;
 		string nextHopAD = it->second.nextHop;
@@ -1010,7 +1001,22 @@ void Controller::populateADEntries(RouteTable &routingTable, RouteTable ADRoutin
 		entry.port    = routingTable[nextHopAD].port;
 		entry.flags   = routingTable[nextHopAD].flags;
 
-		printf("adding  %s with %s\n", destAD.c_str(), it->second.nextHop.c_str());
+		// add remote ADs here?
+		NodeStateEntry nsentry = _ADNetworkTable[destAD];
+		NeighborList::iterator it1;
+		for (it1 = nsentry.neighbor_list.begin(); it1 != nsentry.neighbor_list.end(); it1++) {
+
+			if (it1->AD == _myAD) {
+				continue;
+			}
+			RouteEntry ee;
+			ee.dest = it1->AD;
+			ee.nextHop = entry.nextHop;
+			ee.port = entry.port;
+			ee.flags = 0;
+
+			routingTable[ee.dest] = ee;
+		}
 	}
 }
 
@@ -1022,8 +1028,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 	NetworkTable::iterator it1;  // Iter for network table
 	NeighborList::iterator it2;             // Iter for neighbor list
 
-	printf("populate for %s\n", srcHID.c_str());
-
 	NetworkTable unvisited;  // Set of unvisited nodes
 
 	routingTable.clear();
@@ -1033,10 +1037,11 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 	it1 = networkTable.begin();
 	while (it1 != networkTable.end()) {
 
-		if (it1->second.neighbor_list.size() == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
+		//if (it1->second.neighbor_list.size() == 0 || it1->second.ad.empty() || it1->second.hid.empty()) {
+		if (it1->second.ad.empty() || it1->second.hid.empty()) {
 			networkTable.erase(it1++);
 		} else {
-			syslog(LOG_NOTICE, "entry %s: neighbors: %d", it1->first.c_str(), it1->second.neighbor_list.size());
+			//syslog(LOG_INFO, "entry %s: neighbors: %lu", it1->first.c_str(), it1->second.neighbor_list.size());
 			++it1;
 		}
 	}
@@ -1061,7 +1066,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 		currXID = (it2->AD == _myAD) ? it2->HID : it2->AD;
 
 		if (networkTable.find(currXID) != networkTable.end()) {
-			printf("network table contains %s\n", currXID.c_str());
 			// there is an entry for this neighbor in the network table already
 			// just update the cost to get there and set previous node to the one we are currently doing neighbors for
 			// FIXME: variable names are confusing here
@@ -1071,7 +1075,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 			networkTable[currXID].prevNode = srcHID;
 
 		} else {
-			printf("new entry!\n");
 			// We have an endhost or a router we haven't seen an LSA from yet
 			// make an entry for it in the network table and add a route to the source node to it
 
@@ -1090,7 +1093,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 			entry.cost = neighbor.cost;
 			entry.prevNode = neighbor.HID;
 			bzero(&entry.dag, sizeof(sockaddr_x));
-			printf("prev node = %s\n", entry.prevNode.c_str());
 
 			networkTable[currXID] = entry;
 		}
@@ -1161,8 +1163,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 				hop_count++;
 			}
 
-			printf("temp HID = %s\n", tempHID2.c_str());
-			printf("temp next hop = %s\n", tempNextHopHID2.c_str());
 			if (hop_count < _settings->max_hop_count()) {
 				routingTable[tempHID1].dest = tempHID1;
 				routingTable[tempHID1].nextHop = tempNextHopHID2;
@@ -1219,7 +1219,6 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 					}
 				}
 
-				printf("next hop is now %s\n", routingTable[tempHID1].nextHop.c_str());
 				if (!entryFound) {
 					// Delete SID entry from routingTable
 
