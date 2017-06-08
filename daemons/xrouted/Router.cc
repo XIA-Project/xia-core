@@ -471,7 +471,7 @@ int Router::processForeign(const Xroute::ForeignADMsg &msg)
 	// add it to the neighbor table
 	NeighborEntry neighbor;
 
-    syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+    //syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
 
 	neighbor.AD    = msg.ad();
 	neighbor.HID   = msg.ad();
@@ -495,7 +495,7 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
 	if (!_joined) {
-        syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
+        //syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
 
 		// now we can fetch our AD/HID
 		if (getXIDs(_myAD, _myHID) < 0) {
