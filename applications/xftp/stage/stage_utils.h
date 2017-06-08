@@ -51,10 +51,10 @@
 #define UNIXMANAGERSOCK "/tmp/stage_manager.sock"
 //#define GETSSID_CMD "iwgetid -r"
 #define GETSSID_CMD "iwconfig wlp1s0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
-#define GETSSID_CMD2 "iwconfig wlan0 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
+#define GETSSID_CMD2 "iwconfig wlx60a44ceca928 | grep '\\\"[a-zA-Z _0-9.-]*\\\"' -o"
 
 #define INTERFACE1 "wlp1s0"
-#define INTERFACE2 "wlp1s0"
+#define INTERFACE2 "wlx60a44ceca928"
 //#define GETSSID_CMD "iwconfig wlp6s0 | grep '\\\"[a-zA-Z\\_0-9.]*\\\"' -o"
 #define PURGE_DELAY_SEC 10
 #define MGT_DELAY_SEC 10

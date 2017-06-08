@@ -811,7 +811,7 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	int sock;
 	Graph g(addr);
 
-	fprintf(stderr, "Fetching: %s\n", g.dag_string().c_str());
+	//fprintf(stderr, "Fetching: %s\n", g.dag_string().c_str());
 
 	sock = Xsocket(AF_XIA, SOCK_STREAM, 0);
 	if (sock < 0) {
@@ -838,7 +838,7 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	offset = 0;
 
 	while (remaining > 0) {
-		fprintf(stderr, "Remaining(1) = %lu\n", remaining);
+		//fprintf(stderr, "Remaining(1) = %lu\n", remaining);
 		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
 		if (recvd < 0) {
 			fprintf(stderr, "Sender Closed the connection: %s", strerror(errno));
@@ -869,7 +869,7 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 			fprintf(stderr, "Xrecv returned 0");
 			break;
 		}
-		fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+		//fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);

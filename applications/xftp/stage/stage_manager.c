@@ -114,13 +114,15 @@ int delegationHandler(int sock, char *cmd)
             pthread_mutex_lock(&profileLock);
             if (CIDToProfile[cmd].state == READY) {
                 //CIDToProfile[cmd].state = IGNORE;
-				pthread_mutex_unlock(&StageControl);
+				alreadyStage--;
+
+				
                 break;
                 say("DAG: %s change into IGNORE!\n", cmd);
             }
 			if(CIDToProfile[cmd].state == BLANK){
 	    	    CIDToProfile[cmd].state = READY;
-				pthread_mutex_unlock(&fetchLock);
+				//pthread_mutex_unlock(&fetchLock);
 				break;
             //    CIDToProfile[cmd].dag = cmd;
             }
@@ -132,8 +134,9 @@ int delegationHandler(int sock, char *cmd)
 ////say("In delegationHandler. stageMutex\nThe command is %s\n", cmd);
         pthread_mutex_lock(&stageMutex);
         fetchIndex = dis;
-        alreadyStage--;
+        
         pthread_mutex_unlock(&stageMutex);
+		pthread_mutex_unlock(&StageControl);
     }
 //say("In delegationHandler. send\nThe command is %s\n", cmd);
     if (send(sock, tmp.c_str(), tmp.size(), 0) < 0) {
@@ -175,8 +178,8 @@ void *clientCmd(void *socketid)
         else if (strncmp(cmd, "fetch", 5) == 0) {
             
             say("Receive a chunk request\n");
-			pthread_mutex_lock(&fetchLock);
-	    	
+			//pthread_mutex_lock(&fetchLock);
+	    	//pthread_mutex_unlock(&StageControl);
             char dag[256] = ""; 
             sscanf(cmd, "fetch %s Time:%ld" ,dag, &timeWifi);
             if (delegationHandler(sock, dag) < 0) {
@@ -227,7 +230,7 @@ say("*********************************In while loop of stageChunk 1\n");
 		start = reply;
 		while((end=strstr(start +6,"ready"))>0){
 			n=end-start;
-			printf("n=%d\n",n);
+			//printf("n=%d\n",n);
 			strncpy(reply1,start,n);
 			start=end;
 			reply1[n]=0;
@@ -275,8 +278,8 @@ void *stageData(void *)
 {
     thread_c++;
     int thread_id = thread_c;
-    cerr << "Thread id " << thread_id << ": " << "Is launched\n";
-    cerr << "Current " << getAD() << endl;
+    //cerr << "Thread id " << thread_id << ": " << "Is launched\n";
+    //cerr << "Current " << getAD() << endl;
 	int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
@@ -285,6 +288,7 @@ void *stageData(void *)
 
 //netStageSock is used to communicate with stage server.
     getNewAD(myAD);
+	lastSSID = getSSID();
     //Connect to the Stage Server
     int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
     //Rtt of wireless
@@ -318,7 +322,7 @@ void *stageData(void *)
     while (1) {
         say("*********************************Before while loop of stageData\n");
         pthread_mutex_lock(&StageControl);
-	pthread_mutex_unlock(&fetchLock);
+	//pthread_mutex_unlock(&fetchLock);
         say("*********************************In while loop of stageData\n");
         if(!isConnect()){
             long newStamp = now_msec();
@@ -444,9 +448,9 @@ int main()
 {
 //pthread_mutex_lock(&StageControl);
 //say("before getSSID");
-    lastSSID = getSSID();
+    //lastSSID = getSSID();
 //say("after getSSID");
-    currSSID = lastSSID;
+    //currSSID = lastSSID;
     timeStamp = now_msec();
     connetTime << currSSID << "Connect." << endl;
     int stageSock = registerUnixStreamReceiver(UNIXMANAGERSOCK);

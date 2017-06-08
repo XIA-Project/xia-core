@@ -9,6 +9,7 @@
 int CONNECT_TIME = 8 * 1000;
 int DISCONNECT_TIME = 32 * 1000;
 int netsize = 1;
+int FREQ[2]={2417, 2432};
 pthread_mutex_t encounterTime = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t disconnectTime = PTHREAD_MUTEX_INITIALIZER;
 #define GET_SSID_LIST "iwlist wlp6s0 scanning | grep -E '(\\\"[a-zA-Z0-9 _-.]*\\\")|(Signal level=-?[0-9]* dBm)' -o"
@@ -19,17 +20,22 @@ void getConfig(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "c:d:n:")) != -1) {
+	while ((c = getopt(argc, argv, "c:d:n:f:F:")) != -1) {
 		switch (c) {
 			case 'c':
-				CONNECT_TIME = 1000 * atoi(optarg);
+				CONNECT_TIME = atoi(optarg);
 				break;
 			case 'd':
-				DISCONNECT_TIME = 1000 * atoi(optarg);
+				DISCONNECT_TIME = atoi(optarg);
 				break;
 			case 'n':
 				netsize = atoi(optarg);
 				break;
+			case 'f':
+				FREQ[0] = atoi(optarg);
+				break;
+			case 'F':
+				FREQ[1] = atoi(optarg);
 			default:
 				break;
 		}
@@ -110,14 +116,17 @@ say("in connect_SSID\n");
 	cmd1 += "connect ";
 	cmd1 += ssid;
 	cmd1 += " ";
+	char freq_string[16];
 	if(ssid[3] == '_'){//"XIA_Tenda2"
-		cmd1 += "2417";
+		sprintf(freq_string, "%d", FREQ[0]);
 	}
 	else if(ssid[3] == '-'){//"XIA-TP-LINK_2.4G"
-		cmd1 += "2472";
+		sprintf(freq_string, "%d", FREQ[1]);
 	}
 	else
 		return -1;
+	cmd1 += freq_string;
+	
 say("cmd1 = %s\n", cmd1.c_str());
 	result = execSystem(cmd1);
 	say("connect to SSID: %s\n", result.c_str());
@@ -148,7 +157,7 @@ say("cmd2 = %s\n", cmd2.c_str());
 	}
 	}
 	result = execSystem("date '+%c%N'");
-        printf("connect time: %s\n", result.c_str());
+        say("connect time: %s\n", result.c_str());
 	return 0;
 }
 int disconnect(int interface){
@@ -156,26 +165,26 @@ int disconnect(int interface){
 	int rtn;
 	pthread_mutex_lock(&disconnectTime);
 	begin_time = now_msec();
-	printf("-------------disconnect begin at %ld \n", begin_time);
+	say("-------------disconnect begin at %ld \n", begin_time);
 	rtn = disconnect_SSID(interface);
 	//usleep(DISCONNECT_TIME * 1000);
 	end_time = now_msec();
 	say("-------------disconnect end at %ld \n", end_time);
 	total_time = end_time - begin_time;
-	printf("-------------disconnect using time = %ld \n", total_time);
+	say("-------------disconnect using time = %ld \n", total_time);
 }
 int connect(int interface, char * ssid){
 	int rtn;
 	long begin_time, end_time, total_time;
 	pthread_mutex_lock(&encounterTime);
 	begin_time = now_msec();
-	printf("-------------connect begin at %ld \n", begin_time);
+	say("-------------connect begin at %ld \n", begin_time);
 	rtn = connect_SSID(interface, ssid);
 	//usleep(CONNECT_TIME * 1000);
 	end_time = now_msec();
 	say("-------------connect end at %ld \n", end_time);
 	total_time = end_time - begin_time;
-	printf("-------------connect using time = %ld \n", total_time);
+	say("-------------connect using time = %ld \n", total_time);
 }
 void * time_control(void *){
     while(1){
@@ -200,14 +209,14 @@ int main(int argc, char **argv){
 	long begin_time, end_time, total_time;
 	
 	result = execSystem(CLOSE_NETWORK_MANAGER);
-	printf("close_network_manager %s\n", result.c_str());
+	say("close_network_manager %s\n", result.c_str());
 
 	/*disconnect_SSID(1);
-	printf("connect time >> ");
+	say("connect time >> ");
 	scanf("%d",&CONNECT_TIME);
-	printf("disconnect time >> ");
+	say("disconnect time >> ");
 	scanf("%d",&DISCONNECT_TIME);
-	printf("Network size >> ");
+	say("Network size >> ");
 	scanf("%d",&netsize);
 	CONNECT_TIME *= 1000;
 	DISCONNECT_TIME *= 1000;*/

@@ -131,7 +131,7 @@ class NetjoinReceiver(threading.Thread):
         gateway_session.push(message_tuple)
 
     def handle_handshake_four(self, message_tuple):
-        logging.info("Got HandshakeFour message")
+        #logging.info("Got HandshakeFour message")
 
         # Find the session this message should be delivered to
         handshake_four = message_tuple[0].handshake_four
@@ -139,7 +139,7 @@ class NetjoinReceiver(threading.Thread):
 
         # Deliver the message
         if not client_session_id in self.client_sessions:
-            logging.error("Session not found to deliver handshake four")
+            #logging.error("Session not found to deliver handshake four")
             return
         client_session = self.client_sessions[client_session_id]
         client_session.push(message_tuple)

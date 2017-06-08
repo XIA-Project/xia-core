@@ -489,7 +489,7 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len)
 			pubkeystr[j++] = pubkeystart[i];
 		}
 	}
-	xs_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
+	//xs_chatter("xs_getPubkeyHash: Stripped pubkey: %s", pubkeystr);
 	xs_getSHA1Hash((const unsigned char *)pubkeystr, strlen(pubkeystr), digest, digest_len);
 
 	free(pubkeystr);
@@ -609,7 +609,7 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
 	if(keydir == NULL) {
-		xs_chatter("xs_sign: Unable to find key directory");
+	//	xs_chatter("xs_sign: Unable to find key directory");
 		goto xs_sign_done;
 	}
 	// Read private key from file in keydir
@@ -628,19 +628,19 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 
 	// Print the SHA1 hash in human readable form
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
-    xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
+    //xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
-    xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
+    //xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
-		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
+		//xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
 		goto xs_sign_done;
 	}
 	state = 2;
     rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
-        xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
+        //xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
 		goto xs_sign_done;
 	}
 

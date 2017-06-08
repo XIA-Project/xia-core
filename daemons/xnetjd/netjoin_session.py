@@ -88,7 +88,7 @@ class NetjoinSession(threading.Thread):
             self.last_message_remaining_iterations -= 1
             if self.last_message_remaining_iterations <= 0:
                 self.disable_retransmission()
-                logging.error("retransmit {} timeout".format(msgtype))
+                #logging.error("retransmit {} timeout".format(msgtype))
                 return False
             else:
                 logging.info("retransmitting {}".format(msgtype))

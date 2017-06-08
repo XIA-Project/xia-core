@@ -1,6 +1,6 @@
 #include "stage_utils.h"
 
-int verbose = 1;
+int verbose = 0;
 
 void say(const char *fmt, ...)
 {
@@ -201,7 +201,7 @@ say("in disconnect_SSID\n");
 	}
 	else
 		return -1;
-	cmd += "disconnect";
+	cmd += " disconnect";
 say("cmd = %s\n", cmd.c_str());
 	result = execSystem(cmd);
 	say("disconnect to SSID: %s\n", result.c_str());
@@ -212,7 +212,7 @@ int Connect_SSID(int interface, char * ssid, int freq){
 say("in connect_SSID\n");
 	string result;
 	string cmd1,cmd2;
-    interface++;
+
 	cmd1 = "iw ";
 	if(interface == 1){
 		cmd1 += INTERFACE1;
@@ -222,7 +222,7 @@ say("in connect_SSID\n");
 	}
 	else
 		return -1;
-	cmd1 += "connect ";
+	cmd1 += " connect ";
 	cmd1 += ssid;
 	cmd1 += " ";
 	char string[16];
@@ -241,7 +241,7 @@ cmd2 = "iw dev ";
 	}
 	else
 		return -1;
-	cmd2 += "link";
+	cmd2 += " link";
 say("cmd2 = %s\n", cmd2.c_str());
 	int looptime=0;
 	while(1){
@@ -279,6 +279,7 @@ int Disconnect1(int interface){
 }
 
 int Connect1(int interface, int n_ssid, int freq){
+interface++;
 	char ssid[128];
 	if(n_ssid == 0){
 		strcpy(ssid, "XIA_Tenda_2");
@@ -1268,11 +1269,11 @@ int registerUnixStageManager(const char* servername){
       un.sun_family = AF_UNIX;
       strcpy(un.sun_path, servername);
       len = offsetof(struct sockaddr_un, sun_path) + strlen(servername);
-      if (connect(fd, (struct sockaddr *)&un, len) < 0)
+      while (connect(fd, (struct sockaddr *)&un, len) < 0)
       {
           rval= -4;
       }
-      else
+      //else
       {
          return (fd);
       }
