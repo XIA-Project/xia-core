@@ -168,9 +168,9 @@ static int _send_and_wait(int sock, const char *buf, size_t len,
 			return -1;
 		}
 		if (rc == 0) {
-			LOG("Timed out waiting for response.");
+			//LOG("Timed out waiting for response.");
 			if (retries > 1) {
-				LOG("Will retry by sending packet again");
+			//	LOG("Will retry by sending packet again");
 			}
 			continue;
 		}

@@ -361,7 +361,7 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 					break;
 
 				// these are not the data you were looking for
-				LOGF("Expected packet %u, received %u, replaying packet\n", seq, sn);
+				//LOGF("Expected packet %u, received %u, replaying packet\n", seq, sn);
 //				cachePacket(sock, sn, buf, buflen);
 //				msg->PrintDebugString();
 
