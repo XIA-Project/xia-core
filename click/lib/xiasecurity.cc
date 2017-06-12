@@ -658,7 +658,7 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 		xs_chatter("xs_sign: RSA_sign failed");
 		goto xs_sign_done;
 	}
-    xs_chatter("xs_sign: signature length: %d", sig_len);
+    //xs_chatter("xs_sign: signature length: %d", sig_len);
 
     //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);

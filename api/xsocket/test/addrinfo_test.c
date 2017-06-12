@@ -68,7 +68,7 @@ void ai_print(const struct addrinfo *ai)
 		sockaddr_x *sx = (sockaddr_x *)ai->ai_addr;
 
 		Graph g(sx);
-		g.print_graph();
+		//g.print_graph();
 	}
 }
 

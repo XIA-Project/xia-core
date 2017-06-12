@@ -39,8 +39,21 @@ ofstream connetTime("connetTime.log");
 ofstream windowToStage("windowToStage.log");
 ofstream managerTime("managerTime.log");
 
-
-
+int CONNECT_TIME = 32000;
+void getConfig(int argc, char** argv)
+{
+    int c;
+    opterr = 0;
+    while ((c = getopt(argc, argv, "c:")) != -1) {
+        switch (c) {
+			case 'c':
+				CONNECT_TIME = atoi(optarg);
+				break;
+            default:
+                    break;
+    	}
+    }
+}
 //Update the stage window
 void updateStageArg() {
     if (rttWifi != -1 && rttInt != -1 && timeWifi && timeInt) {
@@ -51,11 +64,13 @@ void updateStageArg() {
     else {
         chunkToStage = 3;
     }
+/*
     windowToStage << "rttWifi: " << rttWifi
                   << " rttInt: " << rttInt
                   << " timeWifi: " << timeWifi
                   << " timeInt: " << timeInt 
 	          << " chunkToStage: " << chunkToStage << endl;
+*/
 }
 // TODO: mem leak; window pred alg; int netMonSock;
 void regHandler(int sock, char *cmd)
@@ -110,7 +125,7 @@ int delegationHandler(int sock, char *cmd)
         pthread_mutex_unlock(&dagVecLock);
         //allDAGs.erase();
         while (true) {
-//say("In delegationHandler while.\nThe command is %s\n", cmd);
+//say("Pending-----In delegationHandler while.\nThe command is %s\n", cmd);
             pthread_mutex_lock(&profileLock);
             if (CIDToProfile[cmd].state == READY) {
                 //CIDToProfile[cmd].state = IGNORE;
@@ -160,6 +175,7 @@ void *clientCmd(void *socketid)
         memset(cmd, 0, sizeof(cmd));
         if ((n = recv(sock, cmd, sizeof(cmd), 0)) < 0) {
             warn("socket error while waiting for data, closing connetTime\n");
+			die(-1, "unix socket error while waiting for data\n");
             break;
         }
         else {
@@ -181,7 +197,7 @@ void *clientCmd(void *socketid)
 			//pthread_mutex_lock(&fetchLock);
 	    	//pthread_mutex_unlock(&StageControl);
             char dag[256] = ""; 
-            sscanf(cmd, "fetch %s Time:%ld" ,dag, &timeWifi);
+            sscanf(cmd, "fetch %s" ,dag);
             if (delegationHandler(sock, dag) < 0) {
                 break;
             }
@@ -190,8 +206,15 @@ void *clientCmd(void *socketid)
         }
         else if (strncmp(cmd, "time", 4) == 0) {
             say("Get Time! cmd: %s\n", cmd);
-            sscanf(cmd, "time %ld", &timeWifi);
-            updateStageArg();
+			long fetchTime;
+            sscanf(cmd, "time %ld", &fetchTime);
+			if (send(sock, "Get", sizeof("Get"), 0) < 0) {
+       			warn("socket error while sending data, closing connetTime\n");
+    		}
+            if(fetchTime <= CONNECT_TIME){
+				timeWifi = fetchTime;
+				updateStageArg();
+			}
         }
         //usleep(SCAN_DELAY_MSEC*1000);
     }
@@ -246,7 +269,7 @@ say("*********************************In while loop of stageChunk 1\n");
 			CIDToProfile[oldDag].dag = newDag;
 			CIDToProfile[oldDag].state = READY;
 			CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
-			managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
+			//managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
 			pthread_mutex_unlock(&profileLock);
 		}
 			say("*********************************In while loop of stageChunk 2\n");
@@ -261,7 +284,7 @@ say("*********************************In while loop of stageChunk 1\n");
 			CIDToProfile[oldDag].dag = newDag;
 			CIDToProfile[oldDag].state = READY;
 			CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
-			managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
+			//managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
 			pthread_mutex_unlock(&profileLock);
 			//cnt++;
 			//pthread_mutex_unlock(&responseMutex);
@@ -288,7 +311,6 @@ void *stageData(void *)
 
 //netStageSock is used to communicate with stage server.
     getNewAD(myAD);
-	lastSSID = getSSID();
     //Connect to the Stage Server
     int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
     //Rtt of wireless
@@ -326,11 +348,12 @@ void *stageData(void *)
         say("*********************************In while loop of stageData\n");
         if(!isConnect()){
             long newStamp = now_msec();
-            connetTime << lastSSID << " disconnect. Last: " << newStamp - timeStamp << "ms." << endl;
+            //connetTime << lastSSID << " disconnect. Last: " << newStamp - timeStamp << "ms." << endl;
         }
         string currSSID = getSSID();
+say("current SSID = %s\n\n\n", currSSID.c_str());
         if (lastSSID != currSSID) {
-            connetTime << currSSID << "Connect." << endl;
+            //connetTime << currSSID << "Connect." << endl;
             timeStamp = now_msec();
             say("Thread id: %d Network changed, create another thread to continue!\n");
             lastSSID = currSSID;
@@ -339,7 +362,7 @@ void *stageData(void *)
             pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
-        set<string> needStage;
+        vector<string> needStage;
         pthread_mutex_lock(&dagVecLock);
         //for (auto pair : allDAGs) {
             //int sock = pair.first;
@@ -362,7 +385,7 @@ void *stageData(void *)
                 if (CIDToProfile[dags[i]].state == BLANK) {
                     say("needStage: i = %d, beg = %d, dag = %s\n",i, beg, dags[i].c_str());
                     CIDToProfile[dags[i]].state = PENDING;
-                    needStage.insert(dags[i]);
+                    needStage.push_back(dags[i]);
                     j++;
                 }
             }
@@ -403,7 +426,7 @@ void *stageData(void *)
 			CIDToProfile[dag].stageStartTimestemp = now_msec();
 			sprintf(cmd, "%s %s",cmd, dag.c_str());
 			cnt++;
-			if(cnt == 3){
+			if(cnt == 2){
 				cnt = 0;
 				sendStreamCmd(netStageSock, cmd);
 				memset(cmd, 0, sizeof(cmd));
@@ -444,20 +467,33 @@ void *stageData(void *)
     //}
     //pthread_exit(NULL);
 }
-int main()
+void *watchNetwork(void *){
+	string lastSSID = getSSID();
+	while(true){
+		string currSSID = getSSID();
+		if(lastSSID != currSSID){
+			lastSSID = currSSID;
+			say("SSID changed! unlock! \n\n");
+			pthread_mutex_unlock(&StageControl);
+		}
+	}
+}
+int main(int argc, char **argv)
 {
 //pthread_mutex_lock(&StageControl);
 //say("before getSSID");
-    //lastSSID = getSSID();
+    lastSSID = getSSID();
 //say("after getSSID");
     //currSSID = lastSSID;
     timeStamp = now_msec();
-    connetTime << currSSID << "Connect." << endl;
+    //connetTime << currSSID << "Connect." << endl;
     int stageSock = registerUnixStreamReceiver(UNIXMANAGERSOCK);
 //say("after registerUnixStreamReceiver");
     pthread_t thread_stageData;
-
     pthread_create(&thread_stageData, NULL, stageData, NULL);
+	
+	pthread_t thread_watchNetwork;
+    pthread_create(&thread_watchNetwork, NULL, watchNetwork, NULL);
 //say("after stageData");
     UnixBlockListener((void*)&stageSock, clientCmd);
 //say("after clientCmd");

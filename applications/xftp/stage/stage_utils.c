@@ -259,7 +259,7 @@ say("cmd2 = %s\n", cmd2.c_str());
 	}
 	}
 	result = execSystem("date '+%c%N'");
-        printf("connect time: %s\n", result.c_str());
+        //printf("connect time: %s\n", result.c_str());
 	return 0;
 }
 
@@ -269,13 +269,13 @@ int Disconnect1(int interface){
 	interface++;
 	//pthread_mutex_lock(disconnectTime);
 	begin_time = now_msec();
-	printf("-------------disconnect begin at %ld \n", begin_time);
+	//printf("-------------disconnect begin at %ld \n", begin_time);
 	rtn = Disconnect_SSID(interface);
 	//usleep(DISCONNECT_TIME * 1000);
 	end_time = now_msec();
 	say("-------------disconnect end at %ld \n", end_time);
 	total_time = end_time - begin_time;
-	printf("-------------disconnect using time = %ld \n", total_time);
+	//printf("-------------disconnect using time = %ld \n", total_time);
 }
 
 int Connect1(int interface, int n_ssid, int freq){
@@ -292,13 +292,13 @@ interface++;
 	long begin_time, end_time, total_time;
 	//pthread_mutex_lock(encounterTime);
 	begin_time = now_msec();
-	printf("-------------connect begin at %ld \n", begin_time);
+	say("-------------connect begin at %ld \n", begin_time);
 	rtn = Connect_SSID(interface, ssid, freq);
 	//usleep(CONNECT_TIME * 1000);
 	end_time = now_msec();
 	say("-------------connect end at %ld \n", end_time);
 	total_time = end_time - begin_time;
-	printf("-------------connect using time = %ld \n", total_time);
+	say("-------------connect using time = %ld \n", total_time);
 }
 
 int XmyReadLocalHostAddr(int sockfd, char *localhostAD, unsigned lenAD, char *localhostHID, unsigned lenHID, char *local4ID, unsigned len4ID)
@@ -416,7 +416,7 @@ void getNewAD(char *old_ad)
 		if (XmyReadLocalHostAddr(sock, new_ad, sizeof(new_ad), hid, sizeof(hid), ip, sizeof(ip)) < 0)
 			die(-1, "Reading localhost address\n");
 		if (strcmp(new_ad, old_ad) != 0) {
-cerr<<"AD changed!"<<endl;
+//cerr<<"AD changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			Xclose(sock);
 			return;
@@ -461,8 +461,8 @@ void getNewAD2(int iface, char *old_ad)
 		strcpy(new_ad, ads);		
 		
 		if (strcmp(new_ad, old_ad) != 0) { 
-cerr<<"AD changed!"<<endl;
-cerr<<"AD not changed!"<<endl;
+//cerr<<"AD changed!"<<endl;
+//cerr<<"AD not changed!"<<endl;
 			strcpy(old_ad, new_ad);
 			
 			return;
@@ -564,7 +564,7 @@ int hearHello(int sock)
 		warn("socket error while waiting for data, closing connection\n");
 	}
 	//say("HearHello printf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n\n\n\n\n\n\n\n");
-	printf("%s\n", command);
+	say("%s\n", command);
 	return n;
 	/*
 	if (strncmp(command, "get", 3) == 0) {
@@ -635,7 +635,7 @@ int tDatagramClient(const char *name, struct addrinfo *ai, sockaddr_x *sa)
 	sa = (sockaddr_x*)ai->ai_addr;
 
 	Graph g(sa);
-	printf("\n%s\n", g.dag_string().c_str());
+	say("\n%s\n", g.dag_string().c_str());
 
 	int sock;
 	if ((sock = Xsocket(AF_XIA, SOCK_DGRAM, 0)) < 0) {
@@ -668,19 +668,19 @@ int initStreamClient(const char *name, char *src_ad, char *src_hid, char *dst_ad
 
 	// lookup the xia service
 	daglen = sizeof(dag);
-cerr<<"Before got DAG by name: "<<name<<"\n";
+//cerr<<"Before got DAG by name: "<<name<<"\n";
 	if (reXgetDAGbyName(name, &dag, &daglen) < 0)
 		die(-1, "unable to locate: %s\n", name);
-cerr<<"Got DAG by name\n";
+//cerr<<"Got DAG by name\n";
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
-cerr<<"Created socket\n";
+//cerr<<"Created socket\n";
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-cerr<<"Connected to peer\n";
+//cerr<<"Connected to peer\n";
 	rc = XmyReadLocalHostAddr(sock, src_ad, MAX_XID_SIZE, src_hid, MAX_XID_SIZE, IP, MAX_XID_SIZE);
 
 	if (rc < 0) {
@@ -688,7 +688,7 @@ cerr<<"Connected to peer\n";
 		die(-1, "Unable to read local address.\n");
 	}
 	else{
-		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
+		say("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
 
 	// save the AD and HID for later. This seems hacky we need to find a better way to deal with this
@@ -704,7 +704,7 @@ cerr<<"Connected to peer\n";
 	if (sscanf(hids, "%s", dst_hid) < 1 || strncmp(dst_hid, "HID:", 4) != 0) {
 		die(-1, "Unable to extract HID.");
 	}
-	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
+	say("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
 	return sock;
 }
 
@@ -728,7 +728,7 @@ int registerDatagramReceiver(char* name)
 	sockaddr_x *sa = (sockaddr_x*)ai->ai_addr;
 
 	Graph g((sockaddr_x*)ai->ai_addr);
-	printf("\nDatagram DAG\n%s\n", g.dag_string().c_str());
+	say("\nDatagram DAG\n%s\n", g.dag_string().c_str());
 
 	if (XregisterName(name, sa) < 0)
 		die(-1, "error registering name: %s\n", name);
@@ -859,20 +859,20 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 	char sdag[1024];
 	char IP[MAX_XID_SIZE];
 
-cerr << "--------------------------1" << endl;
-say("------------------------name is: %s\n", name);
-say("------------------------myAD is: %s\n", src_ad);
-say("------------------------myHID is: %s\n", src_hid);
-say("------------------------stageAD is: %s\n", dst_ad);
-say("------------------------stageHID is: %s\n", dst_hid);
+//cerr << "--------------------------1" << endl;
+//say("------------------------name is: %s\n", name);
+//say("------------------------myAD is: %s\n", src_ad);
+//say("------------------------myHID is: %s\n", src_hid);
+//say("------------------------stageAD is: %s\n", dst_ad);
+//say("------------------------stageHID is: %s\n", dst_hid);
 	// lookup the xia service
 	daglen = sizeof(dag);
-cerr << "--------------------daglen is: " << daglen << endl;
+//cerr << "--------------------daglen is: " << daglen << endl;
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
-cerr << "-----------------------name is: " << name << endl;
+//cerr << "-----------------------name is: " << name << endl;
 		die(-1, "unable to locate: %s\n", name);
 	}
-cerr << "-------------------------2" << endl;
+//cerr << "-------------------------2" << endl;
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		die(-1, "Unable to create the listening socket\n");
@@ -890,7 +890,7 @@ say("------------------------------4\n");
 		die(-1, "Unable to read local address.\n");
 	}
 	else{
-		warn("My AD: %s, My HID: %s\n", src_ad, src_hid);
+		say("My AD: %s, My HID: %s\n", src_ad, src_hid);
 	}
 say("----------------------------------5\n");
 
@@ -907,7 +907,7 @@ say("----------------------------------5\n");
 	if (sscanf(hids, "%s", dst_hid) < 1 || strncmp(dst_hid, "HID:", 4) != 0) {
 		die(-1, "Unable to extract HID.");
 	}
-	warn("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
+	say("Service AD: %s, Service HID: %s\n", dst_ad, dst_hid);
 say("-------------------------------------6\n");
 	return sock;
 }
@@ -928,7 +928,7 @@ say("in registerMulStageService");
 		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {  
 			if (ifa->ifa_addr == NULL)  
 				continue;  
-			printf("interface: %s \n", ifa->ifa_name); 
+			//printf("interface: %s \n", ifa->ifa_name); 
 			if(iface == 0 && strcmp(ifa->ifa_name, "iface0")==0) if1 = ifa;//"wlp6s0"
 			if(iface == 1 && strcmp(ifa->ifa_name, "iface1")==0 ) if1 = ifa;//"wlan0"
 			if(iface == 2 && strcmp(ifa->ifa_name, "iface2")==0 ) if1 = ifa;
@@ -967,13 +967,13 @@ say("in registerMulStageService");
 		//Use the sockaddr_x returned by Xgetaddrinfo in your next call
 		sa = (sockaddr_x*)ai->ai_addr;
 		Graph ggg(sa);
-		printf("registerMulStageService\n%s\n", ggg.dag_string().c_str());
+		say("registerMulStageService\n%s\n", ggg.dag_string().c_str());
 		//usleep(1 * 1000);
 	//}
 	
 	Xbind(ssock, (struct sockaddr*)sa, sizeof(sa));
 	Graph gg(sa);
-	printf("\n%s\n", gg.dag_string().c_str());
+	say("\n%s\n", gg.dag_string().c_str());
 	
 	sockaddr_x dag;
 	socklen_t daglen = sizeof(dag);

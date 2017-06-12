@@ -101,7 +101,7 @@ say("---------CID:%s\n",cid);
         if (stage) {
             memset(cmd, 0, sizeof(cmd));
             sprintf(cmd, "fetch");
-            sprintf(cmd, "%s %s Time: %d", cmd, CIDs[i].c_str(), fetchTime);
+            sprintf(cmd, "%s %s", cmd, CIDs[i].c_str());
             say("CMD is :%s\n", cmd);
             if (send(stageManagerSock, cmd, strlen(cmd), 0) < 0) {
                 die(-1, "send cmd fail! cmd is %s", cmd);
@@ -154,6 +154,9 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
 			if (send(stageManagerSock, cmd, strlen(cmd), 0) < 0) {
 				die(-1, "send cmd fail! cmd is %s", cmd);
 			}
+			if ((recv(stageManagerSock, cmd, XIA_MAX_BUF, 0)) < 0) {
+                die(-1, "fail to recv from stageManager!");
+            }
 		}
         //------------//logFile << i <<" Chunk. Running time is: " << end_time - start_time << " ms. req: " << req << endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
