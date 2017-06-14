@@ -165,9 +165,9 @@ int Controller::handler()
 	if (t - _last_purge >= _settings->expire_time()) {
 		_last_purge = t;
 
-//      purgeStaleRoutes(t);
-//      purgeStaleNeighbors(t);
-//      purgeStaleADs(t);
+		purgeStaleRoutes(t);
+		purgeStaleNeighbors(t);
+		purgeStaleADs(t);
 	}
 
 	return 0;
@@ -550,6 +550,11 @@ int Controller::sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTa
 		RouteTable::iterator it;
 		for (it = routingTable.begin(); it != routingTable.end(); it++)
 		{
+			if (it->second.dest.length() == 0 || it->second.nextHop.length() == 0) {
+				syslog(LOG_WARNING, "route table missing information!\n");
+				continue;
+			}
+
 			Xroute::TableEntry *e = t->add_routes();
 			Node dest(it->second.dest);
 			Node nexthop(it->second.nextHop);
@@ -730,9 +735,9 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		NodeStateEntry entry;
 		entry.hid = _myHID;
 
-	    // Add neighbors to network table entry
-	    NeighborTable::iterator it;
-	    for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
+		// Add neighbors to network table entry
+		NeighborTable::iterator it;
+		for (it = _neighborTable.begin(); it != _neighborTable.end(); it++)
  			entry.neighbor_list.push_back(it->second);
 
 		_networkTable[_myHID] = entry;
@@ -874,6 +879,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 				} else
 					// maybe do a better check here
 					// no dag in the lsa and not in our trusted list so skip
+					syslog(LOG_NOTICE, "%s is not in our trusted AD list", neighbor.AD.c_str());
 					continue;
 			}
 
