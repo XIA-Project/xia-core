@@ -37,7 +37,7 @@ void Controller::purgeStaleRoutes(time_t now)
 	while (iter != _route_timestamp.end())
 	{
 		if (now - iter->second >= _settings->expire_time() * 10) {
-			syslog(LOG_INFO, "purging route for : %s", iter->first.c_str());
+			syslog(LOG_NOTICE, "purging route for : %s", iter->first.c_str());
 			_xr.delRoute(iter->first);
 //			_last_update_latency = 0; // force update latency
 			_route_timestamp.erase(iter++);
@@ -55,7 +55,7 @@ void Controller::purgeStaleNeighbors(time_t now)
 	{
 		time_t t = iter->second;
 		if ((t != 0) && (now - t >= _settings->expire_time() * 10)) {
-			syslog(LOG_INFO, "purging neighbor route for : %s", iter->first.c_str());
+			syslog(LOG_NOTICE, "purging neighbor route for : %s", iter->first.c_str());
 			_xr.delRoute(iter->first);
 //			_last_update_latency = 0; // force update latency
 			_neighborTable.erase(iter->first);
@@ -74,7 +74,7 @@ void Controller::purgeStaleADs(time_t now)
 	while (iter1 != _ADNetworkTable.end())
 	{
 		if (now - iter1->second.timestamp >= _settings->expire_time() * 10) {
-			syslog(LOG_INFO, "purging AD neighbor : %s", iter1->first.c_str());
+			syslog(LOG_NOTICE, "purging AD neighbor : %s", iter1->first.c_str());
 //			_last_update_latency = 0; // force update latency
 			_xr.delRoute(iter1->first);
 			_ADNetworkTable.erase(iter1++);
@@ -89,7 +89,7 @@ void Controller::purgeStaleADs(time_t now)
 	{
 		if (now - iter2->second.timestamp >= _settings->expire_time()) {
 //			_last_update_latency = 0; // force update latency
-			syslog(LOG_INFO, "purging neighbor : %s", iter2->first.c_str());
+			syslog(LOG_NOTICE, "purging neighbor : %s", iter2->first.c_str());
 			_xr.delRoute(iter2->first);
 			_neighborTable.erase(iter2++);
 		} else {
@@ -102,7 +102,7 @@ void Controller::purgeStaleADs(time_t now)
 	{
 		if (now - iter3->second.timestamp >= _settings->expire_time() * 10) {
 //			_last_update_latency = 0; // force update latency
-			syslog(LOG_INFO, "purging AD neighbor : %s", iter3->first.c_str());
+			syslog(LOG_NOTICE, "purging AD neighbor : %s", iter3->first.c_str());
 
 			_ADNetworkTable[_myAD].neighbor_list.erase(
 				std::remove(_ADNetworkTable[_myAD].neighbor_list.begin(),
@@ -145,7 +145,7 @@ int Controller::handler()
 	gettimeofday(&now, NULL);
 
 	if (timercmp(&now, &h_fire, >=)) {
-//		sendHello();
+		sendHello();
 		timeradd(&now, &h_freq, &h_fire);
 	}
 	if (timercmp(&now, &l_fire, >=)) {
@@ -836,6 +836,8 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	string srcAD  = Node(a.type(), a.id().c_str(), 0).to_string();
 	string srcHID = Node(h.type(), h.id().c_str(), 0).to_string();
 
+	syslog(LOG_NOTICE, "LSA from %s", srcHID.c_str());
+
 	if (msg.has_flags() && msg.flags() & F_IP_GATEWAY) {
 		_dual_router_AD = srcAD;
 	}
@@ -863,6 +865,8 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.HID  = Node(h.type(), h.id().c_str(), 0).to_string();
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
+
+		syslog(LOG_NOTICE, "     neighbor: %s", neighbor.HID.c_str());
 
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
