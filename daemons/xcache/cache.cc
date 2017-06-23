@@ -148,7 +148,8 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 
 	// FIXME: this should be wrapped in a mutex
 	struct cache_download *download;
-	xcache_meta *meta = new xcache_meta(cid);
+	// TODO: NITIN - do we need to support NCID here?
+	xcache_meta *meta = new xcache_meta(cid, XID_TYPE_CID);
 
 	meta->set_state(CACHING);
 	meta->set_seq(ntohl(tcp->th_seq));

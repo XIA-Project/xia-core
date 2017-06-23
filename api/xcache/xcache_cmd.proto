@@ -44,6 +44,7 @@ message xcache_cmd {
 	optional int32 readlen = 12;
 	optional bytes msg = 13;
 	optional int32 hop_count = 14;
+	optional bytes extra = 15;
 };
 
 message xcache_notif {

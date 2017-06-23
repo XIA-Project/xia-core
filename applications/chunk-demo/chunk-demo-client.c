@@ -88,7 +88,7 @@ int get_url(int sock, char *reply, int sz)
 	return n;
 }
 
-int make_and_getchunk(int sock)
+int make_and_getchunk(int sock, int type)
 {
 	char cmd[5120];
 	char url[5120];
@@ -97,7 +97,16 @@ int make_and_getchunk(int sock)
 	int ret;
 
 	// send the file request
-	sprintf(cmd, "make");
+	switch (type) {
+		case XID_TYPE_CID:
+			sprintf(cmd, "make");
+			break;
+		case XID_TYPE_NCID:
+			sprintf(cmd, "make_ncid");
+			break;
+		default:
+			die(-1, "ERROR: invalid type of chunk requested\n");
+	}
 	sendCmd(sock, cmd);
 
 	// get back number of chunks in the file
@@ -241,8 +250,10 @@ int main(int argc, char **argv)
 			die(errno, "%s", strerror(errno));
 		}
 
-		if (strncmp(cmd, "make", 4) == 0){
-			make_and_getchunk(sock);
+		if (strncmp(cmd, "make_ncid", 9) == 0){
+			make_and_getchunk(sock, XID_TYPE_NCID);
+		} else if (strncmp(cmd, "make", 4) == 0){
+			make_and_getchunk(sock, XID_TYPE_CID);
 		}
 	}
 	return 1;

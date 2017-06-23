@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -14,6 +15,7 @@
 #include <iostream>
 #include "Xsocket.h"
 #include "Xkeys.h"
+#include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "xcache_sock.h"
 #include "cid.h"
@@ -75,6 +77,34 @@ static int xcache_create_lib_socket(void)
 	return s;
 }
 
+std::string xcache_controller::get_id(int *type, xcache_cmd *cmd)
+{
+	struct chunk_extra extra;
+	SHA_CTX ctx;
+	unsigned char digest[SHA_DIGEST_LENGTH];
+	char hex_string[SHA_DIGEST_LENGTH*2 + 1];
+
+	if (!cmd->has_extra()) {
+		*type = XID_TYPE_CID;
+		return compute_cid(cmd->data().c_str(), cmd->data().length());
+	}
+
+	memcpy(&extra, (const void *)cmd->extra().c_str(), cmd->extra().size());
+	*type = extra.chunk_type;
+
+	if (extra.chunk_type == XID_TYPE_CID) {
+		return compute_cid(cmd->data().c_str(), cmd->data().length());
+	}
+
+	SHA1_Init(&ctx);
+	SHA1_Update(&ctx, extra.u.ncid.name, strlen(extra.u.ncid.name));
+	SHA1_Update(&ctx, &(extra.u.ncid.certDAG), sizeof(sockaddr_x));
+	SHA1_Final(digest, &ctx);
+
+	xs_hexDigest(digest, SHA_DIGEST_LENGTH, hex_string, sizeof(hex_string));
+	return hex_string;
+}
+
 // FIXME: unused?
 void xcache_controller::status(void)
 {
@@ -112,7 +142,18 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
-	xcache_meta *meta = new xcache_meta(expected_cid.id_string());
+	xcache_meta *meta;
+	switch (expected_cid.type()) {
+		case XID_TYPE_CID:
+			meta = new xcache_meta(expected_cid.id_string(), XID_TYPE_CID);
+			break;
+		case XID_TYPE_NCID:
+			meta = new xcache_meta(expected_cid.id_string(), XID_TYPE_NCID);
+			break;
+		default:
+			syslog(LOG_ERR, "Invalid type for expected CID");
+			return RET_FAILED;
+	}
 
 	meta->set_state(FETCHING);
 
@@ -481,8 +522,11 @@ int xcache_controller::__store_policy(xcache_meta *meta) {
 
 bool xcache_controller::verify_content(xcache_meta *meta, const std::string *data)
 {
-	if (meta->get_cid() != compute_cid(data->c_str(), data->length()))
-		return false;
+	if (meta->_type == XID_TYPE_CID) {
+		if (meta->get_cid() != compute_cid(data->c_str(), data->length())) {
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -524,20 +568,21 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	return RET_SENDRESP;
 }
 
-int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
+int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax, int type)
 {
 	int rc = 0;
-	std::string myCid("CID:");
+	std::string contentID;
 
 	struct addrinfo *ai;
 
-	myCid += cid;
+	contentID = std::string((type == XID_TYPE_CID) ? "CID:" : "NCID:");
+	contentID += cid;
 
 	// make a direct AD-HID-SID dag for the xcache daemon
 	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
 		if (ai->ai_addr) {
 			// now append the CID to it
-			Node cnode(myCid);
+			Node cnode(contentID);
 			Graph spath((sockaddr_x*)ai->ai_addr);
 			spath *= cnode;
 
@@ -622,7 +667,9 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
-	std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
+	//std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
+	int type;
+	std::string cid = get_id(&type, cmd);
 
 	meta = acquire_meta(cid.c_str());
 
@@ -636,7 +683,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		/*
 		 * New object - Allocate a meta
 		 */
-		meta = new xcache_meta(cid);
+		meta = new xcache_meta(cid, type);
 		meta->set_ttl(ttl);
 		meta->set_created();
 		meta->set_length(cmd->data().length());
@@ -655,7 +702,7 @@ printf("store:length: %lu", meta->get_length());
 
 	sockaddr_x addr;
 
-	if (cid2addr(cid, &addr) == 0) {
+	if (cid2addr(cid, &addr, type) == 0) {
 		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
 		Graph g(&addr);
 		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());

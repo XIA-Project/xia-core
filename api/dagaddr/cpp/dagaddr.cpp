@@ -115,6 +115,7 @@ const std::string Node::XID_TYPE_DUMMY_SOURCE_STRING = "SOURCE";
 const std::string Node::XID_TYPE_AD_STRING = "AD";
 const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
+const std::string Node::XID_TYPE_NCID_STRING = "NCID";
 const std::string Node::XID_TYPE_SID_STRING = "SID";
 const std::string Node::XID_TYPE_IP_STRING = "IP";
 const std::string Node::XID_TYPE_FID_STRING = "FID";
@@ -162,6 +163,7 @@ Node::Node(uint32_t type, const void* id, int dummy)
 * 			\n Node::XID_TYPE_AD (Administrative Domain)
 *			\n Node::XID_TYPE_HID (Host)
 *			\n Node::XID_TYPE_CID (Content)
+*			\n Node::XID_TYPE_NCID (NamedContent)
 *			\n Node::XID_TYPE_SID (Service)
 *			\n Node::XID_TYPE_FID (Flood)
 *			\n Node::XID_TYPE_IP (IPv4 / 4ID)
@@ -193,6 +195,7 @@ Node::Node(int type, const std::string id_str)
 *			\n Node::XID_TYPE_AD_STRING
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
+*			\n Node::XID_TYPE_NCID_STRING
 *			\n Node::XID_TYPE_SID_STRING
 *			\n Node::XID_TYPE_FID_STRING
 *			\n Node::XID_TYPE_IP_STRING
@@ -283,6 +286,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_HID;
 	else if (typestr == XID_TYPE_CID_STRING)
 		ptr_->type = XID_TYPE_CID;
+	else if (typestr == XID_TYPE_NCID_STRING)
+		ptr_->type = XID_TYPE_NCID;
 	else if (typestr == XID_TYPE_SID_STRING)
 		ptr_->type = XID_TYPE_SID;
 	else if (typestr == XID_TYPE_IP_STRING)
@@ -381,6 +386,8 @@ Node::type_string() const
 			return XID_TYPE_HID_STRING;
 		case XID_TYPE_CID:
 			return XID_TYPE_CID_STRING;
+		case XID_TYPE_NCID:
+			return XID_TYPE_NCID_STRING;
 		case XID_TYPE_SID:
 			return XID_TYPE_SID_STRING;
 		case XID_TYPE_FID:
@@ -450,6 +457,7 @@ Node::has_valid_xid() const
 		case XID_TYPE_AD:
 		case XID_TYPE_IP:
 		case XID_TYPE_CID:
+		case XID_TYPE_NCID:
 		case XID_TYPE_FID:
 		case XID_TYPE_HID:
 		case XID_TYPE_SID:
@@ -1405,7 +1413,10 @@ Graph::next_hop(const Node& n)
 	// find the next intent node (the final intent of the new DAG)
 	// for now, we we'll only consider CIDs and SIDs to be intent nodes
 	std::size_t intentIndex = nIndex;
-	while (intentIndex == nIndex || (nodes_[intentIndex].type() != XID_TYPE_CID && nodes_[intentIndex].type() != XID_TYPE_SID))
+	while (intentIndex == nIndex ||
+			(nodes_[intentIndex].type() != XID_TYPE_CID
+			 && nodes_[intentIndex].type() != XID_TYPE_NCID
+			 && nodes_[intentIndex].type() != XID_TYPE_SID))
 	{
 		if (is_sink(intentIndex)) {
 			break;

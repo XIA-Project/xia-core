@@ -27,10 +27,11 @@ xcache_meta::xcache_meta()
 	init();
 }
 
-xcache_meta::xcache_meta(std::string cid)
+xcache_meta::xcache_meta(std::string cid, int type)
 {
 	init();
 	_cid = cid;
+	_type = type;
 }
 
 void xcache_meta::access() {

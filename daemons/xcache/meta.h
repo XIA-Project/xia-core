@@ -57,8 +57,9 @@ private:
 	void init();
 
 public:
+	int _type;
 	xcache_meta();
-	xcache_meta(std::string);
+	xcache_meta(std::string, int);
 
 	time_t last_accessed() { return _accessed; }
 	void access();
