@@ -1067,8 +1067,8 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 		return sk;
 
 	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID ||
-			ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-		DBG("Dest = CID, look up the sk for the xcache SID instead\n");
+			ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_NCID) {
+		DBG("Dest = CID/NCID, look up the sk for the xcache SID instead\n");
 		// Packet destined to a CID. Handling it specially.
 		// FIXME: This is hackish. Maybe give users the ability to
 		// register their own rules?
