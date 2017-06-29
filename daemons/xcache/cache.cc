@@ -99,24 +99,24 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 		return PACKET_NO_DATA;
 	}
 
-	// FIXME: this should use the std libraries for managing DAGs instead of going in direct
-	 // get the associated client SID and destination CID
-	for (unsigned i = 0; i < xiah->dnode; i++) {
-		unsigned type = htonl(xiah->node[i].xid.type);
+	Graph dst_dag;
+	dst_dag.from_wire_format(xiah->dnode, &xiah->node[0]);
 
-		if (type == CLICK_XIA_XID_TYPE_SID) {
-			unparse_xid(&xiah->node[i], sid);
-		}
+	Graph src_dag;
+	src_dag.from_wire_format(xiah->snode, &xiah->node[xiah->dnode]);
+
+	// Client service that requested the chunk
+	sid = dst_dag.intent_SID_str();
+
+	// Chunk being transmitted
+	Node src_intent_xid = src_dag.get_final_intent();
+	if (src_intent_xid.type() == CLICK_XIA_XID_TYPE_CID
+			|| src_intent_xid.type() == CLICK_XIA_XID_TYPE_NCID) {
+		cid = src_intent_xid.to_string();
+	} else {
+		syslog(LOG_ERR, "Dest DAG Intent not a CID/NCID");
+		return PACKET_INVALID;
 	}
-
-	for (unsigned i = xiah->dnode; i < total_nodes; i++) {
-		unsigned type = htonl(xiah->node[i].xid.type);
-
-		if (type == CLICK_XIA_XID_TYPE_CID) {
-			unparse_xid(&xiah->node[i], cid);
-		}
-	}
-
 
 	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
@@ -299,7 +299,8 @@ skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
 
-		if (compute_cid(download->data, ntohl(download->header.length)) == cid) {
+		if (compute_cid(download->data, ntohl(download->header.length)) == cid
+			|| cid.find("NCID:") == 0) {
 			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
 
 			meta->set_ttl(ntohl(download->header.ttl));
