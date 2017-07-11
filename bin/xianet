@@ -559,6 +559,10 @@ clean_conf_and_keys()
 	rm -f $XIADIR/etc/click/router*.click
 	echo "Deleting key files"
 	rm -f $XIADIR/key/*
+	echo "Deleting CA files"
+	rm -f $XIADIR/ca/*
+	echo "Deleting Publisher files"
+	rm -rf $XIADIR/publisher/*
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/hosts.xia
