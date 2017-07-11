@@ -29,12 +29,12 @@ class CA:
     
     def __init__(self):
         """ Create a root certificate if one doesn't exist """
-        print "Keys and certs will be stored in {}".format(CA.keydir)
 
         # Create a directory to hold CA keys and signed certs
         if not os.path.exists(CA.keydir):
             os.mkdir(CA.keydir)
             os.chmod(CA.keydir, 0700)
+            print "Keys and certs will be stored in {}".format(CA.keydir)
 
         keyfile = os.path.join(CA.keydir, 'ca.key')
         certfile = os.path.join(CA.keydir, 'ca.cert')
@@ -50,7 +50,7 @@ class CA:
         if not os.path.exists(certfile) or new_key_created:
             print "Creating self-signed cert representing this CA"
             self.make_new_ss_cert(keyfile, certfile)
-        print "Root Certificate:", certfile
+            print "Root Certificate:", certfile
 
         # Notify user that nCID support requires all clients to use ca.cert
         print "NOTE: Copy ca.cert to all clients supporting nCID"
