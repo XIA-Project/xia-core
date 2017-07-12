@@ -462,6 +462,39 @@ int XputChunk(XcacheHandle *h, const char *data, size_t length,
 }
 
 /*!
+** @brief load a named chunk into the local content cache
+**
+** Creates an NCID based on hash of Content URI and Publisher public key
+**
+** Note that each NCID chunk also has a CID address.
+**
+** The chunk is stored in the local content cache and is accessible via
+** both NCID and CID. Both of those identifiers are entered into the
+** corresponding routing tables on the local host.
+**
+** The chunk will expire out of the local cache (and any other locations
+** where it is subsequently cached) if a TTL has been set in XcacheHandle.
+**
+** @param h the cache handle
+** @param data a byte array of data to be converted to a chunk
+** @param length the number of bytes in data
+** @param publisher_name name of publisher signing this chunk
+**
+** @returns XCACHE_OK on success
+** @returns XCACHE_ERR_EXISTS if the chunk already resides in the cache
+** @returns -1 if an error occurs in producing or signing the chunk
+**
+*/
+int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
+		char *publisher_name)
+{
+	int retval = -1;
+	// Build and forward an NCID_STORE request to Xcache controller
+	// Return the status back to the caller.
+	return retval;
+}
+
+/*!
 ** @brief create and cache a chunk consisting of addresses of other chunks
 **
 ** Creates a content chunk that contain a list of DAGs pointing to other CIDs The meta chunk is
