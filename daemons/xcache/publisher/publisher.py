@@ -67,6 +67,7 @@ class Publisher:
         print "Keys and certs will be stored in {}".format(self.keydir)
 
         self.keyfile = os.path.join(self.keydir, name + '.key')
+        self.pubkeyfile = os.path.join(self.keydir, name + '.pub')
         self.reqfile = os.path.join(self.keydir, name + '.req')
         self.conffile = os.path.join(self.keydir, name + '.conf')
 
@@ -103,15 +104,30 @@ class Publisher:
         print "Request ready for CA:", self.reqfile
         return self.reqfile
 
+    def make_public_key(self):
+        """ Output public key in RSAPublicKey format """
+        cmd = "openssl rsa -in {} -RSAPublicKey_out -out {}".format(
+                self.keyfile, self.pubkeyfile)
+        check_call(cmd.split())
+        print "Public key stored in:", self.pubkeyfile
+        return self.pubkeyfile
+
 def parse_args():
     parser = argparse.ArgumentParser(description="XIA Named Content Publisher")
     parser.add_argument("-n", "--name",
             help="publisher name", type=str, required=True)
+    parser.add_argument("-p", "--pubkey",
+            help="generate public key", action="store_true")
+    parser.add_argument("-r", "--request_sign",
+            help="make a signing request to send to CA", action="store_true")
     args =  parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = parse_args()
-    ca = Publisher(args.name)
-    req_file = ca.make_signing_request()
+    publisher = Publisher(args.name)
+    if args.request_sign:
+        req_file = publisher.make_signing_request()
+    if args.pubkey:
+        pub_key = publisher.make_public_key()
 
