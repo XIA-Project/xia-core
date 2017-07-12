@@ -488,10 +488,40 @@ int XputChunk(XcacheHandle *h, const char *data, size_t length,
 int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 		char *publisher_name)
 {
-	int retval = -1;
 	// Build and forward an NCID_STORE request to Xcache controller
-	// Return the status back to the caller.
-	return retval;
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_STORE_NAMED);
+	cmd.set_context_id(h->contextID);
+	cmd.set_data(data, length);
+	cmd.set_publisher_name(publisher_name, strlen(publisher_name));
+	//cmd.set_flags(flags);
+	cmd.set_ttl(h->ttl);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
+		/* Error in Sending chunk */
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Did not get a valid response from xcache\n");
+		return -1;
+	}
+
+	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+		printf("%s received an error from xcache\n", __func__);
+		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
+			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
+			return xcache_cmd::XCACHE_ERR_EXISTS;
+		} else {
+			return -1;
+		}
+	}
+
+	//fprintf(stderr, "%s: Got a response from server\n", __func__);
+
+	return xcache_cmd::XCACHE_OK;
 }
 
 /*!
