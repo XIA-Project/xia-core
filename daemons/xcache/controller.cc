@@ -663,6 +663,12 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
+int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	int retval = RET_FAILED;
+	return retval;
+}
+
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
@@ -879,6 +885,12 @@ void xcache_controller::process_req(xcache_req *req)
 		break;
 	}
 
+	case xcache_cmd::XCACHE_STORE_NAMED:
+		ret = store_named(&resp, (xcache_cmd *)req->data);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
 	case xcache_cmd::XCACHE_STORE:
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
