@@ -68,6 +68,7 @@ class Publisher:
 
         self.keyfile = os.path.join(self.keydir, name + '.key')
         self.pubkeyfile = os.path.join(self.keydir, name + '.pub')
+        self.privkeyfile = os.path.join(self.keydir, name + '.priv')
         self.reqfile = os.path.join(self.keydir, name + '.req')
         self.conffile = os.path.join(self.keydir, name + '.conf')
 
@@ -112,12 +113,22 @@ class Publisher:
         print "Public key stored in:", self.pubkeyfile
         return self.pubkeyfile
 
+    def make_private_key(self):
+        """ Output private key in a format usable by XIA """
+        cmd = "openssl rsa -in {} -outform PEM -out {}".format(
+                self.keyfile, self.privkeyfile)
+        check_call(cmd.split())
+        print "Private key stored in:", self.privkeyfile
+        return self.privkeyfile
+
 def parse_args():
     parser = argparse.ArgumentParser(description="XIA Named Content Publisher")
     parser.add_argument("-n", "--name",
             help="publisher name", type=str, required=True)
     parser.add_argument("-p", "--pubkey",
             help="generate public key", action="store_true")
+    parser.add_argument("-k", "--privkey",
+            help="generate private key in PEM for XIA use", action="store_true")
     parser.add_argument("-r", "--request_sign",
             help="make a signing request to send to CA", action="store_true")
     args =  parser.parse_args()
@@ -130,4 +141,6 @@ if __name__ == "__main__":
         req_file = publisher.make_signing_request()
     if args.pubkey:
         pub_key = publisher.make_public_key()
+    if args.privkey:
+        priv_key = publisher.make_private_key()
 
