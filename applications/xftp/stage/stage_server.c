@@ -132,9 +132,9 @@ void stageControl(int sock, char *cmd)
                 SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
                 SIDToProfile[remoteSID][CID].fetchStartTimestamp);
 //        hearHello(sock);
-        stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
-                        SIDToProfile[remoteSID][CID].fetchStartTimestamp << endl;
-
+//        stageServerTime << "OldDag: " << oldUrl << " NewDag: " << url << " StageTime: " << SIDToProfile[remoteSID][CID].fetchFinishTimestamp -
+//                        SIDToProfile[remoteSID][CID].fetchStartTimestamp << endl;
+		stageServerTime << SIDToProfile[remoteSID][CID].fetchStartTimestamp << "	"<< SIDToProfile[remoteSID][CID].fetchFinishTimestamp <<endl;
         // Send chunk ready message to state manager.
         sendStreamCmd(sock, reply);
         say("xsend return ----- xsend return ---- xsend return ----  %s", CID.c_str());
@@ -259,7 +259,7 @@ void *stageCmd(void *socketid)
 			start = cmd;
 			while((end = strstr(start+6, "stage")) > 0){
 				n = end - start;
-				printf("n = %d\n", n);
+				say("n = %d\n", n);
 				strncpy(cmd1, start, end - start);
 				start = end;
 				*(cmd1+(end-start))=0;
@@ -292,5 +292,6 @@ say("before registerStreamReceiver");
     say("The current stageServerSock is %d\n", stageServerSock);
     blockListener((void *)&stageServerSock, stageCmd);
 say("after blockListener");
+
     return 0;
 }

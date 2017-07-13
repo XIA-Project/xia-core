@@ -48,7 +48,7 @@ int SOFTSTAGE_TIME = 1000;
 int OVERLAP_TIME = 2000;
 int DISCONNECT_TIME = 0;
 int netsize = 1;
-int FREQ[2]={2457, 2432};
+int FREQ[2]={2447, 2442};
 pthread_mutex_t encounterTime = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t disconnectTime = PTHREAD_MUTEX_INITIALIZER;
 
@@ -253,6 +253,9 @@ void *clientCmd(void *socketid)
 			}
             //say("Get Time! cmd: %s\n", cmd);
             sscanf(cmd, "time %ld", &timeWifi);
+			if (send(sock, "Get", sizeof("Get"), 0) < 0) {
+       			warn("socket error while sending data, closing connetTime\n");
+    		}
             updateStageArg();
         }
         //usleep(SCAN_DELAY_MSEC*1000);
@@ -292,7 +295,7 @@ void *stageChunk(void * lastSock){
 		start = reply;
 		while((end=strstr(start +6,"ready"))>0){
 			n=end-start;
-			printf("n=%d\n",n);
+			//printf("n=%d\n",n);
 			strncpy(reply1,start,n);
 			start=end;
 			reply1[n]=0;
@@ -337,8 +340,8 @@ void *stageData(void *)
 {
     thread_c++;
     int thread_id = thread_c;
-    cerr << "Thread id " << thread_id << ": " << "Is launched\n";
-    cerr << "Current " << getAD2(0) << endl;
+    //cerr << "Thread id " << thread_id << ": " << "Is launched\n";
+    //cerr << "Current " << getAD2(0) << endl;
 	//int chunkToRecv=0;
     char myAD[MAX_XID_SIZE];
     char myHID[MAX_XID_SIZE];
@@ -483,12 +486,12 @@ void *preStageData(void *)
     char stageHID[MAX_XID_SIZE];
 	int preStageChunk=0;
 	string	lastSSID = getSSID();
-	strcpy(AD1, "AD:d760f2fd8572b5113d7a7c3b94be28838e97666f");
-	strcpy(AD2, "AD:8a912e21cf0f3fb78eb7e6e7e99f8a70c92f8de8");
+	strcpy(AD1, "AD:aa8225cfdacbe64eb065862714408dc46c649564");
+	strcpy(AD2, "AD:15bd1ffef0c29243a5d3cb332590b7cfe7c3000d");
     getNewAD2(0, myAD);
 	strcpy(myAD, getAD2(0).c_str());
-	cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
-    cerr << "preStageData Current " << getAD2(0) << endl;
+	//cerr << "preStageData Thread id " << thread_id << ": " << "Is launched\n";
+    //cerr << "preStageData Current " << getAD2(0) << endl;
     //Connect to the Stage Server
     string serviceAD = "";
 	if(strcmp(myAD, AD1) == 0)serviceAD = AD2;
@@ -695,7 +698,7 @@ void *handoffPolicy(void *){
 		case 2:
 		{
 			string result = execSystem("service network-manager stop");
-			printf("close_network_manager %s\n", result.c_str());
+			//printf("close_network_manager %s\n", result.c_str());
 			Disconnect1(0);
 			Disconnect1(1);
 			pthread_t thread_time;
