@@ -282,9 +282,9 @@ int Connect1(int interface, int n_ssid, int freq){
 interface++;
 	char ssid[128];
 	if(n_ssid == 0){
-		strcpy(ssid, "XIA_Tenda_2");
+		strcpy(ssid, "XIA_2.4_1");
 	}else if(n_ssid == 1){
-		strcpy(ssid, "XIA-TP-LINK_2.4G");
+		strcpy(ssid, "XIA_2.4_2");
 	}else {
 		strcpy(ssid, "XIA-TP-LINK_5G");
 	}
@@ -650,7 +650,7 @@ int reXgetDAGbyName(const char *name, sockaddr_x *addr, socklen_t *addrlen)
 {
 	int result;
 	for (int i = 0; i < NS_LOOKUP_RETRY_NUM; i++) {
-		printf("-----------Retried %d/%d times...\n", i + 1, NS_LOOKUP_RETRY_NUM);
+		//printf("-----------Retried %d/%d times...\n", i + 1, NS_LOOKUP_RETRY_NUM);
 		if ((result = XgetDAGbyName(name, addr, addrlen)) >= 0) {
 			break;
 		}
@@ -868,9 +868,11 @@ int registerStageService(const char *name, char *src_ad, char *src_hid, char *ds
 	// lookup the xia service
 	daglen = sizeof(dag);
 //cerr << "--------------------daglen is: " << daglen << endl;
-	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
+	while (XgetDAGbyName(name, &dag, &daglen) < 0) {
 //cerr << "-----------------------name is: " << name << endl;
-		die(-1, "unable to locate: %s\n", name);
+		//die(-1, "unable to locate: %s\n", name);
+		//warn("unable to locate: %s\n", name);
+		return -1;
 	}
 //cerr << "-------------------------2" << endl;
 	// create a socket, and listen for incoming connections
@@ -1005,15 +1007,15 @@ int registerStageManager(const char *name)
 	daglen = sizeof(dag);
 
 	if (XgetDAGbyName(name, &dag, &daglen) < 0) {
-		warn("unable to locate: %s\n", name);
+		//warn("unable to locate: %s\n", name);
 	}
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
-		warn("Unable to create the listening socket\n");
+		//warn("Unable to create the listening socket\n");
 	}
 	if (Xconnect(sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(sock);
-		warn("Unable to bind to the dag: %s\n", dag);
+		//warn("Unable to bind to the dag: %s\n", dag);
 		sock = -1;
 	}
 	return sock;
@@ -1045,7 +1047,7 @@ say("In updateManifest()\n");
 	sprintf(cmd, "reg done");
 	//if (Xsend(sock, cmd, strlen(cmd), 0) < 0) {
 	if (send(sock, cmd, strlen(cmd), 0) < 0) {
-		warn("unable to send reply to client\n");
+		//warn("unable to send reply to client\n");
 	}
 	say("Waiting for manager finish profile.\n");
 	say("In updateManifest, register to manager done.");
@@ -1269,11 +1271,11 @@ int registerUnixStageManager(const char* servername){
       un.sun_family = AF_UNIX;
       strcpy(un.sun_path, servername);
       len = offsetof(struct sockaddr_un, sun_path) + strlen(servername);
-      while (connect(fd, (struct sockaddr *)&un, len) < 0)
+      if (connect(fd, (struct sockaddr *)&un, len) < 0)
       {
           rval= -4;
       }
-      //else
+      else
       {
          return (fd);
       }

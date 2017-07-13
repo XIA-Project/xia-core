@@ -92,6 +92,7 @@ say("---------CID:%s\n",cid);
     // chunk fetching begins
     //char data[CHUNKSIZE];
 	void *data;// = (char*)malloc(CHUNKSIZE);
+logFile << now_msec() << "	" << 0 <<endl;
     for (unsigned int i = 0; i < CIDs.size(); i++) {
 
         say("The number of chunks is %d.\n", CIDs.size());
@@ -124,6 +125,7 @@ say("---------CID:%s\n",cid);
 say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
         }
         long start_time = now_msec();
+		//logFile << start_time - startTime << "	" << i <<endl;
         //if ((len = XfetchChunk(&h, data, CHUNKSIZE, XCF_BLOCK | XCF_SKIPCACHE, &addr, sizeof(addr))) < 0) {
         //    die(-1, "XcacheGetChunk Failed\n");
         //}
@@ -159,6 +161,7 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
             }
 		}
         //------------//logFile << i <<" Chunk. Running time is: " << end_time - start_time << " ms. req: " << req << endl;
+		logFile << end_time << "	" << i+1 <<endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
         fwrite((char*)data, 1, len, fd);
         bytes += len;
@@ -171,6 +174,7 @@ say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
     fclose(fd);
     long finishTime = now_msec();
     logFile << "Received file " << fout << " at "<< (1000 * (float)bytes / 1024) / (float)(finishTime - startTime) << " KB/s (Time: " << finishTime - startTime << " msec, Size: " << bytes << "bytes)\n";
+	printf("Total using time: %d\n", finishTime - startTime);
     sendStreamCmd(sock, "done");    // chunk fetching ends, send command to server
     //for (unsigned int i = 0; i < CIDs.size(); i++) {
     //   logFile << fout << "\t" << CIDs[i] << "\t" << chunkSize[i] << " B\t" << latency[i] << "\t" << chunkStartTime[i] << "\t" << chunkFinishTime[i] << endl;

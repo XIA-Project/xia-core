@@ -24,7 +24,8 @@ int fetchIndex;
 bool netStageOn = true;
 int thread_c = 0;
 
-
+long Timeline=-1, StartTime;
+int stageCount = 0;
 // TODO: this is not easy to manage in a centralized manner because we can have multiple threads for staging data due to mobility and we should have a pair of mutex and cond for each thread
 pthread_mutex_t profileLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t dagVecLock = PTHREAD_MUTEX_INITIALIZER;
@@ -38,16 +39,20 @@ long timeStamp;
 ofstream connetTime("connetTime.log");
 ofstream windowToStage("windowToStage.log");
 ofstream managerTime("managerTime.log");
-
+ofstream stageTime("stageTime.log");
+int STAGEPOLICY = 0;
 int CONNECT_TIME = 32000;
 void getConfig(int argc, char** argv)
 {
     int c;
     opterr = 0;
-    while ((c = getopt(argc, argv, "c:")) != -1) {
+    while ((c = getopt(argc, argv, "c:s:")) != -1) {
         switch (c) {
 			case 'c':
 				CONNECT_TIME = atoi(optarg);
+				break;
+			case 's':
+				STAGEPOLICY = atoi(optarg);
 				break;
             default:
                     break;
@@ -56,21 +61,23 @@ void getConfig(int argc, char** argv)
 }
 //Update the stage window
 void updateStageArg() {
-    if (rttWifi != -1 && rttInt != -1 && timeWifi && timeInt) {
-        int left = timeWifi + rttWifi;//rttWifi是stage_manager和stage_server; timeWifi是client下载一个chunk的时间
-        int right = timeInt + rttWifi + rttInt;//rttInt是stage_server到content_server; timeInt是stage一个chunk要花的时间
+	if(STAGEPOLICY!=0){
+		chunkToStage = STAGEPOLICY;
+	}
+    else if (rttWifi != -1 && timeWifi && timeInt) {
+        int left = timeWifi ;//rttWifi是stage_manager和stage_server; timeWifi是client下载一个chunk的时间
+        int right = timeInt + rttWifi ;//rttInt是stage_server到content_server; timeInt是stage一个chunk要花的时间
         chunkToStage = static_cast<double>(right) / left + 1;
     }
     else {
         chunkToStage = 3;
     }
-/*
-    windowToStage << "rttWifi: " << rttWifi
-                  << " rttInt: " << rttInt
-                  << " timeWifi: " << timeWifi
-                  << " timeInt: " << timeInt 
+
+    windowToStage << "fetchRTT:	" << rttWifi
+                  << "	fetchlatency:	" << timeWifi
+                  << "	stagelatency:	" << timeInt 
 	          << " chunkToStage: " << chunkToStage << endl;
-*/
+
 }
 // TODO: mem leak; window pred alg; int netMonSock;
 void regHandler(int sock, char *cmd)
@@ -195,7 +202,7 @@ void *clientCmd(void *socketid)
             
             say("Receive a chunk request\n");
 			//pthread_mutex_lock(&fetchLock);
-	    	//pthread_mutex_unlock(&StageControl);
+	    	pthread_mutex_unlock(&StageControl);
             char dag[256] = ""; 
             sscanf(cmd, "fetch %s" ,dag);
             if (delegationHandler(sock, dag) < 0) {
@@ -284,6 +291,12 @@ say("*********************************In while loop of stageChunk 1\n");
 			CIDToProfile[oldDag].dag = newDag;
 			CIDToProfile[oldDag].state = READY;
 			CIDToProfile[oldDag].stageFinishTimestemp = now_msec();
+			
+			Timeline += timeInt;
+			stageCount++;
+			//stageTime << Timeline << "	" << stageCount << endl;
+		
+
 			//managerTime << "OldDag: " << oldDag << " NewDag: " << newDag << " StageTime: " << CIDToProfile[oldDag].stageFinishTimestemp - CIDToProfile[oldDag].stageStartTimestemp << " ms." << endl;
 			pthread_mutex_unlock(&profileLock);
 			//cnt++;
@@ -299,6 +312,7 @@ say("*********************************Exit while loop of stageChunk\n");
 // control plane: figure out the right DAGs to stage, change the stage state from BLANK to PENDING to READY
 void *stageData(void *)
 {
+long startStamp = now_msec();
     thread_c++;
     int thread_id = thread_c;
     //cerr << "Thread id " << thread_id << ": " << "Is launched\n";
@@ -311,27 +325,39 @@ void *stageData(void *)
 
 //netStageSock is used to communicate with stage server.
     getNewAD(myAD);
+	string lastSSID = getSSID();
     //Connect to the Stage Server
+long endStamp = now_msec();
+say("Total using time1 = %ld ms\n", endStamp - startStamp);
     int netStageSock = registerStageService(getStageServiceName(), myAD, myHID, stageAD, stageHID);
     //Rtt of wireless
-    rttWifi = getRTT(getStageServiceName());
+endStamp = now_msec();
+say("Total using time2 = %ld ms\n", endStamp - startStamp);
+
+    //rttWifi = getRTT(getStageServiceName());
     char rttCMD[100] = "";
     //Ask the Stage server to get the Rtt of Internet
+/*
     sprintf(rttCMD, "xping %s", getXftpName());
     if (Xsend(netStageSock, rttCMD, strlen(rttCMD), 0) < 0
             || Xrecv(netStageSock, rttCMD, sizeof(rttCMD), 0) < 0) {
         die(-1,"Unable to get the RTT.\n");
     }
     sscanf(rttCMD, "rtt %d", &rttInt);
+*/
+endStamp = now_msec();
+say("Total using time3 = %ld ms\n", endStamp - startStamp);
     //Update stage window
-    updateStageArg();
+    //updateStageArg();
     say("++++++++++++++++++++++++++++++++++++The current netStageSock is %d\n", netStageSock);
-    say("RTTWireless = %d RTTInternet = %d\n", rttWifi, rttInt);
+   // say("RTTWireless = %d RTTInternet = %d\n", rttWifi, rttInt);
     if (netStageSock == -1) {
         say("netStageOn is false!\n");
         netStageOn = false;
         pthread_exit(NULL);
     }
+endStamp = now_msec();
+say("Total using time = %ld ms\n", endStamp - startStamp);
     pthread_t thread_stageData;
 	int *lastSock = new int[2];
 	lastSock[0] = netStageSock;
@@ -350,16 +376,20 @@ void *stageData(void *)
             long newStamp = now_msec();
             //connetTime << lastSSID << " disconnect. Last: " << newStamp - timeStamp << "ms." << endl;
         }
+//long beforeget = now_msec();
         string currSSID = getSSID();
+//long afterget = now_msec();
+//printf("Total get SSID using time = %ld ms\n",  afterget - beforeget );
+
 say("current SSID = %s\n\n\n", currSSID.c_str());
         if (lastSSID != currSSID) {
             //connetTime << currSSID << "Connect." << endl;
             timeStamp = now_msec();
             say("Thread id: %d Network changed, create another thread to continue!\n");
-            lastSSID = currSSID;
-            pthread_t thread_stageDataNew;
+            //lastSSID = currSSID;
+            //pthread_t thread_stageDataNew;
             pthread_mutex_unlock(&StageControl);
-            pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
+            //pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
             pthread_exit(NULL);
         }
         vector<string> needStage;
@@ -419,6 +449,7 @@ say("current SSID = %s\n\n\n", currSSID.c_str());
             }
 	    sendStreamCmd(netStageSock, cmd);
 	    */
+//printf("Stage %d chunks!!!!!!!!!!!\n\n", needStage.size());
 	    char cmd[XIA_MAX_BUF] = {0};
 	    int cnt=0;
 	    sprintf(cmd, "stage");
@@ -436,6 +467,15 @@ say("current SSID = %s\n\n\n", currSSID.c_str());
 		if(strlen(cmd) > 8)
 			sendStreamCmd(netStageSock, cmd);
 		chunkToRecv += needStage.size();
+
+		if(Timeline == -1){
+			StartTime = now_msec();
+			Timeline = 0;
+			//stageTime << "0	0" << endl;
+		}else{
+			Timeline = now_msec() - StartTime;
+			//stageTime << Timeline << "	" << stageCount << endl;
+		}
 		//pthread_mutex_lock(&responseMutex);
             //sendStreamCmd(netStageSock, cmd);
 		//pthread_mutex_unlock(&responseMutex);
@@ -468,20 +508,29 @@ say("current SSID = %s\n\n\n", currSSID.c_str());
     //pthread_exit(NULL);
 }
 void *watchNetwork(void *){
-	string lastSSID = getSSID();
+	char myAD[MAX_XID_SIZE];
+	//string lastSSID = "";
 	while(true){
-		string currSSID = getSSID();
-		if(lastSSID != currSSID){
-			lastSSID = currSSID;
-			say("SSID changed! unlock! \n\n");
-			pthread_mutex_unlock(&StageControl);
-		}
+			getNewAD(myAD);
+		//string currSSID = getSSID();
+		//if(lastSSID != currSSID){
+			//lastSSID = currSSID;
+			//printf("SSID changed! %s unlock! \n\n", currSSID.c_str() );
+		
+			pthread_t thread_stageDataNew;
+            pthread_create(&thread_stageDataNew, NULL, stageData, NULL);
+			rttWifi = getRTT(getStageServiceName());
+			updateStageArg();
+			
+			//usleep(100  *1000);
+		//}
 	}
 }
 int main(int argc, char **argv)
 {
 //pthread_mutex_lock(&StageControl);
 //say("before getSSID");
+	getConfig(argc, argv);
     lastSSID = getSSID();
 //say("after getSSID");
     //currSSID = lastSSID;
@@ -489,8 +538,8 @@ int main(int argc, char **argv)
     //connetTime << currSSID << "Connect." << endl;
     int stageSock = registerUnixStreamReceiver(UNIXMANAGERSOCK);
 //say("after registerUnixStreamReceiver");
-    pthread_t thread_stageData;
-    pthread_create(&thread_stageData, NULL, stageData, NULL);
+    //pthread_t thread_stageData;
+    //pthread_create(&thread_stageData, NULL, stageData, NULL);
 	
 	pthread_t thread_watchNetwork;
     pthread_create(&thread_watchNetwork, NULL, watchNetwork, NULL);
