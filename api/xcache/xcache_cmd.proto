@@ -47,6 +47,7 @@ message xcache_cmd {
 	optional int32 hop_count = 14;
 	optional bytes extra = 15;
 	optional bytes publisher_name = 16;
+	optional bytes content_name = 17;
 };
 
 message xcache_notif {

@@ -71,7 +71,7 @@ int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl);
 extern int XputChunk(XcacheHandle *h, const char *data, size_t length,
 		sockaddr_x *info, struct chunk_extra *extra);  //DONE
 extern int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
-		char *publisher_name);
+		char *content_name, char *publisher_name);
 extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count); //DONE
