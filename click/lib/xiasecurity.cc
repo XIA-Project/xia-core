@@ -425,6 +425,28 @@ void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, in
 }
 
 /*!
+ * @brief Generate SHA1 hash and return a hex string representing it
+ *
+ * Given a buffer containing user data, generate its SHA-1 hash
+ * and convert it into a hex string that is returned to the caller.
+ *
+ * @param data user data buffer
+ * @param data_len size of the data buffer
+ * @param hex_string buffer to hold the hex string being returned
+ * @param hex_string_len length of hex_string buffer
+ *
+ * @returns 0 on success
+ * @returns negative value on failure
+ */
+void xs_getSHA1HexDigest(const unsigned char * data, int data_len,
+		char *hex_string, int hex_string_len)
+{
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	xs_getSHA1Hash(data, data_len, digest, sizeof(digest));
+	xs_hexDigest(digest, sizeof(digest), hex_string, hex_string_len);
+}
+
+/*!
  * @brief Convert a SHA1 digest to a hex string
  *
  * Convert the binary SHA-1 hash into a hex string
@@ -677,6 +699,73 @@ xs_sign_done:
 }
 
 /*!
+ * @brief Read public key into a buffer from given path
+ *
+ * The public key file must be present at the provided path.
+ *
+ * @param pubfilepath location of a file containing the public key
+ * @param pubkey a buffer to hold the public key being returned to caller
+ * @param pubkey_len the length of public key buffer
+ *
+ * @returns 0 on success
+ * @returns negative value on failure
+ */
+int xs_readPubkeyFile(const char *pubfilepath,
+		char *pubkey, uint16_t *pubkey_len)
+{
+	FILE *fp;
+	int state = 0;
+	BIO *bio_pub;
+	RSA *rsa;
+	int retval = -1;
+
+	// Read in the public key file
+    fp = fopen(pubfilepath, "r");
+	if(fp == NULL) {
+		xs_chatter("xs_readPubkeyFile: Unable to open %s", pubfilepath);
+		retval = -2;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 1;
+    rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
+    if(rsa==NULL) {
+		xs_chatter("xs_readPubkeyFile: ERROR reading public key:%s:",
+				pubfilepath);
+		retval = -2;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 2;
+
+    bio_pub = BIO_new(BIO_s_mem());
+	if(bio_pub == NULL) {
+		xs_chatter("xs_readPubkeyFile: ERROR allocating BIO for public key");
+		retval = -3;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 3;
+    PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
+	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
+		xs_chatter("xs_readPubkeyFile: ERROR pubkey buffer too small");
+		retval = -4;
+		goto xs_readPubkeyFile_cleanup;
+	}
+    *pubkey_len = BIO_pending(bio_pub);
+    BIO_read(bio_pub, pubkey, *pubkey_len);
+	*pubkey_len += 1; // null terminate the string
+
+	// Pubkey has been successfully read into the provided buffer
+	retval = 0;
+
+xs_readPubkeyFile_cleanup:
+	switch(state) {
+		case 3: BIO_free_all(bio_pub);
+		case 2: RSA_free(rsa);
+		case 1: fclose(fp);
+	};
+	return retval;
+}
+
+/*!
  * @brief Get the public key for a given xid
  *
  * Given an XID, find the public key for it. The public key file must
@@ -694,11 +783,8 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 	int pubfilepathlen;
 	char *pubfilepath;
 	char *pubkeyhash;
-	int retval = 0;
+	int retval = -1;
 	int state = 0;
-	BIO *bio_pub;
-	RSA *rsa;
-	FILE *fp;
 
 	// Clear out the user buffer
 	memset(pubkey, 0, (size_t)*pubkey_len);
@@ -720,40 +806,19 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 		goto xs_getPubkey_cleanup;
 	}
 	state = 1;
+
+	// Build the file path and read the key from the file
 	sprintf(pubfilepath, "%s/%s.pub", keydir, pubkeyhash);
-	// Read in the public key file
-    fp = fopen(pubfilepath, "r");
-	state = 2;
-    rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
-    //RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
-    if(rsa==NULL) {
-		xs_chatter("xs_getPubkey: ERROR reading public key:%s:", pubfilepath);
+	if(xs_readPubkeyFile(pubfilepath, pubkey, pubkey_len)) {
+		xs_chatter("xs_getPubkey: ERROR unable to read pubkey from %s",
+				pubfilepath);
 		retval = -3;
 		goto xs_getPubkey_cleanup;
 	}
-	state = 3;
+	retval = 0;
 
-    bio_pub = BIO_new(BIO_s_mem());
-	if(bio_pub == NULL) {
-		xs_chatter("xs_getPubkey: ERROR allocating BIO for public key");
-		retval = -4;
-		goto xs_getPubkey_cleanup;
-	}
-	state = 4;
-    PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
-	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
-		xs_chatter("xs_getPubkey: ERROR pubkey buffer too small");
-		retval = -5;
-		goto xs_getPubkey_cleanup;
-	}
-    *pubkey_len = BIO_pending(bio_pub);
-    BIO_read(bio_pub, pubkey, *pubkey_len);
-	*pubkey_len += 1; // null terminate the string
 xs_getPubkey_cleanup:
 	switch(state) {
-		case 4: BIO_free_all(bio_pub);
-		case 3: RSA_free(rsa);
-		case 2: fclose(fp);
 		case 1: free(pubfilepath);
 	};
 	return retval;

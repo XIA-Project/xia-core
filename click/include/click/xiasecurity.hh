@@ -59,6 +59,10 @@ const char *xs_XIDHash(const char *xid);
 // Generate SHA1 hash of a given buffer
 void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, int digest_len);
 
+// Get a hex string representing SHA1 hash of provided data
+void xs_getSHA1HexDigest(const unsigned char *data, int data_len,
+		char *hex_string, int hex_string_len);
+
 // Get SHA1 hash of a public key string(null terminated)
 int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len);
 
@@ -72,7 +76,11 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 // Sign a given buffer
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);
 
-// Read public key from file
+// Read public key from provided location
+int xs_readPubkeyFile(const char *pubfilepath,
+		char *pubkey, uint16_t *pubkey_len);
+
+// Read public key from file related to the provided xid
 int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len);
 
 // Verify that a given pubkey matches the corresponding XID
