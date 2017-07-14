@@ -2,22 +2,7 @@
 #include <string.h>
 #include <Xsocket.h>
 #include <Xsecurity.h>
-
-class Publisher {
-	public:
-		Publisher(std::string name);
-		~Publisher();
-		std::string name();
-		std::string ncid(std::string content_name);
-		int sign(const char *content, int len, char *signature, int *siglen);
-	private:
-		std::string content_URI(std::string content_name);
-		std::string pubkey();
-		std::string keydir();
-
-		const char *_keydir;
-		std::string _name;
-};
+#include "publisher.h"
 
 /*!
  * @brief An Object representing a Publisher named on instantiation
@@ -66,7 +51,7 @@ std::string Publisher::pubkey()
 	std::string pubkeypath = keydir() + "/" + name() + ".pub";
 	// Find the pubkey file in the Publisher's credential directory
 	if(xs_readPubkeyFile(pubkeypath.c_str(), pubkeybuf, &pubkeylen)) {
-		printf("Publisher::pubkey() cannot read key from %s",
+		printf("Publisher::pubkey() cannot read key from %s\n",
 				pubkeypath.c_str());
 	}
 	std::string pubkeystr(pubkeybuf, pubkeylen);
@@ -98,8 +83,36 @@ std::string Publisher::keydir()
 	return _keydir;
 }
 
-int Publisher::sign(const char *content, int len, char *signature, int *siglen)
+std::string Publisher::privfilepath()
 {
-	return -1;
+	std::string privkeypath = keydir() + "/" + name() + ".key";
+	return privkeypath;
+}
+
+/*!
+ * @brief Sign the given content to associate it with given content_URI
+ */
+int  Publisher::sign(std::string content_URI,
+		std::string &content,
+		std::string &signature)
+{
+	int retval = -1;
+	unsigned char sig_buf[MAX_SIGNATURE_SIZE];
+	uint16_t siglen = MAX_SIGNATURE_SIZE;
+
+	// Sign (Content URI + Content)
+	std::string data = content_URI + content;
+	// Private file path
+	std::string privkeyfile = privfilepath();
+
+	if(xs_signWithKey(privkeyfile.c_str(),
+				(unsigned char *)data.c_str(), (int) data.size(),
+				sig_buf, &siglen)) {
+		printf("Publisher::sign() failed signing provided content\n");
+		return -1;
+	}
+	std::string sigstr((char *)sig_buf, siglen);
+	signature = sigstr;
+	return retval;
 }
 

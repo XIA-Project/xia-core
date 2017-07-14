@@ -13,6 +13,7 @@
 #include <errno.h>
 #include "controller.h"
 #include <iostream>
+#include "publisher/publisher.h"
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "Xsecurity.h"
@@ -666,6 +667,38 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int retval = RET_FAILED;
+	struct xcache_context *context;
+	xcache_meta *meta;
+	int type;
+	// Build the NCID from the provided request
+	std::string publisher_name = cmd->publisher_name();
+	std::string content = cmd->data();
+
+	// Get a reference to the Publisher
+	// TODO: For now just create a new one every time
+	Publisher publisher(publisher_name);
+
+	std::string content_name = cmd->content_name();
+
+	//std::string cid = get_id(&type, cmd);
+
+	// Content_URI = Publisher_name/content_name
+	std::string content_URI = publisher.content_URI(content_name);
+
+	// NCID = Hash (Content_URI + PublisherPublicKey)
+	std::string ncid = publisher.ncid(content_name);
+
+	// Signature = Sign_priv_key(Content_URI + Content)
+	std::string signature;
+	if(publisher.sign(content_name, content_URI, signature)) {
+		printf("Failed signing %s\n", content_name.c_str());
+		return retval;
+	}
+
+	// NCID Header = Content_URI, NCID, Signature, Pubkey
+
+	// Debugging info
+	printf("controller::store_named %s\n", content_URI.c_str());
 	return retval;
 }
 

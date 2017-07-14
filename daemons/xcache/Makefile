@@ -12,10 +12,11 @@ SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 	policy_manager.cc XIARouter.cc csclient.cc
 OBJS=$(SOURCES:.cc=.o)
 
+LIBS+=$(XLIB)/libpublisher.so
 LDFLAGS+=$(LIBS) -lprotobuf -lcrypto
 CFLAGS+=-I$(APIDIR)/xcache -I ../common -I../../click/include -I$(APIDIR)/xsocket/minini
 
-all:$(XCACHE) $(SUBDIRS)
+all:$(SUBDIRS) $(XCACHE)
 	echo doing all
 
 $(SUBDIRS):
