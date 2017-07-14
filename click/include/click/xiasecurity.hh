@@ -76,6 +76,10 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 // Sign a given buffer
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);
 
+// Sign a given buffer with key stored in given file
+int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
+		          unsigned char *signature, uint16_t *siglen);
+
 // Read public key from provided location
 int xs_readPubkeyFile(const char *pubfilepath,
 		char *pubkey, uint16_t *pubkey_len);

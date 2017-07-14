@@ -620,13 +620,6 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	char *privfilepath = NULL;
 	int retval = -1;        // Return failure by default. 0 == success
 	int state = 0;
-	unsigned char *sig_buf = NULL;
-	unsigned int sig_len = 0;
-	int rc;
-	RSA *rsa;
-	uint8_t digest[SHA_DIGEST_LENGTH];
-	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
-	FILE *fp;
 
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
@@ -644,6 +637,32 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	}
 	state = 1;
 	sprintf(privfilepath, "%s/%s", keydir, privkeyhash);
+	if(xs_signWithKey(privfilepath, data, datalen, signature, siglen)) {
+		xs_chatter("xs_sign: Failed sign with priv key %s", privfilepath);
+		goto xs_sign_done;
+	}
+	// Success
+	retval = 0;
+
+xs_sign_done:
+	switch(state) {
+		case 1: free(privfilepath);
+	};
+	return retval;
+}
+
+int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
+		unsigned char *signature, uint16_t *siglen)
+{
+	int rc;
+	int retval = -1;
+	int state = 0;
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
+	FILE *fp;
+	RSA *rsa;
+	unsigned char *sig_buf = NULL;
+	unsigned int sig_len = 0;
 
 	// Calculate SHA1 hash of given data
 	xs_getSHA1Hash(data, datalen, digest, sizeof digest);
@@ -657,28 +676,28 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
     fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
 		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
-	state = 2;
+	state = 1;
     rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
         xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
 
 	assert(*siglen >= RSA_size(rsa));
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
 		xs_chatter("xs_sign: Failed to allocate memory for signature");
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
-	state = 3;
+	state = 2;
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
 	if(rc != 1) {
 		xs_chatter("xs_sign: RSA_sign failed");
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
     xs_chatter("xs_sign: signature length: %d", sig_len);
 
@@ -689,11 +708,10 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Success
 	retval = 0;
 
-xs_sign_done:
+xs_sign_with_key_done:
 	switch(state) {
-		case 3: free(sig_buf);
-		case 2: fclose(fp);
-		case 1: free(privfilepath);
+		case 2: free(sig_buf);
+		case 1: fclose(fp);
 	}
 	return retval;
 }
