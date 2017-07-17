@@ -699,6 +699,24 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// Debugging info
 	printf("controller::store_named %s\n", content_URI.c_str());
+
+	// Store CID
+	if(store(resp, cmd, cmd->ttl()) == RET_FAILED) {
+		printf("Failed storing named content to local storage\n");
+		return retval;
+	}
+	if(resp->cmd() == xcache_cmd::XCACHE_ERROR) {
+		if(resp->status() != xcache_cmd::XCACHE_ERR_EXISTS) {
+			printf("Xcache store error\n");
+			return retval;
+		}
+	}
+
+	sockaddr_x cid_dag;
+	memcpy(&cid_dag, resp->dag().c_str(), resp->dag().length());
+	Graph cid_graph(&cid_dag);
+	std::string cid = cid_graph.intent_CID_str();
+
 	return retval;
 }
 
