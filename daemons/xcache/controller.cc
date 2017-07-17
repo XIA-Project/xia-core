@@ -718,8 +718,8 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	Graph cid_graph(&cid_dag);
 	std::string cid = cid_graph.intent_CID_str();
 
-	ncid_to_cid[ncid] = cid;
-	cid_to_ncids[cid].push_back(ncid);
+	// Keep track of NCID and corresponding CID
+	register_ncid(ncid, cid);
 
 	return retval;
 }
