@@ -739,6 +739,7 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
  */
 int xcache_controller::register_ncid(std::string ncid, std::string cid)
 {
+	pthread_mutex_lock(&ncid_cid_lock);
 	std::map<std::string, std::string>::iterator ncid_to_cid_it;
 	ncid_to_cid_it = ncid_to_cid.find(ncid);
 
@@ -772,6 +773,7 @@ int xcache_controller::register_ncid(std::string ncid, std::string cid)
 		// Create the vector and add an entry for this NCID in it
 		cid_to_ncids[cid].push_back(ncid);
 	}
+	pthread_mutex_unlock(&ncid_cid_lock);
 
 	return 0;
 }
@@ -793,30 +795,40 @@ int xcache_controller::register_ncid(std::string ncid, std::string cid)
  */
 int xcache_controller::unregister_ncid(std::string ncid, std::string cid)
 {
+	int retval = -1;
+
+	pthread_mutex_lock(&ncid_cid_lock);
+
 	// Make sure both maps have the NCID and CID entries
 	std::map<std::string, std::string>::iterator ncid_to_cid_it;
+	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
+	std::vector<std::string> ncids = cid_to_ncids_it->second;
+	std::vector<std::string>::iterator ncids_it;
+
 	ncid_to_cid_it = ncid_to_cid.find(ncid);
 	if (ncid_to_cid_it == ncid_to_cid.end()) {
 		printf("unregister_ncid: ERROR NCID %s not found\n", ncid.c_str());
+		goto unregister_ncid_done;
 	}
 
-	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
 	cid_to_ncids_it = cid_to_ncids.find(cid);
 	if (cid_to_ncids_it == cid_to_ncids.end()) {
 		printf("unregister_ncid: ERROR NCIDS missing for %s\n", cid.c_str());
-		return -1;
+		goto unregister_ncid_done;
 	}
-	std::vector<std::string> ncids = cid_to_ncids_it->second;
-	std::vector<std::string>::iterator ncids_it;
 	ncids_it = std::find(ncids.begin(), ncids.end(), ncid);
 	if (ncids_it == ncids.end()) {
 		printf("unregister_ncid: ERROR NCID for CID not found\n");
-		return -1;
+		goto unregister_ncid_done;
 	}
 
 	ncid_to_cid.erase(ncid_to_cid_it);
 	ncids.erase(ncids_it);
-	return 0;
+	retval = 0;	// Atomically erased entries from both maps
+
+unregister_ncid_done:
+	pthread_mutex_unlock(&ncid_cid_lock);
+	return retval;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)

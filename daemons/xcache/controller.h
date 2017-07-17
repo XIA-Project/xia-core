@@ -45,6 +45,7 @@ private:
 	sem_t req_sem;
 	std::queue<xcache_req *> request_queue;
 	pthread_mutex_t request_queue_lock;
+	pthread_mutex_t ncid_cid_lock;
 
 
 	int n_threads;
@@ -100,6 +101,7 @@ public:
 	xcache_controller() {
 		hostname.assign("host0");
 		pthread_mutex_init(&request_queue_lock, NULL);
+		pthread_mutex_init(&ncid_cid_lock, NULL);
 		context_id = 0;
 		sem_init(&req_sem, 0, 0);
 	}
