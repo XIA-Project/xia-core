@@ -61,6 +61,16 @@ private:
 	std::map<uint32_t, struct xcache_context *> context_map;
 
 	/**
+	 * Map of NCID to CID
+	 */
+	std::map<std::string, std::string> ncid_to_cid;
+
+	/**
+	 * Map of CID to matching NCIDs
+	 */
+	std::map<std::string, std::vector<std::string>> cid_to_ncids;
+
+	/**
 	 * Hostname while running on localhost.
 	 */
 	std::string hostname;
@@ -165,6 +175,8 @@ public:
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 	int store_named(xcache_cmd *, xcache_cmd *);
+	int register_ncid(std::string ncid, std::string cid);
+	int unregister_ncid(std::string ncid, std::string cid);
 
 	// evict a chunk locally
 	int evict(xcache_cmd *resp, xcache_cmd *cmd);

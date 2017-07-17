@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <string>
+#include <algorithm>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -717,7 +718,105 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	Graph cid_graph(&cid_dag);
 	std::string cid = cid_graph.intent_CID_str();
 
+	ncid_to_cid[ncid] = cid;
+	cid_to_ncids[cid].push_back(ncid);
+
 	return retval;
+}
+
+/*!
+ * @brief register an NCID with the corresponding CID
+ *
+ * We maintain two maps between NCIDs and CIDs
+ * 1. ncid_to_cid - CID corresponding to each NCID known
+ * 2. cid_to_ncids - NCIDs that provided CID is associated with
+ * TODO: Lock both maps when adding entries
+ *
+ * @param ncid the NCID to be registered
+ * @param cid representing the actual data in storage corresponding to ncid
+ *
+ * @returns 0 on success, can add existence of ncid in map as failure
+ */
+int xcache_controller::register_ncid(std::string ncid, std::string cid)
+{
+	std::map<std::string, std::string>::iterator ncid_to_cid_it;
+	ncid_to_cid_it = ncid_to_cid.find(ncid);
+
+	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
+	cid_to_ncids_it = cid_to_ncids.find(cid);
+
+	// NCID is known
+	if (ncid_to_cid_it != ncid_to_cid.end()) {
+		// If the CID is different from one known before, replace it
+		if (ncid_to_cid_it->second.compare(cid)) {
+			printf("Replacing %s for %s\n", cid.c_str(), ncid.c_str());
+			ncid_to_cid[cid] = ncid;
+		}
+	} else {
+		// Simply add to map if not known already
+		ncid_to_cid[ncid] = cid;
+	}
+
+	// CID is known
+	if (cid_to_ncids_it != cid_to_ncids.end()) {
+
+		// Is the NCID already associated with this CID
+		std::vector<std::string> ncids = cid_to_ncids_it->second;
+		std::vector<std::string>::iterator ncids_it;
+
+		// If not, add NCID to the list of NCIDs for this CID
+		if(std::find(ncids.begin(), ncids.end(), ncid) == ncids.end()) {
+			ncids.push_back(ncid);
+		}
+	} else {
+		// Create the vector and add an entry for this NCID in it
+		cid_to_ncids[cid].push_back(ncid);
+	}
+
+	return 0;
+}
+
+/*!
+ * @brief unregister an NCID and the corresponding CID
+ *
+ * We maintain two maps between NCIDs and CIDs
+ * 1. ncid_to_cid - CID corresponding to each NCID known
+ * 2. cid_to_ncids - NCIDs that provided CID is associated with
+ * This function deletes the NCID and CID entries from both maps
+ * TODO: Lock both maps while removing entries
+ *
+ * @param ncid the NCID to be unregistered
+ * @param cid corresponding to the NCID that is getting unregistered
+ *
+ * @returns 0 on success
+ * @returns -1 if the entries to be unregistered don't exist
+ */
+int xcache_controller::unregister_ncid(std::string ncid, std::string cid)
+{
+	// Make sure both maps have the NCID and CID entries
+	std::map<std::string, std::string>::iterator ncid_to_cid_it;
+	ncid_to_cid_it = ncid_to_cid.find(ncid);
+	if (ncid_to_cid_it == ncid_to_cid.end()) {
+		printf("unregister_ncid: ERROR NCID %s not found\n", ncid.c_str());
+	}
+
+	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
+	cid_to_ncids_it = cid_to_ncids.find(cid);
+	if (cid_to_ncids_it == cid_to_ncids.end()) {
+		printf("unregister_ncid: ERROR NCIDS missing for %s\n", cid.c_str());
+		return -1;
+	}
+	std::vector<std::string> ncids = cid_to_ncids_it->second;
+	std::vector<std::string>::iterator ncids_it;
+	ncids_it = std::find(ncids.begin(), ncids.end(), ncid);
+	if (ncids_it == ncids.end()) {
+		printf("unregister_ncid: ERROR NCID for CID not found\n");
+		return -1;
+	}
+
+	ncid_to_cid.erase(ncid_to_cid_it);
+	ncids.erase(ncids_it);
+	return 0;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
