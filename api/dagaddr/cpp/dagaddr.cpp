@@ -976,6 +976,12 @@ Graph::intent_XID_index(uint32_t xid_type) const
 }
 
 std::size_t
+Graph::intent_CID_index() const
+{
+	return intent_XID_index(XID_TYPE_CID);
+}
+
+std::size_t
 Graph::intent_SID_index() const
 {
 	return intent_XID_index(XID_TYPE_SID);
@@ -1146,6 +1152,35 @@ Graph::intent_SID() const
 	return nodes_[sid_index];
 }
 
+/*
+ * @brief Return the CID for the Graph's intent node
+ *
+ * Get the CID string on first path to intent node
+ * Note: This function is essentially identical to intent_AD_str()
+ *
+ * @return The CID if found, empty string otherwise
+ */
+std::string
+Graph::intent_CID_str() const
+{
+	std::string cid;
+	std::size_t cid_index = intent_CID_index();
+	if (cid_index == INVALID_GRAPH_INDEX) {
+		return "";
+	}
+	return nodes_[cid_index].to_string();
+}
+
+const Node&
+Graph::intent_CID() const
+{
+	std::size_t cid_index = intent_CID_index();
+	if (cid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_CID: CID index not found\n");
+		throw std::range_error("CID not found");
+	}
+	return nodes_[cid_index];
+}
 
 
 /**

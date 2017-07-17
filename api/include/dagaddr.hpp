@@ -137,9 +137,11 @@ public:
 	const Node& intent_AD() const;
 	const Node& intent_HID() const;
 	const Node& intent_SID() const;
+	const Node& intent_CID() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
+	std::string intent_CID_str() const;
 	bool is_valid() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
@@ -175,6 +177,7 @@ private:
 	std::size_t intent_AD_index() const;
 	std::size_t intent_HID_index() const;
 	std::size_t intent_SID_index() const;
+	std::size_t intent_CID_index() const;
 
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
