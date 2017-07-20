@@ -732,6 +732,7 @@ XStream::tcp_input(WritablePacket *p)
 				if ( tp->t_timer[TCPT_REXMT] == 0 || ti.ti_ack != tp->snd_una){
 					tp->t_dupacks = 0;
 
+				// TCPFIX: Rui changed TCP_REXMT_THRESH to 1, what side effects may happen because of this?
 				} else if (++tp->t_dupacks == TCP_REXMT_THRESH || (tp->t_dupacks > (TCP_REXMT_THRESH) && isPowerOfTwo(tp->t_dupacks))){
 
 					tcp_seq_t onxt = tp->snd_nxt;
@@ -1673,6 +1674,7 @@ XStream::tcp_timers (int timer) {
 		  tp->snd_nxt = tp->snd_una;
 		  tp->t_rtt = 0;
 
+		  // TCPFIX: any negative side effects?
 		  // fast recovery upon rexmt timeout, don't go back to slow start
 		  // a change made by Rui
 		  {
