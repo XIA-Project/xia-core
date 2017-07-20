@@ -16,6 +16,7 @@ SOURCE="Carnegie Mellon University"
 UTILITIES=     \
 	cachectl   \
 	psx        \
+	makechunk  \
 	xarp       \
 	xdag       \
 	xdebug     \
@@ -46,6 +47,9 @@ doc: $(MANDIR) $(MANPAGES)
 
 $(MANDIR)/cachectl.1: ./cachectl
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "enable/disable caching" ./$< -o$@
+
+$(MANDIR)/makechunk.1: ./makechunk
+	help2man -N -m $(MANUAL) -S $(SOURCE) -n "create random files for chunk testing" ./$< -o$@
 
 $(MANDIR)/psx.1: ./psx
 	help2man -N -m $(MANUAL) -S $(SOURCE) -n "list process ids" ./$< -o$@
