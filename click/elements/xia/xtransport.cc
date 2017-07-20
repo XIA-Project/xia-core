@@ -163,7 +163,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_tcp_globals.tcp_keepidle         = TCPTV_KEEP_IDLE;
 	_tcp_globals.tcp_keepintvl        = TCPTV_KEEPINTVL;
 	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
-	_tcp_globals.tcp_now              = tcp_now();tcp_now// TCPFIX use system time instead of counter for tcp ticks
+	_tcp_globals.tcp_now              = tcp_now(); // TCPFIX use system time instead of counter for tcp ticks
 	_tcp_globals.so_recv_buffer_size  = 0x100000;
 	_tcp_globals.tcp_mssdflt          = 1500;
 	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT;
