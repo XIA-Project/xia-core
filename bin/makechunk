@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# create arbitrarily sized files for chunk testing
+
+VERSION="makechunk 1.0"
+SIZE=1m
+
+help() {
+cat << EOH
+makechunk [-s size] name
+
+    create files for testing chunks
+
+options:
+  name          output file name
+  -s            size of file [e.g 100 256k 20m 1g] default = 1m
+  -h, --help    display this help
+  -v, --version display the version number
+EOH
+    exit 0
+}
+
+toBytes() {
+ echo $1 | echo $((`sed 's/.*/\L\0/;s/t/Xg/;s/g/Xm/;s/m/Xk/;s/k/X/;s/b//;s/X/ *1024/g'`))
+}
+
+
+[ "$1" == "--version" ] && echo $VERSION && exit 0
+[ "$1" == "--help" ] && help
+
+while getopts "hvs:" opt; do
+	case $opt in
+        s)
+            SIZE=$OPTARG
+            ;;
+		v)
+			echo $VERSION
+			exit 0
+			;;
+		h)
+			help
+			;;
+		\?)
+			help
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
+if [ "$1" == "" ]; then
+    help
+fi
+
+NAME=$1
+SIZE=$(toBytes $SIZE)
+
+echo creating $NAME containing $SIZE bytes
+openssl rand $SIZE > $NAME
+
