@@ -20,8 +20,10 @@ EOH
     exit 0
 }
 
+# convert number + suffix to value (2k => 2048, etc...)
 toBytes() {
- echo $1 | echo $((`sed 's/.*/\L\0/;s/t/Xg/;s/g/Xm/;s/m/Xk/;s/k/X/;s/b//;s/X/ *1024/g'`))
+	# here lies magic
+	echo $1 | echo $((`sed 's/.*/\L\0/;s/t/Xg/;s/g/Xm/;s/m/Xk/;s/k/X/;s/b//;s/X/ *1024/g'`))
 }
 
 
@@ -53,6 +55,11 @@ fi
 
 NAME=$1
 SIZE=$(toBytes $SIZE)
+
+if [ "$SIZE" == "" ] || [ "$SIZE" == "0" ]; then
+	echo invalid size specified
+	exit 1
+fi
 
 echo creating $NAME containing $SIZE bytes
 openssl rand $SIZE > $NAME
