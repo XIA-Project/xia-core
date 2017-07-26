@@ -6,6 +6,7 @@
 #include <map>
 #include <iostream>
 #include <stdint.h>
+#include "content_header.h"
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 #include <time.h>
@@ -54,12 +55,13 @@ private:
 
 	int32_t _fetchers;
 
+	ContentHeader *_chdr;
+
 	void init();
 
 public:
-	int _type;
 	xcache_meta();
-	xcache_meta(std::string, int);
+	xcache_meta(std::string, ContentHeader *chdr);
 
 	time_t last_accessed() { return _accessed; }
 	void access();
@@ -114,7 +116,11 @@ public:
 
 	uint64_t get_length() { return _len; }
 
-	std::string get_cid() { return _cid; }
+	std::string id() { return (_chdr) ? _chdr->id() : ""; }
+
+	std::string store_id();
+
+	void set_content_header(ContentHeader *chdr) { _chdr = chdr; }
 
 	int lock(void) {
 		return 0;

@@ -212,7 +212,7 @@ public:
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
 	std::string addr2cid(sockaddr_x *addr);
-	int cid2addr(std::string cid, sockaddr_x *sax, int);
+	int cid2addr(std::string cid, sockaddr_x *sax);
 
 	void enqueue_request_safe(xcache_req *req);
 	xcache_req *dequeue_request_safe(void);

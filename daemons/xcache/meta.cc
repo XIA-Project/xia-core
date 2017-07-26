@@ -12,6 +12,7 @@ XIARouter xr;
 
 void xcache_meta::init()
 {
+	_chdr = NULL;
 	_store = NULL;
 	_policy = NULL;
 	_len = 0;
@@ -27,11 +28,11 @@ xcache_meta::xcache_meta()
 	init();
 }
 
-xcache_meta::xcache_meta(std::string cid, int type)
+xcache_meta::xcache_meta(std::string cid, ContentHeader *chdr)
 {
 	init();
 	_cid = cid;
-	_type = type;
+	_chdr = chdr;
 }
 
 void xcache_meta::access() {
@@ -60,6 +61,11 @@ std::string xcache_meta::safe_get(void)
 	this->unlock();
 
 	return data;
+}
+
+std::string xcache_meta::store_id()
+{
+	return _chdr->store_id();
 }
 
 void xcache_meta::status(void)
@@ -115,7 +121,7 @@ void meta_map::release_meta(xcache_meta *meta)
 void meta_map::add_meta(xcache_meta *meta)
 {
 	write_lock();
-	_map[meta->get_cid()] = meta;
+	_map[meta->id()] = meta;
 	unlock();
 }
 
@@ -123,7 +129,7 @@ void meta_map::remove_meta(xcache_meta *meta)
 {
 	// Note: this only removes the meta from the map, it doesn't delete it
 	write_lock();
-	_map.erase(meta->get_cid());
+	_map.erase(meta->id());
 	unlock();
 }
 
@@ -137,7 +143,7 @@ int meta_map::walk(void)
 
 	for (i = _map.begin(); i != _map.end(); ) {
 		xcache_meta *m = i->second;
-		std::string c = "CID:" + m->get_cid();
+		std::string c = "CID:" + m->id();
 
 		switch(m->state()) {
 			case CACHING:

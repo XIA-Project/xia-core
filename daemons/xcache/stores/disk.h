@@ -37,7 +37,7 @@ public:
 		int ret, fd;
 		std::string path;
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0666);
 		if (fd < 0) {
@@ -70,7 +70,7 @@ public:
 			return "";
 		}
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_RDONLY);
 		if (fd < 0) {
@@ -101,7 +101,7 @@ public:
 		std::string path;
 		char *buf = (char *)malloc(READ_SIZE);
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_RDONLY);
 		if (fd < 0) {
@@ -135,7 +135,7 @@ public:
 		if (meta) {
 			std::string path;
 
-			path = content_dir + meta->get_cid();
+			path = content_dir + meta->store_id();
 			rc = unlink(path.c_str());
 		}
 		return rc;

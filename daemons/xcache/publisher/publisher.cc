@@ -60,6 +60,9 @@ std::string Publisher::pubkey()
 
 /*!
  * @brief calculate NCID for the given content name
+ *
+ * NOTE: Returned string does not have "NCID:" prepended to it
+ * @returns Hex string representing the NCID for given content name
  */
 std::string Publisher::ncid(std::string content_name)
 {
@@ -93,7 +96,7 @@ std::string Publisher::privfilepath()
  * @brief Sign the given content to associate it with given content_URI
  */
 int  Publisher::sign(std::string content_URI,
-		std::string &content,
+		const std::string &content,
 		std::string &signature)
 {
 	int retval = -1;

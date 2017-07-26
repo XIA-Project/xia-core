@@ -62,7 +62,18 @@ void xcache_cache::unparse_xid(struct click_xia_xid_node *node, std::string &xid
 	xid = std::string(hex);
 }
 
-int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp)
+/*!
+ * @brief validate a packet and retrieve header information from it
+ *
+ * @param pkt the buffer containing the packet
+ * @param len length of the packet
+ * @returns chunk identifier - could be CID or NCID
+ * @returns sid service identifier of the requesting client process
+ * @returns xtcp the TCP header
+ * @returns PACKET_OK on success, error code on failure
+ */
+int xcache_cache::validate_pkt(char *pkt, size_t len,
+		std::string &cid, std::string &sid, struct xtcp **xtcp)
 {
 	struct click_xia *xiah = (struct click_xia *)pkt;
 	struct xtcp *x;
@@ -71,18 +82,23 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 
 	*xtcp = NULL;
 
+	// Check if the packet is too small
 	if ((len < sizeof(struct click_xia)) || (htons(xiah->plen) > len) ) {
 		// packet is too small, this had better not happen!
 		return PACKET_INVALID;
 	}
 
+	// Retrieve the pointer to TCP header in packet
 	total_nodes = xiah->dnode + xiah->snode;
 	xip_size = sizeof(struct click_xia) + (total_nodes * sizeof(struct click_xia_xid_node));
 	x = (struct xtcp *)(pkt + xip_size);
 
+	// Verify TCP flags
 	uint16_t flags = ntohs(x->th_flags);
-	// we only see the flow from server to client, so we'll never see a plain SYN here
-	// FIXME: we should probably be smart enough to deal with other flags like RST here eventually
+	// we only see the flow from server to client,
+	// so we'll never see a plain SYN here
+	// FIXME: we should probably be smart enough to deal with other flags
+	// like RST here eventually
 	if (flags == XTH_ACK) {
 		ushort hlen = (ushort)(x->th_off) << 2;
 
@@ -105,10 +121,10 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	Graph src_dag;
 	src_dag.from_wire_format(xiah->snode, &xiah->node[xiah->dnode]);
 
-	// Client service that requested the chunk
+	// Returning - Client service that requested the chunk
 	sid = dst_dag.intent_SID_str();
 
-	// Chunk being transmitted
+	// Returning - Chunk being transmitted - CID or NCID
 	Node src_intent_xid = src_dag.get_final_intent();
 	if (src_intent_xid.type() == CLICK_XIA_XID_TYPE_CID
 			|| src_intent_xid.type() == CLICK_XIA_XID_TYPE_NCID) {
@@ -118,6 +134,7 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 		return PACKET_INVALID;
 	}
 
+	// Drop packets that don't have a stream header
 	if (xiah->nxt != CLICK_XIA_NXT_XSTREAM) {
 		syslog(LOG_INFO, "%s: not a stream packet, ignoring...", cid.c_str());
 		return PACKET_INVALID;
@@ -134,11 +151,23 @@ int xcache_cache::validate_pkt(char *pkt, size_t len, std::string &cid, std::str
 	// syslog(LOG_INFO, "SID = %s\n", sid.c_str());
 
 
+	// Returning a pointer to the TCP header
 	*xtcp = x;
+
 	return PACKET_OK;
 }
 
-xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid)
+/*!
+ * @brief New metadata to track an ongoing download for a CID/NCID
+ *
+ * @param tcp the TCP header for the packet being processed
+ * @param cid Content identifier - could be CID or NCID
+ * @param sid Client process service identifier
+ *
+ * @returns meta the new metadata object
+ */
+xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp,
+		std::string cid, std::string sid)
 {
 	// if it's not a syn-ack we don't know how much content has already gone by
 	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
@@ -148,8 +177,9 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 
 	// FIXME: this should be wrapped in a mutex
 	struct cache_download *download;
-	// TODO: NITIN - do we need to support NCID here?
-	xcache_meta *meta = new xcache_meta(cid, XID_TYPE_CID);
+
+	// CID not filled in at this time because it could be an NCID
+	xcache_meta *meta = new xcache_meta();
 
 	meta->set_state(CACHING);
 	meta->set_seq(ntohl(tcp->th_seq));
@@ -161,11 +191,18 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp, std::string &cid, st
 	return meta;
 }
 
+/*!
+ * @brief Process a packet that we are eavesdropping on
+ *
+ * @param ctrl a reference to the xcache controller
+ * @param pkt the buffer containing the packet being observed
+ * @param len length of the packet buffer
+ */
 void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 {
 	int rc;
 	struct xtcp *tcp;
-	std::string cid = "";
+	std::string chunk_id = "";
 	std::string sid = "";
 	size_t payload_len;
 	size_t offset;
@@ -175,7 +212,8 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
 
-	rc = validate_pkt(pkt, len, cid, sid, &tcp);
+	// Retrieve chunk_id, sid and TCP header from a valid packet
+	rc = validate_pkt(pkt, len, chunk_id, sid, &tcp);
 	switch (rc) {
 	case PACKET_OK:
 		// keep going, it's either a SYN-ACK or contains data
@@ -196,12 +234,13 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 	char *payload = (char *)tcp + ((ushort)(tcp->th_off) << 2);
 	payload_len = len + (size_t)(pkt - payload);
-	syslog(LOG_DEBUG, "%s Payload length = %lu\n", cid.c_str(), payload_len);
+	syslog(LOG_DEBUG, "%s Payload length = %lu\n",
+			chunk_id.c_str(), payload_len);
 
-	if (!(meta = ctrl->acquire_meta(cid))) {
-		syslog(LOG_INFO, "ACCEPTING: New Meta CID=%s", cid.c_str());
+	if (!(meta = ctrl->acquire_meta(chunk_id))) {
+		syslog(LOG_INFO, "ACCEPTING: New Meta ID=%s", chunk_id.c_str());
 
-		xcache_meta *new_meta = start_new_meta(tcp, cid, sid);
+		xcache_meta *new_meta = start_new_meta(tcp, chunk_id, sid);
 
 		if (new_meta != NULL) {
 			ctrl->add_meta(new_meta);
@@ -225,15 +264,16 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 
 		case EVICTING:
 			ctrl->release_meta(meta);
-			syslog(LOG_INFO, "The CID is in process of being evicted: %s", cid.c_str());
+			syslog(LOG_INFO, "The CID is in process of being evicted: %s", chunk_id.c_str());
 			return;
 
 		default:
-			syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", cid.c_str());
+			syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", chunk_id.c_str());
 			ctrl->release_meta(meta);
 			return;
 	}
 
+	// Ignore this stream if another stream is already getting the chunk
 	if (meta->dest_sid() != sid) {
 		// Another stream is already getting this chunk.
 		//  so we can ignore this stream's data
@@ -247,11 +287,11 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	uint32_t initial_seq = meta->seq();
 	ctrl->release_meta(meta);
 
-	iter = ongoing_downloads.find(cid);
+	iter = ongoing_downloads.find(chunk_id);
 	if (iter == ongoing_downloads.end()) {
 		// Something bad happened!
 		// we should close this meta up
-		syslog(LOG_ERR, "Unable to find download buffer for %s", cid.c_str());
+		syslog(LOG_ERR, "Unable to find download buffer for %s", chunk_id.c_str());
 		return;
 	}
 	//syslog(LOG_INFO, "Download Found\n");
@@ -299,9 +339,10 @@ skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
 
-		if (compute_cid(download->data, ntohl(download->header.length)) == cid
-			|| cid.find("NCID:") == 0) {
-			syslog(LOG_INFO, "chunk is valid: %s", cid.c_str());
+		// TODO: NITIN replace this with ContentHeader parsing and processing
+		if (compute_cid(download->data, ntohl(download->header.length)) == chunk_id
+			|| chunk_id.find("NCID:") == 0) {
+			syslog(LOG_INFO, "chunk is valid: %s", chunk_id.c_str());
 
 			meta->set_ttl(ntohl(download->header.ttl));
 			meta->set_created();
@@ -311,7 +352,7 @@ skip_data:
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;
-			req->cid = strdup(cid.c_str());
+			req->cid = strdup(chunk_id.c_str());
 			req->data = download->data;
 			req->datalen = ntohl(download->header.length);
 			ctrl->enqueue_request_safe(req);
@@ -326,7 +367,7 @@ skip_data:
 			// FIXME: we're currently leaving this open. Maybe it should be marked
 			// as broken so that if a new copy of the same chunk comes through we throw
 			// the old one away and start over.
-			syslog(LOG_ERR, "Invalid chunk, discarding: %s", cid.c_str());
+			syslog(LOG_ERR, "Invalid chunk, discarding: %s", chunk_id.c_str());
 		}
 	}
 }

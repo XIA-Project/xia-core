@@ -41,7 +41,7 @@ public:
 
 	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
 	int validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp);
-	xcache_meta* start_new_meta(struct xtcp *tcp, std::string &cid, std::string &sid);
+	xcache_meta* start_new_meta(struct xtcp *tcp, std::string cid, std::string sid);
 	void unparse_xid(struct click_xia_xid_node *node, std::string &xid);
 
 

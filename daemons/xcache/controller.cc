@@ -19,6 +19,7 @@
 #include "Xkeys.h"
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
+#include "ncid_header.h"
 #include "xcache_sock.h"
 #include "cid.h"
 
@@ -144,18 +145,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
-	xcache_meta *meta;
-	switch (expected_cid.type()) {
-		case XID_TYPE_CID:
-			meta = new xcache_meta(expected_cid.id_string(), XID_TYPE_CID);
-			break;
-		case XID_TYPE_NCID:
-			meta = new xcache_meta(expected_cid.id_string(), XID_TYPE_NCID);
-			break;
-		default:
-			syslog(LOG_ERR, "Invalid type for expected CID");
-			return RET_FAILED;
-	}
+	xcache_meta *meta = new xcache_meta();
 
 	meta->set_state(FETCHING);
 
@@ -207,6 +197,11 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
 	struct xcache_context *context = lookup_context(cmd->context_id());
+
+	// Build a content header for this CID and store it with the metadata
+	// TODO: NITIN Verify expected_cid vs computed_cid
+	ContentHeader *chdr = new CIDHeader(data, ntohl(header.ttl));
+	meta->set_content_header(chdr);
 
 	if (!context) {
 		syslog(LOG_WARNING, "Context Lookup Failed");
@@ -524,10 +519,10 @@ int xcache_controller::__store_policy(xcache_meta *meta) {
 
 bool xcache_controller::verify_content(xcache_meta *meta, const std::string *data)
 {
-	if (meta->_type == XID_TYPE_CID) {
-		if (meta->get_cid() != compute_cid(data->c_str(), data->length())) {
-			return false;
-		}
+	std::string cid = meta->store_id();
+
+	if (cid != compute_cid(data->c_str(), data->length())) {
+		return false;
 	}
 
 	return true;
@@ -555,7 +550,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	}
 	syslog(LOG_DEBUG, "[thread %lu] after store policy\n", pthread_self());
 
-	std::string cid = "CID:" + meta->get_cid();
+	std::string cid = "CID:" + meta->id();
 
 	store_manager.store(meta, data);
 
@@ -570,15 +565,12 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	return RET_SENDRESP;
 }
 
-int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax, int type)
+int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 {
 	int rc = 0;
 	std::string contentID;
 
 	struct addrinfo *ai;
-
-	contentID = std::string((type == XID_TYPE_CID) ? "CID:" : "NCID:");
-	contentID += cid;
 
 	// make a direct AD-HID-SID dag for the xcache daemon
 	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
@@ -680,9 +672,12 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	Publisher publisher(publisher_name);
 
 	std::string content_name = cmd->content_name();
+	ContentHeader *chdr = new NCIDHeader(content, cmd->ttl(),
+			publisher_name, content_name);
 
 	//std::string cid = get_id(&type, cmd);
 
+	/*
 	// Content_URI = Publisher_name/content_name
 	std::string content_URI = publisher.content_URI(content_name);
 
@@ -700,6 +695,7 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// Debugging info
 	printf("controller::store_named %s\n", content_URI.c_str());
+	*/
 
 	// Store CID
 	if(store(resp, cmd, cmd->ttl()) == RET_FAILED) {
@@ -719,7 +715,7 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	std::string cid = cid_graph.intent_CID_str();
 
 	// Keep track of NCID and corresponding CID
-	register_ncid(ncid, cid);
+	register_ncid(chdr->id(), chdr->store_id());
 
 	return retval;
 }
@@ -835,9 +831,9 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
+	ContentHeader *chdr = new CIDHeader(cmd->data(), ttl);
 	//std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
-	int type;
-	std::string cid = get_id(&type, cmd);
+	std::string cid = chdr->id();
 
 	meta = acquire_meta(cid.c_str());
 
@@ -851,7 +847,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		/*
 		 * New object - Allocate a meta
 		 */
-		meta = new xcache_meta(cid, type);
+		meta = new xcache_meta(cid, chdr);
 		meta->set_ttl(ttl);
 		meta->set_created();
 		meta->set_length(cmd->data().length());
@@ -870,7 +866,7 @@ printf("store:length: %lu", meta->get_length());
 
 	sockaddr_x addr;
 
-	if (cid2addr(cid, &addr, type) == 0) {
+	if (cid2addr(cid, &addr) == 0) {
 		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
 		Graph g(&addr);
 		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());
@@ -1053,6 +1049,7 @@ void xcache_controller::process_req(xcache_req *req)
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
+		break;
 	case xcache_cmd::XCACHE_STORE:
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {

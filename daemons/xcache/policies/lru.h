@@ -108,14 +108,14 @@ printf("_max_size = %lu, current size = %lu\n", _max_size, _cache_size);
 
 		if (rc) {
 			if (remove) {
-				syslog(LOG_INFO, "LRU Policy: %s removed from queue\n", m->get_cid().c_str());
+				syslog(LOG_INFO, "LRU Policy: %s removed from queue\n", m->id().c_str());
 
 			} else {
-				syslog(LOG_INFO, "LRU Policy: %s moved back to front of queue\n", m->get_cid().c_str());
+				syslog(LOG_INFO, "LRU Policy: %s moved back to front of queue\n", m->id().c_str());
 			}
 
 		} else {
-			syslog(LOG_WARNING, "LRU Policy: %s not found\n", m->get_cid().c_str());
+			syslog(LOG_WARNING, "LRU Policy: %s not found\n", m->id().c_str());
 		}
 		return rc;
 	}
@@ -151,7 +151,7 @@ private:
 				case AVAILABLE:
 				case EVICTING:
 					m->lock();
-					printf("\n\nsz:%lu  bytes:%lu : Popping %s off the end\n", _q.size(), _cache_size, m->get_cid().c_str());
+					printf("\n\nsz:%lu  bytes:%lu : Popping %s off the end\n", _q.size(), _cache_size, m->id().c_str());
 					m->set_state(PURGING);
 					m->unlock();
 
