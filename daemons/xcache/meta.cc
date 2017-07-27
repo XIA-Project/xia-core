@@ -35,6 +35,13 @@ xcache_meta::xcache_meta(std::string cid, ContentHeader *chdr)
 	_chdr = chdr;
 }
 
+xcache_meta::~xcache_meta()
+{
+	if (_chdr != NULL) {
+		delete _chdr;
+	}
+}
+
 void xcache_meta::access() {
 	_accessed = time(NULL);
 	_policy->touch(this, false);
@@ -103,6 +110,8 @@ meta_map::~meta_map()
 	_map.clear();
 
 	pthread_rwlock_destroy(&_rwlock);
+	delete _instance;
+	_instance = 0;
 }
 
 xcache_meta *meta_map::acquire_meta(std::string cid)

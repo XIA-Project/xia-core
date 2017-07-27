@@ -62,6 +62,7 @@ private:
 public:
 	xcache_meta();
 	xcache_meta(std::string, ContentHeader *chdr);
+	~xcache_meta();
 
 	time_t last_accessed() { return _accessed; }
 	void access();
