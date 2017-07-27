@@ -51,10 +51,7 @@ private:
 	int n_threads;
 	pthread_t *threads;
 
-	/**
-	 * Map of metadata.
-	 */
-	meta_map _map;
+	meta_map *_map;
 
 	/**
 	 * Map of contexts.
@@ -99,6 +96,7 @@ public:
 	 * FIXME: What do we need to do in the constructor?
 	 */
 	xcache_controller() {
+		_map = meta_map::get_map();
 		hostname.assign("host0");
 		pthread_mutex_init(&request_queue_lock, NULL);
 		pthread_mutex_init(&ncid_cid_lock, NULL);
@@ -151,7 +149,7 @@ public:
 	void process_req(struct xcache_req *req);
 
 	static void *worker_thread(void *arg);
-	static void *garbage_collector(void *arg);
+	static void *garbage_collector(void *);
 
 
 	/**
@@ -197,12 +195,10 @@ public:
 	void remove(void);
 
 	/** Concurrency control **/
-	xcache_meta *acquire_meta(std::string cid) { return _map.acquire_meta(cid); };
-	void release_meta(xcache_meta *meta) { _map.release_meta(meta); };
-	void add_meta(xcache_meta *meta) { _map.add_meta(meta); };
-	void remove_meta(xcache_meta *meta) { _map.remove_meta(meta); };
-
-	meta_map *get_meta_map() { return &_map; };
+	xcache_meta *acquire_meta(std::string cid) { return _map->acquire_meta(cid); };
+	void release_meta(xcache_meta *meta) { _map->release_meta(meta); };
+	void add_meta(xcache_meta *meta) { _map->add_meta(meta); };
+	void remove_meta(xcache_meta *meta) { _map->remove_meta(meta); };
 
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);

@@ -136,12 +136,7 @@ public:
 
 class meta_map {
 public:
-	meta_map();
-	~meta_map();
-
-	int read_lock(void)  { return pthread_rwlock_rdlock(&_rwlock); };
-	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
-	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
+	static meta_map *get_map();
 
 	xcache_meta *acquire_meta(std::string cid);
 	void release_meta(xcache_meta *meta);
@@ -151,9 +146,18 @@ public:
 	//int walk(bool(*f)(xcache_meta *m));
 	int walk();
 
+protected:
+	meta_map();
+	~meta_map();
+
 private:
+	int read_lock(void)  { return pthread_rwlock_rdlock(&_rwlock); };
+	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
+	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
+
 	std::map<std::string, xcache_meta *> _map;
 	pthread_rwlock_t _rwlock;
+	static meta_map* _instance;
 };
 
 #endif

@@ -73,9 +73,24 @@ void xcache_meta::status(void)
 	syslog(LOG_INFO, "[%s] %s", _cid.c_str(), _store->get(this).c_str());
 }
 
+// The only meta_map. Initialized by first call to meta_map::get_map()
+meta_map* meta_map::_instance = 0;
+
 meta_map::meta_map()
 {
+	_instance = 0;
 	pthread_rwlock_init(&_rwlock, NULL);
+}
+
+/*!
+ * @brief The only way to get a reference to the map storing all metadata
+ */
+meta_map* meta_map::get_map()
+{
+	if (_instance == 0) {
+		_instance = new meta_map;
+	}
+	return _instance;
 }
 
 meta_map::~meta_map()

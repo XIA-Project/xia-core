@@ -556,7 +556,7 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 
 	meta->set_state(AVAILABLE);
 
-	_map.add_meta(meta);
+	_map->add_meta(meta);
 
 	meta->unlock();
 
@@ -1129,14 +1129,12 @@ void *xcache_controller::worker_thread(void *arg)
 }
 
 // delete any chunks that are not complete but are too stale
-void *xcache_controller::garbage_collector(void *arg)
+void *xcache_controller::garbage_collector(void *)
 {
-	xcache_controller *ctrl = (xcache_controller *)arg;
-
 	while(1) {
 		sleep(GC_INTERVAL);
 
-		meta_map *map = ctrl->get_meta_map();
+		meta_map *map = meta_map::get_map();
 		map->walk();
 	}
 }
@@ -1182,7 +1180,7 @@ void xcache_controller::run(void)
 	}
 
 	// start the garbage collector
-	pthread_create(&gc_thread, NULL, garbage_collector, (void *)this);
+	pthread_create(&gc_thread, NULL, garbage_collector, NULL);
 
 	syslog(LOG_INFO, "Entering The Loop\n");
 
