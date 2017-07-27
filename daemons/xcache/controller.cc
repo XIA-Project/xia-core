@@ -663,61 +663,71 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	struct xcache_context *context;
 	xcache_meta *meta;
 	int type;
-	// Build the NCID from the provided request
+
+	// Retrieve publisher name, content name and data passed by user
 	std::string publisher_name = cmd->publisher_name();
 	std::string content = cmd->data();
+	std::string content_name = cmd->content_name();
 
 	// Get a reference to the Publisher
 	// TODO: For now just create a new one every time
+	// In future, we should have a cache of known Publishers
 	Publisher publisher(publisher_name);
 
-	std::string content_name = cmd->content_name();
+	// Build the NCID Header from the provided request
 	ContentHeader *chdr = new NCIDHeader(content, cmd->ttl(),
 			publisher_name, content_name);
 
-	//std::string cid = get_id(&type, cmd);
+	// Check if the CID is already stored locally
+	meta = acquire_meta(chdr->store_id().c_str());
 
-	/*
-	// Content_URI = Publisher_name/content_name
-	std::string content_URI = publisher.content_URI(content_name);
+	if (meta != NULL) {
+		/*
+		 * Meta already exists
+		 */
+		release_meta(meta);
+		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
+	} else {
+		/*
+		 * Create new Meta object and use that to store chunk
+		 * NOTE: meta_map keys only by store_id == CID, never NCID
+		 * but the ContentHeader value can be an NCIDHeader
+		 */
+		meta = new xcache_meta(chdr->store_id(), chdr);
+		meta->set_ttl(chdr->ttl());
+		meta->set_created();
+		meta->set_length(cmd->data().length());
+printf("store:length: %lu", meta->get_length());
+		context = lookup_context(cmd->context_id());
+		if(!context) {
+			return RET_FAILED;
+		}
 
-	// NCID = Hash (Content_URI + PublisherPublicKey)
-	std::string ncid = publisher.ncid(content_name);
-
-	// Signature = Sign_priv_key(Content_URI + Content)
-	std::string signature;
-	if(publisher.sign(content_name, content_URI, signature)) {
-		printf("Failed signing %s\n", content_name.c_str());
-		return retval;
-	}
-
-	// NCID Header = Content_URI, NCID, Signature, Pubkey
-
-	// Debugging info
-	printf("controller::store_named %s\n", content_URI.c_str());
-	*/
-
-	// Store CID
-	if(store(resp, cmd, cmd->ttl()) == RET_FAILED) {
-		printf("Failed storing named content to local storage\n");
-		return retval;
-	}
-	if(resp->cmd() == xcache_cmd::XCACHE_ERROR) {
-		if(resp->status() != xcache_cmd::XCACHE_ERR_EXISTS) {
-			printf("Xcache store error\n");
-			return retval;
+		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
+			return RET_FAILED;
 		}
 	}
 
-	sockaddr_x cid_dag;
-	memcpy(&cid_dag, resp->dag().c_str(), resp->dag().length());
-	Graph cid_graph(&cid_dag);
-	std::string cid = cid_graph.intent_CID_str();
+	// Prepare a response for caller
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
+
+	sockaddr_x addr;
+
+	// Return the DAG for the CID that just got stored
+	if (cid2addr(chdr->id(), &addr) == 0) {
+		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
+		Graph g(&addr);
+		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());
+	} else {
+		// FIXME: do some sort of error handling here
+	}
+
+	syslog(LOG_INFO, "Store Finished\n");
 
 	// Keep track of NCID and corresponding CID
 	register_ncid(chdr->id(), chdr->store_id());
 
-	return retval;
+	return RET_SENDRESP;
 }
 
 /*!
@@ -831,10 +841,12 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
-	ContentHeader *chdr = new CIDHeader(cmd->data(), ttl);
-	//std::string cid = compute_cid(cmd->data().c_str(), cmd->data().length());
-	std::string cid = chdr->id();
 
+	// Build a CIDHeader so we can compute the CID
+	ContentHeader *chdr = new CIDHeader(cmd->data(), ttl);
+	std::string cid = chdr->store_id();
+
+	// Check if the CID is already stored locally
 	meta = acquire_meta(cid.c_str());
 
 	if (meta != NULL) {
@@ -845,7 +857,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
 	} else {
 		/*
-		 * New object - Allocate a meta
+		 * Create new Meta object and use that to store chunk
 		 */
 		meta = new xcache_meta(cid, chdr);
 		meta->set_ttl(ttl);
@@ -862,10 +874,12 @@ printf("store:length: %lu", meta->get_length());
 		}
 	}
 
+	// Prepare a response for caller
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
 	sockaddr_x addr;
 
+	// Return the DAG for the CID that just got stored
 	if (cid2addr(cid, &addr) == 0) {
 		resp->set_dag((char *)&addr, sizeof(sockaddr_x));
 		Graph g(&addr);
