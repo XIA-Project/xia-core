@@ -173,7 +173,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	/* TODO: window_scale and use_timestamp were being used uninitialized
 	   setting them to 0 and false respectively for now but need to revisit
 	   especially for the window scale */
-	_tcp_globals.window_scale		= 1;
+	_tcp_globals.window_scale		= 4;
 	_tcp_globals.use_timestamp		= true;
 
 	_verbosity 						= VERB_ERRORS;
