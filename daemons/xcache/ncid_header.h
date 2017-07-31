@@ -10,7 +10,8 @@ class NCIDHeader : public CIDHeader {
 		NCIDHeader(const std::string &data, time_t ttl, std::string pub_name,
 				std::string content_name);
 		virtual ~NCIDHeader() {}
-		std::string serialize();
+		virtual std::string serialize();
+		virtual bool deserialize(const std::string &buf);
 	private:
 		std::string _signature;
 		std::string _uri;
@@ -49,5 +50,24 @@ NCIDHeader::serialize()
 	std::string serialized_header;
 	chdr_buf.SerializeToString(&serialized_header);
 	return serialized_header;
+}
+
+bool
+NCIDHeader::deserialize(const std::string &buf)
+{
+	ContentHeaderBuf chdr_buf;
+	if(chdr_buf.ParseFromString(buf) == false) {
+		return false;
+	}
+	if(!chdr_buf.has_ncid_header()) {
+		return false;
+	}
+	const NCIDHeaderBuf ncid_hdr = chdr_buf.ncid_header();
+	_len = ncid_hdr.len();
+	_ttl = ncid_hdr.ttl();
+	_id = ncid_hdr.id();
+	_store_id = ncid_hdr.store_id();
+	_signature = ncid_hdr.signature();
+	return true;
 }
 #endif // _NCID_HEADER_H
