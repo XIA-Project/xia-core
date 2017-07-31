@@ -9,6 +9,8 @@ class NCIDHeader : public CIDHeader {
 		// Call the CID Header constructor first
 		NCIDHeader(const std::string &data, time_t ttl, std::string pub_name,
 				std::string content_name);
+		virtual ~NCIDHeader() {}
+		std::string serialize();
 	private:
 		std::string _signature;
 		std::string _uri;
@@ -31,5 +33,21 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 		// TODO throw an exception here
 	}
 	_signature = signature;
+}
+
+std::string
+NCIDHeader::serialize()
+{
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	ContentHeaderBuf chdr_buf;
+	NCIDHeaderBuf *ncid_header = chdr_buf.mutable_ncid_header();
+	ncid_header->set_len(_len);
+	ncid_header->set_ttl(_ttl);
+	ncid_header->set_id(_id);
+	ncid_header->set_store_id(_store_id);
+	ncid_header->set_signature(_signature);
+	std::string serialized_header;
+	chdr_buf.SerializeToString(&serialized_header);
+	return serialized_header;
 }
 #endif // _NCID_HEADER_H

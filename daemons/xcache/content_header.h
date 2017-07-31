@@ -11,6 +11,7 @@
 
 class ContentHeader {
 	public:
+		virtual ~ContentHeader() {}
 		virtual std::string id() = 0;
 		virtual void set_id(std::string id) = 0;
 
@@ -22,6 +23,8 @@ class ContentHeader {
 
 		virtual time_t ttl() = 0;
 		virtual void set_ttl(time_t ttl) = 0;
+
+		virtual std::string serialize() = 0;
 
 	protected:
 		size_t _len;

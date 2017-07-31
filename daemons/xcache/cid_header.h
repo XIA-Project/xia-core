@@ -3,10 +3,12 @@
 
 #include "Xsecurity.h"
 #include "content_header.h"
+#include "chdr.pb.h"
 
 class CIDHeader : public ContentHeader {
 	public:
 		CIDHeader(const std::string &data, time_t ttl);
+		virtual ~CIDHeader() {}
 
 		virtual std::string id() { return _id; }
 		virtual void set_id(std::string id) { _id = id; }
@@ -21,6 +23,7 @@ class CIDHeader : public ContentHeader {
 
 		virtual time_t ttl() { return _ttl; }
 		virtual void set_ttl(time_t ttl) { _ttl = ttl; }
+		virtual std::string serialize();
 	private:
 		std::string _sha1hash(const std::string &data);
 };
@@ -42,4 +45,17 @@ CIDHeader::CIDHeader(const std::string &data, time_t ttl)
 	_store_id = _id;
 }
 
+std::string
+CIDHeader::serialize()
+{
+	GOOGLE_PROTOBUF_VERIFY_VERSION;
+	ContentHeaderBuf chdr_buf;
+	CIDHeaderBuf *cid_header = chdr_buf.mutable_cid_header();
+	cid_header->set_len(_len);
+	cid_header->set_ttl(_ttl);
+	cid_header->set_id(_id);
+	std::string serialized_header;
+	chdr_buf.SerializeToString(&serialized_header);
+	return serialized_header;
+}
 #endif // _CID_HEADER_H
