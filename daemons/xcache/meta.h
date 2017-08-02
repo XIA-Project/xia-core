@@ -51,7 +51,6 @@ private:
 	time_t _created;
 	time_t _accessed;
 	time_t _updated;
-	time_t _ttl;
 
 	int32_t _fetchers;
 
@@ -91,8 +90,8 @@ public:
 
 	void set_length(uint64_t length) { _len = length; }
 
-	void set_ttl(time_t t) { _ttl = t; }
-	time_t ttl() { return _ttl; }
+	void set_ttl(time_t t) { _chdr->set_ttl(t); }
+	time_t ttl() { return _chdr->ttl(); }
 
 	void fetch(bool fetching) {
 		if (fetching) {

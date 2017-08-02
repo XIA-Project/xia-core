@@ -16,7 +16,6 @@ void xcache_meta::init()
 	_store = NULL;
 	_policy = NULL;
 	_len = 0;
-	_ttl = 0;
 	_initial_seq = 0;
 	_fetchers = 0;
 	pthread_mutex_init(&_meta_lock, NULL);
