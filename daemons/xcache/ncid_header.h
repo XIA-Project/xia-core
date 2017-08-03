@@ -9,6 +9,7 @@ class NCIDHeader : public CIDHeader {
 		// Call the CID Header constructor first
 		NCIDHeader(const std::string &data, time_t ttl, std::string pub_name,
 				std::string content_name);
+		NCIDHeader(const std::string &buf);
 		virtual ~NCIDHeader() {}
 		virtual std::string serialize();
 		virtual bool deserialize(const std::string &buf);
@@ -34,6 +35,12 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 		// TODO throw an exception here
 	}
 	_signature = signature;
+}
+
+NCIDHeader::NCIDHeader(const std::string &buf)
+	: CIDHeader(buf)
+{
+	deserialize(buf);
 }
 
 std::string

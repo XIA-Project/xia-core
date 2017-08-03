@@ -8,6 +8,7 @@
 class CIDHeader : public ContentHeader {
 	public:
 		CIDHeader(const std::string &data, time_t ttl);
+		CIDHeader(const std::string &buf) {deserialize(buf);}
 		virtual ~CIDHeader() {}
 
 		virtual std::string id() { return _id; }

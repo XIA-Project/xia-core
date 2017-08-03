@@ -85,6 +85,7 @@ meta_map* meta_map::_instance = 0;
 meta_map::meta_map()
 {
 	_instance = 0;
+	_ncid_table = NCIDTable::get_table();
 	pthread_rwlock_init(&_rwlock, NULL);
 }
 
@@ -225,6 +226,7 @@ int meta_map::walk(void)
 				m->store()->remove(m);
 				delete m;
 				_map.erase(i++);
+				_ncid_table->unregister_cid(c);
 				break;
 
 			default:

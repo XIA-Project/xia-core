@@ -7,6 +7,7 @@
 #include <iostream>
 #include <stdint.h>
 #include "content_header.h"
+#include "ncid_table.h"
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 #include <time.h>
@@ -121,6 +122,7 @@ public:
 	std::string store_id();
 
 	void set_content_header(ContentHeader *chdr) { _chdr = chdr; }
+	std::string content_header_str() {return _chdr->serialize();}
 
 	int lock(void) {
 		return 0;
@@ -158,6 +160,7 @@ private:
 	std::map<std::string, xcache_meta *> _map;
 	pthread_rwlock_t _rwlock;
 	static meta_map* _instance;
+	NCIDTable *_ncid_table;
 };
 
 #endif

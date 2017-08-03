@@ -20,6 +20,7 @@
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
 #include "ncid_header.h"
+#include "ncid_table.h"
 #include "xcache_sock.h"
 #include "cid.h"
 
@@ -139,7 +140,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	std::string data;
 	char buf[IO_BUF_SIZE];
-	struct cid_header header;
+	uint32_t header_len;
 	size_t remaining;
 	size_t offset;
 	unsigned hop_count;
@@ -149,12 +150,20 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	meta->set_state(FETCHING);
 
-	remaining = sizeof(cid_header);
+	if(Xrecv(sock, (void *)&header_len, sizeof(header_len), 0) !=
+			sizeof(header_len)) {
+		syslog(LOG_ERR, "Unable to fetch header length for %s",
+				g.dag_string().c_str());
+		Xclose(sock);
+		assert(0);
+	}
+
+	remaining = header_len;
 	offset = 0;
 
 	while (remaining > 0) {
 		syslog(LOG_DEBUG, "Remaining(1) = %lu\n", remaining);
-		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
+		recvd = Xrecv(sock, (char *)&buf + offset, remaining, 0);
 		if (recvd < 0) {
 			syslog(LOG_ALERT, "Sender Closed the connection: %s", strerror(errno));
 			Xclose(sock);
@@ -167,11 +176,23 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		remaining -= recvd;
 		offset += recvd;
 	}
+	std::string serialized_header(buf, header_len);
+	// Build a content header for this NCID/CID
+	ContentHeader *chdr;
+	switch (expected_cid.type()) {
+		case CLICK_XIA_XID_TYPE_NCID:
+			chdr = new NCIDHeader(serialized_header);
+			break;
+		case CLICK_XIA_XID_TYPE_CID:
+			chdr = new CIDHeader(serialized_header);
+	}
 
-	remaining = ntohl(header.length);
-	hop_count = ntohl(header.hop_count);
+	//remaining = ntohl(header.length);
+	remaining = chdr->content_len();
+	//hop_count = ntohl(header.hop_count);
+	// TODO: NITIN setting to 0 until we figure out how to do this right
+	hop_count = 0;
 	meta->set_created();
-	meta->set_ttl(ntohl(header.ttl));
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -198,9 +219,8 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	std::string computed_cid = compute_cid(data.c_str(), data.length());
 	struct xcache_context *context = lookup_context(cmd->context_id());
 
-	// Build a content header for this CID and store it with the metadata
+	// Store the content header with the metadata
 	// TODO: NITIN Verify expected_cid vs computed_cid
-	ContentHeader *chdr = new CIDHeader(data, ntohl(header.ttl));
 	meta->set_content_header(chdr);
 
 	if (!context) {
@@ -235,20 +255,36 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	return RET_OK;
 }
 
+/*!
+ * @brief Fetch content from local storage
+ *
+ * Fetch the requested content from local storage, if available.
+ *
+ * @param addr DAG of the content to be retrieved
+ * @param addrlen length of the content DAG. IGNORED.
+ * @param resp response including content retrieved and metadata
+ * @param cmd IGNORED
+ *
+ * @returns RET_FAILED on failure
+ * @returns RET_OK on success
+ */
 int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 					   xcache_cmd *resp, xcache_cmd *cmd,
 					   int flags)
 {
 	xcache_meta *meta;
 	std::string data;
+
+	// Get the intended CID from given address
 	Graph g(addr);
 	Node expected_cid(g.get_final_intent());
-	std::string cid(expected_cid.id_string());
+	std::string cid = _ncid_table->to_cid(expected_cid.to_string());
 
 	IGNORE_PARAM(flags);
 	IGNORE_PARAM(addrlen);
 	IGNORE_PARAM(cmd);
-	syslog(LOG_INFO, "Fetching content %s from local\n", expected_cid.id_string().c_str());
+	syslog(LOG_INFO, "Fetching content %s from local\n",
+			expected_cid.id_string().c_str());
 
 	meta = acquire_meta(cid);
 	if(!meta) {
@@ -391,9 +427,26 @@ std::string xcache_controller::addr2cid(sockaddr_x *addr)
 {
 	Graph g(addr);
 	Node cid_node(g.get_final_intent());
-	return cid_node.id_string();
+	std::string cid = _ncid_table->to_cid(cid_node.to_string());
+	return cid;
 }
 
+
+/*!
+ * @brief Acquire metadata reference for requested content (CID/NCID)
+ *
+ * We convert NCIDs to corresponding CIDs and then acquire a reference
+ * the CID's metadata.
+ *
+ * @param content_id CID/NCID string for requested content
+ * @returns reference to requested metadata
+ * @return NULL on error
+ */
+xcache_meta *
+xcache_controller::acquire_meta(std::string cid)
+{
+	return _map->acquire_meta(cid);
+}
 
 int xcache_controller::chunk_read(xcache_cmd *resp, xcache_cmd *cmd)
 {
@@ -609,7 +662,7 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 
 int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	std::string cid = cmd->cid();
+	std::string cid = _ncid_table->to_cid(cmd->cid());
 
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
@@ -725,116 +778,9 @@ printf("store:length: %lu", meta->get_length());
 	syslog(LOG_INFO, "Store Finished\n");
 
 	// Keep track of NCID and corresponding CID
-	register_ncid(chdr->id(), chdr->store_id());
+	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 
 	return RET_SENDRESP;
-}
-
-/*!
- * @brief register an NCID with the corresponding CID
- *
- * We maintain two maps between NCIDs and CIDs
- * 1. ncid_to_cid - CID corresponding to each NCID known
- * 2. cid_to_ncids - NCIDs that provided CID is associated with
- * TODO: Lock both maps when adding entries
- *
- * @param ncid the NCID to be registered
- * @param cid representing the actual data in storage corresponding to ncid
- *
- * @returns 0 on success, can add existence of ncid in map as failure
- */
-int xcache_controller::register_ncid(std::string ncid, std::string cid)
-{
-	pthread_mutex_lock(&ncid_cid_lock);
-	std::map<std::string, std::string>::iterator ncid_to_cid_it;
-	ncid_to_cid_it = ncid_to_cid.find(ncid);
-
-	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
-	cid_to_ncids_it = cid_to_ncids.find(cid);
-
-	// NCID is known
-	if (ncid_to_cid_it != ncid_to_cid.end()) {
-		// If the CID is different from one known before, replace it
-		if (ncid_to_cid_it->second.compare(cid)) {
-			printf("Replacing %s for %s\n", cid.c_str(), ncid.c_str());
-			ncid_to_cid[cid] = ncid;
-		}
-	} else {
-		// Simply add to map if not known already
-		ncid_to_cid[ncid] = cid;
-	}
-
-	// CID is known
-	if (cid_to_ncids_it != cid_to_ncids.end()) {
-
-		// Is the NCID already associated with this CID
-		std::vector<std::string> ncids = cid_to_ncids_it->second;
-		std::vector<std::string>::iterator ncids_it;
-
-		// If not, add NCID to the list of NCIDs for this CID
-		if(std::find(ncids.begin(), ncids.end(), ncid) == ncids.end()) {
-			ncids.push_back(ncid);
-		}
-	} else {
-		// Create the vector and add an entry for this NCID in it
-		cid_to_ncids[cid].push_back(ncid);
-	}
-	pthread_mutex_unlock(&ncid_cid_lock);
-
-	return 0;
-}
-
-/*!
- * @brief unregister an NCID and the corresponding CID
- *
- * We maintain two maps between NCIDs and CIDs
- * 1. ncid_to_cid - CID corresponding to each NCID known
- * 2. cid_to_ncids - NCIDs that provided CID is associated with
- * This function deletes the NCID and CID entries from both maps
- * TODO: Lock both maps while removing entries
- *
- * @param ncid the NCID to be unregistered
- * @param cid corresponding to the NCID that is getting unregistered
- *
- * @returns 0 on success
- * @returns -1 if the entries to be unregistered don't exist
- */
-int xcache_controller::unregister_ncid(std::string ncid, std::string cid)
-{
-	int retval = -1;
-
-	pthread_mutex_lock(&ncid_cid_lock);
-
-	// Make sure both maps have the NCID and CID entries
-	std::map<std::string, std::string>::iterator ncid_to_cid_it;
-	std::map<std::string, std::vector<std::string>>::iterator cid_to_ncids_it;
-	std::vector<std::string> ncids = cid_to_ncids_it->second;
-	std::vector<std::string>::iterator ncids_it;
-
-	ncid_to_cid_it = ncid_to_cid.find(ncid);
-	if (ncid_to_cid_it == ncid_to_cid.end()) {
-		printf("unregister_ncid: ERROR NCID %s not found\n", ncid.c_str());
-		goto unregister_ncid_done;
-	}
-
-	cid_to_ncids_it = cid_to_ncids.find(cid);
-	if (cid_to_ncids_it == cid_to_ncids.end()) {
-		printf("unregister_ncid: ERROR NCIDS missing for %s\n", cid.c_str());
-		goto unregister_ncid_done;
-	}
-	ncids_it = std::find(ncids.begin(), ncids.end(), ncid);
-	if (ncids_it == ncids.end()) {
-		printf("unregister_ncid: ERROR NCID for CID not found\n");
-		goto unregister_ncid_done;
-	}
-
-	ncid_to_cid.erase(ncid_to_cid_it);
-	ncids.erase(ncids_it);
-	retval = 0;	// Atomically erased entries from both maps
-
-unregister_ncid_done:
-	pthread_mutex_unlock(&ncid_cid_lock);
-	return retval;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
@@ -908,24 +854,38 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		assert(0);
 	}
 
-	struct cid_header header;
+	std::string cid_str = _ncid_table->get_known_cid(cid.to_string());
+	xcache_meta *meta = acquire_meta(cid_str);
+	std::string header = meta->content_header_str();
 	size_t remaining;
 	size_t offset;
 	int sent;
 
+	/*
 	header.version = htons(CID_HEADER_VER);
 	header.hlen = htons(sizeof(struct cid_header));
 	header.length = htonl(resp.data().length());
 	header.hop_count = htonl(req->hop_count);
 	header.ttl = htonl(resp.ttl());
+	*/
 
+	// Send header length
+	uint32_t header_len = sizeof(header);
+	if(Xsend(req->to_sock, (void *)&header_len, sizeof(header_len), 0) !=
+			sizeof(header_len)) {
+		syslog(LOG_ALERT, "Unable to send header length");
+		assert(0);
+		Xclose(req->to_sock);
+	}
+
+	// Now send the header
 	remaining = sizeof(header);
 	offset = 0;
 
 	syslog(LOG_DEBUG, "Header Send Start\n");
 
 	while (remaining > 0) {
-		sent = Xsend(req->to_sock, (char *)&header + offset, remaining, 0);
+		sent = Xsend(req->to_sock, header.c_str() + offset, remaining, 0);
 		if (sent < 0) {
 			syslog(LOG_ALERT, "Receiver Closed the connection %s", strerror(errno));
 			assert(0);
@@ -935,6 +895,7 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		offset += sent;
 	}
 
+	// and finally, the data
 	remaining = resp.data().length();
 	offset = 0;
 
@@ -1047,7 +1008,8 @@ void xcache_controller::process_req(xcache_req *req)
 	switch(req->type) {
 	case xcache_cmd::XCACHE_CACHE:
 	{
-		xcache_meta *meta = acquire_meta(req->cid);
+		// Cache an in-flight chunk that is passing by
+		xcache_meta *meta = acquire_meta(_ncid_table->to_cid(req->cid));
 		if (meta) {
 			std::string chunk((const char *)req->data, req->datalen);
 			release_meta(meta);
@@ -1058,6 +1020,7 @@ void xcache_controller::process_req(xcache_req *req)
 	}
 
 	case xcache_cmd::XCACHE_STORE_NAMED:
+		// Store a named chunk provided by the user; creates NCID+CID
 		ret = store_named(&resp, (xcache_cmd *)req->data);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
@@ -1065,6 +1028,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_STORE:
+		// Store a chunk provided by the user, creates CID
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
@@ -1072,6 +1036,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_FETCHCHUNK:
+		// Fetch a CID requested by the user. May be local or remote
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_fetch_content(&resp, cmd, cmd->flags());
 		syslog(LOG_INFO, "xcache_fetch_content returned %d", ret);
@@ -1081,6 +1046,7 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_READ:
+		// Read a (partial/whole) chunk from local storage
 		cmd = (xcache_cmd *)req->data;
 		ret = chunk_read(&resp, cmd);
 		if(ret == RET_SENDRESP) {
@@ -1089,10 +1055,12 @@ void xcache_controller::process_req(xcache_req *req)
 		}
 		break;
 	case xcache_cmd::XCACHE_SENDCHUNK:
+		// On server/router, send a chunk requested by a remote client
 		send_content_remote(req, (sockaddr_x *)req->data);
 		break;
 
 	case xcache_cmd::XCACHE_EVICT:
+		// Evict a chunk from local cache
 		cmd = (xcache_cmd *)req->data;
 		ret = evict(&resp, cmd);
 		if(ret >= 0) {

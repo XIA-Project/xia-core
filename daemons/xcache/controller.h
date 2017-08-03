@@ -7,6 +7,7 @@
 #include "xcache_cmd.pb.h"
 #include "slice.h"
 #include "meta.h"
+#include "ncid_table.h"
 #include "store_manager.h"
 #include "policy_manager.h"
 #include "XIARouter.hh"
@@ -52,6 +53,7 @@ private:
 	pthread_t *threads;
 
 	meta_map *_map;
+	NCIDTable *_ncid_table;
 
 	/**
 	 * Map of contexts.
@@ -97,6 +99,7 @@ public:
 	 */
 	xcache_controller() {
 		_map = meta_map::get_map();
+		_ncid_table = NCIDTable::get_table();
 		hostname.assign("host0");
 		pthread_mutex_init(&request_queue_lock, NULL);
 		pthread_mutex_init(&ncid_cid_lock, NULL);
@@ -175,8 +178,6 @@ public:
 	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
 	int __store_policy(xcache_meta *);
 	int store_named(xcache_cmd *, xcache_cmd *);
-	int register_ncid(std::string ncid, std::string cid);
-	int unregister_ncid(std::string ncid, std::string cid);
 
 	// evict a chunk locally
 	int evict(xcache_cmd *resp, xcache_cmd *cmd);
@@ -195,7 +196,7 @@ public:
 	void remove(void);
 
 	/** Concurrency control **/
-	xcache_meta *acquire_meta(std::string cid) { return _map->acquire_meta(cid); };
+	xcache_meta *acquire_meta(std::string cid);
 	void release_meta(xcache_meta *meta) { _map->release_meta(meta); };
 	void add_meta(xcache_meta *meta) { _map->add_meta(meta); };
 	void remove_meta(xcache_meta *meta) { _map->remove_meta(meta); };
