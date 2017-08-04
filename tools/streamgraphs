@@ -1,0 +1,42 @@
+#!/usr/bin/gnuplot -c
+
+cli = sprintf("%s-c.log", ARG1)
+svr = sprintf("%s-s.log", ARG1)
+win = sprintf("%s-win.pdf", ARG1)
+ack = sprintf("%s-ack.pdf", ARG1)
+seq = sprintf("%s-seq.pdf", ARG1)
+sa  = sprintf("%s-both.pdf", ARG1)
+
+reset
+#set term png size 1200,600
+set term pdf color
+
+set xdata time
+set timefmt "%S"
+set format x "%.3S"
+set xlabel "time"
+set grid
+set style data dots
+unset key
+
+set ylabel "win"
+set title "Window Size"
+set output win
+plot cli using 2:5
+
+set ylabel "ack"
+set title "ACK"
+set output ack
+plot cli using 2:4
+
+set ylabel "seq"
+set title "Sequence"
+set output seq
+plot svr using 2:3
+
+
+set title "SEQ / ACK"
+set output sa
+plot cli using 2:4 title "ack", \
+	 svr using 2:3 title "seq"
+

@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# extract server side xstream packets
+
+# read from file.pcap[ng]
+# write frame#, time, and sequence number to files.log
+# capture all lines sent from the server
+
+
+# FIXME:
+# - make code smarter to find SYN and SYN-ACK packets in one pass
+# - make extraction code into a function so it's not cut and pasted!
+
+# use my version of tshark so that it understands xstream
+tshark=~/wireshark/tshark
+name=$1
+
+if [ $# != 1 ]; then
+cat << EOF
+echo usage: $(basename $0) capture_file
+
+output is capture_file-c.log and capture_file-s.log
+
+If more than one xstream session is found additional files will be numbered
+EOF
+	exit
+fi
+
+infile=$1
+
+if [ -e $infile ]; then
+	name="${infile%.*}"
+else
+	echo $infile not found
+	exit 1
+fi
+
+echo "finding SYN packet(s)"
+dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 0" -T fields -e xip.src_dag_entry)
+
+# sadly tshark is putting everything on the same line so split it
+# and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
+i=0
+for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
+	if [ $i == 0 ]; then
+		outfile=$name-c.log
+		rfile=$name-rc.log
+	else
+		outfile=$name-c.$i.log
+		rfile=$name-rc.$i.log
+	fi
+
+	echo "creating $outfile for:"
+	echo "    $dag"
+	
+	# use tail to chop the first line since the ACK in the SYN packet is always 0
+	$tshark -nr $infile \
+		-Y "xip.src_dag_entry == \"$dag\"" \
+		-T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win | tail -n +2 > $outfile
+
+	head $outfile
+	
+	# now make retransmit logs
+	cat $outfile | cut -f4 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
+
+	((i=i+1))
+done
+
+
+echo "finding SYN-ACK packet(s)"
+dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 1" -T fields -e xip.src_dag_entry)
+
+# sadly tshark is putting everything on the same line so split it
+# and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
+i=0
+for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
+	if [ $i == 0 ]; then
+		outfile=$name-s.log
+		rfile=$name-rs.log
+	else
+		outfile=$name-s.$i.log
+		rfile=$name-rs.$1r.log
+	fi
+
+	echo "creating $outfile for:"
+	echo "    $dag"
+	
+	$tshark -nr $infile \
+		-Y "xip.src_dag_entry == \"$dag\"" \
+		-T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
+
+	
+	# now make retransmit logs
+	cat $outfile | cut -f3 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
+
+	((i=i+1))
+done
+
+
