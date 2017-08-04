@@ -213,7 +213,6 @@ int retrieveChunk(FILE *fd, char *url)
 
 		printf("------------------------\n");
 		g.print_graph();
-		say("fetch hop count is %d\n", XgetPrevFetchHopCount());
 		printf("------------------------\n");
 
 

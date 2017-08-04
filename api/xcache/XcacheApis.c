@@ -769,23 +769,6 @@ inline int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 	return XputBuffer(h, xbuf->buf, xbuf->length, chunkSize, addrs);
 }
 
-/* Content Fetching APIs */
-static int hopCount = -1;
-/*!
-** @brief experimental code to return the # of hops a chunk took to arrive
-**
-** Incomplete code intended to indicate how far away (in hops) the source
-** of a chunk is.
-**
-** @note Not thread safe and is only valid for the last chunk requested.
-**
-** @returns the number of hops the previous content chunk took to arrive
-**
-*/
-int XgetPrevFetchHopCount(){
-	return hopCount;
-}
-
 /*!
 ** @brief fetch a chunk from the network
 **
@@ -849,7 +832,6 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 		to_copy = cmd.data().length();
 		*buf = malloc(to_copy);
 		memcpy(*buf, cmd.data().c_str(), to_copy);
-		hopCount = cmd.hop_count();
 
 		return to_copy;
 	}
@@ -900,7 +882,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	int to_recv, recvd;
 	size_t remaining;
 	size_t offset;
-	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
 
@@ -924,7 +905,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	}
 
 	remaining = ntohl(header.length);
-	hop_count = ntohl(header.hop_count);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -954,7 +934,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	*chunk = malloc(to_copy);
 	bzero(*chunk, to_copy);
 	memcpy(*chunk, data.c_str(), to_copy);
-	hopCount = hop_count;
 
 	Xclose(sock);
 

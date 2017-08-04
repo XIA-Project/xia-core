@@ -143,7 +143,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	uint32_t header_len;
 	size_t remaining;
 	size_t offset;
-	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
 	xcache_meta *meta = new xcache_meta();
@@ -187,11 +186,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			chdr = new CIDHeader(serialized_header);
 	}
 
-	//remaining = ntohl(header.length);
 	remaining = chdr->content_len();
-	//hop_count = ntohl(header.hop_count);
-	// TODO: NITIN setting to 0 until we figure out how to do this right
-	hop_count = 0;
 	meta->set_created();
 
 	while (remaining > 0) {
@@ -247,7 +242,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	if (resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
-		resp->set_hop_count(hop_count);
 	}
 
 	Xclose(sock);
@@ -308,7 +302,6 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 	if(resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 		resp->set_data(data);
-		resp->set_hop_count(0);
 		resp->set_ttl(meta->ttl());
 	}
 
@@ -861,14 +854,6 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	size_t offset;
 	int sent;
 
-	/*
-	header.version = htons(CID_HEADER_VER);
-	header.hlen = htons(sizeof(struct cid_header));
-	header.length = htonl(resp.data().length());
-	header.hop_count = htonl(req->hop_count);
-	header.ttl = htonl(resp.ttl());
-	*/
-
 	// Send header length
 	uint32_t header_len = sizeof(header);
 	if(Xsend(req->to_sock, (void *)&header_len, sizeof(header_len), 0) !=
@@ -1199,7 +1184,6 @@ repeat:
 			syslog(LOG_ERR, "XacceptAs failed");
 		} else {
 			// FIXME: reply back the hop count
-			unsigned hop_count = XgetPrevAcceptHopCount();
 			xcache_req *req = new xcache_req();
 
 			syslog(LOG_INFO, "XacceptAs Succeeded\n");
@@ -1213,7 +1197,6 @@ repeat:
 			req->from_sock = sendersocket;
 			req->to_sock = accept_sock;
 			req->data = malloc(mypath_len);
-			req->hop_count = hop_count;
 			memcpy(req->data, &mypath, mypath_len);
 			req->datalen = mypath_len;
 			/* Indicates that after sending, remove the fd */
