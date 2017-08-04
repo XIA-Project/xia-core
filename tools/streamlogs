@@ -58,8 +58,6 @@ for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
 		-Y "xip.src_dag_entry == \"$dag\"" \
 		-T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win | tail -n +2 > $outfile
 
-	head $outfile
-	
 	# now make retransmit logs
 	cat $outfile | cut -f4 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
 
