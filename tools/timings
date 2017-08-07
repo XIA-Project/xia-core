@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# read name-c.log and name-s.log to get first and last packet times
+# and read name-s.log to first and last sequence numbers
+# use them to calculate speed
+
+if [ $# != 1 ] || [ "$1" == "-h" ]; then
+cat << EOF
+usage: timings name
+
+where:
+    name is the base portion of a stream capture log
+    ie test.pcap => test
+
+note:
+    values are displayed in binary values, not SI units (1KB == 1024)
+
+EOF
+	exit
+fi
+
+name=$1
+cli=$name-c.log
+svr=$name-s.log
+
+if [ ! -e $cli ] || [ ! -e $svr ]; then
+	echo $cli and/or $svr not found
+	exit
+fi
+
+# get start & end times
+st=$(head -n1 $name-s.log | cut -f2)
+es=$(tail -n1 $name-s.log | cut -f2)
+ec=$(tail -n1 $name-c.log | cut -f2)
+
+# use the most recent time from the 2 files as the end
+if [ $(echo "$es > $ec" | bc) -eq 1 ]; then
+	e=$es
+else
+	e=$ec
+fi
+
+# compute total time
+tm=$(echo "$e - $st" | bc)
+
+# get first and last sequence #s
+bs=$(head -n1 $name-s.log | cut -f3)
+be=$(tail -n1 $name-s.log | cut -f3)
+
+((bytes=be - bs))
+
+echo $(echo $bytes | numfmt --to=iec --format="%.3f") bytes
+echo $(echo $tm | numfmt --format="%.3f") seconds
+echo $(echo "$bytes * 8 / $tm" | bc | numfmt --to=iec --format="%.3f") bits/second
+
