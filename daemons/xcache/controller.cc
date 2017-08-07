@@ -14,7 +14,6 @@
 #include <errno.h>
 #include "controller.h"
 #include <iostream>
-#include "publisher/publisher.h"
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "Xsecurity.h"
@@ -714,11 +713,6 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	std::string publisher_name = cmd->publisher_name();
 	std::string content = cmd->data();
 	std::string content_name = cmd->content_name();
-
-	// Get a reference to the Publisher
-	// TODO: For now just create a new one every time
-	// In future, we should have a cache of known Publishers
-	Publisher publisher(publisher_name);
 
 	// Build the NCID Header from the provided request
 	ContentHeader *chdr = new NCIDHeader(content, cmd->ttl(),

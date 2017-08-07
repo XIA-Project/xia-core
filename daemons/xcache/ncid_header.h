@@ -2,6 +2,7 @@
 #define _NCID_HEADER_H
 
 #include "cid_header.h"
+#include "publisher_list.h"
 #include "publisher/publisher.h"
 
 class NCIDHeader : public CIDHeader {
@@ -25,12 +26,14 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 		std::string publisher_name, std::string content_name)
 	: CIDHeader(data, ttl)
 {
-	Publisher publisher(publisher_name);
-	_id = "NCID:" + publisher.ncid(content_name);
-	_uri = publisher.content_URI(content_name);
+	PublisherList *publishers = PublisherList::get_publishers();
+	Publisher *publisher = publishers->get(publisher_name);
+
+	_id = publisher->ncid(content_name);
+	_uri = publisher->content_URI(content_name);
 	// TODO: 
 	std::string signature;
-	if(publisher.sign(_uri, data, signature)) {
+	if(publisher->sign(_uri, data, signature)) {
 		printf("ERROR: Unable to sign %s\n", _uri.c_str());
 		// TODO throw an exception here
 	}

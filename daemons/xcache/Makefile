@@ -12,6 +12,7 @@ CLEAN=$(addsuffix .build, $(SUBDIRS))
 .PHONY: all clean $(SUBDIRS)
 
 SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
+		publisher_list.cc \
 	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc $(PROTO_SRCS)
 OBJS=$(SOURCES:.cc=.o)
 
