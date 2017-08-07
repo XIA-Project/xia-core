@@ -6,10 +6,14 @@ SOURCES=publisher.cc
 OBJECTS=$(SOURCES:.cc=.o)
 LIBS=$(XLIB)/libpublisher.so
 STATICLIB=$(XLIB)/libpublisher.a
+ANNOUNCER=$(BINDIR)/announce_publisher
+
+ANNOUNCER_SOURCES=announce_publisher.cc
 
 CFLAGS+=-I$(APIDIR)/include
+LDFLAGS+=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so $(XLIB)/libxcache.so
 
-all: $(LIBS)
+all: $(LIBS) $(ANNOUNCER)
 
 static: $(STATICLIB)
 
@@ -22,5 +26,8 @@ $(LIBS): $(OBJECTS)
 $(STATICLIB): $(OBJECTS)
 	ar rcs $@ $(OBJECTS)
 
+$(ANNOUNCER): $(ANNOUNCER_SOURCES)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 clean:
-	-rm -f *.o *.so $(LIBS) $(STATICLIB)
+	-rm -f *.o *.so $(LIBS) $(STATICLIB) $(ANNOUNCER)
