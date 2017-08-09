@@ -13,7 +13,8 @@ set term pdf color
 
 set xdata time
 set timefmt "%S"
-set format x "%.3S"
+set yrange [0:*]
+#set format x "%.1S"
 set xlabel "time"
 set grid
 set style data dots
