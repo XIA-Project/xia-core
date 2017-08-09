@@ -64,6 +64,7 @@ fi
 infile=$1
 
 if [ -e $infile ]; then
+    # strip the extension
     name="${infile%.*}"
 else
     echo $infile not found
@@ -76,7 +77,15 @@ dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 0" -
 # sadly tshark is putting everything on the same line so split it
 # and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
 i=0
+last=""
 for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
+
+    if [ "$last" == "$dag" ]; then
+        # skip over cases where the SYN/SYN-ACK were retransmitted
+        continue
+    fi
+    last=$dag
+
     if [ $i == 0 ]; then
         outfile=$name-c.log
         rfile=$name-rc.log
@@ -109,7 +118,15 @@ dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 1" -
 # sadly tshark is putting everything on the same line so split it
 # and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
 i=0
+last=""
 for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
+
+    if [ "$last" == "$dag" ]; then
+        # skip over cases where the SYN/SYN-ACK were retransmitted
+        continue
+    fi
+    last=$dag
+
     if [ $i == 0 ]; then
         outfile=$name-s.log
         rfile=$name-rs.log
