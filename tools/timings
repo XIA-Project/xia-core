@@ -47,7 +47,12 @@ tm=$(echo "$e - $st" | bc)
 bs=$(head -n1 $name-s.log | cut -f3)
 be=$(tail -n1 $name-s.log | cut -f3)
 
-((bytes=be - bs))
+((bytes = be - bs))
+
+# if bytes < 0, sequence #'s wrapped, fix it
+if [ $bytes -lt 0 ]; then
+	((bytes = bytes + (4 * 1024 * 1024 * 1024)))
+fi
 
 echo $(echo $bytes | numfmt --to=iec --format="%.3f") bytes
 echo $(echo $tm | numfmt --format="%.3f") seconds
