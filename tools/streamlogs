@@ -15,6 +15,39 @@
 tshark=~/wireshark/tshark
 name=$1
 
+normalize() {
+awk '                                                   \
+    BEGIN {                                             \
+        init = 0;                                       \
+    }                                                   \
+    {                                                   \
+        # skip over any SYN packets                     \
+        if ($4 == 0) {                                  \
+            next                                        \
+        }                                               \
+        if (init == 0) {                                \
+            # get the base values                       \
+            init = 1;                                   \
+            tm = $2;                                    \
+            seq = $3;                                   \
+            ack = $4;                                   \
+        }                                               \
+        # normalize values                              \
+        t = $2 - tm;                                    \
+        s = $3 - seq;                                   \
+        a = $4 - ack;                                   \
+        # fix sequence & ack # wrapping issues          \
+        if (s < 0) {                                    \
+            s += 4 * 1024 * 1024 * 1024;                \
+        }                                               \
+        if (a < 0) {                                    \
+            a += 4 * 1024 * 1024 * 1024;                \
+        }                                               \
+        printf "%d\t%f\t%d\t%d\t%d\n", $1, t, s, a, $5  \
+    }                                                   \
+    ' $1 > $1.tmp && mv $1.tmp $1
+}
+
 if [ $# != 1 ]; then
 cat << EOF
 echo usage: $(basename $0) capture_file
@@ -23,16 +56,16 @@ output is capture_file-c.log and capture_file-s.log
 
 If more than one xstream session is found additional files will be numbered
 EOF
-	exit
+    exit
 fi
 
 infile=$1
 
 if [ -e $infile ]; then
-	name="${infile%.*}"
+    name="${infile%.*}"
 else
-	echo $infile not found
-	exit 1
+    echo $infile not found
+    exit 1
 fi
 
 echo "finding SYN packet(s)"
@@ -42,26 +75,29 @@ dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 0" -
 # and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
 i=0
 for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
-	if [ $i == 0 ]; then
-		outfile=$name-c.log
-		rfile=$name-rc.log
-	else
-		outfile=$name-c.$i.log
-		rfile=$name-rc.$i.log
-	fi
+    if [ $i == 0 ]; then
+        outfile=$name-c.log
+        rfile=$name-rc.log
+    else
+        outfile=$name-c.$i.log
+        rfile=$name-rc.$i.log
+    fi
 
-	echo "creating $outfile for:"
-	echo "    $dag"
-	
-	# use tail to chop the first line since the ACK in the SYN packet is always 0
-	$tshark -nr $infile \
-		-Y "xip.src_dag_entry == \"$dag\"" \
-		-T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win | tail -n +2 > $outfile
+    echo "creating $outfile for:"
+    echo "    $dag"
+    
+    # make the data files
+    $tshark -nr $infile \
+        -Y "xip.src_dag_entry == \"$dag\"" \
+        -T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
 
-	# now make retransmit logs
-	cat $outfile | cut -f4 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
+    # strip out any SYN packets & then normalize output to start at 0
+    normalize $outfile
+    
+    # now make retransmit logs
+    cat $outfile | cut -f4 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
 
-	((i=i+1))
+    ((i=i+1))
 done
 
 
@@ -72,26 +108,28 @@ dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 1" -
 # and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
 i=0
 for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
-	if [ $i == 0 ]; then
-		outfile=$name-s.log
-		rfile=$name-rs.log
-	else
-		outfile=$name-s.$i.log
-		rfile=$name-rs.$1r.log
-	fi
+    if [ $i == 0 ]; then
+        outfile=$name-s.log
+        rfile=$name-rs.log
+    else
+        outfile=$name-s.$i.log
+        rfile=$name-rs.$1r.log
+    fi
 
-	echo "creating $outfile for:"
-	echo "    $dag"
-	
-	$tshark -nr $infile \
-		-Y "xip.src_dag_entry == \"$dag\"" \
-		-T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
+    echo "creating $outfile for:"
+    echo "    $dag"
+    
+    $tshark -nr $infile \
+        -Y "xip.src_dag_entry == \"$dag\"" \
+        -T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
 
-	
-	# now make retransmit logs
-	cat $outfile | cut -f3 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
+    # strip out any SYN packets & then normalize output to start at 0
+    normalize $outfile
+    
+    # now make retransmit logs
+    cat $outfile | cut -f3 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
 
-	((i=i+1))
+    ((i=i+1))
 done
 
 
