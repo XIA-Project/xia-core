@@ -2,18 +2,16 @@
 
 # extract server side xstream packets
 
-# read from file.pcap[ng]
-# write frame#, time, and sequence number to files.log
-# capture all lines sent from the server
+# read from FILE.pcap[ng]
+# capture all TCP packets
+# create logs with time and seq# starting at 0
+# create log of retransmits
+# output files:
+# FILE(n)-c.log  : client side packets
+# FILE(n_-s.log  : server side packets
+# FILE(n)-rc.log : client side retransmit counts
+# FILE(n)-rs.log : server side retransmit counts
 
-
-# FIXME:
-# - make code smarter to find SYN and SYN-ACK packets in one pass
-# - make extraction code into a function so it's not cut and pasted!
-
-# use my version of tshark so that it understands xstream
-tshark=~/wireshark/tshark
-name=$1
 
 normalize() {
 awk '                                                   \
@@ -23,18 +21,18 @@ awk '                                                   \
         init = 0;                                       \
     }                                                   \
     {                                                   \
-        # skip over any SYN packets                     \
+        # skip over any SYN packets, ackino is always 0 \
         if ($4 == 0) {                                  \
             next                                        \
         }                                               \
         if (init == 0) {                                \
-            # get the base values                       \
+            # get the initial values                    \
             init = 1;                                   \
             tm = $2;                                    \
             seq = $3;                                   \
             ack = $4;                                   \
         }                                               \
-        # normalize values                              \
+        # normalize values so we start from 0           \
         t = $2 - tm;                                    \
         s = $3 - seq;                                   \
         a = $4 - ack;                                   \
@@ -45,10 +43,83 @@ awk '                                                   \
         if (a < 0) {                                    \
             a += 4 * 1024 * 1024 * 1024;                \
         }                                               \
-        print $1, t, s, a, $5                           \
+        # keep the original seq #s for retransmit logs  \
+        print $1, t, s, a, $5, $3, $4                   \
     }                                                   \
     ' $1 > $1.tmp && mv $1.tmp $1
 }
+
+makelogs() {
+    if [ "$1" == "server" ]; then
+        echo "finding SYN-ACK packet(s)"
+        type="s"
+        ack=1
+        fieldno="-f6"
+
+    else
+        echo "finding SYN packet(s)"
+        type="c"
+        ack=0
+        fieldno="-f7"
+    fi
+
+    fields="xstream.flags.syn==1 && xstream.flags.ack == $ack"
+
+    dags=$($tshark -nr $infile -Y "$fields" -T fields -e xip.src_dag_entry)
+
+    # annoyingly tshark is putting everything on the same line so split it
+    # and convert spaces inside the dags to newline sequences since tshark needs dags formatted that way
+    i=0
+    last=""
+    for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
+
+        if [ "$last" == "$dag" ]; then
+            # skip over cases where the SYN/SYN-ACK packets were retransmitted
+            continue
+        fi
+        last=$dag
+
+        # handle naming if multiple sessions were found in the trace
+        if [ $i == 0 ]; then
+            outfile=$name-$type.log
+            rfile=$name-r$type.log
+        else
+            outfile=$name$i-$type.log
+            rfile=$name$i-r$type.log
+        fi
+
+        echo "creating $outfile for:"
+        echo "    $dag"
+
+        # make the data files
+        $tshark -nr $infile                    \
+            -Y "xip.src_dag_entry == \"$dag\"" \
+            -T fields                          \
+            -e frame.number                    \
+            -e frame.time_relative             \
+            -e xstream.seq_no                  \
+            -e xstream.ack_no                  \
+            -e xstream.win                     \
+            > $outfile
+
+        # strip out any SYN packets & then normalize output to start at 0
+        normalize $outfile
+
+        # now make retransmit logs of sequence/ack # that were sent more than once
+        cat $outfile | cut $fieldno | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
+
+        ((i=i+1))
+    done
+}
+
+##############################################################################
+# START HERE
+
+# use my version of tshark so that it understands xstream packets
+tshark=~/wireshark/tshark
+
+# capture file name
+name=$1
 
 if [ $# != 1 ]; then
 cat << EOF
@@ -71,84 +142,6 @@ else
     exit 1
 fi
 
-echo "finding SYN packet(s)"
-dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 0" -T fields -e xip.src_dag_entry)
-
-# sadly tshark is putting everything on the same line so split it
-# and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
-i=0
-last=""
-for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
-
-    if [ "$last" == "$dag" ]; then
-        # skip over cases where the SYN/SYN-ACK were retransmitted
-        continue
-    fi
-    last=$dag
-
-    if [ $i == 0 ]; then
-        outfile=$name-c.log
-        rfile=$name-rc.log
-    else
-        outfile=$name-c.$i.log
-        rfile=$name-rc.$i.log
-    fi
-
-    echo "creating $outfile for:"
-    echo "    $dag"
-    
-    # make the data files
-    $tshark -nr $infile \
-        -Y "xip.src_dag_entry == \"$dag\"" \
-        -T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
-
-    # strip out any SYN packets & then normalize output to start at 0
-    normalize $outfile
-    
-    # now make retransmit logs
-    cat $outfile | cut -f4 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
-
-    ((i=i+1))
-done
-
-
-echo "finding SYN-ACK packet(s)"
-dags=$($tshark -nr $infile -Y "xstream.flags.syn==1 && xstream.flags.ack == 1" -T fields -e xip.src_dag_entry)
-
-# sadly tshark is putting everything on the same line so split it
-# and convert spaces inside the dags to newline representations since tshark needs dags formatted that way
-i=0
-last=""
-for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
-
-    if [ "$last" == "$dag" ]; then
-        # skip over cases where the SYN/SYN-ACK were retransmitted
-        continue
-    fi
-    last=$dag
-
-    if [ $i == 0 ]; then
-        outfile=$name-s.log
-        rfile=$name-rs.log
-    else
-        outfile=$name-s.$i.log
-        rfile=$name-rs.$1r.log
-    fi
-
-    echo "creating $outfile for:"
-    echo "    $dag"
-    
-    $tshark -nr $infile \
-        -Y "xip.src_dag_entry == \"$dag\"" \
-        -T fields -e frame.number -e frame.time_relative -e xstream.seq_no -e xstream.ack_no -e xstream.win > $outfile
-
-    # strip out any SYN packets & then normalize output to start at 0
-    normalize $outfile
-    
-    # now make retransmit logs
-    cat $outfile | cut -f3 | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
-
-    ((i=i+1))
-done
-
+makelogs client
+makelogs server
 
