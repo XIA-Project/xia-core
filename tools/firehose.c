@@ -26,6 +26,7 @@ struct sigaction sa_int;
 
 char *name;
 int verbose = 0;
+int udp = 0;
 
 void handler(int sig)
 {
@@ -74,8 +75,15 @@ void process(int peer)
 	char *buf = NULL;
 	uint32_t count = 0;
 	int rc;
+	sockaddr_x dag;
+	socklen_t sz = sizeof(sockaddr_x);
 
-	if (Xrecv(peer, &fhc, sizeof(fhc), 0) < 0) {
+	if (udp == 0) {
+		rc = Xrecv(peer, &fhc, sizeof(fhc), 0);
+	} else {
+		rc = Xrecvfrom(peer, &fhc, sizeof(fhc), 0, (struct sockaddr*)&dag, &sz);
+	}
+	if (rc < 0) {
 		printf("Unable to get configuration block\n");
 		goto done;
 	}
@@ -105,7 +113,13 @@ void process(int peer)
 		// the rest of the packet will be 0's
 		*(uint32_t*)buf = count;
 
-		if ((rc = Xsend(peer, buf, fhc.pktSize, 0)) < 0) {
+		if (udp == 0) {
+			rc = Xsend(peer, buf, fhc.pktSize, 0);
+		} else {
+			rc = Xsendto(peer, buf, fhc.pktSize, 0, (struct sockaddr*)&dag, sz);
+		}
+
+		if (rc  < 0) {
 			Xclose(peer);
 			if (timetodie) {
 				die("session terminated\n");
@@ -133,6 +147,7 @@ void help()
 {
 	printf("usage: firehose [-v] name\n");
 	printf("where:\n");
+	printf(" -u : use udp sockets\n");
 	printf(" -v : run in verbose mode\n");
 	printf("name = XIA name to listen for connections on\n");
 	printf("default is %s\n", NAME);
@@ -144,8 +159,11 @@ void configure(int argc, char** argv)
 	int c;
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "hv")) != -1) {
+	while ((c = getopt(argc, argv, "huv")) != -1) {
 		switch (c) {
+			case 'u':
+				udp = 1;
+				break;
 			case 'v':
 				verbose = 1;
 				break;
@@ -202,45 +220,52 @@ int main(int argc, char **argv)
 	if ( XregisterName(NAME, sa) < 0)
 		die("Unable to register name %s\n", name);
 
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((sock = Xsocket(AF_XIA, (udp == 0 ? SOCK_STREAM : SOCK_DGRAM), 0)) < 0)
 		die("Unable to create socket\n");
 	if (Xbind(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
 		die("Unable to bind to DAG\n");
 	}
 
-	if (Xlisten(sock, 5) < 0) {
+	if (udp != 0) {
+
+		process(sock);
 		Xclose(sock);
-		die("Listen failed\n");
-	}
 
-	while (!timetodie) {
-		peer = Xaccept(sock, NULL, NULL);
-		if (peer < 0) {
-			printf("Xaccept failed\n");
-			break;
-		}
-
-		say("drinker connected...\n");
-		pid = Xfork();
-
-		if (pid == -1) {
-			printf("fork failed\n");
-			break;
-		}
-		else if (pid == 0) {
+	} else {
+		if (Xlisten(sock, 5) < 0) {
 			Xclose(sock);
-			process(peer);
-			exit(0);
+			die("Listen failed\n");
 		}
-		else {
-			Xclose(peer);
-		}
-	}
 
-	if (pid != 0) {
-		say("firehose server exiting\n");
-		Xclose(sock);
+		while (!timetodie) {
+			peer = Xaccept(sock, NULL, NULL);
+			if (peer < 0) {
+				printf("Xaccept failed\n");
+				break;
+			}
+
+			say("drinker connected...\n");
+			pid = Xfork();
+
+			if (pid == -1) {
+				printf("fork failed\n");
+				break;
+			}
+			else if (pid == 0) {
+				Xclose(sock);
+				process(peer);
+				exit(0);
+			}
+			else {
+				Xclose(peer);
+			}
+		}
+
+		if (pid != 0) {
+			say("firehose server exiting\n");
+			Xclose(sock);
+		}
 	}
 	return 0;
 }

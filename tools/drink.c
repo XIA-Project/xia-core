@@ -39,6 +39,7 @@ int numPkts = 0;
 int delay = 0;
 int sock = -1;
 int timetodie = 0;
+int udp = 0;
 
 struct sigaction sa_new;
 struct sigaction sa_term;
@@ -50,6 +51,7 @@ void help(const char *name)
 	printf("\n%s (%s)\n", TITLE, VERSION);
 	printf("usage: %s -v [-d <usec>][-r <usec>][-p <n>][-s <s>]\n", name);
 	printf("where:\n");
+	printf("-u        : use UDP sockets\n");
 	printf(" -d <usec>: delay for usecs between each receive\n");
 	printf("            default is no delay\n");
 	printf(" -r <usec>: tell firehose to wait for usecs between sends\n");
@@ -74,8 +76,11 @@ void getConfig(int argc, char** argv)
 	fhc.numPkts = 0;
 	fhc.pktSize = PKTSIZE;
 
-	while ((c = getopt(argc, argv, "d:p:r:s:v")) != -1) {
+	while ((c = getopt(argc, argv, "d:p:r:s:vu")) != -1) {
 		switch (c) {
+			case 'u':
+				udp = 1;
+				break;
 			case 'p':
 				fhc.numPkts = atoi(optarg);
 				numPkts = fhc.numPkts;
@@ -157,6 +162,7 @@ int main(int argc, char **argv)
 	struct addrinfo *ai;
 	sockaddr_x *sa;
 	int seq = 0;
+	int rc;
 
 	memset (&sa_new, 0, sizeof (struct sigaction));
 	sigemptyset (&sa_new.sa_mask);
@@ -178,17 +184,23 @@ int main(int argc, char **argv)
 		die("Unable to lookup address for  %s\n", NAME);
 	sa = (sockaddr_x*)ai->ai_addr;
 
-	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
+	if ((sock = Xsocket(AF_XIA, (udp == 0 ? SOCK_STREAM : SOCK_DGRAM), 0)) < 0)
 		die("Unable to create a socket\n");
 
 	say("Opening firehose: %s\n", NAME);
-	if (Xconnect(sock, (struct sockaddr*)sa, sizeof(sockaddr_x)) < 0) {
-		Xclose(sock);
-		die("Unable to connect to %s\n", NAME);
-	}
-
 	// tell firehose how many packets we expect
-	if (Xsend(sock, &fhc, sizeof(fhc), 0) < 0) {
+	if (udp == 0) {
+		if ((rc = Xconnect(sock, (struct sockaddr*)sa, sizeof(sockaddr_x))) < 0) {
+			Xclose(sock);
+			die("Unable to connect to %s\n", NAME);
+		}
+
+		rc = Xsend(sock, &fhc, sizeof(fhc), 0);
+	} else {
+
+		rc = Xsendto(sock, &fhc, sizeof(fhc), 0, (struct sockaddr*)sa, sizeof(sockaddr_x));
+	}
+	if (rc < 0) {
 		Xclose(sock);
 		die("Unable to send config information to the firehose\n");
 	}
@@ -203,7 +215,14 @@ int main(int argc, char **argv)
 		int sz = ntohl(fhc.pktSize);
 
 		while (received < sz) {
-			int rc = Xrecv(sock, bp, sz - received, 0);
+			int rc;
+
+			if (udp == 0) {
+				rc	= Xrecv(sock, bp, sz - received, 0);
+			} else {
+				rc	= Xrecvfrom(sock, bp, sz - received, 0, NULL, NULL);
+			}
+
 			if (rc < 0)
 				die("Receive failure\n");
 			else if(rc == 0) {
