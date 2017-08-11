@@ -187,7 +187,7 @@ elementclass XIALineCard {
 
 	// packets to network could be XIA packets or XARP queries (or XCMP messages?)
 	// we only want to print/count the XIA packets
-	toNet :: Tee(3) -> Queue(1000) -> [0]output;   // send all packets
+	toNet :: Tee(3) -> Queue(500) -> [0]output;   // send all packets
 	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
 	toNet[2] -> xrespFilter :: Classifier(12/C0DE, -) -> Strip(14) -> CheckXIAHeader -> MarkXIAHeader -> [1]xresp[2] -> Discard;
 	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
@@ -243,7 +243,7 @@ elementclass IPLineCard {
 	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, -);
 	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, -);
 
-	toNet :: Null -> print_out -> Queue(1000) -> [0]output; //count_final_out -> count_next_out -> [0]output;
+	toNet :: Null -> print_out -> Queue(500) -> [0]output; //count_final_out -> count_next_out -> [0]output;
 
 	// On receiving a packet from the host
 	// Sending an XIA-encapped-in-IP packet (via ARP if necessary)
