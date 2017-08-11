@@ -2307,7 +2307,7 @@ int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
     unsigned newwindow = so_recv_buffer_space();
 
 	//INFO("oldwin:%d newwin:%d", oldwindow, newwindow);
-    if (oldwindow < mss && newwindow > mss * 20) {
+    if (oldwindow < mss && newwindow > mss * 16) {
         // send the last ack again to let other side know we have more space now
 		// window size in the stream header is the available buffer space right shifted by window_scale
 #if DEBUG == 1
