@@ -770,6 +770,62 @@ inline int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 }
 
 /*!
+ * @brief fetch a chunk by its name
+ *
+ * Fetches the specified chunk from the network. The caller provides a
+ * name for the chunk that it can derive based on an agreement/protocol
+ * with the publisher. The name could be completely arbitrary, but for
+ * now we are using <Publisher_name>/<Content_name_and_attrs>, e.g.
+ *    Netflix/Movies/2016/Moana/useragent=Safari/ver=10.8...
+ *    where, Publisher_name = Netflix
+ *    content_name_and_attrs = Movies/2016/Moana/useragent=Safari/ver=10.8...
+ *
+ * @param h the xcache handle
+ * @param buf a pointer to the chunk's data. Caller must free data
+ * @param flags user specified flags for content retrieval characteristics
+ * @param name string representing content to be retrieved
+ *
+ * @returns size of data stored in *buf
+ * @return -1 on error
+ */
+int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
+{
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_FETCHNAMEDCHUNK);
+	cmd.set_context_id(h->contextID);
+	cmd.set_content_name(name);
+	cmd.set_flags(flags);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error in sending command to xcache\n");
+		/* Error in Sending chunk */
+		return -1;
+	}
+	fprintf(stderr, "Command sent to xcache successfully\n");
+
+	if(flags & XCF_BLOCK) {
+		size_t to_copy;
+
+		if (get_response_blocking(h->xcacheSock, &cmd) < 0) {
+			fprintf(stderr, "Did not get a valid response from xcache\n");
+			return -1;
+		}
+
+		if (cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+			fprintf(stderr, "Chunk fetch failed\n");
+			return -1;
+		}
+
+		to_copy = cmd.data().length();
+		*buf = malloc(to_copy);
+		memcpy(*buf, cmd.data().c_str(), to_copy);
+
+		return to_copy;
+	}
+	return 0;
+}
+
+/*!
 ** @brief fetch a chunk from the network
 **
 ** Fetches the specified chunk from the network. The chunk is retrieved from the origin server specified

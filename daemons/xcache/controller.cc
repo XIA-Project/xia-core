@@ -415,6 +415,25 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 	return ret;
 }
 
+int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
+		xcache_cmd *cmd, int flags)
+{
+	// Get Publisher and Content name from cmd->content_name
+	std::string name(cmd->content_name());
+	std::string publisher_name = name.substr(0, name.find('/'));
+	std::string content_name = name.substr(name.find('/'), std::string::npos);
+	// Get reference to a Publisher object that can build NCID
+	// NOTE: This object cannot sign new content
+	// Retrieve Publisher certificate if necessary (in Publisher code)
+	// Save off DAG of Publisher certificate for building NCID DAG
+	// Retrieve Publisher pubkey from certificate
+	// Build NCID via Publisher object
+	// Build DAG for NCID from certificate DAG
+	// Build a new xcache_cmd with NCID DAG in DAG
+	// Now call xcache_fetch_content with NCID DAG
+	return 0;
+}
+
 std::string xcache_controller::addr2cid(sockaddr_x *addr)
 {
 	Graph g(addr);
@@ -1014,6 +1033,15 @@ void xcache_controller::process_req(xcache_req *req)
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
 		break;
+	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
+		// Fetch content named by the user. May be local or remote
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_fetch_named_content(&resp, cmd, cmd->flags());
+		syslog(LOG_INFO, "xcache_fetch_named_content returned %d", ret);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 		// Fetch a CID requested by the user. May be local or remote
 		cmd = (xcache_cmd *)req->data;

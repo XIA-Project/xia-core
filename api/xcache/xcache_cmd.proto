@@ -19,6 +19,7 @@ message xcache_cmd {
 		XCACHE_EVICT = 16;
 		XCACHE_CACHE = 17;
 		XCACHE_STORE_NAMED = 18;
+		XCACHE_FETCHNAMEDCHUNK = 19;
 	};
 
 	enum status_type {

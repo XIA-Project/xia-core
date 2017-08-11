@@ -140,6 +140,12 @@ public:
 	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
 
 	/**
+	 * Fetch named content from Xcache.
+	 */
+	int xcache_fetch_named_content(xcache_cmd *resp, xcache_cmd *cmd,
+			int flags);
+
+	/**
 	 * Chunk reading
 	 */
 	int chunk_read(xcache_cmd *resp, xcache_cmd *cmd);
