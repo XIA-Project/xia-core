@@ -1605,7 +1605,7 @@ XStream::tcp_timers (int timer) {
 		  }
 		  break;
 		case TCPT_PERSIST:
-		  INFO("in persist timer");
+		  INFO("in persist timer %u\n", get_transport()->tcp_now());
 		  tcp_setpersist();
 		  tp->t_force = 1;
 		  tcp_output();
@@ -1644,7 +1644,7 @@ XStream::tcp_timers (int timer) {
 		  break;
 		case TCPT_REXMT:
 
-		  INFO("in retransmit timer");
+		  printf("in retransmit timer %u %u\n", tp->t_rxtcur, get_transport()->tcp_now());
 		  if (tp->t_rxtshift >= TCP_MAXRXTSHIFT){ // retransmissions exhausted
 			tp->t_rxtshift = TCP_MAXRXTSHIFT-1;
 			printf("tcp_drop #5\n");
