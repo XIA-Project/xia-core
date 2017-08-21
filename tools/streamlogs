@@ -1,17 +1,16 @@
 #!/bin/bash
 
-# extract server side xstream packets
-
-# read from FILE.pcap[ng]
-# capture all TCP packets
-# create logs with time and seq# starting at 0
-# create log of retransmits
+# input:
+#   FILE.pcap[ng]
+#
 # output files:
-# FILE(n)-c.log  : client side packets
-# FILE(n_-s.log  : server side packets
-# FILE(n)-rc.log : client side retransmit counts
-# FILE(n)-rs.log : server side retransmit counts
-
+#   FILE(n)-c.log  : client side packets
+#   FILE(n_-s.log  : server side packets
+#   FILE(n)-rc.log : client side retransmit counts
+#   FILE(n)-rs.log : server side retransmit counts
+#
+# tab delimited output format:
+#   pkt# normalized_timestamp normalized_seq# normalized_ack# window orig_seq# orig_ack#
 
 normalize() {
 awk '                                                   \
@@ -21,7 +20,7 @@ awk '                                                   \
         init = 0;                                       \
     }                                                   \
     {                                                   \
-        # skip over any SYN packets, ackino is always 0 \
+        # skip over any SYN packets, ack_no is always 0 \
         if ($4 == 0) {                                  \
             next                                        \
         }                                               \
@@ -53,42 +52,37 @@ makelogs() {
     if [ "$1" == "server" ]; then
         echo "finding SYN-ACK packet(s)"
         type="s"
-        ack=1
-        fieldno="-f6"
+        ack=1            # find SYN-ACKs
+        fieldno="-f6"    # use original seq# column
 
     else
         echo "finding SYN packet(s)"
         type="c"
-        ack=0
-        fieldno="-f7"
+        ack=0            # find SYNs
+        fieldno="-f7"    # use original ack# column
     fi
 
     fields="xstream.flags.syn==1 && xstream.flags.ack == $ack"
 
     dags=$($tshark -nr $infile -Y "$fields" -T fields -e xip.src_dag_entry)
 
-    # annoyingly tshark is putting everything on the same line so split it
-    # and convert spaces inside the dags to newline sequences since tshark needs dags formatted that way
-    i=0
+    i=""
     last=""
+    # tshark is annoying and is putting everything onto a single line
+    # split lines on AD entries
+    # and replace spaces between XIDs with newline escape sequence (\x0a) to make tshark happy
     for dag in $(echo $dags | sed 's/ ad/\nad/g' | sed 's/ /\\x0a/g'); do
 
-        if [ "$last" == "$dag" ]; then
-            # skip over cases where the SYN/SYN-ACK packets were retransmitted
-            continue
-        fi
+        # skip over cases where the SYN/SYN-ACK packets were retransmitted
+        [ "$last" == "$dag" ] && continue
         last=$dag
 
-        # handle naming if multiple sessions were found in the trace
-        if [ $i == 0 ]; then
-            outfile=$name-$type.log
-            rfile=$name-r$type.log
-        else
-            outfile=$name$i-$type.log
-            rfile=$name$i-r$type.log
-        fi
+        logfile=$name$i-$type.log
+        rfile=$name$i-r$type.log
+        [ "$i" == "" ] && i=0
+        ((i=i+1))
 
-        echo "creating $outfile for:"
+        echo "creating $logfile for:"
         echo "    $dag"
 
         # make the data files
@@ -100,22 +94,20 @@ makelogs() {
             -e xstream.seq_no                  \
             -e xstream.ack_no                  \
             -e xstream.win                     \
-            > $outfile
+            > $logfile
 
         # strip out any SYN packets & then normalize output to start at 0
-        normalize $outfile
+        normalize $logfile
 
         # now make retransmit logs of sequence/ack # that were sent more than once
-        cat $outfile | cut $fieldno | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
-
-        ((i=i+1))
+        cat $logfile | cut $fieldno | sort | uniq -c | sort -n | egrep -v "^ +1" > $rfile
     done
 }
 
 ##############################################################################
 # START HERE
 
-# use my version of tshark so that it understands xstream packets
+# use the XIA version of tshark so that it understands xstream packets
 tshark=~/wireshark/tshark
 
 # capture file name
@@ -125,9 +117,14 @@ if [ $# != 1 ]; then
 cat << EOF
 echo usage: $(basename $0) capture_file
 
-output is capture_file-c.log and capture_file-s.log
+Create logs for xstream packet traces similar to chunk transfers where all
+data flows in one direction.
 
-If more than one xstream session is found additional files will be numbered
+Output is separate log files for the client and server ends of the connection
+as well as a pair of logs showing retransmitted packets.
+
+If multiple stream sessions are found, each session will be output to a new
+set of numbered log files.
 EOF
     exit
 fi

@@ -8,7 +8,9 @@
 # total packets is the sum of all of the packets that were retransmitted
 
 print_counts() {
-	awk '{s+=$1;l+=1}END{printf "unique: %d\n", l; printf " total: %s\n", s}' $1
+	# of lines == # of unique packets
+	# sum of the retransmits on each line - # of lines is number of extra packets sent
+	awk '{s+=$1;l+=1}END{printf "unique: %d\n", l; printf " total: %s\n", s - l}' $1
 }
 
 
