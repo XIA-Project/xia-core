@@ -2,7 +2,7 @@
 #include "dagaddr.hpp"
 
 
-// The only NCIDTable. Initialized by first call to NCIDTable::get_map()
+// The only NCIDTable. Initialized by first call to NCIDTable::get_table()
 NCIDTable* NCIDTable::_instance = 0;
 
 NCIDTable::NCIDTable()
