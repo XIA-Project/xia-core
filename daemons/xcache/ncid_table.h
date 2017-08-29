@@ -1,7 +1,6 @@
 #ifndef __NCID_TABLE_H__
 #define __NCID_TABLE_H__
 
-#include "clicknet/xia.h"
 #include <iostream>
 #include <map>
 #include <algorithm>
