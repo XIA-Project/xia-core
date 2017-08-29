@@ -5,10 +5,20 @@
 #include <Xsocket.h>
 #include <Xsecurity.h>
 
+/*!
+ * @brief Represent a Publisher and its local capabilities
+ *
+ * In presence of Publisher private key, this object is capable of
+ * signing named content.
+ *
+ * On a client downloading named content, this object is capable of
+ * verifying the said content if the Publisher's certificate is
+ * available
+ */
 class Publisher {
 	public:
 		Publisher(std::string name);
-		//~Publisher();
+		~Publisher();
 		std::string name();
 		std::string content_URI(std::string content_name);
 		std::string ncid(std::string content_name);
@@ -18,6 +28,14 @@ class Publisher {
 		std::string privfilepath();
 		std::string pubkey();
 		std::string keydir();
+
+		bool pubkey_present(std::string path);
+		bool fetch_pubkey();
+		std::string cert_name();
+
+		bool keydir_present();
+		bool ensure_keydir_exists();
+		bool store_publisher_cert(void *cert, size_t len,std::string &certpath);
 
 		const char *_keydir;
 		std::string _name;

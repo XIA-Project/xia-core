@@ -2,7 +2,7 @@ include ../../../xia.mk
 
 .PHONY: all clean
 
-SOURCES=publisher.cc
+SOURCES=publisher.cc publisher_cert.cc
 OBJECTS=$(SOURCES:.cc=.o)
 LIBS=$(XLIB)/libpublisher.so
 STATICLIB=$(XLIB)/libpublisher.a
@@ -10,7 +10,8 @@ ANNOUNCER=$(BINDIR)/announce_publisher
 
 ANNOUNCER_SOURCES=announce_publisher.cc
 
-CFLAGS+=-I$(APIDIR)/include
+CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I../../common
+CFLAGS+=-I$(APIDIR)/xsocket/minini
 LDFLAGS+=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so $(XLIB)/libxcache.so
 
 all: $(LIBS) $(ANNOUNCER)

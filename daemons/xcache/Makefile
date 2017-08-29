@@ -18,7 +18,7 @@ OBJS=$(SOURCES:.cc=.o)
 
 LIBS+=$(XLIB)/libpublisher.so
 LDFLAGS+=$(LIBS) -lprotobuf -lcrypto
-CFLAGS+=-I$(APIDIR)/xcache -I ../common -I../../click/include -I$(APIDIR)/xsocket/minini
+CFLAGS+=-I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../../click/include -I$(APIDIR)/xsocket/minini
 
 %.pb.cc: %.proto
 	protoc -I. --cpp_out=. $<
