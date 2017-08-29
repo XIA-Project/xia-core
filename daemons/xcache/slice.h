@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <map>
-#include "clicknet/xia.h"
 #include "policies/policy.h"
 #include <stdint.h>
 
