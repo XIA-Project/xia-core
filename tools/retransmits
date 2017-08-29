@@ -8,9 +8,25 @@
 # total packets is the sum of all of the packets that were retransmitted
 
 print_counts() {
-	# of lines == # of unique packets
-	# sum of the retransmits on each line - # of lines is number of extra packets sent
-	awk '{s+=$1;l+=1}END{printf "unique: %d\n", l; printf " total: %s\n", s - l}' $1
+    # of lines == # of unique packets
+    # most == highest number of retransmits for a single packet
+    # sum of the retransmits on each line - # of lines is number of extra packets sent
+    awk '
+    BEGIN {                          \
+        max=0                        \
+    }                                \
+    {                                \
+        s += $1;                     \
+        l += 1;                      \
+        if ($1 > max) {              \
+            max = $1                 \
+        }                            \
+    }                                \
+    END {                            \
+        printf "unique: %d\n", l;    \
+        printf "  most: %d\n", max;  \
+        printf " total: %s\n", s - l \
+    }' $1
 }
 
 
@@ -22,7 +38,7 @@ where:
     name is the base portion of a stream capture log
     ie test.pcap => test
 EOF
-	exit
+    exit
 fi
 
 name=$1
@@ -30,8 +46,8 @@ cli=$name-rc.log
 svr=$name-rs.log
 
 if [ ! -e $cli ] || [ ! -e $svr ]; then
-	echo $cli and/or $svr not found
-	exit
+    echo $cli and/or $svr not found
+    exit
 fi
 
 
