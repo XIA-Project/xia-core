@@ -92,20 +92,21 @@ private:
 
 	unsigned context_id;
 
-public:
 	/**
+	 * The only controller instance
+	 */
+	static xcache_controller *_instance;
+
+protected:
+/**
 	 * A Constructor.
 	 * FIXME: What do we need to do in the constructor?
 	 */
-	xcache_controller() {
-		_map = meta_map::get_map();
-		_ncid_table = NCIDTable::get_table();
-		hostname.assign("host0");
-		pthread_mutex_init(&request_queue_lock, NULL);
-		pthread_mutex_init(&ncid_cid_lock, NULL);
-		context_id = 0;
-		sem_init(&req_sem, 0, 0);
-	}
+	xcache_controller();
+	~xcache_controller();
+
+public:
+	static xcache_controller *get_instance();
 
 	std::string get_id(int *type, xcache_cmd *cmd);
 	/**

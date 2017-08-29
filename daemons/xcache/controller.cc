@@ -27,6 +27,36 @@
 #define IO_BUF_SIZE (1024 * 1024)
 #define MAX_XID_SIZE 100
 
+// The only xcache_controller. Initialized by first call to
+// xcache_controller::get_instance()
+xcache_controller *xcache_controller::_instance = 0;
+
+xcache_controller::xcache_controller()
+{
+	_instance = 0;
+	_map = meta_map::get_map();
+	_ncid_table = NCIDTable::get_table();
+	hostname.assign("host0");
+	pthread_mutex_init(&request_queue_lock, NULL);
+	pthread_mutex_init(&ncid_cid_lock, NULL);
+	context_id = 0;
+	sem_init(&req_sem, 0, 0);
+}
+
+xcache_controller *xcache_controller::get_instance()
+{
+	if (_instance == 0) {
+		_instance = new xcache_controller;
+	}
+	return _instance;
+}
+
+xcache_controller::~xcache_controller()
+{
+	delete _instance;
+	_instance = 0;
+}
+
 enum {
 	RET_FAILED = -1,
 	RET_OK,
