@@ -4,6 +4,7 @@
 #include <string.h>
 #include <Xsocket.h>
 #include <Xsecurity.h>
+#include <dagaddr.hpp>
 
 /*!
  * @brief Represent a Publisher and its local capabilities
@@ -22,10 +23,15 @@ class Publisher {
 		std::string name();
 		std::string content_URI(std::string content_name);
 		std::string ncid(std::string content_name);
+		std::string ncid_dag(std::string content_name);
 		int sign(std::string content_URI, const std::string &content,
 				std::string &signature);
+		bool isValidSignature(std::string content_URI,
+				const std::string &content,
+				const std::string &signature);
 	private:
 		std::string privfilepath();
+		std::string pubfilepath();
 		std::string pubkey();
 		std::string keydir();
 
@@ -39,5 +45,6 @@ class Publisher {
 
 		const char *_keydir;
 		std::string _name;
+		Graph *_cert_dag;
 };
 #endif // _PUBLISHER_H

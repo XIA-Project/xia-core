@@ -11,8 +11,8 @@ ANNOUNCER=$(BINDIR)/announce_publisher
 ANNOUNCER_SOURCES=announce_publisher.cc
 
 CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I../../common
-CFLAGS+=-I$(APIDIR)/xsocket/minini
-LDFLAGS+=$(XLIB)/libXsocket.so $(XLIB)/libdagaddr.so $(XLIB)/libxcache.so
+CFLAGS+=-I$(APIDIR)/xsocket/minini -L$(XLIB)
+LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lxcache -Wl,-rpath,$(XLIB)
 
 all: $(LIBS) $(ANNOUNCER)
 

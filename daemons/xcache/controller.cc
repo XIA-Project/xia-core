@@ -245,6 +245,10 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	// Store the content header with the metadata
 	// TODO: NITIN Verify expected_cid vs computed_cid
+	// TODO: FILL NITIN
+	// If NCID Header, then verify data was signed by publisher
+	// Get Publisher from PublisherList
+	// Make the publisher verify data and signature in header
 	meta->set_content_header(chdr);
 
 	if (!context) {
@@ -453,15 +457,16 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	std::string publisher_name = name.substr(0, name.find('/'));
 	std::string content_name = name.substr(name.find('/'), std::string::npos);
 	// Get reference to a Publisher object that can build NCID
-	// NOTE: This object cannot sign new content
-	// Retrieve Publisher certificate if necessary (in Publisher code)
-	// Save off DAG of Publisher certificate for building NCID DAG
-	// Retrieve Publisher pubkey from certificate
-	// Build NCID via Publisher object
-	// Build DAG for NCID from certificate DAG
-	// Build a new xcache_cmd with NCID DAG in DAG
+	// NOTE: This object cannot sign new content. Just verify it.
+	PublisherList *publishers = PublisherList::get_publishers();
+	Publisher *publisher = publishers->get(publisher_name);
+	// Build DAG for retrieving the NCID
+	std::string ncid_dag = publisher->ncid_dag(name);
+	// Fill in the NCID DAG in the user's command
+	cmd->set_dag(ncid_dag);
 	// Now call xcache_fetch_content with NCID DAG
-	return 0;
+	return xcache_fetch_content(resp, cmd, flags);
+	// Verify the downloaded content against Publisher's pubkey
 }
 
 std::string xcache_controller::addr2cid(sockaddr_x *addr)
@@ -753,16 +758,15 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	int retval = RET_FAILED;
 	struct xcache_context *context;
 	xcache_meta *meta;
-	int type;
 
 	// Retrieve publisher name, content name and data passed by user
 	std::string publisher_name = cmd->publisher_name();
 	std::string content = cmd->data();
 	std::string content_name = cmd->content_name();
 
+	// FIXME: Free chdr on errors
 	// Build the NCID Header from the provided request
 	ContentHeader *chdr = new NCIDHeader(content, cmd->ttl(),
 			publisher_name, content_name);

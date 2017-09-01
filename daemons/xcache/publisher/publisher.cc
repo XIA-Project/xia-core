@@ -19,7 +19,9 @@
  */
 Publisher::Publisher(std::string name)
 {
-	char keydir[MAX_KEYDIR_PATH_LEN];
+	char *keydir = (char *)malloc(MAX_KEYDIR_PATH_LEN);
+	assert(keydir != NULL);
+
 	std::string publisher_dir = "/publisher/" + name;
 	if(XrootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
 		printf("ERROR: Unable to get XIA root directory name");
@@ -31,12 +33,16 @@ Publisher::Publisher(std::string name)
 	_keydir = strcat(keydir, publisher_dir.c_str());
 
 	_name = name;
+	_cert_dag = NULL;
 }
 
 Publisher::~Publisher()
 {
 	if(_keydir!= NULL) {
 		free((void *)_keydir);
+	}
+	if(_cert_dag) {
+		delete _cert_dag;
 	}
 }
 
@@ -180,8 +186,10 @@ bool Publisher::fetch_pubkey()
 		goto fetch_pubkey_done;
 	}
 
-	// Fetch Publisher cert via XfetchChunk equivalent logic
+	// Store certificate DAG for building NCID DAGs in future
+	_cert_dag = new Graph(&addr);
 
+	// Fetch Publisher cert via XfetchChunk equivalent logic
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_dag(&addr, addrlen);
 	cmd.set_flags(flags);
@@ -299,6 +307,31 @@ std::string Publisher::ncid(std::string content_name)
 }
 
 /*!
+ * @brief get a DAG for requested content name
+ *
+ * Convert a content name to the corresponding DAG. This involves
+ * a lot of complex set of steps:
+ * 1. Download the Publisher's certificate, if necessary.
+ * 2. Verifying the certificate against the CA root certiifcate
+ * 3. Extracting the public ke from the Publisher Certificate
+ * 4. Calculating the NCID from pubkey and content_name
+ * 5. Creating DAG by substituting intent CID in Publisher cert with NCID
+ *
+ * @returns DAG for retrieving the NCID on success
+ * @returns empty string on failure
+ */
+std::string Publisher::ncid_dag(std::string content_name)
+{
+	if(_cert_dag == NULL) {
+		return "";
+	}
+	Graph dag(*_cert_dag);
+	Node ncid_node(ncid(content_name));
+	dag.replace_final_intent(ncid_node);
+	return dag.dag_string();
+}
+
+/*!
  * @brief Directory containing all Publisher security credentials
  */
 std::string Publisher::keydir()
@@ -312,8 +345,18 @@ std::string Publisher::privfilepath()
 	return privkeypath;
 }
 
+std::string Publisher::pubfilepath()
+{
+	std::string pubkeypath = privfilepath();
+	pubkeypath.replace(-3, 3, "pub");
+	return pubkeypath;
+}
+
 /*!
  * @brief Sign the given content to associate it with given content_URI
+ *
+ * @returns signature for the content, if successful
+ * @returns 0 on success -1 on failure
  */
 int  Publisher::sign(std::string content_URI,
 		const std::string &content,
@@ -336,6 +379,30 @@ int  Publisher::sign(std::string content_URI,
 	}
 	std::string sigstr((char *)sig_buf, siglen);
 	signature = sigstr;
+	retval = 0;
 	return retval;
 }
 
+/*!
+ * @brief Verify the signature
+ *
+ * @returns true on success, false on failure.
+ */
+bool Publisher::isValidSignature(std::string content_URI,
+		const std::string &content,
+		const std::string &signature)
+{
+	// The publisher signed (Content URI + Content)
+	std::string data = content_URI + content;
+	// Public file path
+	std::string pubkeyfile = pubfilepath();
+	// Verify signature is valid
+	if(xs_isValidSignature(pubkeyfile.c_str(),
+				(const unsigned char *)data.c_str(), data.size(),
+				(unsigned char *)signature.c_str(), signature.size())
+			!= 1) {
+		std::cout << "ERROR invalid signature" << std::endl;
+		return false;
+	}
+	return true;
+}
