@@ -69,9 +69,20 @@ int xs_getPubkeyHash(char *pubkey, uint8_t *digest, int digest_len);
 // Convert a SHA1 digest to a hex string
 void xs_hexDigest(uint8_t* digest, int digest_len, char* hex_string, int hex_string_len);
 
+
 // Verify signature
-int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, const char *xid);
-int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *pem_pub, int pem_pub_len);
+
+// XID known
+int xs_isValidSignature(const unsigned char *data, size_t datalen,
+		unsigned char *signature, unsigned int siglen, const char *xid);
+// Pubkey in memory
+int xs_isValidSignature(const unsigned char *data, size_t datalen,
+		unsigned char *signature, unsigned int siglen,
+		char *pem_pub, int pem_pub_len);
+// Pubkey file path known
+int xs_isValidSignature(const char *pubfilepath,
+		const unsigned char *data, size_t datalen,
+		unsigned char *signature, unsigned int siglen);
 
 // Sign a given buffer
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);

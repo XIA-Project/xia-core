@@ -560,7 +560,8 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
  * @param pem_pub a buffer holding the public key
  * @param length of the pem_pub buffer length
  *
- * @returns non-zero if the signature matches data, verified against pem_pub
+ * @returns 1 if the signature matches data, verified against pem_pub
+ * @returns 0 if signature does not match data
  */
 int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *pem_pub, int pem_pub_len)
 {
@@ -579,6 +580,32 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, signature, siglen, rsa);
 	RSA_free(rsa);
 	return sig_verified;
+}
+
+/*!
+ * @brief Verify signature using public key read from given file
+ *
+ * @param pubfilepath path of file holding the public key
+ * @param data to be verified
+ * @param datalen length of data buffer
+ * @param signature buffer holding the signature to be verified against
+ * @param siglen length of the signature buffer
+ *
+ * @returns 1 if the signature is valid
+ * @returns 0 if the signature does not match the data
+ */
+int xs_isValidSignature(const char *pubfilepath,
+		const unsigned char *data, size_t datalen,
+		unsigned char *signature, unsigned int siglen)
+{
+	char pem_pub[MAX_PUBKEY_SIZE];
+	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
+	if(xs_readPubkeyFile(pubfilepath, pem_pub, &pem_pub_len)) {
+		return 0;
+	}
+
+	return xs_isValidSignature(data, datalen, signature, siglen,
+			pem_pub, pem_pub_len);
 }
 
 /*!
