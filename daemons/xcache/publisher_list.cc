@@ -17,8 +17,16 @@ PublisherList::PublisherList()
  * TODO: In future we should throw exception if the publisher creds
  * are not found during object creation.
  *
- * Create a Publisher instance that is capable of publishing named content
- * that can be trusted by the clients and retrieved via its name.
+ * Return a reference to a Publisher instance. If one doesn't exist
+ * it is created.
+ *
+ * If the private key for the publisher is present, this instance can
+ * sign and publish named content. The clients will be able to trust
+ * this content by verifying publisher cert against CA root certificate.
+ *
+ * On a client, this Publisher instance will be able to fetch the
+ * publisher's certificate and verify the named content against it.
+ *
  * If a Publisher instance already exists, it is returned as is.
  *
  * @param publisher_name the string used to represent the publisher
