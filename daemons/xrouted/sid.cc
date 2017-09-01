@@ -1,7 +1,7 @@
 process_msg
 {
 		case Xroute::SID_MANAGE_KA_MSG:
-			rc = processServiceKeepAlive(msg.keep_alive());
+			rc = processServiceKeepAlive(msg.sid_keep_alive());
 			break;
 		case Xroute::SID_TABLE_UPDATE_MSG:
 		//////////////////////////////////////////////////////////////////////
@@ -1120,11 +1120,11 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 		Node hid(_myHID);
 
 		Xroute::XrouteMsg msg;
-		Xroute::KeepAliveMsg *ka = msg.mutable_keep_alive();
-		Xroute::Node         *n  = ka->mutable_from();
-		Xroute::XID          *a  = n ->mutable_ad();
-		Xroute::XID          *h  = n ->mutable_hid();
-		Xroute::XID          *s  = ka->mutable_sid();
+		Xroute::SidKeepAliveMsg *ka = msg.mutable_keep_alive();
+		Xroute::Node *n  = ka->mutable_from();
+		Xroute::XID  *a  = n ->mutable_ad();
+		Xroute::XID  *h  = n ->mutable_hid();
+		Xroute::XID  *s  = ka->mutable_sid();
 
 		msg.set_type(Xroute::SID_MANAGE_KA_MSG);
 		msg.set_version(Xroute::XROUTE_PROTO_VERSION);
@@ -1140,7 +1140,7 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 		// FIXME: there is a lot more in the servicestate struct than is being used here
 
 		if (it->second.isLeader) {
-			processServiceKeepAlive(msg.keep_alive()); // process locally
+			processServiceKeepAlive(msg.sid_keep_alive()); // process locally
 
 		} else {
 			sockaddr_x ddag;
@@ -1155,7 +1155,7 @@ int Controller::sendKeepAliveToServiceControllerLeader()
 	return rc;
 }
 
-int Controller::processServiceKeepAlive(const Xroute::KeepAliveMsg &msg)
+int Controller::processServiceKeepAlive(const Xroute::SidKeepAliveMsg &msg)
 {
 	int rc = 1;
 	string neighborAD, neighborHID, sid;

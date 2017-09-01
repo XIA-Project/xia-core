@@ -130,7 +130,7 @@ message GlobalLSAMsg {
   repeated NeighborEntry neighbors = 3;
 }
 
-message KeepAliveMsg {
+message SidKeepAliveMsg {
   required Node   from     = 1;
   required XID    sid      = 2;
   required uint32 capacity = 3;
@@ -205,7 +205,7 @@ message XrouteMsg {
     SIDTableUpdateMsg sid_table_update = 8;
     GlobalLSAMsg      global_lsa       = 9;
     HostLeaveMsg      host_leave       = 10;
-    KeepAliveMsg      keep_alive       = 11;
+    SidKeepAliveMsg   sid_keep_alive   = 11;
     DecisionQueryMsg  sid_query        = 12;
     DecisionAnswerMsg sid_answer       = 13;
     SIDDiscoveryMsg   sid_discovery    = 14;

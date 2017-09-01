@@ -103,7 +103,7 @@ class section
 	int updateADPathStates(void);
 	void set_sid_conf(const char* myhostname);
 	static void* updatePathThread(void* updating);
-	int processServiceKeepAlive(const Xroute::KeepAliveMsg& msg);
+	int processServiceKeepAlive(const Xroute::SidKeepAliveMsg& msg);
 	int processSidDecisionQuery(const Xroute::XrouteMsg& msg);
 	int processSidDiscovery(const Xroute::SIDDiscoveryMsg& msg);
 	int processSidDecisionAnswer(const Xroute::DecisionAnswerMsg& msg);
