@@ -12,6 +12,7 @@ message NCIDHeaderBuf {
 	required string id = 3;
 	required string store_id = 4;
 	required string signature = 5;
+	required string publisher_name = 6;
 }
 
 message ContentHeaderBuf {

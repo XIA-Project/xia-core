@@ -27,6 +27,8 @@ class ContentHeader {
 		virtual std::string serialize() = 0;
 		virtual bool deserialize(const std::string &buf) = 0;
 
+		virtual bool valid_data(const std::string &data) = 0;
+
 	protected:
 		size_t _len;
 		time_t _ttl;

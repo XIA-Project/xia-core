@@ -26,8 +26,12 @@ class CIDHeader : public ContentHeader {
 		virtual void set_ttl(time_t ttl) { _ttl = ttl; }
 		virtual std::string serialize();
 		virtual bool deserialize(const std::string &buf);
+
+		virtual bool valid_data(const std::string &data);
+
 	private:
 		std::string _sha1hash(const std::string &data);
+		std::string _calculate_id(const std::string &data);
 };
 
 std::string CIDHeader::_sha1hash(const std::string &data)
@@ -39,11 +43,16 @@ std::string CIDHeader::_sha1hash(const std::string &data)
 	return hashstr;
 }
 
+std::string CIDHeader::_calculate_id(const std::string &data)
+{
+	return "CID" + _sha1hash(data);
+}
+
 CIDHeader::CIDHeader(const std::string &data, time_t ttl)
 {
 	_len = data.size();
 	_ttl = ttl;
-	_id = "CID:" + _sha1hash(data);
+	_id = _calculate_id(data);
 	_store_id = _id;
 }
 
@@ -76,5 +85,11 @@ CIDHeader::deserialize(const std::string &buf)
 	_ttl = cid_hdr.ttl();
 	_id = _store_id = cid_hdr.id();
 	return true;
+}
+
+bool
+CIDHeader::valid_data(const std::string &data)
+{
+	return (_calculate_id(data) == _id);
 }
 #endif // _CID_HEADER_H

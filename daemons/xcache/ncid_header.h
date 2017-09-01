@@ -14,9 +14,12 @@ class NCIDHeader : public CIDHeader {
 		virtual ~NCIDHeader() {}
 		virtual std::string serialize();
 		virtual bool deserialize(const std::string &buf);
+		virtual bool valid_data(const std::string &buf);
+
 	private:
 		std::string _signature;
 		std::string _uri;
+		std::string _publisher_name;
 };
 
 /*!
@@ -31,6 +34,7 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 
 	_id = publisher->ncid(content_name);
 	_uri = publisher->content_URI(content_name);
+	_publisher_name = publisher_name;
 	// TODO: 
 	std::string signature;
 	if(publisher->sign(_uri, data, signature)) {
@@ -57,6 +61,7 @@ NCIDHeader::serialize()
 	ncid_header->set_id(_id);
 	ncid_header->set_store_id(_store_id);
 	ncid_header->set_signature(_signature);
+	ncid_header->set_publisher_name(_publisher_name);
 	std::string serialized_header;
 	chdr_buf.SerializeToString(&serialized_header);
 	return serialized_header;
@@ -78,6 +83,22 @@ NCIDHeader::deserialize(const std::string &buf)
 	_id = ncid_hdr.id();
 	_store_id = ncid_hdr.store_id();
 	_signature = ncid_hdr.signature();
+	_publisher_name = ncid_hdr.publisher_name();
 	return true;
+}
+
+bool
+NCIDHeader::valid_data(const std::string &data)
+{
+	// TODO - Do we need to verify that NCID is correct?
+	// Maybe a new function to validate that the NCID header is correct
+	// Which basically runs the constructor to verify deserialized values
+
+	// Retrieve Publisher name from _uri
+	PublisherList *publishers = PublisherList::get_publishers();
+	Publisher *publisher = publishers->get(_publisher_name);
+
+	// Call Publisher::isValidSignature()
+	return publisher->isValidSignature(_uri, data, _signature);
 }
 #endif // _NCID_HEADER_H
