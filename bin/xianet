@@ -388,10 +388,12 @@ host()
 			sleep 0.5
 			;;
 		"stop")
+			kill_service $host "xhostd"
 			kill_service $host "xnetjd"
 			kill_service $host "xcache"
 			;;
 		"check")
+			check_service $host "xhostd"
 			check_service $host "xnetjd"
 			check_service $host "xcache"
 			;;
