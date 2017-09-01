@@ -16,9 +16,9 @@ SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc $(PROTO_SRCS)
 OBJS=$(SOURCES:.cc=.o)
 
-LIBS+=$(XLIB)/libpublisher.so
-LDFLAGS+=$(LIBS) -lprotobuf -lcrypto
-CFLAGS+=-I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../../click/include -I$(APIDIR)/xsocket/minini
+LIBS+=-lpublisher
+LDFLAGS+=-L$(XLIB) $(LIBS) -lprotobuf -lcrypto
+CFLAGS+=-I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../../click/include -I$(APIDIR)/xsocket/minini -L$(XLIB)
 
 %.pb.cc: %.proto
 	protoc -I. --cpp_out=. $<
