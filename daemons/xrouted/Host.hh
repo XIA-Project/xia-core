@@ -38,11 +38,11 @@ protected:
 
 	// message handlers
 	int processMsg(std::string msg, uint32_t iface);
-	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
+	int processKeepalive(const Xroute::KeepaliveMsg& msg, uint32_t iface);
 	int processConfig(const Xroute::ConfigMsg &msg);
 	int processSIDRequest(Xroute::XrouteMsg &msg);
 
-	int sendHello();
+	int sendKeepalive();
 
 	// other stuff
 	int makeSockets();
@@ -63,10 +63,10 @@ protected:
 	uint32_t _flags;
 
 	// FIXME: improve these guys
-	// track when to fire off lsa and hello msgs
+	// track when to fire off lsa and keepalive msgs
 	struct timeval h_freq, h_fire;
 
-	// track the last time we saw a node in a route update, or a hello
+	// track the last time we saw a node in a route update, or a keepalive
 	TimestampList _neighbor_timestamp;
 
 	// last time we looked for stale entries

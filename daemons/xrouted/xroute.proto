@@ -89,7 +89,7 @@ message SIDRequestMsg {
   optional string sid = 1;
 }
 
-message HelloMsg {
+message KeepaliveMsg {
   required Node   node  = 1;
   optional uint32 flags = 2;
 }
@@ -161,7 +161,7 @@ message SIDDiscoveryMsg {
 
 enum msg_type {
   // router -> router messages
-  HELLO_MSG               = 1;
+  KEEPALIVE_MSG           = 1;
 
   // router -> controller messages
   LSA_MSG                 = 2;
@@ -199,7 +199,7 @@ message XrouteMsg {
   required msg_type type    = 2;
 
   oneof payload {
-    HelloMsg          hello            = 5;
+    KeepaliveMsg      keepalive        = 5;
     LSAMsg            lsa              = 6;
     TableUpdateMsg    table_update     = 7;
     SIDTableUpdateMsg sid_table_update = 8;

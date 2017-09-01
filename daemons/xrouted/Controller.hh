@@ -38,13 +38,13 @@ protected:
 	int makeSockets();
 	int saveControllerDAG();
 
-	int sendHello();
+	int sendKeepalive();
 	int sendInterDomainLSA();
 	int sendRoutingTable(NodeStateEntry *nodeState, RouteTable routingTable);
 
 	int processMsg(std::string msg, uint32_t iface, bool locaL);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
-	int processHello(const Xroute::HelloMsg& msg, uint32_t iface);
+	int processKeepalive(const Xroute::KeepaliveMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);
 	int processSIDRequest(Xroute::XrouteMsg &msg);
@@ -92,7 +92,7 @@ protected:
 	int32_t _calc_dijstra_ticks;
 
 	// FIXME: improve these guys
-	// next time the hello or lsa should be sent
+	// next time the keepalive or lsa should be sent
 	struct timeval h_freq, h_fire;
 	struct timeval l_freq, l_fire;
 

@@ -61,7 +61,7 @@ void Router::purge()
 		}
 	}
 
-	// walk list of neighbors we've discovered via hello
+	// walk list of neighbors we've discovered via keepalive
 	//  and delete any that are stale
 	if (now - _last_neighbor_purge >= NEIGHBOR_EXPIRE_TIME) {
 		_last_neighbor_purge = now;
@@ -110,14 +110,14 @@ int Router::handler()
 
 	if (_joined) {
 		// once we are initialized, purge any stale routes
-		//  and start sending hello's and lsa's
+		//  and start sending keepalive's and lsa's
 		purge();
 
 		struct timeval now;
 		gettimeofday(&now, NULL);
 
 		if (timercmp(&now, &h_fire, >=)) {
-			sendHello();
+			sendKeepalive();
 			timeradd(&now, &h_freq, &h_fire);
 		}
 		if (timercmp(&now, &l_fire, >=)) {
@@ -140,7 +140,7 @@ int Router::makeSockets()
 	Node nHID(_myHID);
 	Node nAD(_myAD);
 
-	// broadcast socket - hello messages, can hopefully go away
+	// broadcast socket - keepalive messages, can hopefully go away
 	g = src * Node(broadcast_fid) * Node(intradomain_sid);
 	if ((_broadcast_sock = makeSocket(g, &_broadcast_dag)) < 0) {
 		return -1;
@@ -198,9 +198,9 @@ int Router::init()
 	return 0;
 }
 
-// send hello on braodcast interface
+// send keepalive on broadcast interface
 // will eventually go away when netjoin does this for us
-int Router::sendHello()
+int Router::sendKeepalive()
 {
 	// FIXME: removed sending SIDs for now, do we need to in the future???
 	string message;
@@ -210,15 +210,15 @@ int Router::sendHello()
 	Node n_sid(intradomain_sid);
 
 	Xroute::XrouteMsg msg;
-	Xroute::HelloMsg *hello = msg.mutable_hello();
-	Xroute::Node     *node  = hello->mutable_node();
+	Xroute::KeepaliveMsg *ka = msg.mutable_keepalive();
+	Xroute::Node     *node  = ka->mutable_node();
 	Xroute::XID      *ad    = node->mutable_ad();
 	Xroute::XID      *hid   = node->mutable_hid();
 	//Xroute::XID      *sid   = node->mutable_sid();
 
-	msg.set_type(Xroute::HELLO_MSG);
+	msg.set_type(Xroute::KEEPALIVE_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
-	hello->set_flags(_flags);
+	ka->set_flags(_flags);
 	ad ->set_type(n_ad.type());
 	ad ->set_id(n_ad.id(), XID_SIZE);
 	hid->set_type(n_hid.type());
@@ -305,8 +305,8 @@ int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 	}
 
 	switch (msg.type()) {
-		case Xroute::HELLO_MSG:
-			rc = processHello(msg.hello(), iface);
+		case Xroute::KEEPALIVE_MSG:
+			rc = processKeepalive(msg.keepalive(), iface);
 			break;
 
 		case Xroute::FOREIGN_AD_MSG:
@@ -556,7 +556,7 @@ int Router::processSIDRequest(Xroute::XrouteMsg &msg)
 }
 
 
-int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
+int Router::processKeepalive(const Xroute::KeepaliveMsg &msg, uint32_t iface)
 {
 	string neighborAD, neighborHID, neighborSID;
 	uint32_t flags = F_HOST;
@@ -600,10 +600,10 @@ int Router::processHello(const Xroute::HelloMsg &msg, uint32_t iface)
 
 	_neighbor_timestamp[internal ? neighbor.HID : neighbor.AD] = time(NULL);
 
-	// FIXME: hack until xnetjd deals with hid hello routes
+	// FIXME: hack until xnetjd deals with hid keepalive routes
 	_xr.setRoute(neighborHID, iface, neighborHID, flags);
 
-	//syslog(LOG_INFO, "Process-Hello[%s]", neighbor.HID.c_str());
+	//syslog(LOG_INFO, "Process-Keepalive[%s]", neighbor.HID.c_str());
 
 	return 1;
 }
