@@ -101,6 +101,13 @@ message LSAMsg {
   repeated NeighborEntry peers = 4;
 }
 
+message HostConfigMsg {
+  required string ad    = 1;
+  required string hid   = 2;
+  required string sid   = 3;
+  required uint32 iface = 4;
+}
+
 message HostJoinMsg {
   required string hid       = 1;
   required uint32 interface = 2;
@@ -191,7 +198,7 @@ enum msg_type {
   CONFIG_MSG              = 15;
   HOST_JOIN_MSG           = 16;
   FOREIGN_AD_MSG          = 17;
-
+  HOST_CONFIG_MSG         = 18;
 }
 
 message XrouteMsg {
@@ -213,5 +220,6 @@ message XrouteMsg {
     ConfigMsg         config           = 16;
     ForeignADMsg      foreign          = 17;
     HostJoinMsg       host_join        = 18;
+    HostConfigMsg     host_config      = 19;
   }
 }
