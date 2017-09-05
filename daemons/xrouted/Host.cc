@@ -99,7 +99,6 @@ int Host::init()
 // FIXME: make sure to do this for each interface
 int Host::sendKeepalive()
 {
-    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\nsend keep alive!!!\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 	string message;
 
 	Node n_ad(_myAD);
@@ -164,8 +163,6 @@ int Host::processConfig(const Xroute::HostConfigMsg &msg)
 	std::string hid = msg.hid();
 	std::string sid = msg.sid();
 	uint32_t iface  = msg.iface();
-
-    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\ngot config msg!!!\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 
 	dag = "RE " + hid + " " + sid;
 
