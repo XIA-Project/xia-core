@@ -44,6 +44,7 @@ protected:
 
 	int processMsg(std::string msg, uint32_t iface, bool locaL);
 	int processHostRegister(const Xroute::HostJoinMsg& msg);
+	int processHostLeave(const Xroute::HostLeaveMsg& msg);
 	int processKeepalive(const Xroute::KeepaliveMsg& msg, uint32_t iface);
 	int processLSA(const Xroute::LSAMsg& msg);
 	int processInterdomainLSA(const Xroute::XrouteMsg& msg);

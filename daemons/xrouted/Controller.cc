@@ -243,12 +243,12 @@ int Controller::saveControllerDAG()
 	fclose(f);
 
 	// creat a conf file to share with other ADs
-	strncat(root, "/etc/controller.conf", sizeof(root));
+	snprintf(s, sizeof(s), "%s/etc/controller.conf", root);
 
 	struct stat st;
-	if (stat(root, &st) < 0) {
+	if (stat(s, &st) < 0) {
 		// conf file doesn't exist yet, stick in a header comment
-		f = fopen(root, "w");
+		f = fopen(s, "w");
 		if (f == NULL) {
 			// FIXME: handle error
 			return -1;
@@ -261,7 +261,7 @@ int Controller::saveControllerDAG()
 		fclose(f);
 	}
 
-	minIni ini(root);
+	minIni ini(s);
 
 	std::string d = "DAG 0 - " + _myAD + " 1 - " + _myHID + " 2 - " + getControllerSID();
 
@@ -702,6 +702,22 @@ int Controller::processHostRegister(const Xroute::HostJoinMsg& msg)
 }
 
 
+int Controller::processHostLeave(const Xroute::HostLeaveMsg& msg)
+{
+	// FIXME: figure out how we do this
+	// The controller and every router in the AD have to know the host
+	// left so that they can remove it fromm the routing table.
+	// there's an additional problem if the host migrated to a new location
+	// in the same AD as we need to telll everyone except the new router
+	// that the host is gone
+	// the new router will advertise the host, but if it's not removed, some
+	// routers will get routes to the host's old location
+
+	_xr.delRoute(msg.hid());
+	return 1;
+}
+
+
 int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 {
 	if (msg.ad() == _myAD) {
@@ -794,6 +810,15 @@ int Controller::processKeepalive(const Xroute::KeepaliveMsg &msg, uint32_t iface
 
 	_neighbor_timestamp[neighborHID] = time(NULL);
 	return 1;
+}
+
+
+int Controller::processSIDRequest(Xroute::XrouteMsg &msg)
+{
+	Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
+	r->set_sid(_recv_sid);
+
+	return sendLocalMessage(msg);
 }
 
 
@@ -1308,7 +1333,12 @@ int Controller::processMsg(std::string msg_str, uint32_t iface, bool local)
 			break;
 
 		case Xroute::HOST_LEAVE_MSG:
+			rc = processHostLeave(msg.host_leave());
 			break;
+
+		case Xroute::SID_REQUEST_MSG:
+			rc = processSIDRequest(msg);
+		    break;
 
 		case Xroute::FOREIGN_AD_MSG:
 			if (local) {
