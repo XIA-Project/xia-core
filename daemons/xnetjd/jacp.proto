@@ -275,6 +275,7 @@ message PXHCPConfigDeclaration {
     optional string control_rv_dag = 4;
     optional bytes router_4id = 5;
     optional string controller_dag = 6;
+    optional string router_sid = 7;
 }
 
 // XIP\ Configuration:1 ends here
