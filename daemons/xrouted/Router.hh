@@ -62,6 +62,9 @@ protected:
 	std::string _myAD;
 	std::string _myHID;
 
+    // SID bound to the router's listening socket
+	std::string _recv_sid;
+
 	// true once we are configured to be on the network
 	bool _joined;
 
