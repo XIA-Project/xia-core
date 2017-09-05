@@ -68,8 +68,6 @@ protected:
 	sockaddr_x _source_dag;		// dag os socket we send on
 	sockaddr_x _recv_dag;		// dag we receive on (same as contoller when in controller process)
 
-	std::string _recv_sid;      // SID bound to the router's listening socket
-
 	sockaddr_in _local_sa;
 
 	RouteModule(const char *name);

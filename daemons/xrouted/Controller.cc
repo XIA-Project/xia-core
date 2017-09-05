@@ -315,6 +315,7 @@ int Controller::makeSockets()
 	if ((_broadcast_sock = makeSocket(g, &_broadcast_dag)) < 0) {
 		return -1;
 	}
+	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
 
 	// controller socket - flooded & interdomain communication
 	XcreateFID(s, sizeof(s));
@@ -326,6 +327,8 @@ int Controller::makeSockets()
 		return -1;
 	}
 	memcpy(&_controller_dag, &_recv_dag, sizeof(sockaddr_x));
+
+	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
 
 	// save the controller dag to disk so xnetj can find it
 	if (saveControllerDAG() < 0) {
@@ -340,9 +343,6 @@ int Controller::makeSockets()
 	if ((_source_sock = makeSocket(g, &_source_dag)) < 0) {
 		return -1;
 	}
-
-	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
-	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
 	syslog(LOG_INFO, "Source: %s", g.dag_string().c_str());
 
 	return 0;
@@ -816,7 +816,7 @@ int Controller::processKeepalive(const Xroute::KeepaliveMsg &msg, uint32_t iface
 int Controller::processSIDRequest(Xroute::XrouteMsg &msg)
 {
 	Xroute::SIDRequestMsg *r = msg.mutable_sid_request();
-	r->set_sid(_recv_sid);
+	r->set_sid(getControllerSID());
 
 	return sendLocalMessage(msg);
 }
