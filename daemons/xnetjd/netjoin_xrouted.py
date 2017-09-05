@@ -27,6 +27,13 @@ class NetjoinXrouted():
         packet = xrmsg.SerializeToString()
         self._rsockfd.sendto(packet, self._xrouted_addr)
 
+    def __get_xrouted_msg(self):
+        """Get an XrouteMsg from Xrouted"""
+        (message, addr) = self._rsockfd.recvfrom(1024)
+        xrmsg = xroute_pb2.XrouteMsg()
+        xrmsg.ParseFromString(message)
+        return xrmsg
+
     def __new_xrmsg(self):
         """Create a new XrouteMsg"""
         xrmsg = xroute_pb2.XrouteMsg()
@@ -50,6 +57,16 @@ class NetjoinXrouted():
         xrmsg.config.controller_dag = controller_dag
         self.__send_xrouted_msg(xrmsg)
 
+    def send_host_config(self, ad, hid, sid, iface):
+        """Notify Xrouted of our AD, router's HID, router's SID and interface"""
+        xrmsg = self.__new_xrmsg()
+        xrmsg.type = xroute_pb2.HOST_CONFIG_MSG
+        xrmsg.host_config.ad = ad
+        xrmsg.host_config.hid = hid
+        xrmsg.host_config.sid = sid
+        xrmsg.host_config.iface = iface
+        self.__send_xrouted_msg(xrmsg)
+
     def send_foreign_ad(self, interface, ad):
         """Notify Xrouted of a foreign network seen on an interface"""
         xrmsg = self.__new_xrmsg()
@@ -57,4 +74,19 @@ class NetjoinXrouted():
         xrmsg.foreign.iface = interface
         xrmsg.foreign.ad = ad
         self.__send_xrouted_msg(xrmsg)
+
+    def get_sid(self):
+        """Get SID of the Xrouted process on this system"""
+        xrmsg = self.__new_xrmsg()
+        xrmsg.type = xroute_pb2.SID_REQUEST_MSG
+        xrmsg.sid_request.SetInParent()
+        self.__send_xrouted_msg(xrmsg)
+        xrresp = self.__get_xrouted_msg()
+        if xrresp.type != xroute_pb2.SID_REQUEST_MSG:
+            return ""
+        if not xrresp.HasField("sid_request"):
+            return ""
+        if not xrresp.sid_request.HasField("sid"):
+            return ""
+        return xrresp.sid_request.sid
 

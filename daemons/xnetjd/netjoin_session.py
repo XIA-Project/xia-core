@@ -59,6 +59,10 @@ class NetjoinSession(threading.Thread):
         self.xrouted = NetjoinXrouted()
         self.is_router = is_router
         self.controller_dag = None
+
+        self.router_sid = None
+        self.router_hid = None
+
         self.l2_handler = None    # Created on receiving beacon or handshake1
         self.last_message_tuple = None # (message, outgoing_interface, theirmac)
         self.last_message_remaining_iterations = None
@@ -256,6 +260,9 @@ class NetjoinSession(threading.Thread):
         if self.is_router:
             self.controller_dag = str(netjoin_h2.controller_dag())
 
+        # Get router's SID for xrouted notification after hs4
+        self.router_sid = str(netjoin_h2.router_sid())
+
         # Configure Click info
         router_dag = str(netjoin_h2.router_dag())
         router_4id = ""
@@ -308,9 +315,9 @@ class NetjoinSession(threading.Thread):
                 logging.info("Control RV DAG sent to Click and processed")
 
         # TODO: Create XARP entry for router HID
-        router_hid = Graph(router_dag).intent_HID_str()
+        self.router_hid = Graph(router_dag).intent_HID_str()
         sendermacstr = "%02x:%02x:%02x:%02x:%02x:%02x" % (theirmac)
-        logging.info("XARP: {} has {}".format(sendermacstr, router_hid))
+        logging.info("XARP: {} has {}".format(sendermacstr, self.router_hid))
 
         # Inform RV service of new network joined
         # TODO: This should really happen on receiving handshake four
@@ -430,6 +437,10 @@ class NetjoinSession(threading.Thread):
         logging.info("TOTAL joining time: {}ms".format(total_joining_time*1000))
         self.state = self.HS_DONE
 
+        net_id = self.beacon.find_xip_netid()
+        assert(net_id is not None)
+        ad = "AD:{}".format(self.conf.raw_ad_to_hex(net_id))
+
         # On routers; Notify xrouted and start announcing this network
         if self.is_router:
 
@@ -452,11 +463,8 @@ class NetjoinSession(threading.Thread):
             # TODO: Need to get beacon_interval from a config file
             l2_type = LayerTwoIdentifier.ETHERNET
             beacon_interval = 0.5
-            net_id = self.beacon.find_xip_netid()
-            assert(net_id is not None)
 
             # Inform local xrouted that NetJoin is complete
-            ad = "AD:{}".format(self.conf.raw_ad_to_hex(net_id))
             self.xrouted.send_config(ad, self.controller_dag)
 
             # Ask the NetjoinReceiver to announce the newly joined network
@@ -465,6 +473,9 @@ class NetjoinSession(threading.Thread):
                 logging.info("No announcer or controller dag changed")
                 logging.info("So announce this network")
                 self.receiver.announce(l2_type, net_id, beacon_interval)
+        else:
+            self.xrouted.send_host_config(ad, self.router_hid,
+                    self.router_sid, interface)
 
         return True
 

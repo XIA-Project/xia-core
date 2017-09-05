@@ -62,6 +62,11 @@ class NetjoinHandshakeTwo(object):
                 logging.info("Sending controller dag to new router")
                 xhcp_reply.controller_dag = self.conf.get_controller_dag()
 
+            # Send the xrouted SID to the client
+            xhcp_reply.router_sid = self.session.xrouted.get_sid()
+            if xhcp_reply.router_sid == "":
+                logging.info("Router SID not found from xrouted")
+
             # Get router/ns/rv dags from click and fill into xhcp_reply
             with ClickControl() as click:
                 xhcp_reply.router_dag = click.getDefaultAddr(hostname)
@@ -115,6 +120,9 @@ class NetjoinHandshakeTwo(object):
         if self.xhcp_info().HasField('control_rv_dag'):
             return self.xhcp_info().control_rv_dag
         return None
+
+    def router_sid(self):
+        return self.xhcp_info().router_sid
 
     def layer_two_granted(self):
         l2_response_t = self.cyphertext.gateway_l2_reply.WhichOneof("l2_reply")
