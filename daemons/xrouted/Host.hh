@@ -38,26 +38,23 @@ protected:
 
 	// message handlers
 	int processMsg(std::string msg, uint32_t iface);
-	int processKeepalive(const Xroute::KeepaliveMsg& msg, uint32_t iface);
-	int processConfig(const Xroute::ConfigMsg &msg);
-	int processSIDRequest(Xroute::XrouteMsg &msg);
+	int processConfig(const Xroute::HostConfigMsg &msg);
 
 	int sendKeepalive();
 
 	// other stuff
 	int makeSockets();
-	void purge();
 
 protected:
 	// local addr, these should change to nodes
+	// FIXME: need one for each interface!
 	std::string _myAD;
 	std::string _myHID;
 
+	sockaddr_x _router_dag;
+
 	// true once we are configured to be on the network
 	bool _joined;
-
-	// neighbor nodes I've discovered
-	NeighborTable _neighborTable;
 
 	// our route table flags we send to others
 	uint32_t _flags;
@@ -65,12 +62,6 @@ protected:
 	// FIXME: improve these guys
 	// track when to fire off lsa and keepalive msgs
 	struct timeval h_freq, h_fire;
-
-	// track the last time we saw a node in a route update, or a keepalive
-	TimestampList _neighbor_timestamp;
-
-	// last time we looked for stale entries
-	time_t _last_neighbor_purge;
 };
 
 #endif
