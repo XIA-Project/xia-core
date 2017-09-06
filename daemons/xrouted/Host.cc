@@ -138,7 +138,7 @@ int Host::processMsg(std::string msg_str, uint32_t iface)
 		}
 
 	} catch (std::exception e) {
-		syslog(LOG_INFO, "invalid router message received\n");
+		syslog(LOG_WARNING, "invalid router message received\n");
 		return 0;
 	}
 
@@ -148,7 +148,7 @@ int Host::processMsg(std::string msg_str, uint32_t iface)
 			break;
 
 		default:
-			syslog(LOG_INFO, "unknown routing message type");
+			syslog(LOG_WARNING, "unsupported routing message received");
 			break;
 	}
 

@@ -46,7 +46,6 @@ void Router::purge()
 	if (now - _last_route_purge >= ROUTE_EXPIRE_TIME) {
 		_last_route_purge = now;
 
-	printf("purge?\n");
 		TimestampList::iterator iter = _route_timestamp.begin();
 		while (iter != _route_timestamp.end()) {
 
@@ -236,7 +235,7 @@ int Router::sendKeepalive()
 int Router::sendLSA()
 {
 
-	syslog(LOG_NOTICE, "sending routing table");
+	//syslog(LOG_DEBUG, "sending routing table");
 	Node n_ad(_myAD);
 	Node n_hid(_myHID);
 
@@ -263,7 +262,7 @@ int Router::sendLSA()
 		Node p_ad(it->second.AD);
 		Node p_hid(it->second.HID);
 
-		syslog(LOG_NOTICE, "     neighbor: %s", it->second.HID.c_str());
+		//syslog(LOG_DEBUG, "     neighbor: %s", it->second.HID.c_str());
 
 		n   = lsa->add_peers();
 		ad  = n->mutable_ad();
@@ -300,7 +299,7 @@ int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 		}
 
 	} catch (std::exception e) {
-		syslog(LOG_INFO, "invalid router message received\n");
+		syslog(LOG_WARNING, "invalid router message received\n");
 		return 0;
 	}
 
@@ -345,7 +344,7 @@ int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 		    break;
 
 		default:
-			syslog(LOG_INFO, "unknown routing message type");
+			syslog(LOG_WARNING, "unsupported routing message received");
 			break;
 	}
 
@@ -497,11 +496,10 @@ int Router::processConfig(const Xroute::ConfigMsg &msg)
 {
 	std::string ad = msg.ad();
 
-syslog(LOG_NOTICE, "XXXXXXXXXXXXXXXXXX config  beacon from %s\n", msg.ad().c_str());
 	xia_pton(AF_XIA, msg.controller_dag().c_str(), &_controller_dag);
 
 	if (!_joined) {
-        syslog(LOG_NOTICE, "neighbor beacon from %s\n", msg.ad().c_str());
+        //syslog(LOG_INFO, "neighbor beacon from %s\n", msg.ad().c_str());
 
 		// now we can fetch our AD/HID
 		if (getXIDs(_myAD, _myHID) < 0) {
@@ -519,7 +517,7 @@ syslog(LOG_NOTICE, "XXXXXXXXXXXXXXXXXX config  beacon from %s\n", msg.ad().c_str
 
 		if (XisDualStackRouter(_source_sock) == 1) {
 			_flags |= F_IP_GATEWAY;
-			syslog(LOG_DEBUG, "configured as a dual-stack router");
+			//syslog(LOG_DEBUG, "configured as a dual-stack router");
 		}
 
 		// we're part of the network now and can start talking
@@ -623,7 +621,7 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 	string dstAD  = Node(ta.type(), ta.id().c_str(), 0).to_string();
 	string dstHID = Node(th.type(), th.id().c_str(), 0).to_string();
 
-	syslog(LOG_NOTICE, "got routing table");
+	//syslog(LOG_INFO, "got routing table");
 
 	if (srcAD != _myAD) {
 		// FIXME: we shouldn't need this once we have edge detection
@@ -644,7 +642,7 @@ int Router::processRoutingTable(const Xroute::XrouteMsg& xmsg)
 			flags = e.flags();
 		}
 
-		syslog(LOG_NOTICE, "got route for %s", xid.c_str());
+		//syslog(LOG_INFO, "got route for %s", xid.c_str());
 
 		int rc;
 		if ((rc = _xr.setRoute(xid, port, nextHop, flags)) != 0)
