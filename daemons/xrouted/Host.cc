@@ -35,7 +35,7 @@ int Host::handler()
 
 	// get the next incoming message
 	if ((rc = readMessage(recv_message, &pfd, 1, &iface)) > 0) {
-		processMsg(string(recv_message, rc), iface);
+		processMsg(string(recv_message, rc));
 	}
 
 	if (_joined) {
@@ -54,21 +54,20 @@ int Host::handler()
 
 // FIXME: deal with multihoming!!!
 // now that we've joined the network, set up our dags and sockets
-int Host::makeSockets()
+int Host::makeSock(uint32_t iface)
 {
 	char s[MAX_DAG_SIZE];
 	Graph g;
 
 	Node src;
 	Node nHID(_myHID);
-	Node nAD(_myAD);
 
 	// source socket - sending socket
 	XmakeNewSID(s, sizeof(s));
 	Node outSID(s);
-	g = src * nAD * nHID * outSID;
+	g = src * nHID * outSID;
 
-	if ((_source_sock = makeSocket(g, &_source_dag)) < 0) {
+	if ((_networks[iface].fd = makeSocket(g, &_networks[iface].source_dag)) < 0) {
 		return -1;
 	}
 
@@ -96,34 +95,44 @@ int Host::init()
 }
 
 // send keepalive to router(s)
-// FIXME: make sure to do this for each interface
 int Host::sendKeepalive()
 {
+	int rc;
 	string message;
+	Xroute::XrouteMsg msg;
 
-	Node n_ad(_myAD);
 	Node n_hid(_myHID);
 
-	Xroute::XrouteMsg msg;
 	Xroute::KeepaliveMsg *ka = msg.mutable_keepalive();
 	Xroute::Node *node  = ka->mutable_node();
-	Xroute::XID  *ad    = node->mutable_ad();
 	Xroute::XID  *hid   = node->mutable_hid();
 
 	msg.set_type(Xroute::KEEPALIVE_MSG);
 	msg.set_version(Xroute::XROUTE_PROTO_VERSION);
 	ka->set_flags(_flags);
-	ad ->set_type(n_ad.type());
-	ad ->set_id(n_ad.id(), XID_SIZE);
+
 	hid->set_type(n_hid.type());
 	hid->set_id(n_hid.id(), XID_SIZE);
 
-	return sendMessage(&_router_dag, msg);
+	for (NetworkMap::iterator it = _networks.begin(); it != _networks.end(); it++) {
+
+		Node n_ad(it->second.ad);
+		Xroute::XID *ad = node->mutable_ad();
+
+		ad ->set_type(n_ad.type());
+		ad ->set_id(n_ad.id(), XID_SIZE);
+
+		if ((rc = sendMessage(it->second.fd, &it->second.router_dag, msg)) < 0) {
+			break;
+		}
+	}
+
+	return rc;
 }
 
 
 // handle the incoming messages
-int Host::processMsg(std::string msg_str, uint32_t iface)
+int Host::processMsg(std::string msg_str)
 {
 	int rc = 0;
 	Xroute::XrouteMsg msg;
@@ -158,31 +167,51 @@ int Host::processMsg(std::string msg_str, uint32_t iface)
 
 int Host::processConfig(const Xroute::HostConfigMsg &msg)
 {
-	std::string dag;
-	std::string ad  = msg.ad();
-	std::string hid = msg.hid();
-	std::string sid = msg.sid();
-	uint32_t iface  = msg.iface();
+	std::string a;
+	std::string rdag;
+	NetInfo n;
 
-	dag = "RE " + hid + " " + sid;
+	uint32_t iface = msg.iface();
 
-	xia_pton(AF_XIA, dag.c_str(), &_router_dag);
+	printf("iface = %d\n", iface);
 
-	if (!_joined) {
-		// now we can fetch our AD/HID
-		if (getXIDs(_myAD, _myHID) < 0) {
-			return -1;
-		}
+	n.ad = msg.ad();
 
-		makeSockets();
+	rdag = "RE " + msg.hid() + " " + msg.sid();
+	xia_pton(AF_XIA, rdag.c_str(), &n.router_dag);
 
-		// we're part of the network now and can start talking
-		_joined = true;
-
-	} else if (ad != _myAD) {
-		// FIXME: should we nuke the neighbor table?
-		// what about the routing tables in click?
+	printf("made router dag\n");
+	// throw ad away since it won't be valid if we're multihomed
+	// we have the correct ad in the msg, so we're still ok
+	if (getXIDs(a, _myHID) < 0) {
+		return -1;
 	}
+
+	printf("got xids\n");
+	char s[MAX_DAG_SIZE];
+	Graph g;
+
+	Node src;
+	Node nHID(_myHID);
+
+	// source socket - sending socket
+	XmakeNewSID(s, sizeof(s));
+	Node outSID(s);
+	g = src * nHID * outSID;
+
+	printf("making socket\n");
+	if ((n.fd = makeSocket(g, &n.source_dag)) < 0) {
+		return -1;
+	}
+
+	syslog(LOG_INFO, "Joined %s with Source socket: %s", n.ad.c_str(), g.dag_string().c_str());
+
+	printf("adding to list\n");
+	_networks[iface] = n;
+	printf("added\n");
+
+	// we're part of the network now and can start talking
+	_joined = true;
 
 	return 1;
 }

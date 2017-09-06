@@ -26,6 +26,16 @@
 
 #define NEIGHBOR_EXPIRE_TIME 10
 
+typedef struct {
+	std::string ad;
+	sockaddr_x  router_dag;
+	sockaddr_x  source_dag;
+	int         fd;
+} NetInfo;
+
+typedef std::map<uint32_t, NetInfo> NetworkMap;
+
+
 class Host : public RouteModule {
 public:
 	Host(const char *name) : RouteModule(name) {}
@@ -37,13 +47,13 @@ protected:
 	int init();
 
 	// message handlers
-	int processMsg(std::string msg, uint32_t iface);
+	int processMsg(std::string msg);
 	int processConfig(const Xroute::HostConfigMsg &msg);
 
 	int sendKeepalive();
 
 	// other stuff
-	int makeSockets();
+	int makeSock(uint32_t iface);
 
 protected:
 	// local addr, these should change to nodes
@@ -51,7 +61,7 @@ protected:
 	std::string _myAD;
 	std::string _myHID;
 
-	sockaddr_x _router_dag;
+	NetworkMap _networks;
 
 	// true once we are configured to be on the network
 	bool _joined;
