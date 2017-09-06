@@ -184,11 +184,6 @@ int Host::processConfig(const Xroute::HostConfigMsg &msg)
 		// what about the routing tables in click?
 	}
 
-	// netjoin causes the default routes to be treated as if this
-	// is a host and not a router. Put them back to normal.
-	_xr.setRoute("AD:-", FALLBACK, "", 0);
-	_xr.setRoute("HID:-", FALLBACK, "", 0);
-
 	return 1;
 }
 
