@@ -77,6 +77,7 @@ protected:
 	int makeSocket(Graph &g, sockaddr_x *sa);
 
 	int readMessage(char *recv_message, struct pollfd *pfd, unsigned npfds, int *iface, bool *local = NULL);
+	int sendMessage(int sock, sockaddr_x *dest, const Xroute::XrouteMsg &msg);
 	int sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg);
 	int sendMessage(sockaddr *dest, const Xroute::XrouteMsg &msg);
 	int sendBroadcastMessage(const Xroute::XrouteMsg &msg) { return sendMessage(&_broadcast_dag, msg); };

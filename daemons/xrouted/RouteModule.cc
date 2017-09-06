@@ -175,18 +175,22 @@ int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned np
 	return rc;
 }
 
-
-int RouteModule::sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg)
+int RouteModule::sendMessage(int sock, sockaddr_x *dest, const Xroute::XrouteMsg &msg)
 {
 	int rc;
 	string message;
 	msg.SerializeToString(&message);
 
-	rc = Xsendto(_source_sock, message.c_str(), message.length(), 0, (sockaddr*)dest, sizeof(sockaddr_x));
+	rc = Xsendto(sock, message.c_str(), message.length(), 0, (sockaddr*)dest, sizeof(sockaddr_x));
 	if (rc < 0) {
 		syslog(LOG_WARNING, "unable to send %s msg: %s", Xroute::msg_type_Name(msg.type()).c_str(), strerror(errno));
 	}
 	return rc;
+}
+
+int RouteModule::sendMessage(sockaddr_x *dest, const Xroute::XrouteMsg &msg)
+{
+	return sendMessage(_source_sock, dest, msg);
 }
 
 int RouteModule::sendMessage(sockaddr *dest, const Xroute::XrouteMsg &msg)
