@@ -26,4 +26,4 @@ name=click
 xpid=$(pgrep $name)
 [ "$xpid" == "" ] && echo "$name process not found" && exit
 
-gdb $name $xpid
+sudo gdb $name $xpid
