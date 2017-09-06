@@ -667,7 +667,6 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 {
 	int rc = 0;
-	std::string contentID;
 
 	struct addrinfo *ai;
 
@@ -675,7 +674,7 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
 		if (ai->ai_addr) {
 			// now append the CID to it
-			Node cnode(contentID);
+			Node cnode(cid);
 			Graph spath((sockaddr_x*)ai->ai_addr);
 			spath *= cnode;
 
@@ -756,10 +755,24 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	return RET_SENDRESP;
 }
 
+/*!
+ * @brief store a chunk by publisher_name/content_name
+ *
+ * Store given data as an NCID chunk. The Publisher must have a valid
+ * key matching their name. The key is used to sign and publish the
+ * named chunk and an NCID is produced for the chunk
+ *
+ * @returns RET_SENDRESP & a DAG for the newly stored NCID on success
+ * @returns RET_FAILED on failure
+ */
 int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
+	int state = 0;
+	int retval = RET_FAILED;
+	sockaddr_x addr;
+	ContentHeader *chdr;
 
 	// Retrieve publisher name, content name and data passed by user
 	std::string publisher_name = cmd->publisher_name();
@@ -768,10 +781,9 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// FIXME: Free chdr on errors
 	// Build the NCID Header from the provided request
-	ContentHeader *chdr = new NCIDHeader(content, cmd->ttl(),
-			publisher_name, content_name);
+	chdr = new NCIDHeader(content, cmd->ttl(), publisher_name, content_name);
 
-	// Check if the CID is already stored locally
+	// Check if the CID for this NCID is already stored locally
 	meta = acquire_meta(chdr->store_id().c_str());
 
 	if (meta != NULL) {
@@ -790,21 +802,21 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		meta->set_ttl(chdr->ttl());
 		meta->set_created();
 		meta->set_length(cmd->data().length());
-printf("store:length: %lu", meta->get_length());
+		printf("store:length: %lu", meta->get_length());
 		context = lookup_context(cmd->context_id());
 		if(!context) {
-			return RET_FAILED;
+			syslog(LOG_ERR, "Context not found for %s", chdr->id().c_str());
+			goto store_named_done;
 		}
 
 		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
-			return RET_FAILED;
+			syslog(LOG_ERR, "Unable to store %s", chdr->id().c_str());
+			goto store_named_done;
 		}
 	}
 
 	// Prepare a response for caller
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
-
-	sockaddr_x addr;
 
 	// Return the DAG for the CID that just got stored
 	if (cid2addr(chdr->id(), &addr) == 0) {
@@ -820,7 +832,17 @@ printf("store:length: %lu", meta->get_length());
 	// Keep track of NCID and corresponding CID
 	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 
-	return RET_SENDRESP;
+	// Successfully completed storing the NCID (internally as CID)
+	retval = RET_SENDRESP;
+
+store_named_done:
+	if (retval == RET_FAILED) {
+		switch(state) {
+			case 2: delete meta;
+			case 1: delete chdr;
+		};
+	}
+	return retval;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
