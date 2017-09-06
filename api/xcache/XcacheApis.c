@@ -494,9 +494,9 @@ int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 	cmd.set_cmd(xcache_cmd::XCACHE_STORE_NAMED);
 	cmd.set_context_id(h->contextID);
 	cmd.set_data(data, length);
+	// TODO: limit size of content_name and publisher_name
 	cmd.set_content_name(content_name, strlen(content_name));
 	cmd.set_publisher_name(publisher_name, strlen(publisher_name));
-	//cmd.set_flags(flags);
 	cmd.set_ttl(h->ttl);
 
 	if(send_command(h->xcacheSock, &cmd) < 0) {
