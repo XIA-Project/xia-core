@@ -379,7 +379,7 @@ int Controller::init()
 	// mark if this is a dual XIA-IPv4 router
 	if( XisDualStackRouter(_source_sock) == 1 ) {
 		_dual_router = true;
-		syslog(LOG_DEBUG, "configured as a dual-stack router");
+		//syslog(LOG_DEBUG, "configured as a dual-stack router");
 	} else {
 		_dual_router = false;
 	}
@@ -860,7 +860,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	string srcAD  = Node(a.type(), a.id().c_str(), 0).to_string();
 	string srcHID = Node(h.type(), h.id().c_str(), 0).to_string();
 
-	syslog(LOG_NOTICE, "LSA from %s", srcHID.c_str());
+	//syslog(LOG_INFO, "LSA from %s", srcHID.c_str());
 
 	if (msg.has_flags() && msg.flags() & F_IP_GATEWAY) {
 		_dual_router_AD = srcAD;
@@ -890,7 +890,7 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 		neighbor.port = n.port();
 		neighbor.cost = n.cost();
 
-		syslog(LOG_NOTICE, "     neighbor: %s", neighbor.HID.c_str());
+		//syslog(LOG_INFO, "     neighbor: %s", neighbor.HID.c_str());
 
 		if (neighbor.AD != _myAD) { // update neighbors
 			neighbor.timestamp = time(NULL);
@@ -1148,7 +1148,7 @@ void Controller::populateRoutingTable(std::string srcHID, NetworkTable &networkT
 		}
 		if(selectedHID.empty()) {
 			// Rest of the nodes cannot be reached from the visited set
-			syslog(LOG_INFO, "%s has an empty routingTable", srcHID.c_str());
+			//syslog(LOG_INFO, "%s has an empty routingTable", srcHID.c_str());
 			break;
 		}
 
@@ -1347,7 +1347,7 @@ int Controller::processMsg(std::string msg_str, uint32_t iface, bool local)
 			break;
 
 		default:
-			syslog(LOG_INFO, "controller received an unknown message type");
+			syslog(LOG_WARNING, "controller received an unsupported message type");
 			break;
 	}
 
