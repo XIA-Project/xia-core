@@ -45,7 +45,7 @@ std::string CIDHeader::_sha1hash(const std::string &data)
 
 std::string CIDHeader::_calculate_id(const std::string &data)
 {
-	return "CID" + _sha1hash(data);
+	return "CID:" + _sha1hash(data);
 }
 
 CIDHeader::CIDHeader(const std::string &data, time_t ttl)
