@@ -933,7 +933,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		Graph g(&addr);
 		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());
 	} else {
-		// FIXME: do some sort of error handling here
+		syslog(LOG_ERR, "Failed getting DAG for chunk");
+		goto store_done;
 	}
 
 	retval = RET_SENDRESP;
