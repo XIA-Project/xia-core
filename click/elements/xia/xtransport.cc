@@ -163,7 +163,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	_tcp_globals.tcp_keepidle         = TCPTV_KEEP_IDLE;
 	_tcp_globals.tcp_keepintvl        = TCPTV_KEEPINTVL;
 	_tcp_globals.tcp_maxidle          = TCPTV_MAXIDLE;
-	_tcp_globals.tcp_now              = 0;
+	_tcp_globals.tcp_now              = tcp_now(); // TCPFIX use system time instead of counter for tcp ticks
 	_tcp_globals.so_recv_buffer_size  = 0x100000;
 	_tcp_globals.tcp_mssdflt          = 1500;
 	_tcp_globals.tcp_rttdflt          = TCPTV_SRTTDFLT;
@@ -174,7 +174,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 	   setting them to 0 and false respectively for now but need to revisit
 	   especially for the window scale */
 	_tcp_globals.window_scale		= 4;
-	_tcp_globals.use_timestamp		= false;
+	_tcp_globals.use_timestamp		= true;
 
 	_verbosity 						= VERB_ERRORS;
 
@@ -307,6 +307,18 @@ void XTRANSPORT::manageRoute(const XID &xid, bool create)
 		HandlerCall::call_write(table + ".remove", xidstr, this);
 	}
 }
+
+// TCPFIX - is this going to be too heavy?
+// can't set a 1ms timer to bump a counter as it runs the cpu to 99%
+uint32_t XTRANSPORT::tcp_now()
+{
+	struct timeval t;
+
+	gettimeofday(&t, NULL);
+	return t.tv_sec * 1000 + t.tv_usec / 1000;
+	return _tcp_globals.tcp_now;
+}
+
 
 /*************************************************************
 ** HANDLER FUNCTIONS
@@ -804,7 +816,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 			}
 		}
 		_slow_ticks->reschedule_after_msec(TCP_SLOW_TICK_MS);
-		(globals()->tcp_now)++;
+//TCPFIX		(globals()->tcp_now)++;
 	} else if (timer == _reaper) {
 		for (; i; i++) {
 			//INFO("This is %d, %d",i->second->id, i->second->reap);

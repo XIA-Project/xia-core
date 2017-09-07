@@ -157,7 +157,8 @@ private:
 
 	/* TCP related fields */
     tcp_globals *globals()  { return &_tcp_globals; }
-    uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
+//    uint32_t tcp_now()      { return _tcp_globals.tcp_now; }
+    uint32_t tcp_now();
     // Element Handler Methods
     static String read_verb(Element*, void*);
     static int write_verb(const String&, Element*, void*, ErrorHandler*);

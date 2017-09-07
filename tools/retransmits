@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# read name-rc.log and name-rs.log to get the number of packets that were retransmitted by each side
+# The client side shows the number of times an ack was resent
+# the server side shows the number of times a packet was resent
+#
+# unique packets is the number of packets that were retranmitted 2 or more times
+# total packets is the sum of all of the packets that were retransmitted
+
+print_counts() {
+    # of lines == # of unique packets
+    # most == highest number of retransmits for a single packet
+    # sum of the retransmits on each line - # of lines is number of extra packets sent
+    awk '
+    BEGIN {                          \
+        max=0                        \
+    }                                \
+    {                                \
+        s += $1;                     \
+        l += 1;                      \
+        if ($1 > max) {              \
+            max = $1                 \
+        }                            \
+    }                                \
+    END {                            \
+        printf "unique: %d\n", l;    \
+        printf "  most: %d\n", max;  \
+        printf " total: %s\n", s - l \
+    }' $1
+}
+
+
+if [ $# != 1 ] || [ "$1" == "-h" ]; then
+cat << EOF
+usage: retransmits name
+
+where:
+    name is the base portion of a stream capture log
+    ie test.pcap => test
+EOF
+    exit
+fi
+
+name=$1
+cli=$name-rc.log
+svr=$name-rs.log
+
+if [ ! -e $cli ] || [ ! -e $svr ]; then
+    echo $cli and/or $svr not found
+    exit
+fi
+
+
+echo retransmits
+echo "client (ACKs)"
+print_counts $cli
+echo
+echo "server (data)"
+print_counts $svr
+

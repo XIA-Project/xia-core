@@ -37,7 +37,7 @@
 #define BUFSIZE 1000
 
 #define MB(__mb) (__mb * 1024 * 1024)
-#define MAXCHUNKSIZE MB(10)
+#define MAXCHUNKSIZE MB(1024)
 
 int verbose = 0;
 unsigned ttl = 0;

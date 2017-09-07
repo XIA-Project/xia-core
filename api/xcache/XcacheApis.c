@@ -869,7 +869,7 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 			fprintf(stderr, "Xrecv returned 0");
 			break;
 		}
-		fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
+		//fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
 
 		remaining -= recvd;
 		std::string temp(buf, recvd);

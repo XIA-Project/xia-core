@@ -35,7 +35,7 @@
 #define VERSION "v2.0"
 #define TITLE "XIA Basic FTP client"
 #define NAME "basicftp.xia"
-#define MAX_CHUNKSIZE (10 * 1024 * 1024)	// set upper limit since we don't know how big chunks will be
+#define MAX_CHUNKSIZE (1024 * 1024 * 1024)	// set upper limit since we don't know how big chunks will be
 
 // global configuration options
 int verbose = 0;
