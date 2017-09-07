@@ -289,8 +289,7 @@ store_publisher_cert_done:
 /*!
  * @brief calculate NCID for the given content name
  *
- * NOTE: Returned string does not have "NCID:" prepended to it
- * @returns Hex string representing the NCID for given content name
+ * @returns NCID for given content name
  */
 std::string Publisher::ncid(std::string content_name)
 {
@@ -302,7 +301,7 @@ std::string Publisher::ncid(std::string content_name)
 	xs_getSHA1HexDigest((const unsigned char *)ncid_data.c_str(),
 			ncid_data.size(), ncidhex, ncidlen);
 	std::string ncidstr(ncidhex, ncidlen);
-	return ncidstr;
+	return "NCID:" + ncidstr;
 
 }
 
