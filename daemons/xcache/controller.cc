@@ -664,6 +664,20 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	return RET_SENDRESP;
 }
 
+/*!
+ * @brief Build a DAG for provided CID/NCID cached on this host
+ *
+ * Build a DAG for the provided CID or NCID. It is assumed that the chunk
+ * is cached on the local xcache.
+ *
+ *     * -------------------------> cid
+ *      `--> AD -> HID -> SID--'
+ *
+ * @param cid is the CID or NCID that is cached locally
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
 int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 {
 	int rc = 0;
