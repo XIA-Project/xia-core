@@ -796,6 +796,11 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 	// FIXME: Free chdr on errors
 	// Build the NCID Header from the provided request
 	chdr = new NCIDHeader(content, cmd->ttl(), publisher_name, content_name);
+	if(chdr == NULL) {
+		syslog(LOG_ERR, "Error creating NCIDHeader for chunk");
+		goto store_named_done;
+	}
+	state = 1;
 
 	// Check if the CID for this NCID is already stored locally
 	meta = acquire_meta(chdr->store_id().c_str());
@@ -813,6 +818,11 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		 * but the ContentHeader value can be an NCIDHeader
 		 */
 		meta = new xcache_meta(chdr->store_id(), chdr);
+		if(meta == NULL) {
+			syslog(LOG_ERR, "Error creating xcache_meta for chunk");
+			goto store_named_done;
+		}
+		state = 2;
 		meta->set_ttl(chdr->ttl());
 		meta->set_created();
 		meta->set_length(cmd->data().length());
@@ -864,10 +874,20 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
 	struct xcache_context *context;
 	xcache_meta *meta;
+	int state = 0;
+	int retval = RET_FAILED;
+	std::string cid;
+	sockaddr_x addr;
 
 	// Build a CIDHeader so we can compute the CID
 	ContentHeader *chdr = new CIDHeader(cmd->data(), ttl);
-	std::string cid = chdr->store_id();
+	if(chdr == NULL) {
+		syslog(LOG_ERR, "Failed allocating CIDHeader for a chunk");
+		goto store_done;
+	}
+	state = 1;
+
+	cid = chdr->store_id();
 
 	// Check if the CID is already stored locally
 	meta = acquire_meta(cid.c_str());
@@ -883,24 +903,29 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		 * Create new Meta object and use that to store chunk
 		 */
 		meta = new xcache_meta(cid, chdr);
+		if(meta == NULL) {
+			syslog(LOG_ERR, "Failed allocating xcache_meta for a chunk");
+			goto store_done;
+		}
+		state = 2;
 		meta->set_ttl(ttl);
 		meta->set_created();
 		meta->set_length(cmd->data().length());
-printf("store:length: %lu", meta->get_length());
+		printf("store:length: %lu", meta->get_length());
 		context = lookup_context(cmd->context_id());
 		if(!context) {
-			return RET_FAILED;
+			syslog(LOG_ERR, "Context not found for chuck");
+			goto store_done;
 		}
 
 		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
-			return RET_FAILED;
+			syslog(LOG_ERR, "Failed storing chunk");
+			goto store_done;
 		}
 	}
 
 	// Prepare a response for caller
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
-
-	sockaddr_x addr;
 
 	// Return the DAG for the CID that just got stored
 	if (cid2addr(cid, &addr) == 0) {
@@ -911,9 +936,19 @@ printf("store:length: %lu", meta->get_length());
 		// FIXME: do some sort of error handling here
 	}
 
+	retval = RET_SENDRESP;
+
 	syslog(LOG_INFO, "Store Finished\n");
 
-	return RET_SENDRESP;
+store_done:
+	// On error, delete allocated data structures
+	if(retval == RET_FAILED) {
+		switch(state) {
+			case 2: delete meta;
+			case 1: delete chdr;
+		};
+	}
+	return retval;
 }
 
 // FIXME:this should set fetching state so we can't delete the data/route
