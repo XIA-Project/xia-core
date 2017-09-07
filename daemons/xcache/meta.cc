@@ -74,6 +74,16 @@ std::string xcache_meta::store_id()
 	return _chdr->store_id();
 }
 
+std::vector<std::string> xcache_meta::all_ids()
+{
+	std::vector<std::string> ids;
+	ids.push_back(store_id());
+	if(store_id() != id()) {
+		ids.push_back(id());
+	}
+	return ids;
+}
+
 void xcache_meta::status(void)
 {
 	syslog(LOG_INFO, "[%s] %s", _cid.c_str(), _store->get(this).c_str());

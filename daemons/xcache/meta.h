@@ -119,6 +119,7 @@ public:
 	std::string id() { return (_chdr) ? _chdr->id() : ""; }
 
 	std::string store_id();
+	std::vector<std::string> all_ids();
 
 	void set_content_header(ContentHeader *chdr) { _chdr = chdr; }
 	std::string content_header_str() {return _chdr->serialize();}

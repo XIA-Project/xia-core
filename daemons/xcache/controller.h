@@ -211,7 +211,7 @@ public:
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);
 
-	int register_meta(std::string &);
+	int register_meta(std::vector<std::string> &ids);
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);

@@ -649,8 +649,6 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 	}
 	syslog(LOG_DEBUG, "[thread %lu] after store policy\n", pthread_self());
 
-	std::string cid = "CID:" + meta->id();
-
 	store_manager.store(meta, data);
 
 	meta->set_state(AVAILABLE);
@@ -659,7 +657,9 @@ int xcache_controller::__store(struct xcache_context * /*context */,
 
 	meta->unlock();
 
-	register_meta(cid);
+	// Set routes to CID and any NCID associated with the meta object
+	std::vector<std::string> all_ids = meta->all_ids();
+	register_meta(all_ids);
 
 	return RET_SENDRESP;
 }
@@ -841,15 +841,16 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		// FIXME: do some sort of error handling here
 	}
 
-	syslog(LOG_INFO, "Store Finished\n");
-
 	// Keep track of NCID and corresponding CID
 	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 
 	// Successfully completed storing the NCID (internally as CID)
 	retval = RET_SENDRESP;
 
+	syslog(LOG_INFO, "Store Finished\n");
+
 store_named_done:
+	// Remove allocated data structures on failure
 	if (retval == RET_FAILED) {
 		switch(state) {
 			case 2: delete meta;
@@ -1030,14 +1031,21 @@ int xcache_controller::create_sender(void)
 	return xcache_sock;
 }
 
-int xcache_controller::register_meta(std::string &cid)
+int xcache_controller::register_meta(std::vector<std::string> &ids)
 {
 	int rv;
 	std::string empty_str("");
 
-	syslog(LOG_DEBUG, "[thread %lu] Setting Route for %s.\n",  pthread_self(), cid.c_str());
-	rv = xr.setRoute(cid, DESTINED_FOR_LOCALHOST, empty_str, 0);
-	syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n", pthread_self(), rv, xr.cserror());
+	for(size_t i=0;i<ids.size();i++) {
+
+		syslog(LOG_DEBUG, "[thread %lu] Setting Route for %s.\n",
+				pthread_self(), ids[i].c_str());
+
+		rv = xr.setRoute(ids[i], DESTINED_FOR_LOCALHOST, empty_str, 0);
+
+		syslog(LOG_DEBUG, "[thread %lu] status code %d error message %s\n",
+				pthread_self(), rv, xr.cserror());
+	}
 
 	return rv;
 }
