@@ -121,6 +121,8 @@ public:
 	std::string store_id();
 	std::vector<std::string> all_ids();
 
+	bool valid_data(const std::string &data);
+
 	void set_content_header(ContentHeader *chdr) { _chdr = chdr; }
 	std::string content_header_str() {return _chdr->serialize();}
 

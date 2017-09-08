@@ -182,7 +182,7 @@ public:
 	 * Stores content locally.
 	 */
 	int store(xcache_cmd *, xcache_cmd *, time_t);
-	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
+	int __store(struct xcache_context *context, xcache_meta *meta, const std::string &data);
 	int __store_policy(xcache_meta *);
 	int store_named(xcache_cmd *, xcache_cmd *);
 

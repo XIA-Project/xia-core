@@ -159,6 +159,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		return RET_FAILED;
 	}
 
+	// Setup a reliable connection to a source of requested CID/NCID
 	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
 		syslog(LOG_ERR, "connect failed: %s\n", strerror(errno));
 		Xclose(sock);
@@ -167,6 +168,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	syslog(LOG_INFO, "Xcache client now connected with remote");
 
+	// Download the ContentHeader for the requested CID/NCID
 	std::string data;
 	char buf[IO_BUF_SIZE];
 	uint32_t header_len;
@@ -205,6 +207,7 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		offset += recvd;
 	}
 	std::string serialized_header(buf, header_len);
+
 	// Build a content header for this NCID/CID
 	ContentHeader *chdr;
 	switch (expected_cid.type()) {
@@ -259,18 +262,21 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	}
 
 	if ((flags & XCF_CACHE)) {
-		if (__store(context, meta, (const std::string *)&data) == RET_FAILED) {
+		if (__store(context, meta, data) == RET_FAILED) {
 			delete meta;
 			Xclose(sock);
 			return RET_FAILED;
 		}
 	} else {
-		if (verify_content(meta, (const std::string *)&data) == false) {
+		if (meta->valid_data(data) == false) {
 			delete meta;
 			Xclose(sock);
 			return RET_FAILED;
 		}
 	}
+	// TODO: DO THIS ONLY FOR NCIDs
+	NCIDTable *_ncid_table = NCIDTable::get_table();
+	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 
 	if (resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
@@ -628,20 +634,20 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 }
 
 int xcache_controller::__store(struct xcache_context * /*context */,
-			       xcache_meta *meta, const std::string *data)
+			       xcache_meta *meta, const std::string &data)
 {
 	meta->lock();
 
 	syslog(LOG_DEBUG, "[thread %lu] after locking meta map and meta\n", pthread_self());
 
-	if (verify_content(meta, data) == false) {
+	if (meta->valid_data(data) == false) {
 		// Content Verification Failed
 		syslog(LOG_ERR, "Content Verification Failed");
 		meta->unlock();
 		return RET_FAILED;
 	}
 
-	meta->set_length(data->size());	// size of the data in bytes
+	meta->set_length(data.size());	// size of the data in bytes
 	if (__store_policy(meta) < 0) {
 		syslog(LOG_ERR, "Context store failed\n");
 		meta->unlock();
@@ -833,7 +839,7 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 			goto store_named_done;
 		}
 
-		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
+		if(__store(context, meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Unable to store %s", chdr->id().c_str());
 			goto store_named_done;
 		}
@@ -918,7 +924,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 			goto store_done;
 		}
 
-		if(__store(context, meta, &cmd->data()) == RET_FAILED) {
+		if(__store(context, meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Failed storing chunk");
 			goto store_done;
 		}
@@ -1125,7 +1131,7 @@ void xcache_controller::process_req(xcache_req *req)
 		if (meta) {
 			std::string chunk((const char *)req->data, req->datalen);
 			release_meta(meta);
-			__store(NULL, meta, &chunk);
+			__store(NULL, meta, chunk);
 			free(req->cid);
 		}
 		break;

@@ -32,7 +32,7 @@ public:
 	 * Return values are crucial. These values are used by the
 	 * store manager to take policy decisions.
 	 */
-	virtual int store(xcache_meta *meta, const std::string *data) {
+	virtual int store(xcache_meta *meta, const std::string &data) {
 		/* Ignoring compiler error for unused attribute */
 		(void)meta;
 		(void)data;

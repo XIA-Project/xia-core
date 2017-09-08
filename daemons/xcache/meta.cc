@@ -84,6 +84,11 @@ std::vector<std::string> xcache_meta::all_ids()
 	return ids;
 }
 
+bool xcache_meta::valid_data(const std::string &data)
+{
+	return _chdr->valid_data(data);
+}
+
 void xcache_meta::status(void)
 {
 	syslog(LOG_INFO, "[%s] %s", _cid.c_str(), _store->get(this).c_str());

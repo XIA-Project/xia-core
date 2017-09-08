@@ -32,7 +32,7 @@ public:
 		mkdir(content_dir.c_str(), 0777);
 	}
 
-	int store(xcache_meta *meta, const std::string *data)
+	int store(xcache_meta *meta, const std::string &data)
 	{
 		int ret, fd;
 		std::string path;
@@ -49,9 +49,9 @@ public:
 
 		ret = 0;
 
-		int rc = write(fd, data->c_str(), data->length());
-		if ((unsigned)rc != data->length()) {
-			syslog(LOG_ERR, "write requested:%lu actual:%d", data->length(), rc);
+		int rc = write(fd, data.c_str(), data.length());
+		if ((unsigned)rc != data.length()) {
+			syslog(LOG_ERR, "write requested:%lu actual:%d", data.length(), rc);
 			ret = -1;
 		}
 
