@@ -274,9 +274,12 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 			return RET_FAILED;
 		}
 	}
-	// TODO: DO THIS ONLY FOR NCIDs
-	NCIDTable *_ncid_table = NCIDTable::get_table();
-	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
+
+	// Map NCID to corresponding CID in NCIDTable
+	if(expected_cid.type() == CLICK_XIA_XID_TYPE_NCID) {
+		NCIDTable *_ncid_table = NCIDTable::get_table();
+		_ncid_table->register_ncid(chdr->id(), chdr->store_id());
+	}
 
 	if (resp) {
 		resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
