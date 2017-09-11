@@ -486,7 +486,7 @@ int XputChunk(XcacheHandle *h, const char *data, size_t length,
 **
 */
 int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
-		char *content_name, char *publisher_name)
+		const char *content_name, const char *publisher_name)
 {
 	// Build and forward an NCID_STORE request to Xcache controller
 	xcache_cmd cmd;
