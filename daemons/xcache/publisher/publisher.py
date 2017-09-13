@@ -107,7 +107,7 @@ class Publisher:
 
     def make_public_key(self):
         """ Output public key in RSAPublicKey format """
-        cmd = "openssl rsa -in {} -RSAPublicKey_out -out {}".format(
+        cmd = "openssl rsa -pubout -in {} -out {}".format(
                 self.keyfile, self.pubkeyfile)
         check_call(cmd.split())
         print "Public key stored in:", self.pubkeyfile
