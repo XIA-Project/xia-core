@@ -983,8 +983,11 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		assert(0);
 	}
 
-	std::string cid_str = _ncid_table->get_known_cid(cid.to_string());
+	// cid can be CID or NCID. If CID, there may be no NCID associated
+	std::string cid_str = _ncid_table->to_cid(cid.to_string());
+	assert(cid_str.size() > 0);
 	xcache_meta *meta = acquire_meta(cid_str);
+	assert(meta);
 	std::string header = meta->content_header_str();
 	size_t remaining;
 	size_t offset;
