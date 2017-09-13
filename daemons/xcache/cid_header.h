@@ -39,7 +39,8 @@ std::string CIDHeader::_sha1hash(const std::string &data)
 	char hash[XIA_SHA_DIGEST_STR_LEN];
 	xs_getSHA1HexDigest((const unsigned char *)data.c_str(), data.size(),
 			hash, sizeof(hash));
-	std::string hashstr(hash, XIA_SHA_DIGEST_STR_LEN);
+	assert(strlen(hash) == XIA_SHA_DIGEST_STR_LEN - 1);
+	std::string hashstr(hash);
 	return hashstr;
 }
 
