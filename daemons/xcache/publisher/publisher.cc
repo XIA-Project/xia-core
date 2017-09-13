@@ -300,7 +300,8 @@ std::string Publisher::ncid(std::string content_name)
 	int ncidlen = XIA_SHA_DIGEST_STR_LEN;
 	xs_getSHA1HexDigest((const unsigned char *)ncid_data.c_str(),
 			ncid_data.size(), ncidhex, ncidlen);
-	std::string ncidstr(ncidhex, ncidlen);
+	assert(strlen(ncidhex) == XIA_SHA_DIGEST_STR_LEN - 1);
+	std::string ncidstr(ncidhex);
 	return "NCID:" + ncidstr;
 
 }
@@ -340,14 +341,15 @@ std::string Publisher::keydir()
 
 std::string Publisher::privfilepath()
 {
-	std::string privkeypath = keydir() + "/" + name() + ".key";
+	std::string privkeypath = keydir() + "/" + name() + ".priv";
 	return privkeypath;
 }
 
 std::string Publisher::pubfilepath()
 {
+	// Replace the last 4 chars in privfilepath: "priv" with "pub"
 	std::string pubkeypath = privfilepath();
-	pubkeypath.replace(-3, 3, "pub");
+	pubkeypath.replace(pubkeypath.size()-4, 4, "pub");
 	return pubkeypath;
 }
 
