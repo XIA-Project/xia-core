@@ -322,11 +322,14 @@ std::string Publisher::ncid(std::string content_name)
  */
 std::string Publisher::ncid_dag(std::string content_name)
 {
+	Node ncid_node(ncid(content_name));
+
+	// NOTE: ncid() call above populates _cert_dag, so order is important
 	if(_cert_dag == NULL) {
 		return "";
 	}
+
 	Graph dag(*_cert_dag);
-	Node ncid_node(ncid(content_name));
 	dag.replace_final_intent(ncid_node);
 	return dag.dag_string();
 }
