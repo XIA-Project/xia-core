@@ -14,9 +14,9 @@ class CIDHeader : public ContentHeader {
 		virtual std::string id() { return _id; }
 		virtual void set_id(std::string id) { _id = id; }
 
-		virtual std::string store_id() { return _id; }
+		virtual std::string store_id() { return _store_id; }
 		virtual void set_store_id(std::string store_id) {
-			_id=_store_id=store_id;
+			_store_id=store_id;
 		}
 
 		virtual size_t content_len() { return _len; }
