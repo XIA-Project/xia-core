@@ -32,11 +32,13 @@ int NCIDDemoServer::serve()
 
 	// Store it as a named chunk
 	int ret;
+	std::cout << "Putting a chunk by its name into xcache" << std::endl;
 	ret = XputNamedChunk(&_xcache, data.c_str(), data.size(),
 			_content_name.c_str(), _publisher.c_str());
 	if (ret < 0) {
 		std::cout << "Failed publishing named chunk" << std::endl;
 	}
+	std::cout << "Named chunk was placed into cache" << std::endl;
 	return ret;
 }
 
