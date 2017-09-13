@@ -1,0 +1,73 @@
+==============
+NCID operation
+==============
+
+Named Content is represented by NCID. This README shows how to set up the
+necessary components to use and test NCIDs.
+
+Use NCIDs from scratch:
+----------------------
+1. Create a CA
+	./daemons/xcache/ca/ca.py
+2. Create a Publisher
+	./daemons/xcache/publisher/publisher.py -n Netflix -p -k -r
+3. CA certifies the Publisher via a signed certificate
+	./daemons/xcache/ca/ca.py --sign ./publisher/Netflix/Netflix.req --config ./publisher/Netflix/Netflix.conf
+	mv Netflix.cert publisher/Netflix
+4. Publish the certificate for Clients to find
+	./bin/announce_publisher Netflix
+5. Create a demo NCID and store into Xcache
+	./applications/chunk-demo/ncid-demo-server
+
+After a Click restart:
+---------------------
+	Repeat steps 4 and 5 above.
+
+
+=======
+DETAILS
+=======
+
+Certifying Authority
+--------------------
+Start the CA by running the following command:
+    ./daemons/xcache/ca/ca.py
+
+Enter a passphrase two times. Once to generate the key. Second time to use
+the CA key to sign the CA root certificate.
+
+The root certificate entries must be entered as prompted.
+
+Cope the root certificate ./ca/ca.cert to all clients at same location.
+
+Publisher
+---------
+Create a publisher with the command
+    ./daemons/xcache/publisher/publisher.py -n Netflix -p -k -r
+
+This creates a publisher called Netflix and stores its credentials in
+./publisher/Netflix
+
+The following files are created:
+Netflix.conf - A configuration for a certification request
+Netflix.key - The master key for Netflix publisher
+Netflix.priv - The private key derived from the master key
+Netfilx.pub - The public key for Netflix publisher
+Netflix.req - A request for CA to sign a certificate for Netflix
+
+CA cert for Publisher
+---------------------
+Now generate a CA Cert for our publisher
+./daemons/xcache/ca/ca.py --sign ./publisher/Netflix/Netflix.req  --config ./publisher/Netflix/Netflix.conf
+
+This creates Netflix.cert - a certificate that clients will trust.
+mv Netflix.cert publisher/Netflix/
+
+Publish the certificate for clients to retrieve
+-----------------------------------------------
+Announce our shiny new publisher to clients via nameservice:
+./bin/announce_publisher Netflix
+
+Reads the key from publisher/Netflix/Netflix.cert
+Adds it as a CID to Xcache
+Announces its location on the name service
