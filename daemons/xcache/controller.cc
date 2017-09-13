@@ -471,6 +471,11 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	Publisher *publisher = publishers->get(publisher_name);
 	// Build DAG for retrieving the NCID
 	std::string ncid_dag = publisher->ncid_dag(name);
+	if(ncid_dag == "") {
+		std::cout << "xcache_fetch_named_content Cannot find addr for " <<
+			name << std::endl;
+		return -1;
+	}
 	// Fill in the NCID DAG in the user's command
 	cmd->set_dag(ncid_dag);
 	// Now call xcache_fetch_content with NCID DAG
