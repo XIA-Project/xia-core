@@ -561,13 +561,15 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 
 	case xcache_cmd::XCACHE_EVICT:
 	case xcache_cmd::XCACHE_STORE:
+	case xcache_cmd::XCACHE_STORE_NAMED:
 	case xcache_cmd::XCACHE_FETCHCHUNK:
+	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
 	case xcache_cmd::XCACHE_READ:
 		ret = RET_ENQUEUE;
 		break;
 
 	default:
-		syslog(LOG_WARNING, "Unknown message received\n");
+		syslog(LOG_WARNING, "Unknown message received %d\n", cmd->cmd());
 	}
 
 	return ret;
@@ -920,7 +922,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		meta->set_ttl(ttl);
 		meta->set_created();
 		meta->set_length(cmd->data().length());
-		printf("store:length: %lu", meta->get_length());
+		printf("store:length: %lu\n", meta->get_length());
 		context = lookup_context(cmd->context_id());
 		if(!context) {
 			syslog(LOG_ERR, "Context not found for chuck");
