@@ -64,15 +64,15 @@ int main(int argc, char **argv)
 		std::cout << "ERROR: Cert was too big to fit in a chunk" << std::endl;
 		return -1;
 	}
-	Graph g(&addrs[1]);
+	Graph g(&addrs[0]);
 	std::string cert_dag = g.dag_string();
 	std::cout << "Cert address is " << cert_dag << std::endl;
 
 	// Announce location of cert file on nameserver so clients can get to it
 	std::string cert_name = publisher_name + ".publisher.cert.xia";
-	if(XregisterName(cert_name.c_str(), &addrs[1])) {
+	if(XregisterName(cert_name.c_str(), &addrs[0])) {
 		std::cout << "ERROR: Failed registering " << cert_name <<
-			"with the nameservice" << std::endl;
+			" with the nameservice" << std::endl;
 		return -1;
 	}
 	std::cout << "Successfully registered " << publisher_name << std::endl;
