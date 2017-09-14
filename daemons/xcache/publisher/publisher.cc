@@ -110,11 +110,11 @@ bool Publisher::keydir_present()
 bool Publisher::ensure_keydir_exists()
 {
 	if(!keydir_present()) {
-		if(!mkdir(_keydir, S_IRWXU)) {
-			std::cout << "ERROR creating creds directory" << std::endl;
+		if(mkdir(_keydir, S_IRWXU | S_IRWXG | S_IRWXO)) {
+			std::cout << "ERROR creating creds dir " << _keydir << std::endl;
 			return false;
 		}
-		if(!chmod(_keydir, 0700)) {
+		if(chmod(_keydir, S_IRWXU | S_IRWXG | S_IRWXO)) {
 			std::cout << "ERROR setting permissions on dir" << std::endl;
 			return false;
 		}
@@ -210,7 +210,7 @@ bool Publisher::fetch_pubkey()
 	memcpy(cert, resp.data().c_str(), certlen);
 
 	// Write Publisher cert to disk
-	if(store_publisher_cert(cert, certlen, certpath)) {
+	if(store_publisher_cert(cert, certlen, certpath) == false) {
 		std::cout << "Unable to store cert on disk" << std::endl;
 		goto fetch_pubkey_done;
 	}
