@@ -114,6 +114,10 @@ bool Publisher::ensure_keydir_exists()
 			std::cout << "ERROR creating creds directory" << std::endl;
 			return false;
 		}
+		if(!chmod(_keydir, 0700)) {
+			std::cout << "ERROR setting permissions on dir" << std::endl;
+			return false;
+		}
 	}
 	return true;
 }
