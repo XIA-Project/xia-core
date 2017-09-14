@@ -8,7 +8,11 @@
 class CIDHeader : public ContentHeader {
 	public:
 		CIDHeader(const std::string &data, time_t ttl);
-		CIDHeader(const std::string &buf) {deserialize(buf);}
+		CIDHeader(const std::string &buf) {
+			if(deserialize(buf) == false) {
+				throw "Unable to deserialize CID header from buffer";
+			}
+		}
 		virtual ~CIDHeader() {}
 
 		virtual std::string id() { return _id; }
@@ -76,9 +80,11 @@ CIDHeader::deserialize(const std::string &buf)
 {
 	ContentHeaderBuf chdr_buf;
 	if(chdr_buf.ParseFromString(buf) == false) {
+		std::cout << "CIDHeader unable to parse provided buffer" << std::endl;
 		return false;
 	}
 	if(!chdr_buf.has_cid_header()) {
+		std::cout << "CIDHeader not found in provided buffer" << std::endl;
 		return false;
 	}
 	const CIDHeaderBuf cid_hdr = chdr_buf.cid_header();
