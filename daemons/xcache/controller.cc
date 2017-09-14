@@ -338,14 +338,17 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 
 	// Get the intended CID from given address
 	Graph g(addr);
+
 	Node expected_cid(g.get_final_intent());
+	syslog(LOG_INFO, "Fetching content %s from local\n",
+			expected_cid.to_string().c_str());
+
 	std::string cid = _ncid_table->to_cid(expected_cid.to_string());
+	syslog(LOG_INFO, "Reading %s from storage", cid.c_str());
 
 	IGNORE_PARAM(flags);
 	IGNORE_PARAM(addrlen);
 	IGNORE_PARAM(cmd);
-	syslog(LOG_INFO, "Fetching content %s from local\n",
-			expected_cid.id_string().c_str());
 
 	meta = acquire_meta(cid);
 	if(!meta) {
@@ -488,8 +491,9 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 {
 	// Get Publisher and Content name from cmd->content_name
 	std::string name(cmd->content_name());
-	std::string publisher_name = name.substr(0, name.find('/'));
-	std::string content_name = name.substr(name.find('/'), std::string::npos);
+	size_t s_pos = name.find('/');	// position of first '/'
+	std::string publisher_name = name.substr(0, s_pos);
+	std::string content_name = name.substr(s_pos + 1, std::string::npos);
 	// Get reference to a Publisher object that can build NCID
 	// NOTE: This object cannot sign new content. Just verify it.
 	PublisherList *publishers = PublisherList::get_publishers();
