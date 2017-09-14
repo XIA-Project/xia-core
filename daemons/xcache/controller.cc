@@ -145,7 +145,7 @@ void xcache_controller::status(void)
 }
 
 int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
-					    xcache_cmd *resp, xcache_cmd *cmd,
+					    xcache_cmd *resp,
 					    int flags)
 {
 	int state = 0;	// Cleanup state
@@ -162,7 +162,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	Node *expected_cid = NULL;
 	ContentHeader *chdr = NULL;
 	xcache_meta *meta = NULL;
-	struct xcache_context *context = NULL;
 
 	Graph g(addr);
 
@@ -273,25 +272,14 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 		data += temp;
 	}
+	assert(remaining == 0);
+	syslog(LOG_INFO, "Got chunk of size %zu", data.length());
 
-	computed_cid = compute_cid(data.c_str(), data.length());
-	context = lookup_context(cmd->context_id());
-
-	// Store the content header with the metadata
-	// TODO: NITIN Verify expected_cid vs computed_cid
-	// If NCID Header, then verify data was signed by publisher
-	// Get Publisher from PublisherList
-	// Make the publisher verify data and signature in header
+	// Store the content header into the metadata
 	meta->set_content_header(chdr);
 
-	if (!context) {
-		syslog(LOG_WARNING, "Context Lookup Failed");
-		goto fetch_content_remote_done;
-	}
-	state = 5;
-
 	if ((flags & XCF_CACHE)) {
-		if (__store(context, meta, data) == RET_FAILED) {
+		if (__store(meta, data) == RET_FAILED) {
 			goto fetch_content_remote_done;
 		}
 	} else {
@@ -316,9 +304,6 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 fetch_content_remote_done:
 	switch(state) {
-		case 5: if(retval != RET_OK) {
-					delete context;
-				}
 		case 4: if(retval != RET_OK) {
 					delete chdr;
 				}
@@ -435,7 +420,7 @@ void *xcache_controller::__fetch_content(void *__args)
 
 	if(ret == RET_FAILED) {
 		ret = args->ctrl->fetch_content_remote(&addr, daglen, args->resp,
-						       args->cmd, args->flags);
+						       args->flags);
 		if (ret == RET_FAILED) {
 			syslog(LOG_ERR, "Remote content fetch failed: %d", ret);
 			if (args->flags & XCF_BLOCK) {
@@ -510,14 +495,18 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	PublisherList *publishers = PublisherList::get_publishers();
 	Publisher *publisher = publishers->get(publisher_name);
 	// Build DAG for retrieving the NCID
-	std::string ncid_dag = publisher->ncid_dag(name);
-	if(ncid_dag == "") {
+	std::string ncid_dag_str = publisher->ncid_dag(name);
+	if(ncid_dag_str == "") {
 		std::cout << "xcache_fetch_named_content Cannot find addr for " <<
 			name << std::endl;
 		return -1;
 	}
 	// Fill in the NCID DAG in the user's command
-	cmd->set_dag(ncid_dag);
+	Graph ncid_dag(ncid_dag_str);
+	sockaddr_x ncid_addr;
+	ncid_dag.fill_sockaddr(&ncid_addr);
+
+	cmd->set_dag(&ncid_addr, sizeof(sockaddr_x));
 	// Now call xcache_fetch_content with NCID DAG
 	return xcache_fetch_content(resp, cmd, flags);
 	// Verify the downloaded content against Publisher's pubkey
@@ -683,8 +672,7 @@ bool xcache_controller::verify_content(xcache_meta *meta, const std::string *dat
 	return true;
 }
 
-int xcache_controller::__store(struct xcache_context * /*context */,
-			       xcache_meta *meta, const std::string &data)
+int xcache_controller::__store(xcache_meta *meta, const std::string &data)
 {
 	meta->lock();
 
@@ -837,7 +825,6 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
  */
 int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	struct xcache_context *context;
 	xcache_meta *meta;
 	int state = 0;
 	int retval = RET_FAILED;
@@ -883,13 +870,8 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		meta->set_created();
 		meta->set_length(cmd->data().length());
 		printf("store:length: %lu", meta->get_length());
-		context = lookup_context(cmd->context_id());
-		if(!context) {
-			syslog(LOG_ERR, "Context not found for %s", chdr->id().c_str());
-			goto store_named_done;
-		}
 
-		if(__store(context, meta, cmd->data()) == RET_FAILED) {
+		if(__store(meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Unable to store %s", chdr->id().c_str());
 			goto store_named_done;
 		}
@@ -928,7 +910,6 @@ store_named_done:
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 {
-	struct xcache_context *context;
 	xcache_meta *meta;
 	int state = 0;
 	int retval = RET_FAILED;
@@ -968,13 +949,8 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		meta->set_created();
 		meta->set_length(cmd->data().length());
 		printf("store:length: %lu\n", meta->get_length());
-		context = lookup_context(cmd->context_id());
-		if(!context) {
-			syslog(LOG_ERR, "Context not found for chuck");
-			goto store_done;
-		}
 
-		if(__store(context, meta, cmd->data()) == RET_FAILED) {
+		if(__store(meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Failed storing chunk");
 			goto store_done;
 		}
@@ -1184,7 +1160,7 @@ void xcache_controller::process_req(xcache_req *req)
 		if (meta) {
 			std::string chunk((const char *)req->data, req->datalen);
 			release_meta(meta);
-			__store(NULL, meta, chunk);
+			__store(meta, chunk);
 			free(req->cid);
 		}
 		break;

@@ -130,7 +130,7 @@ public:
 	 * On reception of XgetChunk API, this function _MAY_ be invoked. If the
 	 * chunk is found locally, then no need to fetch from remote.
 	 */
-	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
+	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 							 xcache_cmd *, int flags);
 
 	int fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
@@ -182,7 +182,7 @@ public:
 	 * Stores content locally.
 	 */
 	int store(xcache_cmd *, xcache_cmd *, time_t);
-	int __store(struct xcache_context *context, xcache_meta *meta, const std::string &data);
+	int __store(xcache_meta *meta, const std::string &data);
 	int __store_policy(xcache_meta *);
 	int store_named(xcache_cmd *, xcache_cmd *);
 
