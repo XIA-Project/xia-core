@@ -165,7 +165,8 @@ bool PublisherCert::extract_pubkey()
 	EVP_PKEY *pubkey = NULL;
 
 	OpenSSL_add_all_algorithms();
-	std::string pubkeypath = _certpath.substr(0, _certpath.size()-4);
+	// Pubkeypath = certpath - strlen(".cert") + ".pub"
+	std::string pubkeypath = _certpath.substr(0, _certpath.size()-5);
 	pubkeypath += ".pub";
 
 	FILE *pubkeyfile = fopen(pubkeypath.c_str(), "w");
