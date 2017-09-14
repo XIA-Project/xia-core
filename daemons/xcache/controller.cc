@@ -994,7 +994,7 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	int sent;
 
 	// Send header length
-	uint32_t header_len = sizeof(header);
+	uint32_t header_len = htonl(header.size());
 	if(Xsend(req->to_sock, (void *)&header_len, sizeof(header_len), 0) !=
 			sizeof(header_len)) {
 		syslog(LOG_ALERT, "Unable to send header length");
