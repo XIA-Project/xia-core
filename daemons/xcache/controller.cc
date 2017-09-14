@@ -1043,7 +1043,7 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	}
 
 	// Now send the header
-	remaining = sizeof(header);
+	remaining = header.size();
 	offset = 0;
 
 	syslog(LOG_DEBUG, "Header Send Start\n");
