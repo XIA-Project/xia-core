@@ -148,7 +148,22 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 					    xcache_cmd *resp, xcache_cmd *cmd,
 					    int flags)
 {
+	int state = 0;	// Cleanup state
+	int retval = RET_FAILED;	// Return failure by default
+
 	int to_recv, recvd, sock;
+	std::string data;
+	std::string serialized_header;
+	std::string computed_cid;
+	char buf[IO_BUF_SIZE];
+	uint32_t header_len;
+	size_t remaining;
+	size_t offset;
+	Node *expected_cid;
+	ContentHeader *chdr;
+	xcache_meta *meta;
+	struct xcache_context *context;
+
 	Graph g(addr);
 
 	syslog(LOG_INFO, "Fetching content from remote DAG = %s\n", g.dag_string().c_str());
@@ -158,47 +173,51 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		syslog(LOG_ERR, "Unable to create socket: %s", strerror(errno));
 		return RET_FAILED;
 	}
+	state = 1;
 
 	// Setup a reliable connection to a source of requested CID/NCID
 	if (Xconnect(sock, (struct sockaddr *)addr, addrlen) < 0) {
 		syslog(LOG_ERR, "connect failed: %s\n", strerror(errno));
-		Xclose(sock);
-		return RET_FAILED;
+		goto fetch_content_remote_done;
 	}
 
 	syslog(LOG_INFO, "Xcache client now connected with remote");
 
 	// Download the ContentHeader for the requested CID/NCID
-	std::string data;
-	char buf[IO_BUF_SIZE];
-	uint32_t header_len;
-	size_t remaining;
-	size_t offset;
+	expected_cid = new Node(g.get_final_intent());
+	state = 2;
 
-	Node expected_cid(g.get_final_intent());
-	xcache_meta *meta = new xcache_meta();
+	// New metadata for the CID or NCID being fetched
+	meta = new xcache_meta();
+	if(meta == NULL) {
+		syslog(LOG_ERR, "Unable to create metadata for chunk");
+		goto fetch_content_remote_done;
+	}
+	state = 3;
 
 	meta->set_state(FETCHING);
 
+	// Fetch length of header, the first sizeof(uint32_t) bytes
 	if(Xrecv(sock, (void *)&header_len, sizeof(header_len), 0) !=
 			sizeof(header_len)) {
 		syslog(LOG_ERR, "Unable to fetch header length for %s",
 				g.dag_string().c_str());
-		Xclose(sock);
-		assert(0);
+		goto fetch_content_remote_done;
 	}
+
+	// FIXME header length must be sent in network byte order
+	syslog(LOG_INFO, "Getting chunk header of size %u", header_len);
 
 	remaining = header_len;
 	offset = 0;
 
+	// Now fetch the serialized ContentHeader
 	while (remaining > 0) {
 		syslog(LOG_DEBUG, "Remaining(1) = %lu\n", remaining);
 		recvd = Xrecv(sock, (char *)&buf + offset, remaining, 0);
 		if (recvd < 0) {
 			syslog(LOG_ALERT, "Sender Closed the connection: %s", strerror(errno));
-			Xclose(sock);
-			assert(0);
-			break;
+			goto fetch_content_remote_done;
 		} else if (recvd == 0) {
 			syslog(LOG_INFO, "Xrecv returned 0\n");
 			break;
@@ -206,20 +225,27 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		remaining -= recvd;
 		offset += recvd;
 	}
-	std::string serialized_header(buf, header_len);
+	serialized_header.assign(buf, header_len);
 
-	// Build a content header for this NCID/CID
-	ContentHeader *chdr;
-	switch (expected_cid.type()) {
+	// Build a content header object for this NCID/CID
+	switch (expected_cid->type()) {
 		case CLICK_XIA_XID_TYPE_NCID:
 			chdr = new NCIDHeader(serialized_header);
 			break;
 		case CLICK_XIA_XID_TYPE_CID:
 			chdr = new CIDHeader(serialized_header);
+			break;
 	}
+	if(chdr == NULL) {
+		syslog(LOG_ERR, "Bad Content Header received");
+		goto fetch_content_remote_done;
+	}
+	state = 4;
 
 	remaining = chdr->content_len();
 	meta->set_created();
+
+	syslog(LOG_INFO, "Downloading chunk of size %zu", remaining);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -243,12 +269,11 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		data += temp;
 	}
 
-	std::string computed_cid = compute_cid(data.c_str(), data.length());
-	struct xcache_context *context = lookup_context(cmd->context_id());
+	computed_cid = compute_cid(data.c_str(), data.length());
+	context = lookup_context(cmd->context_id());
 
 	// Store the content header with the metadata
 	// TODO: NITIN Verify expected_cid vs computed_cid
-	// TODO: FILL NITIN
 	// If NCID Header, then verify data was signed by publisher
 	// Get Publisher from PublisherList
 	// Make the publisher verify data and signature in header
@@ -256,27 +281,22 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	if (!context) {
 		syslog(LOG_WARNING, "Context Lookup Failed");
-		delete meta;
-		Xclose(sock);
-		return RET_FAILED;
+		goto fetch_content_remote_done;
 	}
+	state = 5;
 
 	if ((flags & XCF_CACHE)) {
 		if (__store(context, meta, data) == RET_FAILED) {
-			delete meta;
-			Xclose(sock);
-			return RET_FAILED;
+			goto fetch_content_remote_done;
 		}
 	} else {
 		if (meta->valid_data(data) == false) {
-			delete meta;
-			Xclose(sock);
-			return RET_FAILED;
+			goto fetch_content_remote_done;
 		}
 	}
 
 	// Map NCID to corresponding CID in NCIDTable
-	if(expected_cid.type() == CLICK_XIA_XID_TYPE_NCID) {
+	if(expected_cid->type() == CLICK_XIA_XID_TYPE_NCID) {
 		NCIDTable *_ncid_table = NCIDTable::get_table();
 		_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 	}
@@ -286,9 +306,24 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		resp->set_data(data);
 	}
 
-	Xclose(sock);
+	// All went well, we now have the chunk
+	retval = RET_OK;
 
-	return RET_OK;
+fetch_content_remote_done:
+	switch(state) {
+		case 5: if(retval != RET_OK) {
+					delete context;
+				}
+		case 4: if(retval != RET_OK) {
+					delete chdr;
+				}
+		case 3: if(retval != RET_OK) {
+					delete meta;
+				}
+		case 2: delete expected_cid;
+		case 1: Xclose(sock);
+	}
+	return retval;
 }
 
 /*!
