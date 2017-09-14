@@ -159,10 +159,10 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	uint32_t header_len;
 	size_t remaining;
 	size_t offset;
-	Node *expected_cid;
-	ContentHeader *chdr;
-	xcache_meta *meta;
-	struct xcache_context *context;
+	Node *expected_cid = NULL;
+	ContentHeader *chdr = NULL;
+	xcache_meta *meta = NULL;
+	struct xcache_context *context = NULL;
 
 	Graph g(addr);
 
@@ -205,7 +205,9 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		goto fetch_content_remote_done;
 	}
 
-	// FIXME header length must be sent in network byte order
+	// Convert header_len to host order from network byte order
+	header_len = ntohl(header_len);
+
 	syslog(LOG_INFO, "Getting chunk header of size %u", header_len);
 
 	remaining = header_len;
@@ -225,14 +227,17 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 		remaining -= recvd;
 		offset += recvd;
 	}
+	assert(remaining == 0);
 	serialized_header.assign(buf, header_len);
 
 	// Build a content header object for this NCID/CID
 	switch (expected_cid->type()) {
 		case CLICK_XIA_XID_TYPE_NCID:
+			syslog(LOG_INFO, "Unpacking NCID header");
 			chdr = new NCIDHeader(serialized_header);
 			break;
 		case CLICK_XIA_XID_TYPE_CID:
+			syslog(LOG_INFO, "Unpacking CID header");
 			chdr = new CIDHeader(serialized_header);
 			break;
 	}
