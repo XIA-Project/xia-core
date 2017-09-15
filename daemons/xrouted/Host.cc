@@ -85,8 +85,8 @@ int Host::init()
 
 	struct timeval now;
 
-	h_freq.tv_sec = 0;
-	h_freq.tv_usec = 100000;
+	h_freq.tv_sec = KEEPALIVE_SECONDS;
+	h_freq.tv_usec = KEEPALIVE_MICROSECONDS;
 
 	gettimeofday(&now, NULL);
 	timeradd(&now, &h_freq, &h_fire);
@@ -97,7 +97,7 @@ int Host::init()
 // send keepalive to router(s)
 int Host::sendKeepalive()
 {
-	int rc;
+	int rc = 0;
 	string message;
 	Xroute::XrouteMsg msg;
 
@@ -173,21 +173,19 @@ int Host::processConfig(const Xroute::HostConfigMsg &msg)
 
 	uint32_t iface = msg.iface();
 
-	printf("iface = %d\n", iface);
+	syslog(LOG_INFO, "iface = %d\n", iface);
 
 	n.ad = msg.ad();
 
 	rdag = "RE " + msg.hid() + " " + msg.sid();
 	xia_pton(AF_XIA, rdag.c_str(), &n.router_dag);
 
-	printf("made router dag\n");
 	// throw ad away since it won't be valid if we're multihomed
 	// we have the correct ad in the msg, so we're still ok
 	if (getXIDs(a, _myHID) < 0) {
 		return -1;
 	}
 
-	printf("got xids\n");
 	char s[MAX_DAG_SIZE];
 	Graph g;
 
@@ -199,16 +197,13 @@ int Host::processConfig(const Xroute::HostConfigMsg &msg)
 	Node outSID(s);
 	g = src * nHID * outSID;
 
-	printf("making socket\n");
 	if ((n.fd = makeSocket(g, &n.source_dag)) < 0) {
 		return -1;
 	}
 
 	syslog(LOG_INFO, "Joined %s with Source socket: %s", n.ad.c_str(), g.dag_string().c_str());
 
-	printf("adding to list\n");
 	_networks[iface] = n;
-	printf("added\n");
 
 	// we're part of the network now and can start talking
 	_joined = true;

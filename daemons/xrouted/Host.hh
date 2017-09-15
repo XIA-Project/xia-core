@@ -24,8 +24,6 @@
 #include "RouteModule.hh"
 #include "Topology.hh"
 
-#define NEIGHBOR_EXPIRE_TIME 10
-
 typedef struct {
 	std::string ad;
 	sockaddr_x  router_dag;

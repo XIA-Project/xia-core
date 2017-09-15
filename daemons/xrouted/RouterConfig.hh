@@ -17,7 +17,20 @@
 #define _RouterConfig_hh
 
 #define APPNAME "xrouted"
-#define EXPIRE_TIME 60
+
+// how long to wait until we purge missing peer routes
+#define NEIGHBOR_EXPIRE_TIME 10
+#define ROUTE_EXPIRE_TIME    60
+
+// how often to send keep alive messages
+#define KEEPALIVE_SECONDS 1
+#define KEEPALIVE_MICROSECONDS 0
+
+// how often to send LSAs
+// If a route table change happens, a new LSA will be sent immediatelyi
+//  regardless of how much time is remaining in the timer
+#define LSA_SECONDS 5
+#define LSA_MICROSECONDS 0
 
 class RouterConfig {
 public:

@@ -47,6 +47,7 @@ const std::string global_sid      ("SID:9999999999999999999999999999999999999999
 #define F_CONTROLLER   0x0008 // node is a controller
 #define F_IP_GATEWAY   0x0010 // router is a dual stack router
 #define F_STATIC_ROUTE 0x0100 // route entry was added manually and should not expire
+#define F_MOBILE       0x0200 // device is a mobile host or router
 
 class RouteModule {
 public:

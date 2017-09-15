@@ -24,9 +24,6 @@
 #include "RouteModule.hh"
 #include "Topology.hh"
 
-#define NEIGHBOR_EXPIRE_TIME 10
-#define ROUTE_EXPIRE_TIME    60
-
 class Router : public RouteModule {
 public:
 	Router(const char *name) : RouteModule(name) {}

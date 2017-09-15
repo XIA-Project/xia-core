@@ -384,10 +384,10 @@ int Controller::init()
 		_dual_router = false;
 	}
 
-	h_freq.tv_sec = 0;
-	h_freq.tv_usec = 100000;
-	l_freq.tv_sec = 0;
-	l_freq.tv_usec = 300000;
+	h_freq.tv_sec = KEEPALIVE_SECONDS;
+	h_freq.tv_usec = KEEPALIVE_MICROSECONDS;
+	l_freq.tv_sec = LSA_SECONDS;
+	l_freq.tv_usec = LSA_MICROSECONDS;
 
 	struct timeval now;
 	gettimeofday(&now, NULL);
