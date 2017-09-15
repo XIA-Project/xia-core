@@ -538,7 +538,8 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
 
 	// Get the public key for given xid
-	if(!xs_getPubkey(xid, pem_pub, &pem_pub_len)) {
+	if(xs_getPubkey(xid, pem_pub, &pem_pub_len)) {
+		printf("xs_isValidSignature: ERROR reading pubkey\n");
 		return 0;
 	}
 
@@ -601,6 +602,7 @@ int xs_isValidSignature(const char *pubfilepath,
 	char pem_pub[MAX_PUBKEY_SIZE];
 	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
 	if(xs_readPubkeyFile(pubfilepath, pem_pub, &pem_pub_len)) {
+		printf("xs_isValidSignature: ERROR reading pubkey\n");
 		return 0;
 	}
 
