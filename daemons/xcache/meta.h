@@ -45,7 +45,6 @@ private:
 	xcache_content_store *_store;
 	xcache_eviction_policy *_policy;
 
-	std::string _cid;
 	std::string _sid;
 
 	time_t _created;
@@ -60,7 +59,7 @@ private:
 
 public:
 	xcache_meta();
-	xcache_meta(std::string, ContentHeader *chdr);
+	xcache_meta(ContentHeader *chdr);
 	~xcache_meta();
 
 	time_t last_accessed() { return _accessed; }

@@ -866,7 +866,7 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		 * NOTE: meta_map keys only by store_id == CID, never NCID
 		 * but the ContentHeader value can be an NCIDHeader
 		 */
-		meta = new xcache_meta(chdr->store_id(), chdr);
+		meta = new xcache_meta(chdr);
 		if(meta == NULL) {
 			syslog(LOG_ERR, "Error creating xcache_meta for chunk");
 			goto store_named_done;
@@ -945,7 +945,7 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		/*
 		 * Create new Meta object and use that to store chunk
 		 */
-		meta = new xcache_meta(cid, chdr);
+		meta = new xcache_meta(chdr);
 		if(meta == NULL) {
 			syslog(LOG_ERR, "Failed allocating xcache_meta for a chunk");
 			goto store_done;

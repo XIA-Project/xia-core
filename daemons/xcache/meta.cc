@@ -27,10 +27,9 @@ xcache_meta::xcache_meta()
 	init();
 }
 
-xcache_meta::xcache_meta(std::string cid, ContentHeader *chdr)
+xcache_meta::xcache_meta(ContentHeader *chdr)
 {
 	init();
-	_cid = cid;
 	_chdr = chdr;
 }
 
@@ -91,7 +90,7 @@ bool xcache_meta::valid_data(const std::string &data)
 
 void xcache_meta::status(void)
 {
-	syslog(LOG_INFO, "[%s] %s", _cid.c_str(), _store->get(this).c_str());
+	syslog(LOG_INFO,"[%s] %s", store_id().c_str(), _store->get(this).c_str());
 }
 
 // The only meta_map. Initialized by first call to meta_map::get_map()
@@ -133,9 +132,12 @@ xcache_meta *meta_map::acquire_meta(std::string cid)
 {
 	xcache_meta *m = NULL;
 
+	// If user requested NCID, convert to a CID
+	std::string content_id = _ncid_table->to_cid(cid);
+
 	read_lock();
 
-	std::map<std::string, xcache_meta *>::iterator i = _map.find(cid);
+	std::map<std::string, xcache_meta *>::iterator i = _map.find(content_id);
 	if (i == _map.end()) {
 		// We could not find the content locally
 		unlock();
@@ -160,7 +162,8 @@ void meta_map::release_meta(xcache_meta *meta)
 void meta_map::add_meta(xcache_meta *meta)
 {
 	write_lock();
-	_map[meta->id()] = meta;
+	// Metadata is only stored by CID
+	_map[meta->store_id()] = meta;
 	unlock();
 }
 
@@ -168,7 +171,7 @@ void meta_map::remove_meta(xcache_meta *meta)
 {
 	// Note: this only removes the meta from the map, it doesn't delete it
 	write_lock();
-	_map.erase(meta->id());
+	_map.erase(meta->store_id());
 	unlock();
 }
 
@@ -182,14 +185,15 @@ int meta_map::walk(void)
 
 	for (i = _map.begin(); i != _map.end(); ) {
 		xcache_meta *m = i->second;
-		std::string c = "CID:" + m->id();
+		std::string id = m->id();
+		std::string store_id = m->store_id();
 
 		switch(m->state()) {
 			case CACHING:
 				// printf("walk:caching\n");
 				// see if the chunk stalled for too long while caching
 				if (now - m->updated() > TOO_OLD) {
-					syslog(LOG_INFO, "removing stalled cid:%s", c.c_str());
+					syslog(LOG_INFO, "removing stalled chunk:%s", id.c_str());
 					delete m;
 					_map.erase(i++);
 				} else {
@@ -232,16 +236,21 @@ int meta_map::walk(void)
 				// remove meta from the route table and stores
 				if (m->fetch_count() > 0) {
 					m->set_state(PURGING);
-					syslog(LOG_INFO, "%s is in use, marked for future eviction\n", c.c_str());
+					syslog(LOG_INFO, "%s in use, marked for future eviction",
+							id.c_str());
 					continue;
 				}
 
-				syslog(LOG_INFO, "%s chunk %s", (m->state() == EVICTING ? "evicting" : "purging"), c.c_str());
-				xr.delRoute(c);
+				syslog(LOG_INFO, "%s chunk %s", (m->state() == EVICTING ? "evicting" : "purging"), id.c_str());
+				xr.delRoute(id);
+				// If NCID, remove CID route and its entries from ncid table
+				if(store_id != id) {
+					xr.delRoute(store_id);
+					_ncid_table->unregister_cid(store_id);
+				}
 				m->store()->remove(m);
 				delete m;
 				_map.erase(i++);
-				_ncid_table->unregister_cid(c);
 				break;
 
 			default:
