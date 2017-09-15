@@ -32,23 +32,23 @@ int NCIDDemoClient::fetch()
 
 	// Store it as a named chunk
 	int ret;
-	char **buf;
+	void *buf;
 	int flags = XCF_BLOCK;
 	buf = NULL;
 	std::string name = _publisher + "/" + _content_name;
 	std::cout << "Fetching: " << name << std::endl;
-	ret = XfetchNamedChunk(&_xcache, (void **)buf, flags, name.c_str());
+	ret = XfetchNamedChunk(&_xcache, &buf, flags, name.c_str());
 	if (ret < 0) {
 		std::cout << "Failed publishing named chunk" << std::endl;
 		return ret;
 	}
 	if(ret > 0) {
-		std::string chunk(*buf, (size_t)ret);
-		std::cout << "Chunk contains:" << chunk << std::endl;
+		std::string chunk((const char *)buf, (size_t)ret);
+		std::cout << "Chunk contains:" << chunk << ":" << std::endl;
 	}
 
-	if(*buf) {
-		free(*buf);
+	if(buf) {
+		free(buf);
 	}
 	return 0;
 }
