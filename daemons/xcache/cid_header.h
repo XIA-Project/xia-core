@@ -8,11 +8,10 @@
 class CIDHeader : public ContentHeader {
 	public:
 		CIDHeader(const std::string &data, time_t ttl);
-		CIDHeader(const std::string &buf) {
-			if(deserialize(buf) == false) {
-				throw "Unable to deserialize CID header from buffer";
-			}
-		}
+
+		// NCIDHeader() calls CIDHeader(), so ignore deserialize failure
+		CIDHeader(const std::string &buf) { deserialize(buf); }
+
 		virtual ~CIDHeader() {}
 
 		virtual std::string id() { return _id; }
