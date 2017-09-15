@@ -132,6 +132,11 @@ xcache_meta *meta_map::acquire_meta(std::string cid)
 {
 	xcache_meta *m = NULL;
 
+	// Sanity check user provided argument
+	if(cid.size() < (CLICK_XIA_XID_ID_LEN*2)) {
+		return NULL;
+	}
+
 	// If user requested NCID, convert to a CID
 	std::string content_id = _ncid_table->to_cid(cid);
 

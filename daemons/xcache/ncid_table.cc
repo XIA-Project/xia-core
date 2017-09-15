@@ -197,6 +197,11 @@ std::string
 NCIDTable::to_cid(std::string content_id)
 {
 	std::string cid = "";
+
+	// Sanity check the content_id. Should be at least 40 bytes
+	if(content_id.size() < (CLICK_XIA_XID_ID_LEN*2)) {
+		return "";
+	}
 	Node content_id_node(content_id);
 
 	read_lock();
