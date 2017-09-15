@@ -75,7 +75,7 @@ std::string Publisher::pubkey()
 
 	// If the pubkey is not available, try getting it
 	if(!pubkey_present(pubkeypath)) {
-		if(fetch_pubkey()) {
+		if(fetch_pubkey() == false) {
 			return "";
 		}
 	}
