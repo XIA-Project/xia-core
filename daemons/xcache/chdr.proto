@@ -13,6 +13,7 @@ message NCIDHeaderBuf {
 	required string store_id = 4;
 	required bytes signature = 5;
 	required string publisher_name = 6;
+	required string uri = 7;
 }
 
 message ContentHeaderBuf {

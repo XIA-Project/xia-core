@@ -62,6 +62,7 @@ NCIDHeader::serialize()
 	ncid_header->set_store_id(_store_id);
 	ncid_header->set_signature(_signature);
 	ncid_header->set_publisher_name(_publisher_name);
+	ncid_header->set_uri(_uri);
 	std::string serialized_header;
 	chdr_buf.SerializeToString(&serialized_header);
 	return serialized_header;
@@ -84,6 +85,7 @@ NCIDHeader::deserialize(const std::string &buf)
 	_store_id = ncid_hdr.store_id();
 	_signature = ncid_hdr.signature();
 	_publisher_name = ncid_hdr.publisher_name();
+	_uri = ncid_hdr.uri();
 	return true;
 }
 
