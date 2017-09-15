@@ -11,7 +11,7 @@ message NCIDHeaderBuf {
 	required int64 ttl = 2;
 	required string id = 3;
 	required string store_id = 4;
-	required string signature = 5;
+	required bytes signature = 5;
 	required string publisher_name = 6;
 }
 
