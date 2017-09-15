@@ -75,6 +75,8 @@ void Router::purge()
 				_neighborTable.erase(iter->first);
 				_neighbor_timestamp.erase(iter++);
 
+				_send_lsa = true;
+
 			} else {
 				++iter;
 			}
@@ -119,9 +121,10 @@ int Router::handler()
 			sendKeepalive();
 			timeradd(&now, &h_freq, &h_fire);
 		}
-		if (timercmp(&now, &l_fire, >=)) {
+		if (_send_lsa || timercmp(&now, &l_fire, >=)) {
 			sendLSA();
 			timeradd(&now, &l_freq, &l_fire);
+			_send_lsa = false;
 		}
 	}
 
@@ -193,6 +196,8 @@ int Router::init()
 	gettimeofday(&now, NULL);
 	timeradd(&now, &h_freq, &h_fire);
 	timeradd(&now, &l_freq, &l_fire);
+
+	_send_lsa = false;
 
 	return 0;
 }
@@ -311,6 +316,7 @@ int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 		case Xroute::FOREIGN_AD_MSG:
 		    if (local) {
 		        rc = processForeign(msg.foreign());
+				_send_lsa = true;
 		    }
 			break;
 
@@ -324,12 +330,14 @@ int Router::processMsg(std::string msg_str, uint32_t iface, bool local)
 
 		case Xroute::HOST_LEAVE_MSG:
 			rc = processHostLeave(msg.host_leave());
+			_send_lsa = true;
 			break;
 
 		case Xroute::HOST_JOIN_MSG:
 			// process the incoming host-register message
 		    if (local) {
 			    rc = processHostRegister(msg.host_join());
+				_send_lsa = true;
 		    }
 		    break;
 

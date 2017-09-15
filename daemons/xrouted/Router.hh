@@ -80,6 +80,9 @@ protected:
 	TimestampList _neighbor_timestamp;
 	TimestampList _route_timestamp;
 
+	// send LSAs immediately if true
+	bool _send_lsa;
+
 	// last time we looked for stale entries
 	time_t _last_route_purge;
 	time_t _last_neighbor_purge;
