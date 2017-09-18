@@ -562,7 +562,7 @@ clean_conf_and_keys()
 	echo "Deleting CA files"
 	rm -f $XIADIR/ca/*
 	echo "Deleting Publisher files"
-	rm -rf $XIADIR/publisher/*
+	rm -rf $XIADIR/publishers/*
 	echo "Deleting config files in etc"
 	rm -f $XIADIR/etc/*.conf
 	rm -f $XIADIR/etc/hosts.xia
