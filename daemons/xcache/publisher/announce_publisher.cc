@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 	// Find the certificate for this publisher
 	std::string publisher_name(argv[1]);
 	std::string root_dir(buf);
-	std::string cert_file = root_dir + "/publisher/" + publisher_name +
+	std::string cert_file = root_dir + "/publishers/" + publisher_name +
 		"/" + publisher_name + ".cert";
 	std::cout << "Certificate: " << cert_file << std::endl;
 

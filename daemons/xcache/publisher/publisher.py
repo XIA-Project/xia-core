@@ -56,7 +56,7 @@ class Publisher:
         self.name = name
 
         # A directory for storing all Publishers' keys
-        self.keydir = os.path.join(xiapyutils.xia_srcdir(), 'publisher')
+        self.keydir = os.path.join(xiapyutils.xia_srcdir(), 'publishers')
         self.check_mkdir(self.keydir)
 
         # Each Publisher has its own working directory

@@ -22,7 +22,7 @@ Publisher::Publisher(std::string name)
 	char *keydir = (char *)malloc(MAX_KEYDIR_PATH_LEN);
 	assert(keydir != NULL);
 
-	std::string publisher_dir = "/publisher/" + name;
+	std::string publisher_dir = "/publishers/" + name;
 	if(XrootDir((char *)keydir, MAX_KEYDIR_PATH_LEN) == NULL) {
 		printf("ERROR: Unable to get XIA root directory name");
 		assert(-1);
