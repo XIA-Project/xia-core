@@ -83,6 +83,7 @@ std::string Publisher::pubkey()
 	if(xs_readPubkeyFile(pubkeypath.c_str(), pubkeybuf, &pubkeylen)) {
 		printf("Publisher::pubkey() cannot read key from %s\n",
 				pubkeypath.c_str());
+		return "";
 	}
 	std::string pubkeystr(pubkeybuf, pubkeylen);
 	return pubkeystr;
@@ -156,6 +157,43 @@ std::string Publisher::cert_name()
 }
 
 /*!
+ * @brief Query the nameservice for the Certificate DAG address
+ *
+ * We use the DAG of the Publisher's certificate to build the DAG for
+ * NCIDs published by the Publisher. This is a hacky but gives us a
+ * DAG for somewhere we know the Publisher is able to publish stuff.
+ * In the real world, the Publisher would probably make DAGs available
+ * for clients to use to get NCID content.
+ *
+ * This function populates _cert_dag.
+ *
+ * @returns true if the DAG for the Publisher's certificate was found
+ * @returns false if the DAG was not found
+ */
+bool Publisher::fetch_cert_dag()
+{
+	sockaddr_x addr;
+	socklen_t addrlen;
+
+	// Quickly return success if _cert_dag is known already
+	if(_cert_dag) {
+		return true;
+	}
+
+	// Otherwise, fetch the certificate address from nameservice
+	std::string cert_url = cert_name();
+
+	if(XgetDAGbyName(cert_url.c_str(), &addr, &addrlen)) {
+		std::cout << "cert_dag: could not be found" << std::endl;
+		_cert_dag = NULL;
+		return false;
+	}
+
+	_cert_dag = new Graph(&addr);
+	return true;
+}
+
+/*!
  * @brief Fetch the public key to the provided path
  *
  * Query the nameserver to see if a certificate for this Publisher is
@@ -167,7 +205,6 @@ std::string Publisher::cert_name()
 bool Publisher::fetch_pubkey()
 {
 	sockaddr_x addr;
-	socklen_t addrlen;
 	int state = 0;
 	bool retval = false;
 	xcache_cmd resp;
@@ -181,21 +218,18 @@ bool Publisher::fetch_pubkey()
 	// Get a reference to the controller
 	xcache_controller *ctrl = xcache_controller::get_instance();
 
-	// Build the Publisher cert name that nameserver should know
-	std::string cert_url = cert_name();
-
-	// Fetch Publisher cert DAG from nameserver
-	if(XgetDAGbyName(cert_url.c_str(), &addr, &addrlen)) {
-		std::cout << "Did not find address for " << cert_url << std::endl;
-		goto fetch_pubkey_done;
+	// Store certificate DAG for building NCID DAGs in future
+	if(fetch_cert_dag() == false) {
+		std::cout << "ERROR fetching Publisher cert addr" << std::endl;
+		return false;
 	}
 
-	// Store certificate DAG for building NCID DAGs in future
-	_cert_dag = new Graph(&addr);
+	// xcache operates on sockaddr_x, so fill one in
+	_cert_dag->fill_sockaddr(&addr);
 
 	// Fetch Publisher cert via XfetchChunk equivalent logic
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
-	cmd.set_dag(&addr, addrlen);
+	cmd.set_dag(&addr, sizeof(sockaddr_x));
 	cmd.set_flags(flags);
 
 	ctrl->xcache_fetch_content(&resp, &cmd, flags);
@@ -328,11 +362,14 @@ std::string Publisher::ncid_dag(std::string content_name)
 {
 	Node ncid_node(ncid(content_name));
 
-	// NOTE: ncid() call above populates _cert_dag, so order is important
-	if(_cert_dag == NULL) {
+	// Fetch address for Publisher certificate, if not known already
+	if(fetch_cert_dag() == false) {
+		std::cout << "Publisher cert address not found" << std::endl;
 		return "";
 	}
 
+	// Replace Publisher certificate CID in address with NCID of content
+	// ASSUMPTION: Certificate is in the same xcache as content being requested
 	Graph dag(*_cert_dag);
 	dag.replace_final_intent(ncid_node);
 	return dag.dag_string();

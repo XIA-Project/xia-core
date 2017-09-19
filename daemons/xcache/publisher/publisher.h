@@ -38,6 +38,7 @@ class Publisher {
 		bool pubkey_present(std::string path);
 		bool fetch_pubkey();
 		std::string cert_name();
+		bool fetch_cert_dag();
 
 		bool keydir_present();
 		bool ensure_keydir_exists();
