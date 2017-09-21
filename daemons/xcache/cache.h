@@ -23,7 +23,9 @@ struct cache_args {
 
 struct cache_download {
 	std::string cid;
-	struct cid_header header;
+	uint32_t chdr_len;
+	char *chdr_data;
+	ContentHeader *chdr;
 	char *data;
 };
 

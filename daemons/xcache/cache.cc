@@ -10,6 +10,7 @@
 #include "controller.h"
 #include "cache.h"
 #include "cid.h"
+#include "ncid_header.h"
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
 
@@ -206,6 +207,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	std::string sid = "";
 	size_t payload_len;
 	size_t offset;
+	size_t data_offset;
 	xcache_meta *meta;
 	struct cache_download *download;
 	std::map<std::string, struct cache_download *>::iterator iter;
@@ -311,42 +313,80 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	offset = ntohl(tcp->th_seq) - initial_seq;
 	//syslog(LOG_INFO, "initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
 
-	// get the cid header if we don't already have it
-	// incrementally build the header if the packet size
-	//  is less than header size
-	if (offset < sizeof(struct cid_header)) {
-		if ((offset + payload_len) >= sizeof(struct cid_header)) {
-			len = sizeof(struct cid_header) - offset;
+	// ASSUMPTION: First packet received is the one with header length
+	//
+	// We found the first packet, get content header length from it
+	if(offset == 0) {
+		assert(payload_len >= sizeof(download->chdr_len));
+		memcpy(&(download->chdr_len), payload, sizeof(download->chdr_len));
+		download->chdr_len = ntohl(download->chdr_len);
+		download->chdr_data = (char *)calloc(download->chdr_len, 1);
+	}
+
+	// Unless the content header is received, we can't receive header or data
+	if(download->chdr_len == 0) {
+		syslog(LOG_INFO, "Data packet received before header, dropping");
+		return;
+	}
+
+	// The offset in stream where content starts, after the header
+	data_offset = sizeof(download->chdr_len) + download->chdr_len;
+
+	// Offset is somewhere in the content header
+	if(offset < data_offset) {
+		// Only save off until end of content header
+		if((offset + payload_len) >= data_offset) {
+			len = data_offset - offset;
 		} else {
 			len = payload_len;
 		}
-
-		memcpy((char *)&download->header + offset, payload, len);
+		memcpy(download->chdr_data + offset - sizeof(download->chdr_len),
+				payload, len);
 		payload += len;
 		offset += len;
 		payload_len -= len;
 	}
 
 	// there's data, append it to the download buffer
-	if (offset >= sizeof(struct cid_header)) {
+	if (offset >= data_offset) {
+
+		// Allocate memory to hold data
 		if (download->data == NULL) {
-			download->data = (char *)calloc(ntohl(download->header.length), 1);
+
+			// Deserialize the ContentHeader received earlier
+			std::string headerstr(download->chdr_data, download->chdr_len);
+			Node content_id(chunk_id);
+			switch(content_id.type()) {
+				case CLICK_XIA_XID_TYPE_NCID:
+					download->chdr = new NCIDHeader(headerstr);
+					break;
+				case CLICK_XIA_XID_TYPE_CID:
+					download->chdr = new CIDHeader(headerstr);
+					break;
+				default:
+					assert(0);
+			}
+
+			// Now allocate space to hold data, based on content len in header
+			download->data = (char *)calloc(download->chdr->content_len(), 1);
 		}
-		memcpy(download->data + offset - sizeof(struct cid_header), payload, payload_len);
+
+		// Copy data based on stream offset. Allows out-of-order packets
+		memcpy(download->data + offset - data_offset, payload, payload_len);
 	}
 
 skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
 
-		// TODO: NITIN replace this with ContentHeader parsing and processing
-		if (compute_cid(download->data, ntohl(download->header.length)) == chunk_id
-			|| chunk_id.find("NCID:") == 0) {
+		meta = ctrl->acquire_meta(chunk_id);
+		meta->set_content_header(download->chdr);
+		if(meta->valid_data(download->data)) {
 			syslog(LOG_INFO, "chunk is valid: %s", chunk_id.c_str());
 
-			meta->set_ttl(ntohl(download->header.ttl));
+			meta->set_ttl(download->chdr->ttl());
 			meta->set_created();
-			meta->set_length(ntohl(download->header.length));
+			meta->set_length(download->chdr->content_len());
 			meta->set_state(READY_TO_SAVE);
 			// printf("cache:cache length: %lu\n", meta->get_length());
 
@@ -354,20 +394,28 @@ skip_data:
 			req->type = xcache_cmd::XCACHE_CACHE;
 			req->cid = strdup(chunk_id.c_str());
 			req->data = download->data;
-			req->datalen = ntohl(download->header.length);
+			req->datalen = ntohl(download->chdr->content_len());
 			ctrl->enqueue_request_safe(req);
 
 			/* Perform cleanup */
 			ongoing_downloads.erase(iter);
+			free(download->chdr_data);
 			free(download);
+			ctrl->release_meta(meta);
 		} else {
-			// FIXME: leave this open in case more data is on the wire
-			// and let garbage collection handle it eventually? or nuke it now?
-
-			// FIXME: we're currently leaving this open. Maybe it should be marked
-			// as broken so that if a new copy of the same chunk comes through we throw
-			// the old one away and start over.
+			// Drop everything related to this chunk being cached.
+			//
+			// Not waiting for the small possibility that some data was
+			// still in flight but out-of-order after the FIN.
+			//
+			// If we want to support that scenario, then support it fully
+			// instead of leaving this partial chunk hanging.
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", chunk_id.c_str());
+			ctrl->remove_meta(meta);
+			ongoing_downloads.erase(iter);
+			free(download->chdr_data);
+			free(download->chdr);
+			free(download->data);
 		}
 	}
 }
