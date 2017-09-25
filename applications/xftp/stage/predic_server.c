@@ -45,7 +45,6 @@ void predic_fetch(int sock)
 {
     char cmd[XIA_MAX_BUF];
     char reply[XIA_MAX_BUF];
-<<<<<<< HEAD
     vector<string> CIDs;
 
 	int n;
@@ -53,11 +52,6 @@ void predic_fetch(int sock)
     char send_to_server_[XIA_MAX_BUF];
     memset(send_to_server_, '\0', strlen(send_to_server_));
     sprintf(send_to_server_, "finish receiveing the current CIDs.");
-=======
-
-    vector<string> CIDs;
-
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
     // send the file request to the xftp server
     sprintf(cmd, "get %s", fin);
     sendStreamCmd(sock, cmd);
@@ -93,19 +87,11 @@ void predic_fetch(int sock)
     }
 
     //fetch the chunk(XCF_CACHE flag will cache the chunk locally)
-<<<<<<< HEAD
     for(int i=0; i <= CIDs.size() * percentage;++i){
         sockaddr_x addr;
         Graph g(CIDs[i]);
         g.fill_sockaddr(&addr);
 		int ret=0;
-=======
-    for(int i=0; i <= CIDs.size() * percentage){
-        sockaddr_x addr;
-        Graph g(CIDs[i]);
-        g.fill_sockaddr(&addr);
-
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
         if ((ret = XfetchChunk(&xcache, NULL, XCF_BLOCK | XCF_CACHE, &addr, sizeof(addr))) < 0) {
             die(-1, "XfetchChunk Failed\n");
         }
@@ -119,11 +105,7 @@ int main()
         die(-1, "unable to create chunk socket\n");
     }
     //stageServerSock = registerStreamReceiver(getStageServiceName(), myAD, myHID, my4ID);
-<<<<<<< HEAD
     stageServerSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);	
-=======
-    ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);	
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
     say("The current stageServerSock is %d\n", stageServerSock);
     predic_fetch(stageServerSock);
 
