@@ -75,7 +75,6 @@ say("---------CID:%s\n",cid);
     unsigned int bytes = 0;
 
     // chunk fetching begins
-    //char data[CHUNKSIZE];
 	void *data;
     logFile << now_msec() << "	" << 0 <<endl;
     for (unsigned int i = 0; i < CIDs.size(); i++) {
@@ -84,29 +83,8 @@ say("---------CID:%s\n",cid);
         say("Fetching chunk %u / %lu\n", i, CIDs.size() - 1);
         int len;
         sockaddr_x addr;
-        if (stage) {
-            memset(cmd, 0, sizeof(cmd));
-            sprintf(cmd, "fetch");
-            sprintf(cmd, "%s %s", cmd, CIDs[i].c_str());
-            say("CMD is :%s\n", cmd);
-            if (send(sock, cmd, strlen(cmd), 0) < 0) {
-                die(-1, "send cmd fail! cmd is %s", cmd);
-            }
-            say("After send Fetch!\n");
-            memset(cmd, 0, sizeof(cmd));
-            if ((len = recv(sock, cmd, XIA_MAX_BUF, 0)) < 0) {
-                die(-1, "fail to recv from stageManager!");
-            }
-            say("Get NewDag: %s\n", cmd);
-			Graph g(cmd);
-			g.fill_sockaddr(&addr);
-        }
-        else {
-			Graph g((char*)CIDs[i].c_str());
-			g.fill_sockaddr(&addr);
-			
-        say("CID=%s %d\n",(char*)CIDs[i].c_str(), CIDs[i].size());
-        }
+        Graph g1(CIDs[i]);
+        g1.fill_sockaddr(&addr);
         long start_time = now_msec();
 		int retry=5;
 		while(retry--){
@@ -125,19 +103,6 @@ say("---------CID:%s\n",cid);
 		strcpy(req, g.http_url_string().c_str());
 		
         fetchTime = end_time - start_time;
-		if(stage){
-			memset(cmd, 0, sizeof(cmd));
-			sprintf(cmd, "time");
-			//sscanf(cmd, "time %ld", &timeWifi);
-			sprintf(cmd, "%s %ld", cmd, fetchTime);
-			say("CMD is :%s\n", cmd);
-			if (send(sock, cmd, strlen(cmd), 0) < 0) {
-				die(-1, "send cmd fail! cmd is %s", cmd);
-			}
-			if ((recv(sock, cmd, XIA_MAX_BUF, 0)) < 0) {
-                die(-1, "fail to recv from stageManager!");
-            }
-		}
 		logFile << end_time << "	" << i+1 <<endl;
         say("writing %d bytes of chunk %s to disk\n", len, string2char(CIDs[i]));
         fwrite((char*)data, 1, len, fd);
