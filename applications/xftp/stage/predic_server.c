@@ -54,6 +54,7 @@ void predic_fetch(int sock)
     sprintf(send_to_server_, "finish receiveing the current CIDs.");
     // send the file request to the xftp server
     sprintf(cmd, "get %s", fin);
+	say("file name:%s\n", fin);
     sendStreamCmd(sock, cmd);
     
     // receive the CID list from xftp server
@@ -87,19 +88,21 @@ void predic_fetch(int sock)
     }
 
     //fetch the chunk(XCF_CACHE flag will cache the chunk locally)
-    for(int i=0; i <= CIDs.size() * percentage;++i){
+    for(int i=0; i < CIDs.size() * percentage;++i){
         sockaddr_x addr;
         Graph g(CIDs[i]);
         g.fill_sockaddr(&addr);
 		int ret=0;
-        if ((ret = XfetchChunk(&xcache, NULL, XCF_BLOCK | XCF_CACHE, &addr, sizeof(addr))) < 0) {
+		void *data;
+        if ((ret = XfetchChunk(&xcache, &data, XCF_BLOCK | XCF_CACHE, &addr, sizeof(addr))) < 0) {
             die(-1, "XfetchChunk Failed\n");
         }
     }
     return;
 }
-int main()
+int main(int argc, char** argv)
 {
+	getConfig(argc, argv);
     XcacheHandleInit(&xcache);
     if ((chunkSock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
         die(-1, "unable to create chunk socket\n");
