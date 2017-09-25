@@ -4,21 +4,13 @@
 using namespace std;
 
 bool stage = true;
-<<<<<<< HEAD
 char fin[256], fout[256];
-=======
-char fin[256];
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
 int ftpSock;
 XcacheHandle h;
 
 int getFile(int sock)
 {
-<<<<<<< HEAD
 	FILE *fd = fopen(fout, "w");
-=======
-    FILE *fd = fopen(fout, "w");
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
     ofstream logFile("clientTime.log");
     int n;
     int status = -1;
@@ -97,20 +89,12 @@ say("---------CID:%s\n",cid);
             sprintf(cmd, "fetch");
             sprintf(cmd, "%s %s", cmd, CIDs[i].c_str());
             say("CMD is :%s\n", cmd);
-<<<<<<< HEAD
             if (send(sock, cmd, strlen(cmd), 0) < 0) {
-=======
-            if (send(stageManagerSock, cmd, strlen(cmd), 0) < 0) {
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
                 die(-1, "send cmd fail! cmd is %s", cmd);
             }
             say("After send Fetch!\n");
             memset(cmd, 0, sizeof(cmd));
-<<<<<<< HEAD
             if ((len = recv(sock, cmd, XIA_MAX_BUF, 0)) < 0) {
-=======
-            if ((len = recv(stageManagerSock, cmd, XIA_MAX_BUF, 0)) < 0) {
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
                 die(-1, "fail to recv from stageManager!");
             }
             say("Get NewDag: %s\n", cmd);
@@ -147,17 +131,10 @@ say("---------CID:%s\n",cid);
 			//sscanf(cmd, "time %ld", &timeWifi);
 			sprintf(cmd, "%s %ld", cmd, fetchTime);
 			say("CMD is :%s\n", cmd);
-<<<<<<< HEAD
 			if (send(sock, cmd, strlen(cmd), 0) < 0) {
 				die(-1, "send cmd fail! cmd is %s", cmd);
 			}
 			if ((recv(sock, cmd, XIA_MAX_BUF, 0)) < 0) {
-=======
-			if (send(stageManagerSock, cmd, strlen(cmd), 0) < 0) {
-				die(-1, "send cmd fail! cmd is %s", cmd);
-			}
-			if ((recv(stageManagerSock, cmd, XIA_MAX_BUF, 0)) < 0) {
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
                 die(-1, "fail to recv from stageManager!");
             }
 		}
@@ -190,10 +167,6 @@ int main(int argc, char **argv)
         if (argc == 2) {
             strcpy(fin, argv[1]);
             sprintf(fout, "my%s", fin);
-<<<<<<< HEAD
-=======
-
->>>>>>> 49123213b986a5d5038e8ee0dfcb8b0bb2e99e7d
             ftpSock = initStreamClient(getXftpName(), myAD, myHID, ftpServAD, ftpServHID);
             getFile(ftpSock);
             return 0;
