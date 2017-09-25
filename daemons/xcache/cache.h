@@ -1,6 +1,7 @@
 #ifndef __CACHE_H__
 #define __CACHE_H__
 
+#include "cache_download.h"
 #include "controller.h"
 #include "cid.h"
 /**
@@ -21,18 +22,11 @@ struct cache_args {
 	xcache_controller *ctrl;
 };
 
-struct cache_download {
-	std::string cid;
-	uint32_t chdr_len;
-	char *chdr_data;
-	ContentHeader *chdr;
-	char *data;
-};
-
 class xcache_cache {
 private:
 	static xcache_controller *ctrl;
-	std::map<std::string, struct cache_download *> ongoing_downloads;
+	// Ongoing downloads are keyed by source intent CID/NCID
+	std::map<std::string, cache_download *> ongoing_downloads;
 
 public:
 	/**
@@ -43,7 +37,8 @@ public:
 
 	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
 	int validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp);
-	xcache_meta* start_new_meta(struct xtcp *tcp, std::string cid, std::string sid);
+	cache_download* start_new_download(struct xtcp *tcp,
+			std::string cid, std::string sid);
 	void unparse_xid(struct click_xia_xid_node *node, std::string &xid);
 
 

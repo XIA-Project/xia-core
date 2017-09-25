@@ -165,11 +165,13 @@ int xcache_cache::validate_pkt(char *pkt, size_t len,
  * @param cid Content identifier - could be CID or NCID
  * @param sid Client process service identifier
  *
- * @returns meta the new metadata object
+ * @returns download object that was just created, on success
+ * @returns NULL on failure
  */
-xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp,
+cache_download* xcache_cache::start_new_download(struct xtcp *tcp,
 		std::string cid, std::string sid)
 {
+	syslog(LOG_INFO, "Cache: starting new download for %s", cid.c_str());
 	// if it's not a syn-ack we don't know how much content has already gone by
 	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
 		syslog(LOG_INFO, "skipping %s: partial stream received", cid.c_str());
@@ -177,19 +179,24 @@ xcache_meta* xcache_cache::start_new_meta(struct xtcp *tcp,
 	}
 
 	// FIXME: this should be wrapped in a mutex
-	struct cache_download *download;
+	cache_download *download = NULL;
 
 	// CID not filled in at this time because it could be an NCID
 	xcache_meta *meta = new xcache_meta();
+	if(meta == NULL) {
+		syslog(LOG_INFO, "Unable to allocate memory for metadata");
+		return NULL;
+	}
 
 	meta->set_state(CACHING);
 	meta->set_seq(ntohl(tcp->th_seq));
 	meta->set_dest_sid(sid);
 
-	download = (struct cache_download *)calloc(sizeof(struct cache_download), 1);
+	download = new cache_download();
+	download->set_meta(meta);
 	ongoing_downloads[cid] = download;
 
-	return meta;
+	return download;
 }
 
 /*!
@@ -205,12 +212,13 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	struct xtcp *tcp;
 	std::string chunk_id = "";
 	std::string sid = "";
+	uint32_t chdr_len = 0;
 	size_t payload_len;
 	size_t offset;
 	size_t data_offset;
 	xcache_meta *meta;
-	struct cache_download *download;
-	std::map<std::string, struct cache_download *>::iterator iter;
+	cache_download *download;
+	std::map<std::string, cache_download *>::iterator downloads_it;
 
 	syslog(LOG_DEBUG, "CACHE RECVD PKT\n");
 
@@ -234,25 +242,35 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		return;
 	}
 
-	char *payload = (char *)tcp + ((ushort)(tcp->th_off) << 2);
-	payload_len = len + (size_t)(pkt - payload);
-	syslog(LOG_DEBUG, "%s Payload length = %lu\n",
-			chunk_id.c_str(), payload_len);
-
-	if (!(meta = ctrl->acquire_meta(chunk_id))) {
-		syslog(LOG_INFO, "ACCEPTING: New Meta ID=%s", chunk_id.c_str());
-
-		xcache_meta *new_meta = start_new_meta(tcp, chunk_id, sid);
-
-		if (new_meta != NULL) {
-			ctrl->add_meta(new_meta);
-		}
-
-		// it's a syn-ack so there's no data to handle yet
+	meta = ctrl->acquire_meta(chunk_id);
+	if(meta != NULL) {
+		ctrl->release_meta(meta);
+		syslog(LOG_INFO, "%s In-flight chunk known to controller. Ignore",
+				chunk_id.c_str());
 		return;
 	}
+	meta = NULL; // we reuse meta to point to in-flight chunk meta later
 
-	switch (meta->state()) {
+	char *payload = (char *)tcp + ((ushort)(tcp->th_off) << 2);
+	payload_len = len + (size_t)(pkt - payload);
+	syslog(LOG_INFO, "%s Payload length = %lu\n",
+			chunk_id.c_str(), payload_len);
+
+	downloads_it = ongoing_downloads.find(chunk_id);
+	if(downloads_it == ongoing_downloads.end()) {
+		download = start_new_download(tcp, chunk_id, sid);
+		if(download == NULL) {
+			syslog(LOG_ERR, "failed creating download for %s",
+					chunk_id.c_str());
+		}
+		// This was a syn-ack, so there is not data to handle yet
+		return;
+	} else {
+		download = downloads_it->second;
+	}
+	// TODO: Verify that CACHING is the only possible state
+	// If yes, then remove this switch
+	switch (download->meta()->state()) {
 		case CACHING:
 			// drop into the code below the switch
 			break;
@@ -260,88 +278,90 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		case AVAILABLE:
 		case READY_TO_SAVE:
 		case FETCHING:
-			ctrl->release_meta(meta);
 			//syslog(LOG_INFO, "This CID is already in the cache: %s", cid.c_str());
 			return;
 
 		case EVICTING:
-			ctrl->release_meta(meta);
 			syslog(LOG_INFO, "The CID is in process of being evicted: %s", chunk_id.c_str());
 			return;
 
 		default:
 			syslog(LOG_ERR, "Some Unknown STATE FIX IT CID=%s", chunk_id.c_str());
-			ctrl->release_meta(meta);
 			return;
 	}
 
 	// Ignore this stream if another stream is already getting the chunk
-	if (meta->dest_sid() != sid) {
+	if (download->meta()->dest_sid() != sid) {
 		// Another stream is already getting this chunk.
 		//  so we can ignore this stream's data
 		//  otherwise we'll have memory overrun issues due to different sequence #s
 		// syslog(LOG_INFO, "don't cross the streams!");
-		ctrl->release_meta(meta);
 		return;
 	}
 
 	// get the initial sequence number for this stream
-	uint32_t initial_seq = meta->seq();
-	ctrl->release_meta(meta);
-
-	iter = ongoing_downloads.find(chunk_id);
-	if (iter == ongoing_downloads.end()) {
-		// Something bad happened!
-		// we should close this meta up
-		syslog(LOG_ERR, "Unable to find download buffer for %s", chunk_id.c_str());
-		return;
-	}
-	//syslog(LOG_INFO, "Download Found\n");
-	download = iter->second;
+	uint32_t initial_seq = download->meta()->seq();
+	syslog(LOG_INFO, "Initial seq no:%u", initial_seq);
 
 	// We got "payload" of length "payload_len"
 	// This is at offset ntohl(tcp->th_seq) in total chunk
 	// Adjusted sequence numbers from 1 to sizeof(struct cid_header)
 	//  constitute the CID header. Everything else is payload
 	if (payload_len == 0) {
+		syslog(LOG_INFO, "Skipping data");
 		// control packet
 		goto skip_data;
 	}
 
+	syslog(LOG_INFO, "Payload len:%zu", payload_len);
 	// FIXME: this doesn't deal with the case where the sequence number wraps.
 	// factor out the random start value of the seq #
 	offset = ntohl(tcp->th_seq) - initial_seq;
+	syslog(LOG_INFO, "Stream packet offset:%zu", offset);
 	//syslog(LOG_INFO, "initial=%u, seq = %u offset = %lu\n", initial_seq, ntohl(tcp->th_seq), offset);
 
 	// ASSUMPTION: First packet received is the one with header length
 	//
 	// We found the first packet, get content header length from it
 	if(offset == 0) {
-		assert(payload_len >= sizeof(download->chdr_len));
-		memcpy(&(download->chdr_len), payload, sizeof(download->chdr_len));
-		download->chdr_len = ntohl(download->chdr_len);
-		download->chdr_data = (char *)calloc(download->chdr_len, 1);
+
+		// Get the content header length
+		assert(payload_len >= sizeof(chdr_len));
+		memcpy(&chdr_len, payload, sizeof(chdr_len));
+		chdr_len = ntohl(chdr_len); // convert from network to host order
+		download->set_chdr_len(chdr_len);
+		syslog(LOG_INFO, "Content header len:%u", download->chdr_len());
+
+		// Allocate memory to hold the content header
+		download->set_chdr_data((char *)calloc(download->chdr_len(), 1));
+		assert(download->chdr_data() != NULL);
+		syslog(LOG_INFO, "ContentHeader stored at:%lu",
+				(long unsigned int)download->chdr_data());
 	}
 
 	// Unless the content header is received, we can't receive header or data
-	if(download->chdr_len == 0) {
+	if(download->chdr_len() == 0) {
 		syslog(LOG_INFO, "Data packet received before header, dropping");
 		return;
 	}
 
 	// The offset in stream where content starts, after the header
-	data_offset = sizeof(download->chdr_len) + download->chdr_len;
+	data_offset = sizeof(chdr_len) + download->chdr_len();
+	syslog(LOG_INFO, "Data offset:%zu", data_offset);
 
 	// Offset is somewhere in the content header
-	if(offset < data_offset) {
+	if(offset < data_offset && offset >= sizeof(chdr_len)) {
 		// Only save off until end of content header
 		if((offset + payload_len) >= data_offset) {
 			len = data_offset - offset;
 		} else {
 			len = payload_len;
 		}
-		memcpy(download->chdr_data + offset - sizeof(download->chdr_len),
+		memcpy(download->chdr_data() + offset - sizeof(chdr_len),
 				payload, len);
+		syslog(LOG_INFO, "Copying chdr contents to addr:%lu size:%zu",
+				(long unsigned int)(download->chdr_data()
+					+ offset - sizeof(chdr_len)), len);
 		payload += len;
 		offset += len;
 		payload_len -= len;
@@ -351,57 +371,81 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	if (offset >= data_offset) {
 
 		// Allocate memory to hold data
-		if (download->data == NULL) {
+		if (download->data_buf() == NULL) {
 
 			// Deserialize the ContentHeader received earlier
-			std::string headerstr(download->chdr_data, download->chdr_len);
-			Node content_id(chunk_id);
-			switch(content_id.type()) {
-				case CLICK_XIA_XID_TYPE_NCID:
-					download->chdr = new NCIDHeader(headerstr);
-					break;
-				case CLICK_XIA_XID_TYPE_CID:
-					download->chdr = new CIDHeader(headerstr);
-					break;
-				default:
-					assert(0);
+			if(download->chdr() == NULL) {
+				std::string headerstr(download->chdr_data(),
+						download->chdr_len());
+
+				Node content_id(chunk_id);
+				switch(content_id.type()) {
+					case CLICK_XIA_XID_TYPE_NCID:
+						syslog(LOG_INFO, "Created NCIDHeader");
+						download->set_chdr(new NCIDHeader(headerstr));
+						break;
+					case CLICK_XIA_XID_TYPE_CID:
+						syslog(LOG_INFO, "Created CIDHeader");
+						download->set_chdr(new CIDHeader(headerstr));
+						break;
+					default:
+						assert(0);
+				}
 			}
 
 			// Now allocate space to hold data, based on content len in header
-			download->data = (char *)calloc(download->chdr->content_len(), 1);
+			download->set_data_buf((char *)calloc(download->chdr()->content_len(), 1));
+			syslog(LOG_INFO, "Chunk data addr: %lu size %zu",
+					(long unsigned int)download->data_buf(),
+					download->chdr()->content_len());
 		}
 
 		// Copy data based on stream offset. Allows out-of-order packets
-		memcpy(download->data + offset - data_offset, payload, payload_len);
+		memcpy(download->data_buf() + offset - data_offset,
+				payload, payload_len);
+		syslog(LOG_INFO, "Copying %zu bytes of chunk data to addr %lu",
+				payload_len,
+				(long unsigned int)(download->data_buf()+offset-data_offset));
 	}
 
 skip_data:
 	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
 		// FIN Received, cache the chunk
 
-		meta = ctrl->acquire_meta(chunk_id);
-		meta->set_content_header(download->chdr);
-		if(meta->valid_data(download->data)) {
+		meta = download->meta();
+		syslog(LOG_INFO, "meta in download points to %lu",
+				(long unsigned int) meta);
+		assert(download->chdr() != NULL);
+		meta->set_content_header(download->chdr());
+		// Convert downloaded data into a string
+		std::string chunk_datastr(download->data_buf(),
+				download->chdr()->content_len());
+		if(meta->valid_data(chunk_datastr)) {
 			syslog(LOG_INFO, "chunk is valid: %s", chunk_id.c_str());
 
-			meta->set_ttl(download->chdr->ttl());
+			meta->set_ttl(download->chdr()->ttl());
 			meta->set_created();
-			meta->set_length(download->chdr->content_len());
+			meta->set_length(download->chdr()->content_len());
 			meta->set_state(READY_TO_SAVE);
+			syslog(LOG_INFO, "saving metadata for CID:%s",
+					meta->store_id().c_str());
+			ctrl->add_meta(meta);
+			assert(ctrl->acquire_meta(chunk_id) != NULL);
 			// printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
 			req->type = xcache_cmd::XCACHE_CACHE;
 			req->cid = strdup(chunk_id.c_str());
-			req->data = download->data;
-			req->datalen = ntohl(download->chdr->content_len());
+			req->data = download->data_buf();
+			req->datalen = download->chdr()->content_len();
 			ctrl->enqueue_request_safe(req);
 
 			/* Perform cleanup */
-			ongoing_downloads.erase(iter);
-			free(download->chdr_data);
-			free(download);
-			ctrl->release_meta(meta);
+			downloads_it = ongoing_downloads.find(chunk_id);
+			if(downloads_it != ongoing_downloads.end()) {
+				ongoing_downloads.erase(downloads_it);
+			}
+			delete download;
 		} else {
 			// Drop everything related to this chunk being cached.
 			//
@@ -411,11 +455,12 @@ skip_data:
 			// If we want to support that scenario, then support it fully
 			// instead of leaving this partial chunk hanging.
 			syslog(LOG_ERR, "Invalid chunk, discarding: %s", chunk_id.c_str());
-			ctrl->remove_meta(meta);
-			ongoing_downloads.erase(iter);
-			free(download->chdr_data);
-			free(download->chdr);
-			free(download->data);
+			downloads_it = ongoing_downloads.find(chunk_id);
+			if(downloads_it != ongoing_downloads.end()) {
+				ongoing_downloads.erase(downloads_it);
+			}
+			download->destroy();
+			delete download;
 		}
 	}
 }
