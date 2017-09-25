@@ -12,8 +12,8 @@ Use NCIDs from scratch:
 2. Create a Publisher
 	./daemons/xcache/publisher/publisher.py -n Netflix -p -k -r
 3. CA certifies the Publisher via a signed certificate
-	./daemons/xcache/ca/ca.py --sign ./publisher/Netflix/Netflix.req --config ./publisher/Netflix/Netflix.conf
-	mv Netflix.cert publisher/Netflix
+	./daemons/xcache/ca/ca.py --sign ./publishers/Netflix/Netflix.req --config ./publishers/Netflix/Netflix.conf
+	mv Netflix.cert publishers/Netflix
 4. Publish the certificate for Clients to find
 	./bin/announce_publisher Netflix
 5. Create a demo NCID and store into Xcache
