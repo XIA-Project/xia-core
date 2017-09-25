@@ -1,12 +1,16 @@
 include ../../../xia.mk
 CFLAGS+=-g -I../../../click/include/click -std=c++11
 LDFLAGS+=$(LIBS) -lpthread -lprotobuf
-all: stage_utils.o getWifiInfo ftpServer ftpClient mulServer mulClient stageManager stage_manager_multihoming stage_manager_soft stageServer stage_server_multihoming stage_server_soft xping testXping switchAP AP multihoming_client multihoming_server disconnection
+all: stage_utils.o getWifiInfo ftpServer ftpClient mulServer mulClient stageManager stage_manager_multihoming stage_manager_soft stageServer stage_server_multihoming stage_server_soft xping testXping switchAP AP multihoming_client multihoming_server disconnection predic_adv_client predic_server
 	rm stage_utils.o
 stage_utils.o:
 	$(CC) $(CFLAGS) -c stage_utils.c
 getWifiInfo:
 	$(CC) $(CFLAGS) getWifiInfo.c stage_utils.o -o getWifiInfo $(LDFLAGS)
+predic_adv_client:
+	$(CC) $(CFLAGS) predic_adv_client.c stage_utils.o -o predic_adv_client $(LDFLAGS)
+predic_server:
+	$(CC) $(CFLAGS) predic_server.c stage_utils.o -o predic_server $(LDFLAGS)
 ftpServer:
 	$(CC) $(CFLAGS) xftp_adv_server.c stage_utils.o -o xftp_adv_server $(LDFLAGS)
 ftpClient:
@@ -42,4 +46,4 @@ multihoming_server:
 disconnection:
 	$(CC) $(CFLAGS) disconnection.c stage_utils.o -o disconnection $(LDFLAGS)
 clean:
-	rm -f getWifiInfo stage_server stage_manager xftp_adv_server xftp_adv_client xping testXping switchAP AP multihoming_client multihoming_server disconnection stage_manager_multihoming stage_server_multihoming mulServer mulClient stage_manager_soft stage_server_soft stage_utils.o
+	rm -f getWifiInfo stage_server stage_manager xftp_adv_server xftp_adv_client xping testXping switchAP AP multihoming_client multihoming_server disconnection stage_manager_multihoming stage_server_multihoming mulServer mulClient stage_manager_soft stage_server_soft predic_adv_client predic_server stage_utils.o
