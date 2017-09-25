@@ -304,14 +304,20 @@ int main(int argc, char **argv)
 {
 	getConfig(argc, argv);
 
-	int sock = registerReceiver();
+	
 
 	if (XcacheHandleInit(&xcache) < 0) {
 		die(-1, "Unable to initialze the cache subsystem\n");
 	}
-
+	sockaddr_x *info = NULL;
+	XputFile(&xcache, "1", chunksize, &info);
+	XputFile(&xcache, "2", chunksize, &info);
+	XputFile(&xcache, "3", chunksize, &info);
+	XputFile(&xcache, "4", chunksize, &info);
+	XputFile(&xcache, "5", chunksize, &info);
 	XcacheHandleSetTtl(&xcache, ttl);
 
+	int sock = registerReceiver();
 	// set the base directory. This affects all paths for the app,
 	// so do it after we've initialized everything otherwise the paths
 	// to /tmp and the keys directory will be incorrect
