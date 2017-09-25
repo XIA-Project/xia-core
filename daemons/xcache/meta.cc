@@ -134,6 +134,7 @@ xcache_meta *meta_map::acquire_meta(std::string cid)
 
 	// Sanity check user provided argument
 	if(cid.size() < (CLICK_XIA_XID_ID_LEN*2)) {
+		syslog(LOG_ERR, "Meta for invalid content id %s", cid.c_str());
 		return NULL;
 	}
 
@@ -169,6 +170,9 @@ void meta_map::add_meta(xcache_meta *meta)
 	write_lock();
 	// Metadata is only stored by CID
 	_map[meta->store_id()] = meta;
+	if(meta->store_id() != meta->id()) {
+		_ncid_table->register_ncid(meta->id(), meta->store_id());
+	}
 	unlock();
 }
 
