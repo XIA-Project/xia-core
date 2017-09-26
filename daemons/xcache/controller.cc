@@ -494,8 +494,6 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	size_t s_pos = name.find('/');	// position of first '/'
 	std::string publisher_name = name.substr(0, s_pos);
 	std::string content_name = name.substr(s_pos + 1, name.size());
-	std::cout << "Publisher: " << publisher_name << std::endl;
-	std::cout << "Content: " << content_name << std::endl;
 	// Get reference to a Publisher object that can build NCID
 	// NOTE: This object cannot sign new content. Just verify it.
 	PublisherList *publishers = PublisherList::get_publishers();
