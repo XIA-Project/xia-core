@@ -3,6 +3,9 @@
 
 #include <click/element.hh>
 #include <clicknet/xia.h>
+#include <click/hashtable.hh>
+
+#include <string>
 
 CLICK_DECLS
 
@@ -18,7 +21,10 @@ CLICK_DECLS
 
 class XIACidFilter : public Element {
 private:
+	void blacklist(Packet *p);
+	int blacklisted(String id);
 	bool enabled;
+	HashTable<String, int> _blacklist;
 
 public:
 	XIACidFilter();

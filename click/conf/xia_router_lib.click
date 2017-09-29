@@ -24,7 +24,7 @@ elementclass CacheFilter {
 	//  used to change state
 	//   write <hostname>/cf/cidFilter.enable true|false
 
-	XcacheSock::Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true, SNAPLEN 65536);
+	XcacheSock::Socket(UNIX, "/tmp/xcache-click.sock", SNAPLEN 65536);
 	srcCidClassifier::XIAXIDTypeClassifier(src CID, src NCID, -);
 
 	cidFilter::XIACidFilter(true);	// if false, don't cache

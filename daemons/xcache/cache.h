@@ -25,6 +25,7 @@ struct cache_args {
 class xcache_cache {
 private:
 	static xcache_controller *ctrl;
+	void blacklist(int cfsock, char *pkt, size_t len);
 	// Ongoing downloads are keyed by source intent CID/NCID
 	std::map<std::string, cache_download *> ongoing_downloads;
 
@@ -35,8 +36,10 @@ public:
 	xcache_cache() {
 	}
 
-	void process_pkt(xcache_controller *ctrl, char *pkt, size_t len);
-	int validate_pkt(char *pkt, size_t len, std::string &cid, std::string &sid, struct xtcp **xtcp);
+	void process_pkt(int cfsock, xcache_controller *ctrl,
+			char *pkt, size_t len);
+	int validate_pkt(char *pkt, size_t len, std::string &cid,
+			std::string &sid, struct xtcp **xtcp);
 	cache_download* start_new_download(struct xtcp *tcp,
 			std::string cid, std::string sid);
 	void unparse_xid(struct click_xia_xid_node *node, std::string &xid);

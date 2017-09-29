@@ -27,7 +27,7 @@ int xcache_cache::create_click_socket()
 {
 	int s;
 
-	if ((s = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+	if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		syslog(LOG_ERR, "can't create click socket: %s", strerror(errno));
 		return -1;
 	}
@@ -37,7 +37,7 @@ int xcache_cache::create_click_socket()
 	sa.sun_family = AF_UNIX;
 	strcpy(sa.sun_path, CACHE_SOCK_NAME);
 
-	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1) {
+	if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == -1) {
 		syslog(LOG_ERR, "unable to bind: %s", strerror(errno));
 		return -1;
 	}
@@ -199,14 +199,38 @@ cache_download* xcache_cache::start_new_download(struct xtcp *tcp,
 	return download;
 }
 
+void xcache_cache::blacklist(int cfsock, char *pkt, size_t len)
+{
+	struct click_xia *xiah = (struct click_xia *)pkt;
+	Graph dst_dag, src_dag;
+	if(len < sizeof(click_xia) +
+			((xiah->dnode + xiah->snode) * sizeof(click_xia_xid_node))) {
+		syslog(LOG_ERR, "Cache::blacklist Packet too short");
+		return;
+	}
+	dst_dag.from_wire_format(xiah->dnode, &xiah->node[0]);
+	src_dag.from_wire_format(xiah->snode, &xiah->node[xiah->dnode]);
+	Node dst_intent = dst_dag.get_final_intent();
+	Node src_intent = src_dag.get_final_intent();
+	std::string session_id = src_intent.to_string() + dst_intent.to_string();
+	syslog(LOG_INFO, "Cache: blacklisting:%s:", session_id.c_str());
+	ssize_t sent = send(cfsock, session_id.c_str(), session_id.size(), 0);
+	if(sent != (ssize_t) session_id.size()) {
+		syslog(LOG_ERR, "Cache: Sent %zu to Click instead of %zu", sent,
+					session_id.size());
+	}
+}
+
 /*!
  * @brief Process a packet that we are eavesdropping on
  *
+ * @param cfsock socket to talk to CacheFilter in Click
  * @param ctrl a reference to the xcache controller
  * @param pkt the buffer containing the packet being observed
  * @param len length of the packet buffer
  */
-void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
+void xcache_cache::process_pkt(int cfsock,
+		xcache_controller *ctrl, char *pkt, size_t len)
 {
 	int rc;
 	struct xtcp *tcp;
@@ -245,8 +269,9 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 	meta = ctrl->acquire_meta(chunk_id);
 	if(meta != NULL) {
 		ctrl->release_meta(meta);
-		syslog(LOG_INFO, "%s In-flight chunk known to controller. Ignore",
+		syslog(LOG_INFO, "%s In-flight chunk known to controller. Blacklist",
 				chunk_id.c_str());
+		blacklist(cfsock, pkt, len);
 		return;
 	}
 	meta = NULL; // we reuse meta to point to in-flight chunk meta later
@@ -296,6 +321,7 @@ void xcache_cache::process_pkt(xcache_controller *ctrl, char *pkt, size_t len)
 		//  so we can ignore this stream's data
 		//  otherwise we'll have memory overrun issues due to different sequence #s
 		// syslog(LOG_INFO, "don't cross the streams!");
+		blacklist(cfsock, pkt, len);
 		return;
 	}
 
@@ -468,19 +494,20 @@ skip_data:
 void *xcache_cache::run(void *arg)
 {
 	struct cache_args *args = (struct cache_args *)arg;
-	int s, ret;
+	int ret;
+	int cfsock;
 	char buffer[XIA_MAXBUF];
 
 	(void)args;
 
-	if ((s = create_click_socket()) < 0) {
+	if ((cfsock = create_click_socket()) < 0) {
 		syslog(LOG_ALERT, "Failed to create a xcache:click socket\n");
 		pthread_exit(NULL);
 	}
 
 	do {
 		syslog(LOG_DEBUG, "Cache listening for data from click\n");
-		ret = recvfrom(s, buffer, XIA_MAXBUF, 0, NULL, NULL);
+		ret = recv(cfsock, buffer, XIA_MAXBUF, 0);
 		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
 			pthread_exit(NULL);
@@ -491,7 +518,7 @@ void *xcache_cache::run(void *arg)
 		}
 
 		syslog(LOG_DEBUG, "Cache received a message of size = %d\n", ret);
-		args->cache->process_pkt(args->ctrl, buffer, ret);
+		args->cache->process_pkt(cfsock, args->ctrl, buffer, ret);
 
 	} while(1);
 }
