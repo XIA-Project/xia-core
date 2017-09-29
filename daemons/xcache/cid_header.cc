@@ -48,7 +48,6 @@ CIDHeader::deserialize(const std::string &buf)
 		return false;
 	}
 	if(!chdr_buf.has_cid_header()) {
-		std::cout << "CIDHeader not found in provided buffer" << std::endl;
 		return false;
 	}
 	const CIDHeaderBuf cid_hdr = chdr_buf.cid_header();

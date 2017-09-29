@@ -33,7 +33,7 @@ int NCIDDemoClient::fetch()
 	// Store it as a named chunk
 	int ret;
 	void *buf;
-	int flags = XCF_BLOCK;
+	int flags = XCF_BLOCK | XCF_CACHE;
 	buf = NULL;
 	std::string name = _publisher + "/" + _content_name;
 	std::cout << "Fetching: " << name << std::endl;
