@@ -681,6 +681,7 @@ case $1 in
 		visualizer "stop"
 		check_all_services
 		rm -f /tmp/xcache*
+		rm -f /tmp/cachefilter*.sock
 		;;
 	restart|reload)
 		echo "Stopping XIA"

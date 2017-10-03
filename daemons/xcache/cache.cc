@@ -15,6 +15,7 @@
 #include <clicknet/xtcp.h>
 
 #define CACHE_SOCK_NAME "/tmp/xcache-click.sock"
+#define CACHEFILTER_SOCK_NAME "/tmp/cachefilter-click.sock"
 
 void xcache_cache::spawn_thread(struct cache_args *args)
 {
@@ -23,11 +24,38 @@ void xcache_cache::spawn_thread(struct cache_args *args)
 	pthread_create(&cache, NULL, run, (void *)args);
 }
 
+/*!
+ * @brief create control socket to talk to CacheFilter in Click
+ *
+ * Simply create a socket that will be used to send control packets
+ * to CacheFilter in Click. The CacheFilter binds to this socket
+ * as a server and receives any packets we send to it.
+ *
+ * @returns socket descriptor on success, -1 on failure
+ */
+int xcache_cache::create_cachefilter_socket()
+{
+	int s;
+	if ((s = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
+		syslog(LOG_ERR, "Can't create socket: %s", strerror(errno));
+		return -1;
+	}
+	return s;
+}
+
+/*!
+ * @brief create bound socket to receive in-flight packets
+ *
+ * Create a socket bound to CACHE_SOCK_NAME. CacheFilter in Click
+ * will forward in-flight packets to this socket.
+ *
+ * @returns socket descriptor on success, -1 on failure
+ */
 int xcache_cache::create_click_socket()
 {
 	int s;
 
-	if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+	if ((s = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1) {
 		syslog(LOG_ERR, "can't create click socket: %s", strerror(errno));
 		return -1;
 	}
@@ -37,7 +65,7 @@ int xcache_cache::create_click_socket()
 	sa.sun_family = AF_UNIX;
 	strcpy(sa.sun_path, CACHE_SOCK_NAME);
 
-	if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == -1) {
+	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1) {
 		syslog(LOG_ERR, "unable to bind: %s", strerror(errno));
 		return -1;
 	}
@@ -199,8 +227,14 @@ cache_download* xcache_cache::start_new_download(struct xtcp *tcp,
 	return download;
 }
 
+/*!
+ * @brief Blacklist the flow that this packet belongs to
+ *
+ * Ask CacheFilter in Click to block packets related to this flow.
+ */
 void xcache_cache::blacklist(int cfsock, char *pkt, size_t len)
 {
+	// Retrieve source and destination DAGs from the packet
 	struct click_xia *xiah = (struct click_xia *)pkt;
 	Graph dst_dag, src_dag;
 	if(len < sizeof(click_xia) +
@@ -210,11 +244,23 @@ void xcache_cache::blacklist(int cfsock, char *pkt, size_t len)
 	}
 	dst_dag.from_wire_format(xiah->dnode, &xiah->node[0]);
 	src_dag.from_wire_format(xiah->snode, &xiah->node[xiah->dnode]);
+
+	// Retrieve intent nodes from the source and destination DAGs
 	Node dst_intent = dst_dag.get_final_intent();
 	Node src_intent = src_dag.get_final_intent();
+
+	// SessionID = <src_intent> + <dst_intent> = CID + SIDclient
 	std::string session_id = src_intent.to_string() + dst_intent.to_string();
 	syslog(LOG_INFO, "Cache: blacklisting:%s:", session_id.c_str());
-	ssize_t sent = send(cfsock, session_id.c_str(), session_id.size(), 0);
+
+	// Build address of CacheFilter to send a packet to it
+	sockaddr_un sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sun_family = AF_UNIX;
+	strcpy(sa.sun_path, CACHEFILTER_SOCK_NAME);
+
+	ssize_t sent = sendto(cfsock, session_id.c_str(), session_id.size(), 0,
+			(struct sockaddr *) &sa, sizeof(sa));
 	if(sent != (ssize_t) session_id.size()) {
 		syslog(LOG_ERR, "Cache: Sent %zu to Click instead of %zu", sent,
 					session_id.size());
@@ -495,19 +541,23 @@ void *xcache_cache::run(void *arg)
 {
 	struct cache_args *args = (struct cache_args *)arg;
 	int ret;
-	int cfsock;
+	int csock, cfsock;
 	char buffer[XIA_MAXBUF];
 
 	(void)args;
 
-	if ((cfsock = create_click_socket()) < 0) {
+	if ((csock = create_click_socket()) < 0) {
 		syslog(LOG_ALERT, "Failed to create a xcache:click socket\n");
+		pthread_exit(NULL);
+	}
+	if ((cfsock = create_cachefilter_socket()) < 0) {
+		syslog(LOG_ERR, "Failed creating sock to talk to CacheFilter\n");
 		pthread_exit(NULL);
 	}
 
 	do {
 		syslog(LOG_DEBUG, "Cache listening for data from click\n");
-		ret = recv(cfsock, buffer, XIA_MAXBUF, 0);
+		ret = recvfrom(csock, buffer, XIA_MAXBUF, 0, NULL, NULL);
 		if(ret < 0) {
 			syslog(LOG_ERR, "Error while reading from socket: %s\n", strerror(errno));
 			pthread_exit(NULL);

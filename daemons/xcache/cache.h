@@ -47,6 +47,7 @@ public:
 
 	static void *run(void *);
 	static int create_click_socket();
+	static int create_cachefilter_socket();
 	static void spawn_thread(struct cache_args *);
 };
 

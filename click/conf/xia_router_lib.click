@@ -24,7 +24,12 @@ elementclass CacheFilter {
 	//  used to change state
 	//   write <hostname>/cf/cidFilter.enable true|false
 
-	XcacheSock::Socket(UNIX, "/tmp/xcache-click.sock", SNAPLEN 65536);
+	// Socket to forward packets to Xcache
+	XcacheSock::Socket(UNIX_DGRAM, "/tmp/xcache-click.sock", CLIENT true,
+		SNAPLEN 65536);
+	// Socket to receive control requests from Xcache. e.g. blacklist
+	CacheFilterSock::Socket(UNIX_DGRAM, "/tmp/cachefilter-click.sock",
+		SNAPLEN 65536);
 	srcCidClassifier::XIAXIDTypeClassifier(src CID, src NCID, -);
 
 	cidFilter::XIACidFilter(true);	// if false, don't cache
@@ -41,7 +46,7 @@ elementclass CacheFilter {
 	cidFork[1]->[1]cidFilter;
 
 	// there is no useful info from xcache to the filter, we can remove this linkage at some point
-	XcacheSock -> cidFilter -> XcacheSock;
+	CacheFilterSock -> cidFilter -> XcacheSock;
 };
 
 elementclass GenericPostRouteProc {
