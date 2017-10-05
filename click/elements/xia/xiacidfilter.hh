@@ -3,6 +3,7 @@
 
 #include <click/element.hh>
 #include <clicknet/xia.h>
+#include <click/timer.hh>
 #include <click/hashtable.hh>
 
 #include <string>
@@ -24,7 +25,11 @@ private:
 	void blacklist(Packet *p);
 	int blacklisted(String id);
 	bool enabled;
-	HashTable<String, int> _blacklist;
+	HashTable<String, Timestamp> _blacklist;
+	Timer _cleanup_timer;
+
+protected:
+	void run_timer(Timer *timer);
 
 public:
 	XIACidFilter();
