@@ -445,6 +445,27 @@ rendezvous()
 }
 
 #
+# create a directory in $XIADIR if it doesn't exist
+#
+create_dir_if_missing()
+{
+	local dirname=$1
+
+	if [ ! -d "$XIADIR/$dirname" ]; then
+		mkdir $XIADIR/$dirname
+		if [ $? -ne 0 ]; then
+			echo Failed creating $XIADIR/$dirname
+			exit 0
+		fi
+		chmod 777 $XIADIR/$dirname
+		if [ $? -ne 0 ]; then
+			echo Failed changing permissions for $XIADIR/$dirname
+			exit 0
+		fi
+	fi
+}
+
+#
 # read etc/nodes.conf and perform the given action on each node
 # assumes the first host found is the nameserver
 # FIXME: work out a better solution for setting the name server in a local topology
@@ -657,6 +678,9 @@ if [ "$1" == "--version" ]; then
 	echo xianet $VERSION
 	exit 0
 fi
+
+create_dir_if_missing "ca"
+create_dir_if_missing "publishers"
 
 setup $@
 shift $((OPTIND-1))
