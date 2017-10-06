@@ -401,6 +401,14 @@ void xcache_cache::process_pkt(int cfsock,
 		assert(payload_len >= sizeof(chdr_len));
 		memcpy(&chdr_len, payload, sizeof(chdr_len));
 		chdr_len = ntohl(chdr_len); // convert from network to host order
+
+		// If content header length is zero, remote server didn't find chunk
+		if(chdr_len == 0) {
+			syslog(LOG_INFO, "Chunk lookup failed. Skip this chunk");
+			blacklist(cfsock, pkt, len);
+			return;
+		}
+
 		download->set_chdr_len(chdr_len);
 		syslog(LOG_INFO, "Content header len:%u", download->chdr_len());
 
