@@ -69,6 +69,7 @@ std::string Publisher::pubkey()
 {
 	char pubkeybuf[MAX_PUBKEY_SIZE];
 	uint16_t pubkeylen = MAX_PUBKEY_SIZE;
+	memset(pubkeybuf, 0, pubkeylen);
 
 	// Pubkey should be in a file in the credential directory
 	std::string pubkeypath = keydir() + "/" + name() + ".pub";
@@ -184,7 +185,8 @@ bool Publisher::fetch_cert_dag()
 	std::string cert_url = cert_name();
 
 	if(XgetDAGbyName(cert_url.c_str(), &addr, &addrlen)) {
-		std::cout << "cert_dag: could not be found" << std::endl;
+		std::cout << "Publisher::fetch_cert_dag: "
+			<< "could not be found" << std::endl;
 		_cert_dag = NULL;
 		return false;
 	}
@@ -220,7 +222,8 @@ bool Publisher::fetch_pubkey()
 
 	// Store certificate DAG for building NCID DAGs in future
 	if(fetch_cert_dag() == false) {
-		std::cout << "ERROR fetching Publisher cert addr" << std::endl;
+		std::cout << "Publisher::fetch_pubkey: " <<
+			"ERROR fetching Publisher cert addr" << std::endl;
 		return false;
 	}
 
@@ -333,6 +336,10 @@ std::string Publisher::ncid(std::string content_name)
 {
 	std::string URI = content_URI(content_name);
 	std::string pubkeystr = pubkey();
+	if(pubkeystr.size() == 0) {
+		std::cout << "Publisher::ncid: ERROR return empty string" << std::endl;
+		return "";
+	}
 	std::string ncid_data = URI + pubkeystr;
 	char ncidhex[XIA_SHA_DIGEST_STR_LEN];
 	int ncidlen = XIA_SHA_DIGEST_STR_LEN;
@@ -360,7 +367,11 @@ std::string Publisher::ncid(std::string content_name)
  */
 std::string Publisher::ncid_dag(std::string content_name)
 {
-	Node ncid_node(ncid(content_name));
+	std::string ncidstr = ncid(content_name);
+	if(ncidstr.size() == 0) {
+		return "";
+	}
+	Node ncid_node(ncidstr);
 
 	// Fetch address for Publisher certificate, if not known already
 	if(fetch_cert_dag() == false) {
