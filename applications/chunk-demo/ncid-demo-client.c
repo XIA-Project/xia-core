@@ -39,7 +39,7 @@ int NCIDDemoClient::fetch()
 	std::cout << "Fetching: " << name << std::endl;
 	ret = XfetchNamedChunk(&_xcache, &buf, flags, name.c_str());
 	if (ret < 0) {
-		std::cout << "Failed publishing named chunk" << std::endl;
+		std::cout << "Failed fetching named chunk" << std::endl;
 		return ret;
 	}
 	if(ret > 0) {
