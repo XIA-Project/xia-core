@@ -501,9 +501,12 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	// Build DAG for retrieving the NCID
 	std::string ncid_dag_str = publisher->ncid_dag(content_name);
 	if(ncid_dag_str == "") {
-		std::cout << "xcache_fetch_named_content Cannot find addr for " <<
-			name << std::endl;
-		return -1;
+		std::cout << "Controller::xcache_fetch_named_content "
+			<< "Cannot find addr for " << name << std::endl;
+		std::cout << "Controller::xcache_fetch_named_content "
+			<< "RET_FAILED:" << RET_FAILED << " returning:-1" << std::endl;
+		resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+		return RET_SENDRESP;
 	}
 	// Fill in the NCID DAG in the user's command
 	Graph ncid_dag(ncid_dag_str);
@@ -1195,6 +1198,7 @@ void xcache_controller::process_req(xcache_req *req)
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
 		}
+		break;
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 		// Fetch a CID requested by the user. May be local or remote
 		cmd = (xcache_cmd *)req->data;
