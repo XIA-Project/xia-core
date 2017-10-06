@@ -766,6 +766,9 @@ int xs_readPubkeyFile(const char *pubfilepath,
 	RSA *rsa;
 	int retval = -1;
 
+	// Clear out the user provided buffer in case they forgot to
+	bzero(pubkey, *pubkey_len);
+
 	// Read in the public key file
     fp = fopen(pubfilepath, "r");
 	if(fp == NULL) {
