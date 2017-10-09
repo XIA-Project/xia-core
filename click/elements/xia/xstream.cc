@@ -1792,8 +1792,8 @@ XStream::tcp_xmit_timer(short rtt) {
 	 * and the return path might not be symmetrical).
 	 */
 	// tp->t_softerror = 0;
-	if (tp->t_rxtcur > 20)
-        tp->t_rxtcur = 20;
+	//if (tp->t_rxtcur > 20)
+        //tp->t_rxtcur = 20;
 }
 
 void
