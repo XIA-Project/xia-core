@@ -785,12 +785,12 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
 	// cid was vaidated by in the API call
-	syslog(LOG_INFO, "evict called for cid:%s!\n", cmd->cid().c_str());
+	syslog(LOG_INFO, "evict called for content:%s!\n", cmd->cid().c_str());
 
 	xcache_meta *meta = acquire_meta(cid.c_str());
 
 	if (meta) {
-		std::string c = "CID:" + cid;
+		std::string c = cid;
 
 		switch (meta->state()) {
 			case AVAILABLE:

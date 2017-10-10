@@ -357,10 +357,15 @@ int XevictChunk(XcacheHandle *h, const char *cid)
 {
 	int rc = xcache_cmd::XCACHE_OK;
 	xcache_cmd cmd;
+	int id_offset = 0;
 
-	if (strncasecmp(cid, "cid:", 4) == 0)
-		cid += 4;
-	if (strlen(cid) != (XID_SIZE * 2)) {
+	if (strncasecmp(cid, "cid:", 4) == 0) {
+		id_offset = strlen("cid:");
+	}
+	if (strncasecmp(cid, "ncid:", 4) == 0) {
+		id_offset = strlen("ncid:");
+	}
+	if (strlen(cid+id_offset) != (XID_SIZE * 2)) {
 		return xcache_cmd::XCACHE_INVALID_CID;
 	}
 
