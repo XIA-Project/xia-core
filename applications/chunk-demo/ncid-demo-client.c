@@ -3,7 +3,6 @@
 NCIDDemoClient::NCIDDemoClient()
 {
 	std::cout << "Starting NCIDDemoClient" << std::endl;
-	std::cout << "Opening a socket to publish data" << std::endl;
 
 	if((_sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		throw "Unable to create socket for client";
@@ -13,8 +12,6 @@ NCIDDemoClient::NCIDDemoClient()
 	if(XcacheHandleInit(&_xcache)) {
 		throw "Unable to talk to xcache";
 	}
-
-	std::cout << "Started NCIDDemoClient" << std::endl;
 }
 
 NCIDDemoClient::~NCIDDemoClient()
@@ -37,6 +34,7 @@ int NCIDDemoClient::fetch()
 	buf = NULL;
 	std::string name = _publisher + "/" + _content_name;
 	std::cout << "Fetching: " << name << std::endl;
+
 	ret = XfetchNamedChunk(&_xcache, &buf, flags, name.c_str());
 	if (ret < 0) {
 		std::cout << "Failed fetching named chunk" << std::endl;
