@@ -206,6 +206,10 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	// Convert header_len to host order from network byte order
 	header_len = ntohl(header_len);
+	if(header_len == 0) {
+		syslog(LOG_ERR, "Remote content not found. Empty header");
+		goto fetch_content_remote_done;
+	}
 
 	syslog(LOG_INFO, "Getting chunk header of size %u", header_len);
 
@@ -344,6 +348,10 @@ int xcache_controller::fetch_content_local(sockaddr_x *addr, socklen_t addrlen,
 			expected_cid.to_string().c_str());
 
 	std::string cid = _ncid_table->to_cid(expected_cid.to_string());
+	if (cid.size() == 0) {
+		syslog(LOG_INFO, "NCID not available locally");
+		return RET_FAILED;
+	}
 	syslog(LOG_INFO, "Reading %s from storage", cid.c_str());
 
 	IGNORE_PARAM(flags);
@@ -998,20 +1006,21 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	Graph g(mypath);
 	Node cid(g.get_final_intent());
 	xcache_cmd resp;
+	std::string header;
 
-	syslog(LOG_INFO, "CID = %s\n", cid.id_string().c_str());
-
-	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0) != RET_OK) {
-		syslog(LOG_ALERT, "This should not happen");
-		assert(0);
+	// Get the content from local storage
+	if (fetch_content_local(mypath, sizeof(sockaddr_x), &resp, NULL, 0)
+			!= RET_OK) {
+		// If chunk not found, return empty header
+		header = "";
+	} else {
+		// cid can be CID or NCID. If CID, there may be no NCID associated
+		std::string cid_str = _ncid_table->to_cid(cid.to_string());
+		assert(cid_str.size() > 0);
+		xcache_meta *meta = acquire_meta(cid_str);
+		assert(meta);
+		header = meta->content_header_str();
 	}
-
-	// cid can be CID or NCID. If CID, there may be no NCID associated
-	std::string cid_str = _ncid_table->to_cid(cid.to_string());
-	assert(cid_str.size() > 0);
-	xcache_meta *meta = acquire_meta(cid_str);
-	assert(meta);
-	std::string header = meta->content_header_str();
 	size_t remaining;
 	size_t offset;
 	int sent;
@@ -1040,6 +1049,11 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		}
 		remaining -= sent;
 		offset += sent;
+	}
+
+	// If the header size was 0, no chunk was found, so return
+	if (header.size() == 0) {
+		return;
 	}
 
 	// and finally, the data
