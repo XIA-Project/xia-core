@@ -37,7 +37,7 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 """
 class Publisher:
     """ Named Content Publisher
-    
+
     Publisher provides signatures for content that Clients can trust.
     This is achieved by having a Publisher certificate from a CA whose
     root certificate is trusted by the clients.
@@ -49,7 +49,7 @@ class Publisher:
     5. Publisher can now use its private key to sign content Clients can trust.
 
     """
-    
+
     def __init__(self, name):
         """ Create a keypair for Publisher if one doesn't exist """
 

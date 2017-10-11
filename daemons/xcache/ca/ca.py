@@ -19,7 +19,7 @@ from subprocess import check_call
 
 class CA:
     """ Certifying Authority
-    
+
     This is an implementation for a minimal CA that can produce a root
     certificate and sign certificates for given common names.
 
@@ -30,7 +30,7 @@ class CA:
     2. A root CA certificate is created if one doesn't exist
     """
     keydir = os.path.join(xiapyutils.xia_srcdir(), 'ca')
-    
+
     def __init__(self):
         """ Create a root certificate if one doesn't exist """
 

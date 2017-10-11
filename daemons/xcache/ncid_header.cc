@@ -15,7 +15,6 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 	_id = publisher->ncid(content_name);
 	_uri = publisher->content_URI(content_name);
 	_publisher_name = publisher_name;
-	// TODO: 
 	std::string signature;
 	if(publisher->sign(_uri, data, signature)) {
 		printf("ERROR: Unable to sign %s\n", _uri.c_str());
