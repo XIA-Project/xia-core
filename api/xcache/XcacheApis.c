@@ -389,7 +389,7 @@ int XevictChunk(XcacheHandle *h, const char *cid)
 }
 
 static int __XputChunk(XcacheHandle *h, const char *data, size_t length,
-		sockaddr_x *addr, int flags, struct chunk_extra *extra)
+		sockaddr_x *addr, int flags)
 {
 	xcache_cmd cmd;
 
@@ -398,9 +398,6 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length,
 	cmd.set_data(data, length);
 	cmd.set_flags(flags);
 	cmd.set_ttl(h->ttl);
-	if (extra != NULL) {
-		cmd.set_extra(extra, sizeof(struct chunk_extra));
-	}
 
 	if(send_command(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
@@ -431,14 +428,14 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length,
 }
 
 static inline int __XputDataChunk(XcacheHandle *h, const char *data,
-		size_t length, sockaddr_x *addr, struct chunk_extra *extra)
+		size_t length, sockaddr_x *addr)
 {
-	return __XputChunk(h, data, length, addr, XCF_DATACHUNK, extra);
+	return __XputChunk(h, data, length, addr, XCF_DATACHUNK);
 }
 
 static inline int __XputMetaChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
 {
-	return __XputChunk(h, data, length, addr, XCF_METACHUNK, NULL);
+	return __XputChunk(h, data, length, addr, XCF_METACHUNK);
 }
 
 /*!
@@ -461,9 +458,9 @@ static inline int __XputMetaChunk(XcacheHandle *h, const char *data, size_t leng
 **
 */
 int XputChunk(XcacheHandle *h, const char *data, size_t length,
-		sockaddr_x *addr, struct chunk_extra *extra)
+		sockaddr_x *addr)
 {
-	return __XputDataChunk(h, data, length, addr, extra);
+	return __XputDataChunk(h, data, length, addr);
 }
 
 /*!
@@ -647,7 +644,7 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 	i = 0;
 	while (!feof(fp)) {
 		if ((count = fread(buf, sizeof(char), chunkSize, fp)) > 0) {
-			rc = XputChunk(h, buf, count, &addrlist[i], NULL);
+			rc = XputChunk(h, buf, count, &addrlist[i]);
 			if(rc < 0) {
 				printf("Xputchunk failed in XputFile\n");
 				break;
@@ -733,7 +730,7 @@ int XputBuffer(XcacheHandle *h, const char *data, size_t length, size_t chunkSiz
 	while(offset < length) {
 		int to_copy = MIN(length - offset, chunkSize);
 		memcpy(buf, data + offset, to_copy);
-		rc = XputChunk(h, buf, to_copy, &addrlist[i], NULL);
+		rc = XputChunk(h, buf, to_copy, &addrlist[i]);
 		if(rc < 0)
 			break;
 		if(rc == xcache_cmd::XCACHE_ERR_EXISTS) {

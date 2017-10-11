@@ -110,34 +110,6 @@ static int xcache_create_lib_socket(void)
 	return s;
 }
 
-std::string xcache_controller::get_id(int *type, xcache_cmd *cmd)
-{
-	struct chunk_extra extra;
-	SHA_CTX ctx;
-	unsigned char digest[SHA_DIGEST_LENGTH];
-	char hex_string[SHA_DIGEST_LENGTH*2 + 1];
-
-	if (!cmd->has_extra()) {
-		*type = XID_TYPE_CID;
-		return compute_cid(cmd->data().c_str(), cmd->data().length());
-	}
-
-	memcpy(&extra, (const void *)cmd->extra().c_str(), cmd->extra().size());
-	*type = extra.chunk_type;
-
-	if (extra.chunk_type == XID_TYPE_CID) {
-		return compute_cid(cmd->data().c_str(), cmd->data().length());
-	}
-
-	SHA1_Init(&ctx);
-	SHA1_Update(&ctx, extra.u.ncid.name, strlen(extra.u.ncid.name));
-	SHA1_Update(&ctx, &(extra.u.ncid.certDAG), sizeof(sockaddr_x));
-	SHA1_Final(digest, &ctx);
-
-	xs_hexDigest(digest, SHA_DIGEST_LENGTH, hex_string, sizeof(hex_string));
-	return hex_string;
-}
-
 // FIXME: unused?
 void xcache_controller::status(void)
 {

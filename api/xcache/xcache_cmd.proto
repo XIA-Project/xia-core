@@ -45,7 +45,6 @@ message xcache_cmd {
 	optional int32 readoffset = 11;
 	optional int32 readlen = 12;
 	optional bytes msg = 13;
-	optional bytes extra = 15;
 	optional bytes publisher_name = 16;
 	optional bytes content_name = 17;
 };

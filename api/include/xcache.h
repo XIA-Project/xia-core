@@ -11,17 +11,6 @@ extern "C" {
 
 #define NCID_MAX_STRLEN 1024
 
-struct chunk_extra {
-	int chunk_type;
-
-	union {
-		struct chunk_ncid_extra {
-			char name[NCID_MAX_STRLEN];
-			sockaddr_x certDAG;
-		} ncid;
-	} u;
-};
-
 typedef struct {
 	char* cid;
 	size_t cidLen;
@@ -69,7 +58,7 @@ int XcacheHandleDestroy(XcacheHandle *h);
 int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl);
 
 extern int XputChunk(XcacheHandle *h, const char *data, size_t length,
-		sockaddr_x *info, struct chunk_extra *extra);  //DONE
+		sockaddr_x *info);  //DONE
 extern int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 		const char *content_name, const char *publisher_name);
 extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE

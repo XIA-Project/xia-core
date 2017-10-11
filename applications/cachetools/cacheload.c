@@ -128,7 +128,7 @@ void populate()
 
 			} else {
 				say("caching %8lu bytes as %s\n", info.st_size, chunk->d_name);
-				XputChunk(&xcache, buf, info.st_size, &addr, NULL);
+				XputChunk(&xcache, buf, info.st_size, &addr);
 			}
 		}
 		close(f);

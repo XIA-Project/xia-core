@@ -108,7 +108,6 @@ protected:
 public:
 	static xcache_controller *get_instance();
 
-	std::string get_id(int *type, xcache_cmd *cmd);
 	/**
 	 * Xcache Sender Thread.
 	 * For sending content chunk, this thread keeps on "Accepting" connections

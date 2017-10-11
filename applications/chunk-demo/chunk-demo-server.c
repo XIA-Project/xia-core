@@ -55,7 +55,7 @@ void die(int ecode, const char *fmt, ...)
 }
 
 
-int make_random_chunk(XcacheHandle *xcache, sockaddr_x *addr, int type)
+int make_random_chunk(XcacheHandle *xcache, sockaddr_x *addr)
 {
 	char chunk[CHUNKSIZE];
 	int i;
@@ -63,28 +63,8 @@ int make_random_chunk(XcacheHandle *xcache, sockaddr_x *addr, int type)
 	for (i = 0; i < CHUNKSIZE; i++)
 		chunk[i] = (char)random();
 
-	switch(type) {
-		case XID_TYPE_CID:
-			if (XputChunk(xcache, (const char *)chunk, (size_t)CHUNKSIZE,
-						addr, NULL) < 0) {
-				return -1;
-			}
-			break;
-		case XID_TYPE_NCID:
-			struct chunk_extra extra;
-
-			memset(&extra, 0, sizeof(chunk_extra));
-			extra.chunk_type = XID_TYPE_NCID;
-			strcpy(&extra.u.ncid.name[0], "ncid://chunk-demo/content");
-
-			if (XputChunk(xcache, (const char *)chunk, (size_t)CHUNKSIZE,
-						addr, &extra) < 0) {
-				return -1;
-			}
-			break;
-		default:
-			die(-1, "Invalid chunk type");
-	}
+	if (XputChunk(xcache, (const char *)chunk, (size_t)CHUNKSIZE, addr) < 0)
+		return -1;
 
 	return 0;
 }
@@ -115,23 +95,9 @@ void *recvCmd(void *socketid)
  			break;
 		}
 		//Sender does the chunking and then should start the sending commands
-		if (strncmp(command, "make_ncid", 9) == 0) {
-			say("Making a random NCID chunk\n");
-			if (make_random_chunk(&xcache, &addr, XID_TYPE_NCID) < 0) {
-				die(-1, "Could not make random NCID chunk\n");
-			}
-
-			Graph g(&addr);
-			int len = g.http_url_string().size()+1;
-
-			// Return the addr
-			if (Xsend(sock, g.http_url_string().c_str(), len, 0) < 0) {
-				warn("unable to send reply to client\n");
-				break;
-			}
-		} else if (strncmp(command, "make", 4) == 0) {
+		if (strncmp(command, "make", 4) == 0) {
 			say("Making a random CID chunk\n");
-			if (make_random_chunk(&xcache, &addr, XID_TYPE_CID) < 0) {
+			if (make_random_chunk(&xcache, &addr) < 0) {
 				die(-1, "Could not make random chunk\n");
 			}
 			Graph g(&addr);
