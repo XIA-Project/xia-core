@@ -856,7 +856,6 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		meta->set_ttl(chdr->ttl());
 		meta->set_created();
 		meta->set_length(cmd->data().length());
-		printf("store:length: %lu", meta->get_length());
 
 		if(__store(meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Unable to store %s", chdr->id().c_str());
@@ -935,7 +934,6 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 		meta->set_ttl(ttl);
 		meta->set_created();
 		meta->set_length(cmd->data().length());
-		printf("store:length: %lu\n", meta->get_length());
 
 		if(__store(meta, cmd->data()) == RET_FAILED) {
 			syslog(LOG_ERR, "Failed storing chunk");

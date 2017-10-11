@@ -698,10 +698,8 @@ int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
 
 	// Print the SHA1 hash in human readable form
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
-    xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
-    xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
 		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
@@ -728,7 +726,6 @@ int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
 		xs_chatter("xs_sign: RSA_sign failed");
 		goto xs_sign_with_key_done;
 	}
-    xs_chatter("xs_sign: signature length: %d", sig_len);
 
     //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);
