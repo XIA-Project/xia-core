@@ -1,6 +1,7 @@
-XDIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
-
-exportPATH=$XDIR/bin:$XDIR/tools:$PATH
+export PATH=~/xia-core/bin:~/xia-core/tools:$PATH
 
 [ "$EDITOR" == "" ] && export EDITOR=vi
+
+
+cd ~/xia-core
 
