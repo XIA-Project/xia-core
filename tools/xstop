@@ -1,0 +1,4 @@
+#!/bin/bash
+XDIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+sudo $XDIR/bin/xianet stop
