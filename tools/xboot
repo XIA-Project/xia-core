@@ -18,7 +18,7 @@ case $(hostname -s) in
 		;;
 
 	g-h*)
-		$X -enp6s7 -t $VERBOSE start
+		$X -fenp6s7 -t $VERBOSE start
 		;;
 	g-c*)
 		$X -fenp6s7 -rSn $VERBOSE start
