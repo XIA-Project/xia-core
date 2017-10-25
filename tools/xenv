@@ -1,0 +1,6 @@
+XDIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+
+exportPATH=$XDIR/bin:$XDIR/tools:$PATH
+
+[ "$EDITOR" == "" ] && export EDITOR=vi
+

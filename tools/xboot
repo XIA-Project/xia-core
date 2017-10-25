@@ -1,0 +1,30 @@
+#!/bin/bash
+
+XDIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
+X="sudo $XDIR/bin/xianet"
+
+[ "$1" == "-v" ] && VERBOSE="-vl6"
+
+
+case $(hostname -s) in
+	h*)
+		$X -fens33 -t $VERBOSE start
+		;;
+	c*)
+		$X -fens33 -rSn $VERBOSE start
+		;;
+	r*)
+		$X -fens33 -r $VERBOSE start
+		;;
+
+	g-h*)
+		$X -enp6s7 -t $VERBOSE start
+		;;
+	g-c*)
+		$X -fenp6s7 -rSn $VERBOSE start
+		;;
+	g-r*)
+		$X -fenp6s7 -r $VERBOSE start
+		;;
+esac
+
