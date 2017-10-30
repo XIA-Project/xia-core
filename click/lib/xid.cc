@@ -80,6 +80,9 @@ XID::unparse() const
         case CLICK_XIA_XID_TYPE_CID:
            c += sprintf(c, "CID");
            break;
+        case CLICK_XIA_XID_TYPE_NCID:
+           c += sprintf(c, "NCID");
+           break;
         case CLICK_XIA_XID_TYPE_SID:
            c += sprintf(c, "SID");
            break;

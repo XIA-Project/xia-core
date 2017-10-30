@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+message CIDHeaderBuf {
+	required int32 len = 1;
+	required int64 ttl = 2;
+	required string id = 3;
+}
+
+message NCIDHeaderBuf {
+	required int32 len = 1;
+	required int64 ttl = 2;
+	required string id = 3;
+	required string store_id = 4;
+	required bytes signature = 5;
+	required string publisher_name = 6;
+	required string uri = 7;
+}
+
+message ContentHeaderBuf {
+	oneof ContentHeaderType {
+		CIDHeaderBuf cid_header= 1;
+		NCIDHeaderBuf ncid_header = 2;
+	}
+}

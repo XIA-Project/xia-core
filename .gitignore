@@ -36,6 +36,8 @@ xia.mk
 
 # directories
 key
+ca
+publishers
 
 # ignore session layer files on this branch only
 api/session

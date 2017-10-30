@@ -1,0 +1,120 @@
+==============
+NCID operation
+==============
+
+Named Content is represented by NCID. This README shows how to set up the
+necessary components to use and test NCIDs.
+
+Use NCIDs from scratch:
+----------------------
+0. Remove any old state
+	./bin/xianet clean
+1. Create a CA
+	./daemons/xcache/ca/ca.py
+2. Create a Publisher
+	./daemons/xcache/publisher/publisher.py -n Netflix -p -k -r
+3. CA certifies the Publisher via a signed certificate
+	./daemons/xcache/ca/ca.py --sign ./publishers/Netflix/Netflix.req --config ./publishers/Netflix/Netflix.conf
+	mv Netflix.cert publishers/Netflix
+4. Publish the certificate for Clients to find
+	./bin/announce_publisher Netflix
+5. Create a demo NCID and store into Xcache
+	./applications/chunk-demo/ncid-demo-server
+
+6. Fetch the named chunk from a client
+	./applications/chunk-demo/ncid-demo-client
+
+After a Click restart:
+---------------------
+	Repeat steps 4 and 5 above on server.
+	and step 6 will fetch the content on the client
+
+
+NOTE: If ./bin/xianet clean is run you need to:
+1. Copy the resolv.conf file to all routers again
+2. Copy the ca.cert to all clients again
+3. If run on the server, repeat all of the steps including creating the CA
+
+=======
+DETAILS
+=======
+
+Certifying Authority
+--------------------
+Start the CA by running the following command:
+    ./daemons/xcache/ca/ca.py
+
+Enter a passphrase two times. Once to generate the key. Second time to use
+the CA key to sign the CA root certificate.
+
+The root certificate entries must be entered as prompted.
+
+Cope the root certificate ./ca/ca.cert to all clients at same location.
+
+Publisher
+---------
+Create a publisher with the command
+    ./daemons/xcache/publisher/publisher.py -n Netflix -p -k -r
+
+This creates a publisher called Netflix and stores its credentials in
+./publishers/Netflix
+
+The following files are created:
+Netflix.conf - A configuration for a certification request
+Netflix.key - The master key for Netflix publisher
+Netflix.priv - The private key derived from the master key
+Netfilx.pub - The public key for Netflix publisher
+Netflix.req - A request for CA to sign a certificate for Netflix
+
+CA cert for Publisher
+---------------------
+Now generate a CA Cert for our publisher
+./daemons/xcache/ca/ca.py --sign ./publishers/Netflix/Netflix.req  --config ./publishers/Netflix/Netflix.conf
+
+This creates Netflix.cert - a certificate that clients will trust.
+mv Netflix.cert publishers/Netflix/
+
+Publish the certificate for clients to retrieve
+-----------------------------------------------
+Announce our shiny new publisher to clients via nameservice:
+./bin/announce_publisher Netflix
+
+Reads the key from publishers/Netflix/Netflix.cert
+Adds it as a CID to Xcache
+Announces its location on the name service
+
+Testing with a demo client and server
+-------------------------------------
+On instance holding the private key of publisher, run the server.
+Note: This server exits after publishing a small chunk. Not really a server.
+./applications/chunk-demo/ncid-demo-server
+
+On any client that has ca/ca.cert copied to it, run the client.
+./applications/chunk-demo/ncid-demo-client
+
+
+The inner working of NCIDs
+--------------------------
+Server uses the XputNamedChunk API to publish a named chunk signed by
+the publisher. This chunk is stored in the local Xcache by its
+underlying CID. A table of published NCIDs and their corresponding CIDs
+is stored in memory.
+
+Client requests a named chunk via XfetchNamedChunk API. If the publisher's
+certificate is not available, it's DAG is requested from the name service.
+The publisher's certificate is then fetched and validated against the
+trusted CA certificate already present locally. The publisher's public
+key is then extracted and stored locally. The publisher credentials are
+only fetched once.
+After the publisher's public key is known, the NCID for the requested
+named content is calculated
+	NCID = SHA1Hash( <Content_URI>+<Publisher_Pubkey> )
+Next we need a DAG for this NCID. For now, we use the Publisher's
+certificate DAG and replace the CID in it with this NCID.
+Finally, we send a request to fetch the NCID from the server. An in-path
+router may have it cached and return a response.
+The server or in-path router will read the corresponding CID from its
+storage, and send a NCID Content Header followed by data.
+Once the data is received, it is verified against the Publisher's public
+key to ensure that it is signed by the (now-trusted) publisher.
+The data is then finally returned to the client.

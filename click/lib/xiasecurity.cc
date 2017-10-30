@@ -425,6 +425,28 @@ void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, in
 }
 
 /*!
+ * @brief Generate SHA1 hash and return a hex string representing it
+ *
+ * Given a buffer containing user data, generate its SHA-1 hash
+ * and convert it into a hex string that is returned to the caller.
+ *
+ * @param data user data buffer
+ * @param data_len size of the data buffer
+ * @param hex_string buffer to hold the hex string being returned
+ * @param hex_string_len length of hex_string buffer
+ *
+ * @returns 0 on success
+ * @returns negative value on failure
+ */
+void xs_getSHA1HexDigest(const unsigned char * data, int data_len,
+		char *hex_string, int hex_string_len)
+{
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	xs_getSHA1Hash(data, data_len, digest, sizeof(digest));
+	xs_hexDigest(digest, sizeof(digest), hex_string, hex_string_len);
+}
+
+/*!
  * @brief Convert a SHA1 digest to a hex string
  *
  * Convert the binary SHA-1 hash into a hex string
@@ -516,7 +538,8 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
 
 	// Get the public key for given xid
-	if(!xs_getPubkey(xid, pem_pub, &pem_pub_len)) {
+	if(xs_getPubkey(xid, pem_pub, &pem_pub_len)) {
+		printf("xs_isValidSignature: ERROR reading pubkey\n");
 		return 0;
 	}
 
@@ -538,7 +561,8 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
  * @param pem_pub a buffer holding the public key
  * @param length of the pem_pub buffer length
  *
- * @returns non-zero if the signature matches data, verified against pem_pub
+ * @returns 1 if the signature matches data, verified against pem_pub
+ * @returns 0 if signature does not match data
  */
 int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char *signature, unsigned int siglen, char *pem_pub, int pem_pub_len)
 {
@@ -557,6 +581,33 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen, unsigned char
 	sig_verified = RSA_verify(NID_sha1, digest, sizeof digest, signature, siglen, rsa);
 	RSA_free(rsa);
 	return sig_verified;
+}
+
+/*!
+ * @brief Verify signature using public key read from given file
+ *
+ * @param pubfilepath path of file holding the public key
+ * @param data to be verified
+ * @param datalen length of data buffer
+ * @param signature buffer holding the signature to be verified against
+ * @param siglen length of the signature buffer
+ *
+ * @returns 1 if the signature is valid
+ * @returns 0 if the signature does not match the data
+ */
+int xs_isValidSignature(const char *pubfilepath,
+		const unsigned char *data, size_t datalen,
+		unsigned char *signature, unsigned int siglen)
+{
+	char pem_pub[MAX_PUBKEY_SIZE];
+	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
+	if(xs_readPubkeyFile(pubfilepath, pem_pub, &pem_pub_len)) {
+		printf("xs_isValidSignature: ERROR reading pubkey\n");
+		return 0;
+	}
+
+	return xs_isValidSignature(data, datalen, signature, siglen,
+			pem_pub, pem_pub_len);
 }
 
 /*!
@@ -598,13 +649,6 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	char *privfilepath = NULL;
 	int retval = -1;        // Return failure by default. 0 == success
 	int state = 0;
-	unsigned char *sig_buf = NULL;
-	unsigned int sig_len = 0;
-	int rc;
-	RSA *rsa;
-	uint8_t digest[SHA_DIGEST_LENGTH];
-	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
-	FILE *fp;
 
 	// Find the directory where keys are stored
 	const char *keydir = get_keydir();
@@ -622,43 +666,66 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	}
 	state = 1;
 	sprintf(privfilepath, "%s/%s", keydir, privkeyhash);
+	if(xs_signWithKey(privfilepath, data, datalen, signature, siglen)) {
+		xs_chatter("xs_sign: Failed sign with priv key %s", privfilepath);
+		goto xs_sign_done;
+	}
+	// Success
+	retval = 0;
+
+xs_sign_done:
+	switch(state) {
+		case 1: free(privfilepath);
+	};
+	return retval;
+}
+
+int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
+		unsigned char *signature, uint16_t *siglen)
+{
+	int rc;
+	int retval = -1;
+	int state = 0;
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
+	FILE *fp;
+	RSA *rsa;
+	unsigned char *sig_buf = NULL;
+	unsigned int sig_len = 0;
 
 	// Calculate SHA1 hash of given data
 	xs_getSHA1Hash(data, datalen, digest, sizeof digest);
 
 	// Print the SHA1 hash in human readable form
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
-    xs_chatter("xs_sign: Hash of given data: %s", hex_digest);
 
     // Encrypt the SHA1 hash with private key
-    xs_chatter("xs_sign: Signing with private key from: %s", privfilepath);
     fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
 		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
-	state = 2;
+	state = 1;
     rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
         xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
 
 	assert(*siglen >= RSA_size(rsa));
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
 		xs_chatter("xs_sign: Failed to allocate memory for signature");
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
-	state = 3;
+	state = 2;
 
     //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
     rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
 	if(rc != 1) {
 		xs_chatter("xs_sign: RSA_sign failed");
-		goto xs_sign_done;
+		goto xs_sign_with_key_done;
 	}
-    xs_chatter("xs_sign: signature length: %d", sig_len);
 
     //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
     memcpy(signature, sig_buf, sig_len);
@@ -667,12 +734,81 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 	// Success
 	retval = 0;
 
-xs_sign_done:
+xs_sign_with_key_done:
 	switch(state) {
-		case 3: free(sig_buf);
-		case 2: fclose(fp);
-		case 1: free(privfilepath);
+		case 2: free(sig_buf);
+		case 1: fclose(fp);
 	}
+	return retval;
+}
+
+/*!
+ * @brief Read public key into a buffer from given path
+ *
+ * The public key file must be present at the provided path.
+ *
+ * @param pubfilepath location of a file containing the public key
+ * @param pubkey a buffer to hold the public key being returned to caller
+ * @param pubkey_len the length of public key buffer
+ *
+ * @returns 0 on success
+ * @returns negative value on failure
+ */
+int xs_readPubkeyFile(const char *pubfilepath,
+		char *pubkey, uint16_t *pubkey_len)
+{
+	FILE *fp;
+	int state = 0;
+	BIO *bio_pub;
+	RSA *rsa;
+	int retval = -1;
+
+	// Clear out the user provided buffer in case they forgot to
+	bzero(pubkey, *pubkey_len);
+
+	// Read in the public key file
+    fp = fopen(pubfilepath, "r");
+	if(fp == NULL) {
+		xs_chatter("xs_readPubkeyFile: Unable to open %s", pubfilepath);
+		retval = -2;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 1;
+    rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
+    if(rsa==NULL) {
+		xs_chatter("xs_readPubkeyFile: ERROR reading public key:%s:",
+				pubfilepath);
+		retval = -2;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 2;
+
+    bio_pub = BIO_new(BIO_s_mem());
+	if(bio_pub == NULL) {
+		xs_chatter("xs_readPubkeyFile: ERROR allocating BIO for public key");
+		retval = -3;
+		goto xs_readPubkeyFile_cleanup;
+	}
+	state = 3;
+    PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
+	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
+		xs_chatter("xs_readPubkeyFile: ERROR pubkey buffer too small");
+		retval = -4;
+		goto xs_readPubkeyFile_cleanup;
+	}
+    *pubkey_len = BIO_pending(bio_pub);
+    BIO_read(bio_pub, pubkey, *pubkey_len);
+	*pubkey_len += 1; // null terminate the string
+
+	// Pubkey has been successfully read into the provided buffer
+	retval = 0;
+
+xs_readPubkeyFile_cleanup:
+	switch(state) {
+		case 3: BIO_free_all(bio_pub);
+		case 2: RSA_free(rsa);
+		case 1: fclose(fp);
+	};
 	return retval;
 }
 
@@ -694,11 +830,8 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 	int pubfilepathlen;
 	char *pubfilepath;
 	char *pubkeyhash;
-	int retval = 0;
+	int retval = -1;
 	int state = 0;
-	BIO *bio_pub;
-	RSA *rsa;
-	FILE *fp;
 
 	// Clear out the user buffer
 	memset(pubkey, 0, (size_t)*pubkey_len);
@@ -720,40 +853,19 @@ int xs_getPubkey(const char *xid, char *pubkey, uint16_t *pubkey_len)
 		goto xs_getPubkey_cleanup;
 	}
 	state = 1;
+
+	// Build the file path and read the key from the file
 	sprintf(pubfilepath, "%s/%s.pub", keydir, pubkeyhash);
-	// Read in the public key file
-    fp = fopen(pubfilepath, "r");
-	state = 2;
-    rsa = PEM_read_RSA_PUBKEY(fp,NULL,NULL,NULL);
-    //RSA *rsa = PEM_read_RSAPublicKey(fp,NULL,NULL,NULL);
-    if(rsa==NULL) {
-		xs_chatter("xs_getPubkey: ERROR reading public key:%s:", pubfilepath);
+	if(xs_readPubkeyFile(pubfilepath, pubkey, pubkey_len)) {
+		xs_chatter("xs_getPubkey: ERROR unable to read pubkey from %s",
+				pubfilepath);
 		retval = -3;
 		goto xs_getPubkey_cleanup;
 	}
-	state = 3;
+	retval = 0;
 
-    bio_pub = BIO_new(BIO_s_mem());
-	if(bio_pub == NULL) {
-		xs_chatter("xs_getPubkey: ERROR allocating BIO for public key");
-		retval = -4;
-		goto xs_getPubkey_cleanup;
-	}
-	state = 4;
-    PEM_write_bio_RSA_PUBKEY(bio_pub, rsa);
-	if(*pubkey_len < BIO_pending(bio_pub) + 1) {
-		xs_chatter("xs_getPubkey: ERROR pubkey buffer too small");
-		retval = -5;
-		goto xs_getPubkey_cleanup;
-	}
-    *pubkey_len = BIO_pending(bio_pub);
-    BIO_read(bio_pub, pubkey, *pubkey_len);
-	*pubkey_len += 1; // null terminate the string
 xs_getPubkey_cleanup:
 	switch(state) {
-		case 4: BIO_free_all(bio_pub);
-		case 3: RSA_free(rsa);
-		case 2: fclose(fp);
 		case 1: free(pubfilepath);
 	};
 	return retval;

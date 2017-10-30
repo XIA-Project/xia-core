@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 	unsigned level = 3;
 	bool verbose = false;
 
-	xcache_controller ctrl;
+	xcache_controller *ctrl = xcache_controller::get_instance();
 	struct xcache_conf xcache_conf;
 
 	xcache_conf.threads = DEFAULT_THREADS;
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 
 	initlogging(xcache_conf.hostname, level, verbose);
 
-	ctrl.set_conf(&xcache_conf);
-	ctrl.run();
+	ctrl->set_conf(&xcache_conf);
+	ctrl->run();
 	return 0;
 }

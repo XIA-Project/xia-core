@@ -1,7 +1,7 @@
 #include "meta.h"
 #include "store_manager.h"
 
-int xcache_store_manager::store(xcache_meta *meta, const std::string *data)
+int xcache_store_manager::store(xcache_meta *meta, const std::string &data)
 {
 	int ret = -1;
 

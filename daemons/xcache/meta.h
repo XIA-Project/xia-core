@@ -1,11 +1,12 @@
 #ifndef __META_H__
 #define __META_H__
 
-#include "clicknet/xia.h"
 #include <iostream>
 #include <map>
 #include <iostream>
 #include <stdint.h>
+#include "content_header.h"
+#include "ncid_table.h"
 #include "xcache_cmd.pb.h"
 #include <unistd.h>
 #include <time.h>
@@ -44,21 +45,22 @@ private:
 	xcache_content_store *_store;
 	xcache_eviction_policy *_policy;
 
-	std::string _cid;
 	std::string _sid;
 
 	time_t _created;
 	time_t _accessed;
 	time_t _updated;
-	time_t _ttl;
 
 	int32_t _fetchers;
+
+	ContentHeader *_chdr;
 
 	void init();
 
 public:
 	xcache_meta();
-	xcache_meta(std::string);
+	xcache_meta(ContentHeader *chdr);
+	~xcache_meta();
 
 	time_t last_accessed() { return _accessed; }
 	void access();
@@ -87,8 +89,8 @@ public:
 
 	void set_length(uint64_t length) { _len = length; }
 
-	void set_ttl(time_t t) { _ttl = t; }
-	time_t ttl() { return _ttl; }
+	void set_ttl(time_t t) { _chdr->set_ttl(t); }
+	time_t ttl() { return _chdr->ttl(); }
 
 	void fetch(bool fetching) {
 		if (fetching) {
@@ -113,7 +115,15 @@ public:
 
 	uint64_t get_length() { return _len; }
 
-	std::string get_cid() { return _cid; }
+	std::string id() { return (_chdr) ? _chdr->id() : ""; }
+
+	std::string store_id();
+	std::vector<std::string> all_ids();
+
+	bool valid_data(const std::string &data);
+
+	void set_content_header(ContentHeader *chdr) { _chdr = chdr; }
+	std::string content_header_str() {return _chdr->serialize();}
 
 	int lock(void) {
 		return 0;
@@ -129,12 +139,7 @@ public:
 
 class meta_map {
 public:
-	meta_map();
-	~meta_map();
-
-	int read_lock(void)  { return pthread_rwlock_rdlock(&_rwlock); };
-	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
-	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
+	static meta_map *get_map();
 
 	xcache_meta *acquire_meta(std::string cid);
 	void release_meta(xcache_meta *meta);
@@ -144,9 +149,19 @@ public:
 	//int walk(bool(*f)(xcache_meta *m));
 	int walk();
 
+protected:
+	meta_map();
+	~meta_map();
+
 private:
+	int read_lock(void)  { return pthread_rwlock_rdlock(&_rwlock); };
+	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
+	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
+
 	std::map<std::string, xcache_meta *> _map;
 	pthread_rwlock_t _rwlock;
+	static meta_map* _instance;
+	NCIDTable *_ncid_table;
 };
 
 #endif

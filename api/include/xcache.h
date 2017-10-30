@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define CIDLEN 512
+#define NCID_MAX_STRLEN 1024
 
 typedef struct {
 	char* cid;
@@ -57,7 +57,10 @@ int XcacheHandleInit(XcacheHandle *h);
 int XcacheHandleDestroy(XcacheHandle *h);
 int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl);
 
-extern int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *info);  //DONE
+extern int XputChunk(XcacheHandle *h, const char *data, size_t length,
+		sockaddr_x *info);  //DONE
+extern int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
+		const char *content_name, const char *publisher_name);
 extern int XputFile(XcacheHandle *h, const char *filename, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputBuffer(XcacheHandle *h, const void *data, size_t length, size_t chunkSize, sockaddr_x **info);  //DONE
 extern int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, socklen_t addrlen, int count); //DONE
@@ -69,9 +72,10 @@ extern int XbufAdd(XcacheBuf *xbuf, void *data, size_t len);
 extern int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_x **info);
 extern void XbufFree(XcacheBuf *xbuf);
 
+extern int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags,
+		const char *name);
 extern int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t addrlen);  //DONE
 extern int _XfetchRemoteChunkBlocking(void **buf, sockaddr_x *addr, socklen_t len);
-extern int XgetPrevFetchHopCount();
 
 //extern int XbufGetChunk(XcacheHandle *h, XcacheBuf *buf, sockaddr_x *addr, socklen_t addrlen, int *flags);
 //

@@ -40,20 +40,6 @@ void warn(const char *fmt, ...)
 
 }
 
-int make_random_chunk(XcacheHandle *xcache, sockaddr_x *addr)
-{
-	char chunk[CHUNKSIZE];
-	int i;
-
-	for (i = 0; i < CHUNKSIZE; i++)
-		chunk[i] = (char)random();
-
-	if (XputChunk(xcache, (const char *)chunk, (size_t)CHUNKSIZE, addr) < 0)
-		return -1;
-
-	return 0;
-}
-
 /*
 ** write the message to stdout, and exit the app
 */
@@ -66,6 +52,21 @@ void die(int ecode, const char *fmt, ...)
 	va_end(args);
 	fprintf(stdout, "%s: exiting\n", TITLE);
 	exit(ecode);
+}
+
+
+int make_random_chunk(XcacheHandle *xcache, sockaddr_x *addr)
+{
+	char chunk[CHUNKSIZE];
+	int i;
+
+	for (i = 0; i < CHUNKSIZE; i++)
+		chunk[i] = (char)random();
+
+	if (XputChunk(xcache, (const char *)chunk, (size_t)CHUNKSIZE, addr) < 0)
+		return -1;
+
+	return 0;
 }
 
 void *recvCmd(void *socketid)
@@ -95,18 +96,15 @@ void *recvCmd(void *socketid)
 		}
 		//Sender does the chunking and then should start the sending commands
 		if (strncmp(command, "make", 4) == 0) {
-			char url[256];
-			say("Making a random chunk\n");
+			say("Making a random CID chunk\n");
 			if (make_random_chunk(&xcache, &addr) < 0) {
 				die(-1, "Could not make random chunk\n");
 			}
-
 			Graph g(&addr);
-			g.fill_sockaddr(&addr);
-			strncpy(url, g.http_url_string().c_str(), 256);
+			int len = g.http_url_string().size()+1;
 
 			// Return the addr
-			if (Xsend(sock, url, strlen(url), 0) < 0) {
+			if (Xsend(sock, g.http_url_string().c_str(), len, 0) < 0) {
 				warn("unable to send reply to client\n");
 				break;
 			}

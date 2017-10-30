@@ -973,7 +973,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 				uint8_t hop_count = -1;
 				// we have received a syn for CID,
-				if (ntohl(_destination_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
+				int dest_type = ntohl(_destination_xid.type());
+				if (dest_type == CLICK_XIA_XID_TYPE_CID
+						|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
 					hop_count = HLIM_DEFAULT - xiah.hlim();
 
 					// we've received a SYN for a CID DAG which usually contains a fallback
@@ -1103,8 +1105,9 @@ sock *XTRANSPORT::XID2Sock(XID dest_xid)
 	if (sk)
 		return sk;
 
-	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID) {
-		DBG("Dest = CID, look up the sk for the xcache SID instead\n");
+	if (ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_CID ||
+			ntohl(dest_xid.type()) == CLICK_XIA_XID_TYPE_NCID) {
+		DBG("Dest = CID/NCID, look up the sk for the xcache SID instead\n");
 		// Packet destined to a CID. Handling it specially.
 		// FIXME: This is hackish. Maybe give users the ability to
 		// register their own rules?

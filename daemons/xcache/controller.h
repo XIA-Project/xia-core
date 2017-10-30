@@ -7,6 +7,7 @@
 #include "xcache_cmd.pb.h"
 #include "slice.h"
 #include "meta.h"
+#include "ncid_table.h"
 #include "store_manager.h"
 #include "policy_manager.h"
 #include "XIARouter.hh"
@@ -45,20 +46,29 @@ private:
 	sem_t req_sem;
 	std::queue<xcache_req *> request_queue;
 	pthread_mutex_t request_queue_lock;
+	pthread_mutex_t ncid_cid_lock;
 
 
 	int n_threads;
 	pthread_t *threads;
 
-	/**
-	 * Map of metadata.
-	 */
-	meta_map _map;
+	meta_map *_map;
+	NCIDTable *_ncid_table;
 
 	/**
 	 * Map of contexts.
 	 */
 	std::map<uint32_t, struct xcache_context *> context_map;
+
+	/**
+	 * Map of NCID to CID
+	 */
+	std::map<std::string, std::string> ncid_to_cid;
+
+	/**
+	 * Map of CID to matching NCIDs
+	 */
+	std::map<std::string, std::vector<std::string>> cid_to_ncids;
 
 	/**
 	 * Hostname while running on localhost.
@@ -82,17 +92,21 @@ private:
 
 	unsigned context_id;
 
-public:
 	/**
+	 * The only controller instance
+	 */
+	static xcache_controller *_instance;
+
+protected:
+/**
 	 * A Constructor.
 	 * FIXME: What do we need to do in the constructor?
 	 */
-	xcache_controller() {
-		hostname.assign("host0");
-		pthread_mutex_init(&request_queue_lock, NULL);
-		context_id = 0;
-		sem_init(&req_sem, 0, 0);
-	}
+	xcache_controller();
+	~xcache_controller();
+
+public:
+	static xcache_controller *get_instance();
 
 	/**
 	 * Xcache Sender Thread.
@@ -115,7 +129,7 @@ public:
 	 * On reception of XgetChunk API, this function _MAY_ be invoked. If the
 	 * chunk is found locally, then no need to fetch from remote.
 	 */
-	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
+	int fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 							 xcache_cmd *, int flags);
 
 	int fetch_content_local(sockaddr_x *addr, socklen_t addrlen, xcache_cmd *,
@@ -124,6 +138,12 @@ public:
 	static void *__fetch_content(void *__args);
 
 	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
+
+	/**
+	 * Fetch named content from Xcache.
+	 */
+	int xcache_fetch_named_content(xcache_cmd *resp, xcache_cmd *cmd,
+			int flags);
 
 	/**
 	 * Chunk reading
@@ -138,7 +158,7 @@ public:
 	void process_req(struct xcache_req *req);
 
 	static void *worker_thread(void *arg);
-	static void *garbage_collector(void *arg);
+	static void *garbage_collector(void *);
 
 
 	/**
@@ -161,8 +181,9 @@ public:
 	 * Stores content locally.
 	 */
 	int store(xcache_cmd *, xcache_cmd *, time_t);
-	int __store(struct xcache_context *context, xcache_meta *meta, const std::string *data);
+	int __store(xcache_meta *meta, const std::string &data);
 	int __store_policy(xcache_meta *);
+	int store_named(xcache_cmd *, xcache_cmd *);
 
 	// evict a chunk locally
 	int evict(xcache_cmd *resp, xcache_cmd *cmd);
@@ -181,17 +202,15 @@ public:
 	void remove(void);
 
 	/** Concurrency control **/
-	xcache_meta *acquire_meta(std::string cid) { return _map.acquire_meta(cid); };
-	void release_meta(xcache_meta *meta) { _map.release_meta(meta); };
-	void add_meta(xcache_meta *meta) { _map.add_meta(meta); };
-	void remove_meta(xcache_meta *meta) { _map.remove_meta(meta); };
-
-	meta_map *get_meta_map() { return &_map; };
+	xcache_meta *acquire_meta(std::string cid);
+	void release_meta(xcache_meta *meta) { _map->release_meta(meta); };
+	void add_meta(xcache_meta *meta) { _map->add_meta(meta); };
+	void remove_meta(xcache_meta *meta) { _map->remove_meta(meta); };
 
 	//inline int lock_meta_map(void);
 	//inline int unlock_meta_map(void);
 
-	int register_meta(std::string &);
+	int register_meta(std::vector<std::string> &ids);
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);

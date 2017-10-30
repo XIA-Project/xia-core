@@ -27,7 +27,7 @@ public:
 	 * @returns >= 0: On successfully storing the data
 	 * @returns < 0:  On failure
 	 */
-	int store(xcache_meta *meta, const std::string *data);
+	int store(xcache_meta *meta, const std::string &data);
 };
 
 #endif

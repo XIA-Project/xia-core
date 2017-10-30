@@ -357,10 +357,15 @@ int XevictChunk(XcacheHandle *h, const char *cid)
 {
 	int rc = xcache_cmd::XCACHE_OK;
 	xcache_cmd cmd;
+	int id_offset = 0;
 
-	if (strncasecmp(cid, "cid:", 4) == 0)
-		cid += 4;
-	if (strlen(cid) != (XID_SIZE * 2)) {
+	if (strncasecmp(cid, "cid:", 4) == 0) {
+		id_offset = strlen("cid:");
+	}
+	if (strncasecmp(cid, "ncid:", 4) == 0) {
+		id_offset = strlen("ncid:");
+	}
+	if (strlen(cid+id_offset) != (XID_SIZE * 2)) {
 		return xcache_cmd::XCACHE_INVALID_CID;
 	}
 
@@ -383,7 +388,8 @@ int XevictChunk(XcacheHandle *h, const char *cid)
 	return rc;
 }
 
-static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr, int flags)
+static int __XputChunk(XcacheHandle *h, const char *data, size_t length,
+		sockaddr_x *addr, int flags)
 {
 	xcache_cmd cmd;
 
@@ -421,7 +427,8 @@ static int __XputChunk(XcacheHandle *h, const char *data, size_t length, sockadd
 	return xcache_cmd::XCACHE_OK;
 }
 
-static inline int __XputDataChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
+static inline int __XputDataChunk(XcacheHandle *h, const char *data,
+		size_t length, sockaddr_x *addr)
 {
 	return __XputChunk(h, data, length, addr, XCF_DATACHUNK);
 }
@@ -450,9 +457,74 @@ static inline int __XputMetaChunk(XcacheHandle *h, const char *data, size_t leng
 ** @returns -1 if a communication error with the xcache daemon occurs
 **
 */
-int XputChunk(XcacheHandle *h, const char *data, size_t length, sockaddr_x *addr)
+int XputChunk(XcacheHandle *h, const char *data, size_t length,
+		sockaddr_x *addr)
 {
 	return __XputDataChunk(h, data, length, addr);
+}
+
+/*!
+** @brief load a named chunk into the local content cache
+**
+** Creates an NCID based on hash of Content URI and Publisher public key
+**
+** Note that each NCID chunk also has a CID address.
+**
+** The chunk is stored in the local content cache and is accessible via
+** both NCID and CID. Both of those identifiers are entered into the
+** corresponding routing tables on the local host.
+**
+** The chunk will expire out of the local cache (and any other locations
+** where it is subsequently cached) if a TTL has been set in XcacheHandle.
+**
+** @param h the cache handle
+** @param data a byte array of data to be converted to a chunk
+** @param length the number of bytes in data
+** @param publisher_name name of publisher signing this chunk
+**
+** @returns XCACHE_OK on success
+** @returns XCACHE_ERR_EXISTS if the chunk already resides in the cache
+** @returns -1 if an error occurs in producing or signing the chunk
+**
+*/
+int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
+		const char *content_name, const char *publisher_name)
+{
+	// Build and forward an NCID_STORE request to Xcache controller
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_STORE_NAMED);
+	cmd.set_context_id(h->contextID);
+	cmd.set_data(data, length);
+	// TODO: limit size of content_name and publisher_name
+	cmd.set_content_name(content_name, strlen(content_name));
+	cmd.set_publisher_name(publisher_name, strlen(publisher_name));
+	cmd.set_ttl(h->ttl);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "%s: Error in sending command to xcache\n", __func__);
+		/* Error in Sending chunk */
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Did not get a valid response from xcache\n");
+		return -1;
+	}
+
+	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+		printf("%s received an error from xcache\n", __func__);
+		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
+			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
+			return xcache_cmd::XCACHE_ERR_EXISTS;
+		} else {
+			return -1;
+		}
+	}
+
+	//fprintf(stderr, "%s: Got a response from server\n", __func__);
+
+	return xcache_cmd::XCACHE_OK;
 }
 
 /*!
@@ -699,21 +771,60 @@ inline int XbufPut(XcacheHandle *h, XcacheBuf *xbuf, size_t chunkSize, sockaddr_
 	return XputBuffer(h, xbuf->buf, xbuf->length, chunkSize, addrs);
 }
 
-/* Content Fetching APIs */
-static int hopCount = -1;
 /*!
-** @brief experimental code to return the # of hops a chunk took to arrive
-**
-** Incomplete code intended to indicate how far away (in hops) the source
-** of a chunk is.
-**
-** @note Not thread safe and is only valid for the last chunk requested.
-**
-** @returns the number of hops the previous content chunk took to arrive
-**
-*/
-int XgetPrevFetchHopCount(){
-	return hopCount;
+ * @brief fetch a chunk by its name
+ *
+ * Fetches the specified chunk from the network. The caller provides a
+ * name for the chunk that it can derive based on an agreement/protocol
+ * with the publisher. The name could be completely arbitrary, but for
+ * now we are using <Publisher_name>/<Content_name_and_attrs>, e.g.
+ *    Netflix/Movies/2016/Moana/useragent=Safari/ver=10.8...
+ *    where, Publisher_name = Netflix
+ *    content_name_and_attrs = Movies/2016/Moana/useragent=Safari/ver=10.8...
+ *
+ * @param h the xcache handle
+ * @param buf a pointer to the chunk's data. Caller must free data
+ * @param flags user specified flags for content retrieval characteristics
+ * @param name string representing content to be retrieved
+ *
+ * @returns size of data stored in *buf
+ * @return -1 on error
+ */
+int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
+{
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_FETCHNAMEDCHUNK);
+	cmd.set_context_id(h->contextID);
+	cmd.set_content_name(name);
+	cmd.set_flags(flags);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error in sending command to xcache\n");
+		/* Error in Sending chunk */
+		return -1;
+	}
+	fprintf(stderr, "Command sent to xcache successfully\n");
+
+	if(flags & XCF_BLOCK) {
+		size_t to_copy;
+
+		if (get_response_blocking(h->xcacheSock, &cmd) < 0) {
+			fprintf(stderr, "Did not get a valid response from xcache\n");
+			return -1;
+		}
+
+		if (cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
+			fprintf(stderr, "Chunk fetch failed\n");
+			return -1;
+		}
+
+		to_copy = cmd.data().length();
+		*buf = malloc(to_copy);
+		memcpy(*buf, cmd.data().c_str(), to_copy);
+
+		return to_copy;
+	}
+	return 0;
 }
 
 /*!
@@ -779,7 +890,6 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 		to_copy = cmd.data().length();
 		*buf = malloc(to_copy);
 		memcpy(*buf, cmd.data().c_str(), to_copy);
-		hopCount = cmd.hop_count();
 
 		return to_copy;
 	}
@@ -830,7 +940,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	int to_recv, recvd;
 	size_t remaining;
 	size_t offset;
-	unsigned hop_count;
 
 	Node expected_cid(g.get_final_intent());
 
@@ -854,7 +963,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	}
 
 	remaining = ntohl(header.length);
-	hop_count = ntohl(header.hop_count);
 
 	while (remaining > 0) {
 		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
@@ -884,7 +992,6 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	*chunk = malloc(to_copy);
 	bzero(*chunk, to_copy);
 	memcpy(*chunk, data.c_str(), to_copy);
-	hopCount = hop_count;
 
 	Xclose(sock);
 

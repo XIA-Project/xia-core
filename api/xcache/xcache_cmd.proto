@@ -18,6 +18,8 @@ message xcache_cmd {
 		XCACHE_FREE_CONTEXT = 15;
 		XCACHE_EVICT = 16;
 		XCACHE_CACHE = 17;
+		XCACHE_STORE_NAMED = 18;
+		XCACHE_FETCHNAMEDCHUNK = 19;
 	};
 
 	enum status_type {
@@ -43,7 +45,8 @@ message xcache_cmd {
 	optional int32 readoffset = 11;
 	optional int32 readlen = 12;
 	optional bytes msg = 13;
-	optional int32 hop_count = 14;
+	optional bytes publisher_name = 16;
+	optional bytes content_name = 17;
 };
 
 message xcache_notif {

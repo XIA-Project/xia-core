@@ -6,6 +6,7 @@ xregister
 xnetcat
 xrendezvous
 xcache
+announce_publisher
 xcontrold
 xhostd
 

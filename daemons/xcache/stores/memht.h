@@ -19,10 +19,10 @@ public:
 	{
 	}
 
-	int store(xcache_meta *meta, const std::string *data)
+	int store(xcache_meta *meta, const std::string &data)
 	{
 		/* std::cout << "Reached MemHt::" << __func__ << " Storing " << data << "\n"; */
-		memht[meta] = *data;
+		memht[meta] = data;
 
 		return 0;
 	}

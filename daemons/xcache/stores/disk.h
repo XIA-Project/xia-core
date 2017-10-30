@@ -32,12 +32,12 @@ public:
 		mkdir(content_dir.c_str(), 0777);
 	}
 
-	int store(xcache_meta *meta, const std::string *data)
+	int store(xcache_meta *meta, const std::string &data)
 	{
 		int ret, fd;
 		std::string path;
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0666);
 		if (fd < 0) {
@@ -49,9 +49,9 @@ public:
 
 		ret = 0;
 
-		int rc = write(fd, data->c_str(), data->length());
-		if ((unsigned)rc != data->length()) {
-			syslog(LOG_ERR, "write requested:%lu actual:%d", data->length(), rc);
+		int rc = write(fd, data.c_str(), data.length());
+		if ((unsigned)rc != data.length()) {
+			syslog(LOG_ERR, "write requested:%lu actual:%d", data.length(), rc);
 			ret = -1;
 		}
 
@@ -70,7 +70,7 @@ public:
 			return "";
 		}
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_RDONLY);
 		if (fd < 0) {
@@ -101,7 +101,7 @@ public:
 		std::string path;
 		char *buf = (char *)malloc(READ_SIZE);
 
-		path = content_dir + meta->get_cid();
+		path = content_dir + meta->store_id();
 
 		fd = open(path.c_str(), O_RDONLY);
 		if (fd < 0) {
@@ -135,7 +135,7 @@ public:
 		if (meta) {
 			std::string path;
 
-			path = content_dir + meta->get_cid();
+			path = content_dir + meta->store_id();
 			rc = unlink(path.c_str());
 		}
 		return rc;
