@@ -1,0 +1,443 @@
+#!/usr/bin/env python
+#
+# Copyright 2017 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the 'License');
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an 'AS IS' BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# FIXME: 
+# - this is calling the python program xconfig.py to make conf files
+#   seems better to merge them together
+# - we're also using assign_addresses, this needs to be newer as well
+# - nodes.conf generation should be eliminated
+# - what should the permissions on the keys, ca, and publisher dirs be?
+# - when do we create HIDs/ADs?
+# - can we make click always just use xia.click?
+# - how can we disable key generation messages?
+
+import os
+import re
+import sys
+import xconfig
+import argparse
+import ipaddress
+import keymanage
+import xiapyutils
+import assign_addresses
+from glob import glob
+from configparser import ConfigParser
+
+# version format string
+VER = '%(prog)s 1.0'
+
+ADDR_CONF  = 'etc/address.conf'
+XIA_CONF   = 'etc/xia.ini'
+CLICK_CONF = 'etc/click/{}.click'
+
+# list of files and locations to delete when clean is run
+conf_files = [
+	'etc/click/host*.click',
+	'etc/click/router*.click',
+        'etc/*.conf',
+	'etc/hosts.xia',
+	'etc/controller_dag',
+	'etc/RHID.cred',
+        'key/*',
+        'ca/*',
+        'publishers/*'
+        ]
+
+temp_files = [
+	'xcache*',
+	'content/*'
+        ]
+
+# hostname with -'s replaced so they work inside click
+hostname = xiapyutils.getxiaclickhostname()
+
+# file paths
+xdir      = xiapyutils.xia_srcdir()
+addr_conf = os.path.join(xdir, ADDR_CONF)
+xia_conf  = os.path.join(xdir, XIA_CONF)
+
+#
+# config validators ##########################################################
+#
+
+#
+# validate and separate the waveserver parameters
+#
+def waveserver(arg):
+
+    try:
+        [m, addr] = arg.split(',')
+        [i, p] = addr.split(':')
+    except ValueError:
+        raise argparse.ArgumentTypeError('invalid waveserver options should be: mac,ip:port')
+
+    # is it a valid IP address?
+    try:
+        ipaddress.ip_address(unicode(i, 'utf-8'))
+    except ipaddress.AddressValueError as err:
+        raise argparse.ArgumentTypeError(str(err))
+
+    # make sure the port is an int
+    try:
+        int(p)
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(str(err))
+
+    # make sure the mac address is correctly formatted
+    if re.match('[0-9a-f]{2}([-:])[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$', m.lower()) == None:
+        raise argparse.ArgumentTypeError('invalid MAC address: {}'.format(m))
+
+    return {'mac':m, 'addr':i, 'port':p}
+
+
+#
+# make sure the specified interface exists on this machine
+#
+def iface(arg):
+    if not arg in os.listdir('/sys/class/net'):
+        raise argparse.ArgumentTypeError('invalid interface name: {}'.format(arg))
+    return arg
+
+
+#
+# validate 4ID configuration info
+#
+def four_id(arg):
+    # FIXME: implement once/if 4IDs are working again
+    #  -4 generate and use a dual stack click script
+    #  -m manually set the node's 4ID IP address
+
+    print '4IDs are not currently supported'
+    sys.exit(1)
+
+
+#
+# ensure socket config is correct
+#
+def socket_server(arg):
+    #  -P set the TCP socket ports to use (instead of ToDevice/FromDevice)
+
+    print 'socket configurations are not currently supported'
+    sys.exit(1)
+
+
+
+#
+# helpers ####################################################################
+#
+
+def status(msg, *params):
+    if not args.quiet:
+        if params:
+            print msg, params
+        else:
+            print msg
+
+#
+# are we already configured?
+#
+def configured(args):
+    # FIXME: this could just use address.conf or it's replacement instead of using the click file
+
+    if args.nodetype == 'controller':
+        kind = 'router'
+    else:
+        kind = args.nodetype
+
+    conf = os.path.join(xdir, CLICK_CONF.format(kind))
+    return os.path.isfile(conf)
+
+
+
+#
+# create xia system directories with correct permissions
+#
+def make_dir_with_permissions(dir, perm):
+
+    path = '%s/%s' % (xdir, dir)
+    try:
+        old_umask = os.umask(0)
+        os.makedirs(path, perm)
+    except OSError:
+        # don't error if the directory already exists
+        None
+
+    finally:
+        os.umask(old_umask)
+
+
+#
+# translate our config into to something usable by xconfig
+#
+# FIXME: This is a hack until there's time to integrate more cleanly with xconfig.
+#
+def run_xconfig(args):
+    if args.nodetype == 'host':
+        cmdline = '-t'
+    elif args.nodetype == 'controller':
+        cmdline = '-r'
+    else:
+        cmdline = '-r'
+
+    cmdline += ' -i ' + hostname
+
+    # get ignored interfaces
+    comma = False
+    if args.ignore:
+        cmdline += ' -f '
+        for i in args.ignore:
+            if comma:
+                cmdline += ','
+            cmdline += i
+            comma = True
+
+    # node should have up to 8 interfaces instead of 4
+    if args.ports == '8':
+        cmdline += ' -8'
+
+    # we'll proxy through a waveserver
+    if args.waveserver:
+        cmdline += ' -W %s,%s:%s' %(args.waveserver['mac'], args.waveserver['addr'], args.waveserver['port'])
+    
+    cmds = cmdline.split(' ')
+    # now make the configuration
+    if args.quiet:
+        xconfig.verbose = False
+    xconfig.build(cmds)
+
+
+
+def create_xia_config(args):
+    c = ConfigParser()
+
+    c['xia'] = {}
+    x = c['xia']
+    x['hostname'] = hostname
+    x['nodetytpe'] = args.nodetype
+    x['numports'] = str(args.ports)
+    x['hid'] = 'FIXME!'
+
+    if args.nodetype == 'controller':
+        c['controller'] = {}
+        cc = c['controller']
+        cc['AD'] = 'FIXME!'
+        cc['SID'] = 'FIXME!'
+        cc['nameserver'] = str(args.nameserver)
+        cc['rendezvous'] = str(args.rendezvous)
+
+    if args.ignore:
+        c['ignore'] = {}
+        i = c['ignore']
+        n = 0
+        for iface in args.ignore:
+            if n == 0:
+                name = 'interface'
+            else:
+               name = 'interface%d' % n
+            n += 1
+            i[name] = iface
+
+    if args.waveserver:
+        c['waveserver'] = args.waveserver
+    
+    with open(xia_conf, 'w') as conf:
+            c.write(conf)
+
+#
+# configuration for all node types
+#
+def common_config(args):
+
+    # don't overwrite existing configurations
+
+    if configured(args):
+        print 'XIA is already configured'
+        sys.exit(0)
+
+    run_xconfig(args)
+    create_legacy_config_files(args)
+
+    create_xia_config(args)
+
+    make_dir_with_permissions('ca', 0775)
+    make_dir_with_permissions('key', 0775)
+    make_dir_with_permissions('publishers', 0775)
+
+
+
+
+def create_legacy_config_files(args):
+    # FIXME: separate out and eventually eliminate support for this file
+
+    status('Creating %s config files', args.nodetype)
+    status('creating address.conf')
+
+    if args.quiet:
+        assign_addresses.verbose = False
+
+    with open (os.path.join(xdir, ADDR_CONF), 'w') as addr_conf:
+        if args.nodetype == 'host':
+            assign_addresses.assign_xids(addr_conf, hostname, 'XIAEndHost')
+
+        elif args.nodetype == 'router':
+            assign_addresses.iscontroller = False
+            assign_addresses.assign_xids(addr_conf, hostname, 'XIA4PortRouter')
+
+        elif args.nodetype == 'controller':
+            assign_addresses.iscontroller = True
+            assign_addresses.assign_xids(addr_conf, hostname, 'Controller')
+            if args.nameserver:
+                assign_addresses.assign_xids(addr_conf, hostname, 'nameserver')
+            if args.rendezvous:
+                assign_addresses.assign_xids(addr_conf, hostname, 'rendezvous')
+
+
+    
+
+#
+# actions
+#
+
+#
+# display configuration
+#
+def info(args):
+    if os.path.isfile(xia_conf):
+        c = ConfigParser()
+        c.read(xia_conf)
+
+        x = c['xia']
+        type = x.get('nodetype', 'unknown')
+        print 'Hostname:          %s' % x.get('hostname', hostname)
+        print 'Node Type:         %s' % type
+        print 'HID:               %s' % x.get('hid', 'unknown')
+
+        if type == 'controller':
+            cc = c['controller']
+            print 'AD:                %s' % cc.get('ad', 'unknown')
+            print 'SID:               %s' % cc.get('sid', 'unknown')
+            print 'Name Server:       %s' % cc.getboolean('nameserver', False)
+            print 'Rendezvous Server: %s' % cc.getboolean('rendezvous', False)
+
+        print 'Number of ports:   %s' % x.get('numports', '4')
+
+        i = c['ignore']
+        if i:
+            print 'Ignored Interfaces:'
+            for iface in i:
+                print '    %s' % i.get(iface)
+
+        w = c['waveserver']
+        if w:
+            print 'Waveserver:'
+            print '    MAC:     %s' % w.get('mac')
+            print '    Address: %s:%s' % (w.get('addr'), w.get('port'))
+
+
+    else:
+        print 'No configuration found'
+
+
+
+
+#    if args.waveserver:
+#        c['waveserver'] = args.waveserver
+
+
+def clean(args):
+    try:
+        for files in temp_files:
+            for f in glob(os.path.join('/tmp', files)):
+                status('removing {}'.format(f))
+                os.remove(f)
+
+
+        for files in conf_files:
+            files = os.path.join(xdir, files)
+
+            for f in glob(files):
+                status('removing {}'.format(f))
+                os.remove(f)
+
+    except IOError as e:
+        if (e[0] == errno.EPERM):
+            print 'root permission required'
+        sys.exit(1)
+
+
+
+def host(args):
+    args.nodetype = 'host'
+    common_config(args)
+
+
+def router(args):
+    args.nodetype = 'router'
+    common_config(args)
+
+
+
+def controller(args):
+    args.nodetype = 'controller'
+    common_config(args)
+
+
+
+#
+# let's go!
+#
+
+xia_config = ConfigParser()
+
+parser = argparse.ArgumentParser(description='configure an XIA node')
+parser.add_argument('-v', '--version', action='version', version=VER)
+parser.add_argument('-q', '--quiet', action='store_true', help='hide status messages')
+
+sub = parser.add_subparsers(help='add -h following option for additional arguments')
+
+# these arguments are common to the host, router, and controller configurations
+common_parser = argparse.ArgumentParser(add_help=False)
+common_parser.add_argument('-i', '--ignore', nargs='+', type=iface, metavar='iface', help='ignore interface')
+common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='# of interfaces (default=4)')
+common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='MAC,IP:PORT', help='connect via a waveserver')
+common_parser.add_argument('-s', '--socket', type=socket_server, metavar='port', help='use a TCP socket instead of an ethernet interface')
+common_parser.add_argument('--4id', type=four_id, help='configure an interface as 4ID')
+
+info_parser = sub.add_parser('info', help='display current configuration')
+info_parser.set_defaults(func=info)
+
+clean_parser = sub.add_parser('clean', help='delete configuration')
+clean_parser.set_defaults(func=clean)
+
+host_parser = sub.add_parser('host', parents=[common_parser], help='configure as an XIA host')
+host_parser.set_defaults(func=host)
+
+router_parser = sub.add_parser('router', parents=[common_parser], help='configure as an XIA router')
+router_parser.set_defaults(func=router)
+
+controller_parser = sub.add_parser('controller', parents=[common_parser], help='configure as an XIA controller')
+controller_parser.add_argument('-n', '--nameserver',action='store_true', help='run the nameserver on this node')
+controller_parser.add_argument('-r', '--rendezvous',action='store_true', help='run a rendezvous server on this node')
+controller_parser.set_defaults(func=controller)
+
+# annoying work around to get a default subparser
+if (len(sys.argv) < 2):
+        args = parser.parse_args(['--help'])
+else:
+    args = parser.parse_args()
+args.func(args)
+
