@@ -22,23 +22,11 @@ import clickcontrol
 
 # NOTE: We only support one HID for all interfaces in multihoming Phase 1
 
-# Retrieve config file paths from arguments
-if len(sys.argv) != 4:
-    print 'Usage: %s <nodes.conf> <address.conf> <router_type>' % sys.argv[0]
-    sys.exit(-1)
-
-nodesconf = sys.argv[1]
-addressconf = sys.argv[2]
-router_type = sys.argv[3]
-
-iscontroller = False
-if router_type == "--controller":
-    iscontroller = True
 
 ns_sid = 'SID:1110000000000000000000000000000000001113'
 
-# We create resolv.conf in the same directory as address.conf
-resolvconfpath = os.path.join(os.path.dirname(addressconf), 'resolv.conf')
+
+verbose = True
 
 # Patterns to look for in config files
 
@@ -50,6 +38,11 @@ rvpattern = re.compile('^(\w+)\s+rendezvous\s+(.+)\s+(.+)')
 
 # e.g. "host0    XIAEndHost"
 nodeconfpattern = re.compile('^(\w+)\s+(\w+)')
+
+
+def message(msg):
+    if verbose:
+        print msg
 
 # Assign XIDs as needed for RV, Routers etc.
 # NS:     <hostname> nameserver
@@ -73,7 +66,7 @@ def assign_xids(outfile, hostname, hosttype):
     outfile.write('%s %s (' % (hostname, hosttype))
 
     # Assign an AD for routers running a controller
-    if 'Router' in hosttype and iscontroller:
+    if ('Controller' in hosttype) or ('Router' in hosttype and iscontroller):
         outfile.write('%s ' % genkeys.create_new_AD())
 
     # Assign the same HID for every interface this host has
@@ -124,7 +117,7 @@ def configure_click(click, config):
             hid = match.group(3)
 
             # Routers have AD and HID in their arguments
-            if 'Router' in hosttype and iscontroller:
+            if ('Controller' in hosttype) or ('Router' in hosttype and iscontroller):
                 ad, hid = hid.split(' ')
 
             # Assign HID to this host
@@ -167,18 +160,38 @@ def configure_click(click, config):
                 for line in resolvconf_lines:
                     resolvconf.write('%s\n' % line)
 
-if __name__ == "__main__":
+def main():
+    # Retrieve config file paths from arguments
+    if len(sys.argv) != 4:
+        print 'Usage: %s  <nodes.conf> <address.conf> <router_type>' % sys.argv[0]
+        sys.exit(-1)
+
+    nodesconf = sys.argv[1]
+    addressconf = sys.argv[2]
+    router_type = sys.argv[3]
+
+    iscontroller = False
+    if router_type == "--controller":
+        iscontroller = True
+
+    # We create resolv.conf in the same directory as address.conf
+    resolvconfpath = os.path.join(os.path.dirname(addressconf), 'resolv.conf')
+
     # If address.conf doesn't exist create it
     # TODO: Also ensure timestamp of nodes.conf is not newer than address.conf
     if not os.path.isfile(addressconf):
-        print 'Creating %s' % addressconf
+        message('Creating %s' % addressconf)
         with open(nodesconf, 'r') as infile:
             with open(addressconf, 'w') as outfile:
                 create_addrconf(infile, outfile)
     else:
-        print 'Using existing addresses from %s' % addressconf
+        message('Using existing addresses from %s' % addressconf)
 
     # Now address.conf exists, so open and process it
     with open(addressconf, 'r') as config:
         with clickcontrol.ClickControl() as click:
             configure_click(click, config)
+
+if __name__ == "__main__":
+    main()
+
