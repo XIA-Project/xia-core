@@ -47,26 +47,14 @@ nodes_conf_file	   = sys.argv[2]
 # Create the nodes.conf file
 nodeconf = create_output_file(nodes_conf_file)
 
-# pattern for comment containing nameserver host name
-ns_pattern = re.compile('//\s*(\w+)\s*::\s*nameserver')
-
 # pattern for a Click element instantiation
 # hostname :: element_type (argument1, argument2, ...)
 element_pattern = re.compile('^(\w+)\s*::\s*(XIA\w+)\s*\((.+)\);')
-
-# Nameserver hostname
-nshost = None
 
 # Read the bootstrapping click config file that defines the topology
 try:
 	with open(topology_conf_file) as conf_file:
 		for line in conf_file:
-			# Read nameserver from comment: '// host :: nameserver'
-			match = ns_pattern.match(line)
-			if match:
-				nshost = match.group(1)
-				continue
-
 			# Look for Click host/router definitions
 			match = element_pattern.match(line)
 			if not match:
@@ -81,9 +69,5 @@ try:
 			nodeconf.write("%s\t%s\n" % (hostname, elemtype))
 except:
 	help()
-
-# Add nameserver (if found) at the end of nodes.conf
-if nshost != None:
-	nodeconf.write("%s\t%s\n" % (nshost, 'nameserver'))
 
 nodeconf.close
