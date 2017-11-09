@@ -1075,6 +1075,24 @@ int XlaunchNotifThread(XcacheHandle *h)
 	return pthread_create(&thread, NULL, __notifThread, (void *)h);
 }
 
+int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_PUSHCHUNK);
+	cmd.set_data(chunk, sizeof(sockaddr_x));
+	cmd.set_dag(addr, sizeof(sockaddr_x));
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error pushing chunk to remote address\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to chunk push\n");
+		return -1;
+	}
+	// TODO: read the response code and return error, when necessary
+	return 0;
+}
 /*!
 ** @brief fetch a partial chunk
 **

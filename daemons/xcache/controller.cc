@@ -499,6 +499,53 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	// Verify the downloaded content against Publisher's pubkey
 }
 
+int xcache_controller::xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	int remote_sock;
+	int addrlen = sizeof(sockaddr_x);
+	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+
+	assert(cmd->cmd() == xcache_cmd::XCACHE_PUSHCHUNK);
+
+	sockaddr_x chunk_addr;
+	sockaddr_x remote_addr;
+
+	memcpy(&chunk_addr, cmd->data().c_str(), cmd->data().length());
+	memcpy(&remote_addr, cmd->dag().c_str(), cmd->dag().length());
+
+	// Connect to the remote end
+	if ((remote_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
+		syslog(LOG_ERR, "Xsocket not created: %s\n", strerror(errno));
+		return RET_SENDRESP;
+		//return -1;
+	}
+	// Bind to the CID DAG provided by user
+	if (Xbind(remote_sock, (struct sockaddr *)&chunk_addr,
+				sizeof(sockaddr_x)) < 0) {
+		syslog(LOG_ERR, "Xbind to chunk dag failed\n");
+		return RET_SENDRESP;
+	}
+	Graph g(&chunk_addr);
+	syslog(LOG_INFO, "Xcache: pushing: %s\n", g.dag_string().c_str());
+
+	if (Xconnect(remote_sock, (struct sockaddr *)&remote_addr, addrlen) < 0) {
+		syslog(LOG_ERR, "Xconnect failed: %s\n", strerror(errno));
+		return RET_SENDRESP;
+		//return -1;
+	}
+
+	// Now fetch the chunk from local storage and send it over
+	xcache_req req;
+	req.type = xcache_cmd::XCACHE_SENDCHUNK;
+	req.to_sock = remote_sock;
+	send_content_remote(&req, &chunk_addr);
+	Xclose(remote_sock);
+
+	resp->set_cmd(xcache_cmd::XCACHE_PUSHCHUNK);
+	resp->set_status(xcache_cmd::XCACHE_OK);
+	return RET_SENDRESP;
+}
+
 std::string xcache_controller::addr2cid(sockaddr_x *addr)
 {
 	Graph g(addr);
@@ -585,6 +632,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_STORE_NAMED:
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
+	case xcache_cmd::XCACHE_PUSHCHUNK:
 	case xcache_cmd::XCACHE_READ:
 		ret = RET_ENQUEUE;
 		break;
@@ -1197,6 +1245,15 @@ void xcache_controller::process_req(xcache_req *req)
 		// Read a (partial/whole) chunk from local storage
 		cmd = (xcache_cmd *)req->data;
 		ret = chunk_read(&resp, cmd);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_PUSHCHUNK:
+		// Send requested chunk to the address given
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_push_chunk(&resp, cmd);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());

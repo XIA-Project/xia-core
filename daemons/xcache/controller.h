@@ -146,6 +146,11 @@ public:
 			int flags);
 
 	/**
+	 * Send a chunk to a requested address
+	 */
+	int xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd);
+
+	/**
 	 * Chunk reading
 	 */
 	int chunk_read(xcache_cmd *resp, xcache_cmd *cmd);
