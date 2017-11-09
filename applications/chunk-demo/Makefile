@@ -4,7 +4,7 @@ include ../../xia.mk
 
 LDFLAGS+=$(LIBS) -lprotobuf 
 
-TARGETS=chunk-demo-server chunk-demo-client ncid-demo-server ncid-demo-client push-demo-server
+TARGETS=chunk-demo-server chunk-demo-client ncid-demo-server ncid-demo-client push-demo-server push-demo-client
 
 all: $(TARGETS)
 
