@@ -20,7 +20,7 @@ public:
 		_max_size = ini_getl("lru", "_max_size", 0, config);
 		_max_size *= 1024;
 
-		printf("cache policy = %lu %lu\n", _max_entries, _max_size);
+//		printf("cache policy = %lu %lu\n", _max_entries, _max_size);
 		_cache_size = 0;
 		pthread_mutex_init(&_lock, NULL);
 	}
@@ -62,7 +62,7 @@ public:
 			}
 		}
 
-printf("_max_size = %lu, current size = %lu\n", _max_size, _cache_size);
+//		printf("_max_size = %lu, current size = %lu\n", _max_size, _cache_size);
 		if (_max_size != 0 && _cache_size > _max_size) {
 			printf("checking bytes\n");
 			size_t bytes = _max_size - (_max_size / 10);
