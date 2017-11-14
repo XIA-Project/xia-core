@@ -215,7 +215,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	_local_4id = local_4id;
 	_hostname = hostname;
-	click_chatter("XTRANSPORT: hostname is %s", _hostname.c_str());
+//	INFO("XTRANSPORT: hostname is %s", _hostname.c_str());
 
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
@@ -328,13 +328,13 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = dag;
-		click_chatter("XTRANSPORT: DAG or Local addr is now %s", f->_local_addr.unparse().c_str());
+		DBG("XTRANSPORT: DAG or Local addr is now %s", f->_local_addr.unparse().c_str());
 		String local_addr_str = f->_local_addr.unparse().c_str();
 		// If a dag was assigned, this is a router.
 		// So assign the same DAG to all interfaces
 		for(int i=0; i<f->_num_ports; i++) {
 			if(!f->_interfaces.update(i, local_addr_str)) {
-				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
+				ERROR("Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
 				return -1;
 			}
 		}
@@ -2311,6 +2311,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	sprintf(linecardname, "xlc%d", interface);
 	String linecardstr(linecardname);
 	String linecardelem = _hostname + "/" + linecardstr;
+
+	printf("interface = %d\n", interface);
 
 	// XIAChallengeSource in XIALineCard being updated
 	String xchal_handler_str = linecardelem + "/xchal.dag";
