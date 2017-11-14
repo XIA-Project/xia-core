@@ -22,3 +22,9 @@ def getxiaclickhostname():
 
 def xia_srcdir():
     return os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+
+def xia_bindir():
+    return os.path.join(xia_srcdir(), 'bin')
+
+def xia_etcdir():
+    return os.path.join(xia_srcdir(), 'etc')
