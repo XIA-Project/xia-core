@@ -1,0 +1,470 @@
+#!/usr/bin/env python
+#
+# Copyright 2017 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the 'License');
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an 'AS IS' BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import re
+import sys
+import time
+import glob
+import psutil
+import argparse
+import ipaddress
+import subprocess
+
+import nodeconf
+import xiapyutils
+import clickcontrol
+
+VER    = '%(prog)s 1.0'
+STATUS = '%-13s: %s'
+DELAY  = 2
+
+# logging levels
+levels = ['LOG_EMERG', 'LOG_ALERT', 'LOG_CRIT', 'LOG_ERR', 'LOG_WARNING', 'LOG_NOTICE', 'LOG_INFO', 'LOG_DEBUG']
+
+# services for the various node types
+common_services           = ['click', 'xnetjd', 'xcache']
+controller_services       = ['xcontrold'] 
+controller_extra_services = ['xnameservice', 'xrendezvous']
+router_services           = ['xrouted']
+host_services             = ['xhostd']
+stats_services            = ['xstats', 'statsserver']
+
+# make a list of all possible services that might be running on a node where the xia.ini file was deleted
+all_services = common_services + router_services + host_services + controller_services + controller_extra_services + stats_services
+
+# files to delete when stop is run
+cleanup_files = [
+    os.path.join(xiapyutils.xia_etcdir(), 'controller_dag'),
+    '/tmp/cachefilter-click.sock',
+    '/tmp/xcache*'
+    ]
+
+
+#
+# config validators ##########################################################
+#
+#
+# custom argparse handler to validate IP addresses
+#
+def ip_addr(arg):
+    try:
+        ipaddress.ip_address(unicode(arg, 'utf-8'))
+    except ipaddress.AddressValueError as err:
+        raise argparse.ArgumentTypeError(str(err))
+    return arg
+
+
+#
+# custom argparse handler to choose syslog levels
+#
+def loglevel(arg):
+    try:
+        value = int(arg)
+    except ValueError as err:
+       raise argparse.ArgumentTypeError(str(err))
+
+    if value < 0 or value > 7:
+        message = "Expected a value in 0..7, got {}".format(value)
+        raise argparse.ArgumentTypeError(message)
+
+    return value
+
+
+# utility functions ##########################################################
+#
+# display status message unless in stealth mode
+#
+def msg(str, *params):
+    if not args.quiet:
+        if params:
+            print str, params
+        else:
+            print str
+
+
+#
+# get the process info for the named process
+#
+def get_process(name):
+    if name == 'xnetjd':
+        # this is in the cmdline, not name, and has the full path the the process
+        name = os.path.join(xiapyutils.xia_bindir(), name)
+
+    return [p.info for p in psutil.process_iter(attrs=['pid', 'name', 'cmdline']) if (name in p.info['name'] or name in p.info['cmdline'])]
+
+
+#
+# kill all processes rather than use the config file to determine what to kill
+#
+def kill(name):
+    state = 'not running'
+
+    xia_processes = get_process(name)
+    for proc in xia_processes:
+        try:
+            p = psutil.Process(proc['pid'])
+            p.kill()
+            state = 'stopped'
+
+        except psutil.AccessDenied:
+            msg(STATUS % (name, 'running'))
+            print 'unable to kill %s, root privileges required' % name
+            exit(1)
+
+    if state == 'stopped' or args.force or (name != 'xstats' and name != 'statsserver'):
+        msg(STATUS % (name, state))
+
+
+#
+# get a list of all the services that should run on this node
+#
+def make_service_list(type, boot=False):
+    if args.force:
+        return all_services
+
+    svcs = []
+    svcs += common_services
+
+    if type == 'controller':
+        svcs += controller_services
+        if node.nameserver():
+            svcs += ['xnameservice']
+        if node.rendezvous_sid():
+            svcs += ['xrendezvous']
+    elif type == 'router':
+        svcs += router_services
+    elif type == 'host':
+        svcs += host_services
+    else:
+        return None
+
+    if not boot:
+        svcs += stats_services
+    else:
+        if args.sclient:
+            svcs.append('xstats')
+        if args.sserver:
+            print 'server'
+
+    return svcs
+
+
+#
+# what kind of an XIA node are we?
+#
+def get_nodetype():
+    nodetype = node.nodetype()
+    if nodetype == None:
+        msg('A valid XIA configuration was not found')
+        exit(1)
+    else:
+        return nodetype
+
+
+#
+# get the runtime logging state for click
+#
+# Note: this only works correctly for click logging, not daemons
+#
+def get_logging():
+    if get_process('click'):
+        xlog = os.path.join(xiapyutils.xia_bindir(), 'xlog')
+
+        p = subprocess.Popen(xlog, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate(input=None)
+        elements = re.split('\n|: ', out)
+        print 'console logs :', elements[1]
+        print 'log level    :', elements[3]
+
+
+#
+# execute the xlog app to set logging parameters
+#
+# Note: this doesn't affect daemon logging which is only set at boot time
+#
+def set_logging():
+    if get_process('click'):
+        xlog = os.path.join(xiapyutils.xia_bindir(), 'xlog')
+        DEVNULL = open(os.devnull, 'wb')
+
+        params = [xlog]
+        if args.verbose > 0:
+            params.append('-v')
+        if args.level:
+            params.append('-l%s' % args.level)
+
+        subprocess.Popen(params, stdout=DEVNULL)
+
+
+#
+# delete temp files and domain sockets when exiting
+#
+def cleanup():
+    for cf in cleanup_files:
+        try:
+            for f in glob.glob(cf):
+                os.unlink(f)
+        except:
+            pass
+
+
+#
+# start click running and send config info down to it
+#
+def start_click():
+    nodetype = get_nodetype()
+    if nodetype == 'host':
+        script = 'host'
+        element = 'XIAEndHost'
+    else:
+        script = 'router'
+        if node.numports() == 4:
+            element = 'XIARouter4Port'
+        else:
+            element = 'XIARouter8Port'
+
+    params = []
+    
+    if args.valgrind:
+        params.append('valgrind')
+    params.append(os.path.join(xiapyutils.xia_srcdir(), 'click/userlevel/click'))
+    params.append('-R')
+    params.append(os.path.join(xiapyutils.xia_etcdir(), 'click/%s.click' % script))
+    
+    try:
+        p = subprocess.Popen(params)
+    except:
+        print 'unable to start click, exiting...'
+        exit(1)
+
+    # wait and see if click actually started correctly
+    time.sleep(DELAY)
+    if not get_process('click'):
+        print 'fail!'
+        cleanup()
+        exit(1)
+
+    # inject config info into click
+    with clickcontrol.ClickControl() as click:
+
+        click.assignHID(hostname, element, node.hid())
+
+        # if we're a controller, do some extra stuff
+        if nodetype == 'controller':
+            ad = node.ad()
+            hid = node.hid()
+            click.assignDAG(hostname, element, 'RE %s %s' % (ad, hid))
+            
+            click.setADInXARPTable(ad)
+
+            # set up rendezvous if we're serving it
+            rv_sid = node.rendezvous_sid()
+            if rv_sid:
+                rvc_sid = node.rendezvous_ctl_sid()
+                rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
+                rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
+                router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
+                click.assignRVDAG(hostname, element,  router_rv_dag)
+                click.assignRVControlDAG(hostname, element, rvc_dag)
+    set_logging()
+
+
+
+#
+# start the joining daemon
+#
+def start_xnetjd(name):
+    params = []
+    params.append(os.path.join(xiapyutils.xia_bindir(), name))
+
+    nodetype = get_nodetype()
+    if nodetype == 'host':
+        nodetype = 'client'
+
+    params.append('--hostname')
+    params.append(hostname)
+
+    if args.verbose > 1:
+        params.append('-v')
+    params.append('-l%s' % args.level)
+
+    params.append('--%s' % nodetype)
+
+    # FIXME do the right thing here  for DSRC!!!
+    params.append('--layer2')
+    params.append('ethernet')
+    
+    subprocess.Popen(params)
+
+
+#
+# start any daemon other than click or xnetjd
+#
+def start_daemon(name):
+        params = []
+        params.append(os.path.join(xiapyutils.xia_bindir(), name))
+
+        params.append('-h')
+        params.append(hostname)
+
+        if args.verbose > 1:
+            params.append('-v')
+        params.append('-l%s' % args.level)
+
+        if name == 'xrendezvous':
+            params.append('-d')
+            params.append(node.rendezvous_sid())
+
+        subprocess.Popen(params)
+
+
+#
+# generic starting point for launching a process
+# verifies that the process was enabled on the command line
+#
+def start_process(name):
+    params = []
+
+    if name == 'click' and args.click:
+        start_click()
+
+    elif args.daemons:
+        if name == 'xnetjd':
+            start_xnetjd(name)
+        else:
+            start_daemon(name)
+
+
+#
+# print service and logging status
+#
+def print_status(nodetype):
+    services = make_service_list(nodetype)
+    for service in services:
+        state = 'stopped'
+        processes = get_process(service)
+        for proc in processes:
+            p = psutil.Process(proc['pid'])
+            state = 'running'
+            break
+
+        print STATUS % (service, state)
+
+    print
+    get_logging()
+
+
+# main functionality #########################################################
+#
+# display node status
+#
+def status():
+    nodetype = get_nodetype()
+    if args.force:
+        msg('XIA service status')
+    else:
+        msg('XIA %s service status' % nodetype)
+
+    print_status(nodetype)
+
+
+#
+# stop the node
+#
+def stop():
+    nodetype = get_nodetype()
+    if args.force:
+        msg('killing any XIA process(es) found on this node')
+        services = all_services
+    else:
+        msg('Stopping XIA %s services' % nodetype)
+
+    services = make_service_list(nodetype)
+    for service in services:
+        kill(service)
+
+    cleanup()
+
+
+#
+# start the node
+#
+def start():
+    nodetype = get_nodetype()
+
+    # set flags so status displays correctly for us
+    args.force = False
+
+    if get_process('click'):
+        args.quiet = True
+        print 'XIA is already running'
+        print_status(nodetype)
+        exit(2)
+
+    msg('starting an XIA %s node' % nodetype)
+
+    args.force = False
+    services = make_service_list(nodetype, True)
+
+    for service in services:
+        start_process(service)
+
+    set_logging()
+
+    if not args.quiet:
+        args.quiet = True
+        print_status(nodetype)
+
+
+# let's go! ##################################################################
+node = nodeconf.nodeconf()
+node.read()
+hostname = xiapyutils.getxiaclickhostname()
+
+parser = argparse.ArgumentParser(description='Control an XIA node')
+parser.add_argument('-v', '--version', action='version', version=VER)
+parser.add_argument('-q', '--quiet', action='store_true', help='hide status messages')
+
+sub = parser.add_subparsers(help='add -h following command for additional arguments')
+
+start_parser = sub.add_parser('start', help='start an XIA node')
+start_parser.add_argument('-v', '--verbose', action='count', help='enable console logging (-vv to log daemons too)')
+start_parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
+
+restrict_parser = start_parser.add_mutually_exclusive_group()
+restrict_parser.add_argument('--click', action='store_false', dest='daemons', help='only start click')
+restrict_parser.add_argument('--daemons', action='store_false', dest='click', help='only start the XIA daemons')
+start_parser.add_argument('--valgrind', action='store_true', help='run click inside of valgrind')
+start_parser.add_argument('-s', '--sclient', type=ip_addr, metavar='IP-ADDR', help='run the stats client and send output to IP-ADDR')
+start_parser.add_argument('-S', '--sserver', action='store_true', help='run the XIA stats server on this node')
+start_parser.set_defaults(func=start, verbose=0, level=3)
+
+stop_parser = sub.add_parser('stop', help='stop an XIA node')
+stop_parser.add_argument('-f', '--force', action='store_true', help='act on all XIA processes')
+stop_parser.set_defaults(func=stop)
+
+status_parser = sub.add_parser('status', help='display node status')
+status_parser.add_argument('-f', '--force', action='store_true', help='act on all XIA processes')
+status_parser.set_defaults(func=status)
+
+if (len(sys.argv) < 2):
+    args = parser.parse_args(['--help'])
+else:
+    args = parser.parse_args()
+
+args.func()
+

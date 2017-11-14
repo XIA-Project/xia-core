@@ -18,57 +18,48 @@
 # FIXME: 
 # - this is calling the python program xconfig.py to make conf files
 #   seems better to merge them together
-# - we're also using assign_addresses, this needs to be newer as well
-# - nodes.conf generation should be eliminated
-# - what should the permissions on the keys, ca, and publisher dirs be?
-# - when do we create HIDs/ADs?
 # - can we make click always just use xia.click?
 # - how can we disable key generation messages?
 
 import os
 import re
 import sys
-import xconfig
 import argparse
 import ipaddress
-import keymanage
-import xiapyutils
-import assign_addresses
+import subprocess
 from glob import glob
 from configparser import ConfigParser
 
-# version format string
+import genkeys
+import xconfig
+import nodeconf
+import keymanage
+import xiapyutils
+
 VER = '%(prog)s 1.0'
 
-ADDR_CONF  = 'etc/address.conf'
-XIA_CONF   = 'etc/xia.ini'
-CLICK_CONF = 'etc/click/{}.click'
+hostname = xiapyutils.getxiaclickhostname()
 
-# list of files and locations to delete when clean is run
+# list of files and locations to delete when clean is run ####################
 conf_files = [
-	'etc/click/host*.click',
-	'etc/click/router*.click',
-        'etc/*.conf',
-	'etc/hosts.xia',
-	'etc/controller_dag',
-	'etc/RHID.cred',
-        'key/*',
-        'ca/*',
-        'publishers/*'
+    'etc/xia.ini',
+    'etc/click/host*.click',
+    'etc/click/router*.click',
+    'etc/*.conf',
+    'etc/hosts.xia',
+    'etc/controller_dag',
+    'etc/RHID.cred',
+    'key/*',
+    'ca/*',
+    'publishers/*'
         ]
 
 temp_files = [
-	'xcache*',
-	'content/*'
+    'cachefilter-click.sock',
+    'xcache*',
+    'content/*'
         ]
 
-# hostname with -'s replaced so they work inside click
-hostname = xiapyutils.getxiaclickhostname()
-
-# file paths
-xdir      = xiapyutils.xia_srcdir()
-addr_conf = os.path.join(xdir, ADDR_CONF)
-xia_conf  = os.path.join(xdir, XIA_CONF)
 
 #
 # config validators ##########################################################
@@ -136,10 +127,10 @@ def socket_server(arg):
 
 
 
-#
 # helpers ####################################################################
 #
-
+# display status unless we are in stealth mode
+#
 def status(msg, *params):
     if not args.quiet:
         if params:
@@ -151,15 +142,7 @@ def status(msg, *params):
 # are we already configured?
 #
 def configured(args):
-    # FIXME: this could just use address.conf or it's replacement instead of using the click file
-
-    if args.nodetype == 'controller':
-        kind = 'router'
-    else:
-        kind = args.nodetype
-
-    conf = os.path.join(xdir, CLICK_CONF.format(kind))
-    return os.path.isfile(conf)
+    return node.nodetype() != None
 
 
 
@@ -168,7 +151,7 @@ def configured(args):
 #
 def make_dir_with_permissions(dir, perm):
 
-    path = '%s/%s' % (xdir, dir)
+    path = '%s/%s' % (xiapyutils.xia_srcdir(), dir)
     try:
         old_umask = os.umask(0)
         os.makedirs(path, perm)
@@ -215,47 +198,52 @@ def run_xconfig(args):
     
     cmds = cmdline.split(' ')
     # now make the configuration
-    if args.quiet:
-        xconfig.verbose = False
+    xconfig.verbose = False
+
+    if args.nodetype == 'host':
+        status('createing host.click')
+    else:
+        status('creating router.click')
     xconfig.build(cmds)
 
 
+#
+# create xia.ini
+#
+def create_nodeconf(args):
+    status('creating credentials')
 
-def create_xia_config(args):
     c = ConfigParser()
 
-    c['xia'] = {}
-    x = c['xia']
-    x['hostname'] = hostname
-    x['nodetytpe'] = args.nodetype
-    x['numports'] = str(args.ports)
-    x['hid'] = 'FIXME!'
+    node.set('hostname', hostname)
+    node.set('nodetype', args.nodetype)
+    node.set('numports', str(args.ports))
+    node.set('hid', genkeys.create_new_HID())
+    node.set('hostname', hostname)
+    node.set('hostname', hostname)
+    node.set('hostname', hostname)
 
     if args.nodetype == 'controller':
-        c['controller'] = {}
-        cc = c['controller']
-        cc['AD'] = 'FIXME!'
-        cc['SID'] = 'FIXME!'
-        cc['nameserver'] = str(args.nameserver)
-        cc['rendezvous'] = str(args.rendezvous)
+        node.set('ad', genkeys.create_new_AD())
+        node.set('controller_sid', genkeys.create_new_SID())
+        node.set('fid', genkeys.create_new_FID())
+        if args.nameserver:
+            node.set('nameserver_sid', 'SID:1110000000000000000000000000000000001113')
+        if args.rendezvous:
+            node.set('rendezvous_sid', genkeys.create_new_SID())
+            node.set('rendezvous_ctl_sid', genkeys.create_new_SID())
 
     if args.ignore:
-        c['ignore'] = {}
-        i = c['ignore']
-        n = 0
         for iface in args.ignore:
-            if n == 0:
-                name = 'interface'
-            else:
-               name = 'interface%d' % n
-            n += 1
-            i[name] = iface
+            node._set('ignore', iface, 'True')
 
     if args.waveserver:
-        c['waveserver'] = args.waveserver
+        node._set('waveserver', 'mac', args.waveserver['mac'])
+        node._set('waveserver', 'addr', args.waveserver['addr'])
+        node._set('waveserver', 'port', args.waveserver['port'])
     
-    with open(xia_conf, 'w') as conf:
-            c.write(conf)
+    status('creating xia.ini')
+    node.write()
 
 #
 # configuration for all node types
@@ -265,99 +253,172 @@ def common_config(args):
     # don't overwrite existing configurations
 
     if configured(args):
-        print 'XIA is already configured'
+        print 'XIA is already configured as a %s' % node.nodetype()
         sys.exit(0)
 
+    status('Generating %s config files' % args.nodetype)
+
+    node.reset()
+    create_nodeconf(args)
     run_xconfig(args)
     create_legacy_config_files(args)
-
-    create_xia_config(args)
 
     make_dir_with_permissions('ca', 0775)
     make_dir_with_permissions('key', 0775)
     make_dir_with_permissions('publishers', 0775)
 
 
+#
+# make the resolv.conf file
+#
+def create_resolv_conf_file():
+    status('creating resolv.conf')
+    with open (os.path.join(xiapyutils.xia_etcdir(), 'resolv.conf'), 'w') as resolvconf:
+        ad = node.ad()
+        hid = node.hid()
+        ns_sid = node.nameserver_sid()
+        rv_sid = node.rendezvous_sid()
+        rvc_sid = node.rendezvous_ctl_sid()
 
+        
+        if rv_sid and rvc_sid:
+            rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
+            rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
+            router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
 
+            if ns_sid:
+                # FIXME: the comment in assignaddresses says to do this,
+                # but the code uses the straight host dag
+                resolvconf.write('nameserver=%s %s\n' % (router_rv_dag, ns_sid))
+            resolvconf.write('rendezvous=%s\n' % (router_rv_dag))
+            resolvconf.write('rendezvousc=%s\n' % (rvc_dag))
+
+        elif ns_sid:
+            resolvconf.write('nameserver=RE %s %s %s\n' % (node.ad(), node.hid(), ns_sid))
+        
+
+#
+# make the address.conf file
+# FIXME: this can hopefully be phased out eventually
+#
 def create_legacy_config_files(args):
-    # FIXME: separate out and eventually eliminate support for this file
 
-    status('Creating %s config files', args.nodetype)
     status('creating address.conf')
 
-    if args.quiet:
-        assign_addresses.verbose = False
+    if args.nodetype == 'host':
+        target = 'XIAEndHost'
+    else:
+        target = 'XIARouter%sPort' % args.ports
 
-    with open (os.path.join(xdir, ADDR_CONF), 'w') as addr_conf:
-        if args.nodetype == 'host':
-            assign_addresses.assign_xids(addr_conf, hostname, 'XIAEndHost')
-
-        elif args.nodetype == 'router':
-            assign_addresses.iscontroller = False
-            assign_addresses.assign_xids(addr_conf, hostname, 'XIA4PortRouter')
-
-        elif args.nodetype == 'controller':
-            assign_addresses.iscontroller = True
-            assign_addresses.assign_xids(addr_conf, hostname, 'Controller')
+    with open (os.path.join(xiapyutils.xia_etcdir(), 'address.conf'), 'w') as conf:
+        if args.nodetype == 'controller':
+            conf.write('%s %s (%s %s)\n' % (hostname, target, node.ad(), node.hid()))
             if args.nameserver:
-                assign_addresses.assign_xids(addr_conf, hostname, 'nameserver')
+                conf.write('%s nameserver\n' % hostname)
             if args.rendezvous:
-                assign_addresses.assign_xids(addr_conf, hostname, 'rendezvous')
+                conf.write('%s rendezvous %s %s\n' % (hostname, node.rendezvous_sid(), node.rendezvous_ctl_sid()))
 
+        else:
+            conf.write('%s %s (%s)\n' % (hostname, target, node.hid()))
 
-    
 
 #
-# actions
+# create the RHID.cred file that routers use to join the AD
 #
+def create_rhid_cred_file():
+    status('creating RHID.cred')
+    params  = [os.path.join(xiapyutils.xia_srcdir(), 'daemons/xnetjd/credmgr.py'), '-r']
+    subprocess.check_call(params)
 
+
+#
+# create the file xcontrold uses to configure itself
+# FIXME: we can probably transition this to use xia.ini
+#
+def create_controller_dag_file():
+    status('creating controller_dag')
+    with open (os.path.join(xiapyutils.xia_etcdir(), 'controller_dag'), 'w') as f:
+        f.write('DAG 0 1 -\n%s 1 -\n%s 2 -\n%s\n' % (node.hid(), node.fid(), node.controller_sid()))
+
+
+#
+# create the controller.conf file that is added to trusted.conf on peer controllers so that we can talk to them
+#
+def create_controller_conf_file():
+    status('creating controller.conf')
+    with open (os.path.join(xiapyutils.xia_etcdir(), 'controller.conf'), 'w') as f:
+        f.write('# controller.conf\n')
+        f.write('# Copy or append this file to the trusted.conf file in neighbor ADs.\n')
+        f.write('# The controller dag in this file will continue to be used across xia\n')
+        f.write('# restarts.\n')
+        f.write('[%s]\n' % node.ad())
+        f.write('dag=DAG 0 - %s 1 - %s 2 - %s\n' % (node.ad(), node.hid(), node.controller_sid()))
+
+
+#
+# how to finish configuring the network
+#
+def display_footer():
+    print '''
+Next Steps:
+ * Run the addrouter command to copy the RHID.cred file to the routers that
+   will be part of this AD.
+
+      addrouter router1 router2 10.0.0.4 ...
+
+ * Run the addpeer command to make this AD know to neighbor ADs.
+  The controller.conf file will be appended to the trusted.conf file on the
+  controller of each listed AD. If this node is the nameserver, the resolf.conf
+  file will be copied as well.
+
+      addpeer controller1, 10.1.0.1 ...
+
+Note:
+ * IP connectivity is required for the above commands to function. Hostnames
+ or IP addresses may be used.
+ * The files will be copied to the same path location as on this machine, so make sure
+   all of your routers and controllers use the same directories.
+    '''
+
+
+
+# actions ####################################################################
 #
 # display configuration
 #
 def info(args):
     if os.path.isfile(xia_conf):
-        c = ConfigParser()
-        c.read(xia_conf)
+        type = node.nodetype()
 
-        x = c['xia']
-        type = x.get('nodetype', 'unknown')
-        print 'Hostname:          %s' % x.get('hostname', hostname)
-        print 'Node Type:         %s' % type
-        print 'HID:               %s' % x.get('hid', 'unknown')
+        print 'Hostname:           %s' % node.hostname()
+        print 'Node Type:          %s' % type
+        print 'HID:                %s' % node.hid()
 
         if type == 'controller':
-            cc = c['controller']
-            print 'AD:                %s' % cc.get('ad', 'unknown')
-            print 'SID:               %s' % cc.get('sid', 'unknown')
-            print 'Name Server:       %s' % cc.getboolean('nameserver', False)
-            print 'Rendezvous Server: %s' % cc.getboolean('rendezvous', False)
+            print 'AD:                 %s' % node.ad()
+            print 'Controller SID:     %s' % node.controller_sid()
+            print 'Controller FID:     %s' % node.fid()
+            print 'Name Server SID:    %s' % node.nameserver_sid()
+            print 'Rendezvous SID:     %s' % node.rendezvous_sid()
+            print 'Rendezvous ctl SID: %s' % node.rendezvous_ctl_sid()
 
-        print 'Number of ports:   %s' % x.get('numports', '4')
+        print 'Number of ports:    %s' % node.numports()
 
-        i = c['ignore']
-        if i:
-            print 'Ignored Interfaces:'
-            for iface in i:
-                print '    %s' % i.get(iface)
+        ifaces = node.interfaces()
+        for iface in ifaces:
+            print 'ignore interface:   %s' % iface
 
-        w = c['waveserver']
+        w = node.waveserver()
         if w:
-            print 'Waveserver:'
-            print '    MAC:     %s' % w.get('mac')
-            print '    Address: %s:%s' % (w.get('addr'), w.get('port'))
-
-
+            print 'Waveserver MAC:     %s' % w[0]
+            print 'Waveserver Addrs:   %s:%s' % (w[1], w[2])
     else:
         print 'No configuration found'
 
 
-
-
-#    if args.waveserver:
-#        c['waveserver'] = args.waveserver
-
-
+#
+# delete all config files, cached content, and any temp files
+#
 def clean(args):
     try:
         for files in temp_files:
@@ -365,9 +426,8 @@ def clean(args):
                 status('removing {}'.format(f))
                 os.remove(f)
 
-
         for files in conf_files:
-            files = os.path.join(xdir, files)
+            files = os.path.join(xiapyutils.xia_srcdir(), files)
 
             for f in glob(files):
                 status('removing {}'.format(f))
@@ -380,47 +440,67 @@ def clean(args):
 
 
 
+#
+# make the node an endhost
+#
 def host(args):
     args.nodetype = 'host'
     common_config(args)
 
 
+#
+# make the node a router
+#
 def router(args):
     args.nodetype = 'router'
     common_config(args)
 
 
-
+#
+# make the node a controller
+#
 def controller(args):
     args.nodetype = 'controller'
     common_config(args)
+    create_rhid_cred_file()
 
+    # FIXME this info could be merged into the xia.ini file instead
+    create_controller_dag_file()
+    create_controller_conf_file()
+
+    if node.nameserver_sid() or node.rendezvous():
+        create_resolv_conf_file()
+
+    display_footer()
 
 
 #
 # let's go!
 #
 
-xia_config = ConfigParser()
+node = nodeconf.nodeconf()
+node.read()
 
 parser = argparse.ArgumentParser(description='configure an XIA node')
 parser.add_argument('-v', '--version', action='version', version=VER)
 parser.add_argument('-q', '--quiet', action='store_true', help='hide status messages')
 
-sub = parser.add_subparsers(help='add -h following option for additional arguments')
+sub = parser.add_subparsers(help='add -h following arguments for additional options')
 
 # these arguments are common to the host, router, and controller configurations
 common_parser = argparse.ArgumentParser(add_help=False)
 common_parser.add_argument('-i', '--ignore', nargs='+', type=iface, metavar='iface', help='ignore interface')
 common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='# of interfaces (default=4)')
 common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='MAC,IP:PORT', help='connect via a waveserver')
-common_parser.add_argument('-s', '--socket', type=socket_server, metavar='port', help='use a TCP socket instead of an ethernet interface')
-common_parser.add_argument('--4id', type=four_id, help='configure an interface as 4ID')
+
+# FIXME: add support for these at some point
+#common_parser.add_argument('-s', '--socket', type=socket_server, metavar='port', help='use a TCP socket instead of an ethernet interface')
+#`common_parser.add_argument('--4id', type=four_id, help='configure an interface as 4ID')
 
 info_parser = sub.add_parser('info', help='display current configuration')
 info_parser.set_defaults(func=info)
 
-clean_parser = sub.add_parser('clean', help='delete configuration')
+clean_parser = sub.add_parser('clean', help='delete configuration and generated files')
 clean_parser.set_defaults(func=clean)
 
 host_parser = sub.add_parser('host', parents=[common_parser], help='configure as an XIA host')
