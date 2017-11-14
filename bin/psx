@@ -13,5 +13,5 @@ EOH
 	exit 0
 fi
 
-pgrep -l "click|xroute|xcache|xname|statsserver|xstats"
-pgrep -fa xnetj | cut -d\  -f1,3 | sed 's/\.\///'
+pgrep -l "click|xrouted|xhostd|xcontrold|xcache|xname|statsserver|xstats"
+pgrep -fa xnetj | cut -d\  -f1,3| sed 's|/.*/||'
