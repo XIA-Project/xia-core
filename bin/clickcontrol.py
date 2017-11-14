@@ -42,13 +42,12 @@ def getxiaconstants():
     global xiaconstantsclick
     xia_constants = {}
     xiaconstantsclick = os.path.join(get_srcdir(), xiaconstantsclick)
-    print 'Reading in %s' % xiaconstantsclick
+
     with open(xiaconstantsclick) as constants:
         for line in constants:
             match = xiaconstantpattern.match(line)
             if match:
                 xia_constants[match.group(1)] = match.group(2)
-    print xia_constants
     return xia_constants
 
 class ClickControl:
@@ -68,8 +67,6 @@ class ClickControl:
             click_ver = self.sock.recv(1024)
             if "Click::ControlSocket" not in click_ver:
                 print 'ERROR: Click did not provide version info on connect'
-            else:
-                print 'Connected to {}'.format(click_ver)
         except:
             print 'ERROR: Unable to connect to Click'
             sys.exit(-1)
@@ -123,7 +120,7 @@ class ClickControl:
         # Call write handler for
         destined_for_localhost = self.xia_constants['$DESTINED_FOR_LOCALHOST']
         cmd = '%s/%s.add %s %s' % (hostname, table, xid, destined_for_localhost)
-        print 'Adding route: %s' % cmd
+
         if not self.writeCommand(cmd):
             return False
         return True
