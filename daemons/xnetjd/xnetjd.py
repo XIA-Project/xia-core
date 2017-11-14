@@ -70,12 +70,15 @@ def main():
     # Set up logging
     logger = logging.getLogger()
     logger.setLevel(loglevel[args.loglevel])
-    print "logger level: {} in response to loglevel {}".format(loglevel[args.loglevel], args.loglevel)
+    # print "logger level: {} in response to loglevel {}".format(loglevel[args.loglevel], args.loglevel)
     sysloghandler = logging.handlers.SysLogHandler(address="/dev/log")
     logger.addHandler(sysloghandler)
     if args.verbose:
         stdouthandler = logging.StreamHandler(stream=sys.stderr)
         logger.addHandler(stdouthandler)
+    else:
+        # make sure we aren't logging to stdout!
+        logger.removeHandler(logger.handlers[0])
 
     # All threads must listen for this event and exit gracefully when set
     shutdown_event = threading.Event()
