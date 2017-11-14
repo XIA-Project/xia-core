@@ -28,7 +28,7 @@ class CredMgr(object):
             raise RuntimeError("Credentials can only be issued on controller")
 
         # Router credential file name. Will include RHID in future.
-        rcredfilepath = 'RHID.cred'
+        rcredfilepath = os.path.join(srcdir, 'etc/RHID.cred')
 
         # Build an AD-only credential for now
         router_cred = jacp_pb2.RouterCredentials()
