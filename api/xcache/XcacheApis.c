@@ -1075,6 +1075,21 @@ int XlaunchNotifThread(XcacheHandle *h)
 	return pthread_create(&thread, NULL, __notifThread, (void *)h);
 }
 
+/*!
+** @brief push a chunk to the requested address
+**
+** Send a chunk to a remote service. The user provides the address of
+** the chunk to be sent and the recipient service address.
+** Typically, the recipient service should know how to handle the
+** incoming chunk header and contents.
+**
+** @param h The cache handle
+** @param chunk DAG of the chunk to be sent. Must be local
+** @param addr Recipient address
+**
+** @returns 0 on success
+** @returns -1 on failure
+*/
 int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr)
 {
 	xcache_cmd cmd;
