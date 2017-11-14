@@ -20,7 +20,7 @@ import re
 import stat
 import hashlib
 import xiapyutils
-from subprocess import check_call
+import subprocess
 
 # Directory where all the keys will be dumped
 keydir = os.path.join(xiapyutils.xia_srcdir(), 'key')
@@ -28,8 +28,11 @@ keydir = os.path.join(xiapyutils.xia_srcdir(), 'key')
 def generate_rsa_key():
     private = None
     public = None
-    check_call("openssl genrsa -out privatekey.txt 1024".split())
-    check_call("openssl rsa -pubout -in privatekey.txt -out publickey.txt".split())
+
+    DEVNULL = open(os.devnull, 'wb')
+    subprocess.check_call("openssl genrsa -out privatekey.txt 1024".split(), stderr=DEVNULL)
+    subprocess.check_call("openssl rsa -pubout -in privatekey.txt -out publickey.txt".split(), stderr=DEVNULL)
+
     with open("privatekey.txt") as privfd:
         private = privfd.read()
     with open("publickey.txt") as pubfd:
@@ -74,6 +77,9 @@ def create_new_HID():
 
 def create_new_SID():
 	return 'SID:' + create_new_address()
+
+def create_new_FID():
+	return 'FID:' + create_new_address()
 
 def delete_AD(ad):
 	adstr, xid = ad.split(':')
