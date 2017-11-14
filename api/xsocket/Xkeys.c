@@ -605,7 +605,7 @@ int exists_keypair(const char *pubkeyhashstr)
 		goto exists_keypair_done;
 	}
 
-	LOGF("Key directory:%s:", keydir);
+//	LOGF("Key directory:%s:", keydir);
 	if(!dir_exists(keydir)) {
 		LOG("Key directory does not exist");
 		goto exists_keypair_done;
