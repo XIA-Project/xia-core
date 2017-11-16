@@ -226,6 +226,10 @@ def cleanup():
 # start click running and send config info down to it
 #
 def start_click():
+
+    # remove domain sockets in case we didn't shutdown cleanly previously
+    cleanup()
+
     nodetype = get_nodetype()
     if nodetype == 'host':
         script = 'host'

@@ -280,22 +280,16 @@ def create_resolv_conf_file():
         rv_sid = node.rendezvous_sid()
         rvc_sid = node.rendezvous_ctl_sid()
 
+        if ns_sid:
+            resolvconf.write('nameserver=RE %s %s %s\n' % (node.ad(), node.hid(), ns_sid))
         
         if rv_sid and rvc_sid:
             rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
             rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
             router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
-
-            if ns_sid:
-                # FIXME: the comment in assignaddresses says to do this,
-                # but the code uses the straight host dag
-                resolvconf.write('nameserver=%s %s\n' % (router_rv_dag, ns_sid))
             resolvconf.write('rendezvous=%s\n' % (router_rv_dag))
             resolvconf.write('rendezvousc=%s\n' % (rvc_dag))
 
-        elif ns_sid:
-            resolvconf.write('nameserver=RE %s %s %s\n' % (node.ad(), node.hid(), ns_sid))
-        
 
 #
 # make the address.conf file
@@ -387,8 +381,8 @@ Note:
 # display configuration
 #
 def info(args):
-    if os.path.isfile(xia_conf):
-        type = node.nodetype()
+    type = node.nodetype()
+    if type:
 
         print 'Hostname:           %s' % node.hostname()
         print 'Node Type:          %s' % type
@@ -468,7 +462,7 @@ def controller(args):
     create_controller_dag_file()
     create_controller_conf_file()
 
-    if node.nameserver_sid() or node.rendezvous():
+    if node.nameserver_sid() or node.rendezvous_sid():
         create_resolv_conf_file()
 
     display_footer()
