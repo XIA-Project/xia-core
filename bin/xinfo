@@ -62,8 +62,10 @@ scmds=" \
 files=" \
 	etc/click/router.click \
 	etc/click/host.click \
+	etc/xia.ini
+	etc/trusted.conf \
+	etc/controller.conf \
 	etc/address.conf \
-	etc/nodes.conf \
 	etc/resolv.conf \
 	etc/xcache.ini \
 	etc/xids \
