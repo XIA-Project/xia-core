@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+#
+# copy the RHID.cred file to the routers in this AD
+
+import os
+import argparse
+import xiapyutils
+import subprocess
+
+VER = '%(prog)s 1.0'
+RESOLV_CONF = 'resolv.conf'
+
+
+def send_file(fname, destname=None):
+
+    if not destname:
+        destname = fname
+    
+    source = os.path.join(xiapyutils.xia_etcdir(), fname)
+    if not os.path.isfile(source):
+        print 'ERROR: %s not found' % fname
+        print 'Run xia-config to create a controller node configuration if one doesn\'t already exist'
+        print 'Or run daemons/xnetjd/credmgr.py -r to recreate the crendetinal file.'
+        exit(1)
+
+    dest = os.path.join(destpath, 'etc/%s' % destname)
+
+    cmdline = ['scp']
+    if args.port:
+        cmdline += ['-p']
+        cmdline += [args.port]
+    cmdline += [source]
+    if args.user:
+        cmdline += ['%s@%s:%s' % (args.user, host, dest)]
+    else:
+        cmdline += ['%s:%s' % (host, dest)]
+
+    try:
+        subprocess.check_call(cmdline)
+    except:
+        print 'ERROR: unable to copy %s to %s' % (fname, host)
+
+
+def add_to_trusted():
+    # put our conf file on the peer
+    send_file('controller.conf', 'peer.tmp')
+
+    # now install it
+    cmdline = ['ssh']
+    if args.port:
+        cmdline += ['-p']
+        cmdline += [args.port]
+    if args.user:
+        cmdline += ['%s@%s' % (args.user, host)]
+    else:
+        cmdline += ['%s' % host]
+
+    cmdline += ['cd %s && bin/addpeer -l' % destpath]
+    subprocess.check_call(cmdline)
+
+    
+def update_trusted():
+    peer = os.path.join(xiapyutils.xia_etcdir(), 'peer.tmp')
+    if os.path.isfile(peer):
+        with open(peer, 'r') as pf:
+            with open(os.path.join(xiapyutils.xia_etcdir(), 'trusted.conf'), 'w+') as tf:
+                for line in pf:
+                    tf.write(line)
+        os.unlink(peer)
+    else:
+        print 'no peer data found'
+    exit(0)
+
+
+parser = argparse.ArgumentParser(description='Update trusted.conf on neighboring ADs with our controller\'s DAG. Also copies resolv.conf if it exists')
+parser.add_argument('-v', '--version', action='version', version=VER)
+parser.add_argument('host', nargs='*', help='one or more addresses')
+parser.add_argument('-u', '--user', help='remote host username')
+parser.add_argument('-p', '--port', help='ssh server port')
+parser.add_argument('-d', '--dest', type=str, help='path to the destination directory')
+parser.add_argument('-l', '--localonly', action='store_true', help='update local trusted.conf file instead of remote')
+args = parser.parse_args()
+
+conf_file = os.path.join(xiapyutils.xia_etcdir(), 'controller.conf')
+resolv_conf = os.path.join(xiapyutils.xia_etcdir(), RESOLV_CONF)
+
+if args.localonly:
+    update_trusted()
+
+if len(args.host) == 0:
+    print 'ERROR: at least one target controller host must be specified'
+    exit(1)
+
+if not os.path.isfile(conf_file) and not os.path.isfile(resolv_conf):
+    print 'Neither controller.conf nor resolv.conf was found.'
+    print 'Run xia-config to create a controller node configuration if one doesn\'t already exist'
+    exit(1)
+
+# get path to root of target xia tree
+if args.dest:
+    destpath = args.dest
+else:
+    destpath = xiapyutils.xia_srcdir()
+
+for host in args.host:
+    print 'updating %s' % host
+
+    # send resolv.conf if it exists
+    if os.path.isfile(resolv_conf):
+        send_file(RESOLV_CONF)
+
+    if os.path.isfile(conf_file):
+        add_to_trusted()
+
+
