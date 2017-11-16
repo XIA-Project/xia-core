@@ -28,7 +28,6 @@ import argparse
 import ipaddress
 import subprocess
 from glob import glob
-from configparser import ConfigParser
 
 import genkeys
 import xconfig
@@ -212,8 +211,6 @@ def run_xconfig(args):
 def create_nodeconf(args):
     status('creating credentials')
 
-    c = ConfigParser()
-
     node.set('hostname', hostname)
     node.set('nodetype', args.nodetype)
     node.set('numports', str(args.ports))
@@ -337,6 +334,21 @@ def create_controller_conf_file():
         f.write('dag=DAG 0 - %s 1 - %s 2 - %s\n' % (node.ad(), node.hid(), node.controller_sid()))
 
 
+def create_trusted_conf_file():
+    with open (os.path.join(xiapyutils.xia_etcdir(), 'trusted.conf'), 'w') as trusted:
+        trusted.write('# ADs that we trust and their respective controllers should be added to\n')
+        trusted.write('# this file. Run \'addtopeer host\' on the other controller specifying\n')
+        trusted.write('# this hostname to automatically update the file. Or, copy controller.conf\n')
+        trusted.write('# from the other controller to etc/peer.tmp and then run \'addtopeer -l\' locally.\n')
+
+        # there's already a peer file from another AD here
+        # stick it into our trusted.conf
+        peer = os.path.join(xiapyutils.xia_etcdir(), 'peer.tmp')
+        if os.path.isfile(peer):
+            cmd = [os.path.join(xiapyutils.xia_bindir(), 'addtopeer'), '-l']
+            subprocess.check_call(cmd)
+
+
 #
 # how to finish configuring the network
 #
@@ -450,6 +462,7 @@ def controller(args):
     if node.nameserver_sid() or node.rendezvous_sid():
         create_resolv_conf_file()
 
+    create_trusted_conf_file()
     display_footer()
 
 
