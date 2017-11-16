@@ -218,87 +218,20 @@ int Controller::getTrustedADs()
 }
 
 
-int Controller::saveControllerDAG()
-{
-	char root[2048];
-	char s[2048];
-
-	if (XrootDir(root, sizeof(root)) == NULL) {
-		// FIXME: handle error
-		return -1;
-	}
-
-	// save the controller dag to a file to be used by xnetjd
-	snprintf(s, sizeof(s), "%s/etc/controller_dag", root);
-
-	FILE *f = fopen(s, "w");
-
-	if (f == NULL) {
-		// FIXME: handle error
-		return -1;
-	}
-
-	xia_ntop(AF_XIA, &_recv_dag, s, sizeof(s));
-	fprintf(f, "%s\n", s);
-	fclose(f);
-
-	// creat a conf file to share with other ADs
-	snprintf(s, sizeof(s), "%s/etc/controller.conf", root);
-
-	struct stat st;
-	if (stat(s, &st) < 0) {
-		// conf file doesn't exist yet, stick in a header comment
-		f = fopen(s, "w");
-		if (f == NULL) {
-			// FIXME: handle error
-			return -1;
-		}
-
-		fprintf(f, "# controller.conf\n");
-		fprintf(f, "# Copy or append this file to the trusted.conf file in neighbor ADs.\n");
-		fprintf(f, "# The controller dag in this file will continue to be used across xia\n");
-		fprintf(f, "# restarts. \n");
-		fclose(f);
-	}
-
-	minIni ini(s);
-
-	std::string d = "DAG 0 - " + _myAD + " 1 - " + _myHID + " 2 - " + getControllerSID();
-
-	ini.put(_myAD, "dag", d);
-
-	return 0;
-}
-
-
 std::string Controller::getControllerSID()
 {
 	char s[2048];
-	std::string dag = "";
 
-	if (_controller_sid == "") {
-
-		// try to read from the controller.conf file
-		if (XrootDir(s, sizeof(s)) != NULL) {
-			strncat(s, "/etc/controller.conf", sizeof(s));
-			minIni ini(s);
-
-		   dag = ini.gets(_myAD, "dag");
-
-			if (dag != "") {
-				size_t i = dag.find("SID:");
-				_controller_sid = dag.substr(i);
-			}
-		}
-
-		if (_controller_sid == "") {
-			// we still haven't found it, make a new one
-			XmakeNewSID(s, sizeof(s));
-			_controller_sid = s;
-		}
+	if (XrootDir(s, sizeof(s)) == NULL) {
+		// FIXME: handle error
+		return 0;
 	}
+	strncat(s, "/etc/xia.ini", sizeof(s));
 
-	return _controller_sid;
+	minIni ini(s);
+
+	printf ("%s\n", ini.gets("controller", "controller_sid").c_str());
+	return ini.gets("controller", "controller_sid");
 }
 
 
@@ -320,20 +253,21 @@ int Controller::makeSockets()
 	// controller socket - flooded & interdomain communication
 	XcreateFID(s, sizeof(s));
 	Node nFID(s);
-	Node rSID(getControllerSID());
+	std::string sid;
+
+	if ((sid = getControllerSID()) == "") {
+		syslog(LOG_ERR, "Unable to locate the controller SID in xia.ini");
+		return -1;
+	}
+
+	Node rSID(sid);
 	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;
 	}
-	memcpy(&_controller_dag, &_recv_dag, sizeof(sockaddr_x));
 
 	syslog(LOG_INFO, "Flood: %s", g.dag_string().c_str());
-
-	// save the controller dag to disk so xnetj can find it
-	if (saveControllerDAG() < 0) {
-		// handle the error
-	}
 
 	// source socket - sending socket
 	XmakeNewSID(s, sizeof(s));

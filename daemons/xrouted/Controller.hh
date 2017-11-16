@@ -36,7 +36,6 @@ protected:
 	int handler();
 	int init();
 	int makeSockets();
-	int saveControllerDAG();
 
 	int sendKeepalive();
 	int sendInterDomainLSA();
