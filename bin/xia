@@ -390,14 +390,14 @@ def status():
 # stop the node
 #
 def stop():
-    nodetype = get_nodetype()
     if args.force:
         msg('killing any XIA process(es) found on this node')
         services = all_services
     else:
         msg('Stopping XIA %s services' % nodetype)
+        nodetype = get_nodetype()
+        services = make_service_list(nodetype)
 
-    services = make_service_list(nodetype)
     for service in services:
         kill(service)
 
