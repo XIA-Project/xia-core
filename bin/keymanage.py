@@ -14,7 +14,7 @@ except ImportError:
 
 class KeyManager:
     _keydirname = 'key'
-    _addrconfname = 'etc/address.conf'
+    _addrconfname = 'etc/xia.ini'
     _click_procname = 'click/userlevel/click'
 
     _xid_pattern = re.compile("([a-zA-Z]+:[0-9a-fA-F]{40})")

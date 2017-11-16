@@ -65,7 +65,6 @@ files=" \
 	etc/xia.ini
 	etc/trusted.conf \
 	etc/controller.conf \
-	etc/address.conf \
 	etc/resolv.conf \
 	etc/xcache.ini \
 	etc/xids \

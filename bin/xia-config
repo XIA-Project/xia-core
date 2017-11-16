@@ -256,7 +256,6 @@ def common_config(args):
     node.reset()
     create_nodeconf(args)
     run_xconfig(args)
-    create_legacy_config_files(args)
 
     make_dir_with_permissions('ca', 0775)
     make_dir_with_permissions('key', 0775)
@@ -284,31 +283,6 @@ def create_resolv_conf_file():
             router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
             resolvconf.write('rendezvous=%s\n' % (router_rv_dag))
             resolvconf.write('rendezvousc=%s\n' % (rvc_dag))
-
-
-#
-# make the address.conf file
-# FIXME: this can hopefully be phased out eventually
-#
-def create_legacy_config_files(args):
-
-    status('creating address.conf')
-
-    if args.nodetype == 'host':
-        target = 'XIAEndHost'
-    else:
-        target = 'XIARouter%sPort' % args.ports
-
-    with open (os.path.join(xiapyutils.xia_etcdir(), 'address.conf'), 'w') as conf:
-        if args.nodetype == 'controller':
-            conf.write('%s %s (%s %s)\n' % (hostname, target, node.ad(), node.hid()))
-            if args.nameserver:
-                conf.write('%s nameserver\n' % hostname)
-            if args.rendezvous:
-                conf.write('%s rendezvous %s %s\n' % (hostname, node.rendezvous_sid(), node.rendezvous_ctl_sid()))
-
-        else:
-            conf.write('%s %s (%s)\n' % (hostname, target, node.hid()))
 
 
 #

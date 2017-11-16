@@ -233,13 +233,8 @@ def start_click():
     nodetype = get_nodetype()
     if nodetype == 'host':
         script = 'host'
-        element = 'XIAEndHost'
     else:
         script = 'router'
-        if node.numports() == '4':
-            element = 'XIARouter4Port'
-        else:
-            element = 'XIARouter8Port'
 
     params = []
     
@@ -265,13 +260,13 @@ def start_click():
     # inject config info into click
     with clickcontrol.ClickControl() as click:
 
-        click.assignHID(hostname, element, node.hid())
+        click.assignHID(hostname, node.hid())
 
         # if we're a controller, do some extra stuff
         if nodetype == 'controller':
             ad = node.ad()
             hid = node.hid()
-            click.assignDAG(hostname, element, 'RE %s %s' % (ad, hid))
+            click.assignDAG(hostname, 'RE %s %s' % (ad, hid))
             
             click.setADInXARPTable(ad)
 
@@ -282,8 +277,8 @@ def start_click():
                 rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
                 rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
                 router_rv_dag = 'RE %s ( %s ) %s' % (ad, rv_fallback, hid)
-                click.assignRVDAG(hostname, element,  router_rv_dag)
-                click.assignRVControlDAG(hostname, element, rvc_dag)
+                click.assignRVDAG(hostname, router_rv_dag)
+                click.assignRVControlDAG(hostname, rvc_dag)
     set_logging()
 
 
@@ -394,8 +389,8 @@ def stop():
         msg('killing any XIA process(es) found on this node')
         services = all_services
     else:
-        msg('Stopping XIA %s services' % nodetype)
         nodetype = get_nodetype()
+        msg('Stopping XIA %s services' % nodetype)
         services = make_service_list(nodetype)
 
     for service in services:

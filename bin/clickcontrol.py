@@ -19,10 +19,7 @@ import re
 import sys
 import socket
 import xiapyutils
-from addrconf import AddrConf
-
-# Number of interfaces for each host type
-numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter8Port':8, 'XIARouter2Port':2}
+import nodeconf
 
 # Principal types
 principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
@@ -59,6 +56,12 @@ class ClickControl:
     # Initialize a socket to talk to Click
     def __init__(self, clickhost='localhost', port=7777):
         self.initialized = False
+
+        n = nodeconf.nodeconf()
+        n.read()
+        self.hostname = n.hostname()
+        self.num_ifaces = int(n.numports())
+
         self.xia_constants = getxiaconstants()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -126,14 +129,14 @@ class ClickControl:
         return True
 
     # Get a list of elements' write handlers
-    def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
+    def getElements(self, hostname, handler_name, iface_elem, elements):
 		# FIXME: delete these lines?
         # Routing tables for each principal type
         #for principal in principals:
         #    elements.append('xrc/n/proc/rt_%s' % principal)
 
         # Iterate over the number of interfaces for this host type
-        for i in range(numIfaces[hosttype]):
+        for i in range(self.num_ifaces):
             # Elements inside each interface card
             for elem in iface_elem:
                 elements.append('xlc%d/%s' % (i, elem))
@@ -142,18 +145,18 @@ class ClickControl:
         return [hostname + '/' + e + '.' + handler_name for e in elements]
 
     # A list of all elements with HID write handler
-    def hidElements(self, hostname, hosttype):
+    def hidElements(self, hostname):
         # Elements in line card that need to be notified
         iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         # FIXME: HACK - remove the FID entry once routing is correct
         hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_FID']
-        return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
+        return self.getElements(hostname, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
-    def assignHID(self, hostname, hosttype, hid):
-        for element in self.hidElements(hostname, hosttype):
+    def assignHID(self, hostname, hid):
+        for element in self.hidElements(self.hostname):
             if not self.writeCommand(element + ' ' + hid):
                 return False
         if not self.addLocalRoute(hostname, hid):
@@ -161,17 +164,17 @@ class ClickControl:
         return True
 
     # A list of all elements with Network DAG write handler
-    def networkDagElements(self, hostname, hosttype):
+    def networkDagElements(self, hostname):
         # Elements in line card that need to be notified
         iface_elem = ['x', 'xchal']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
-        return self.getElements(hostname, hosttype, 'dag', iface_elem, dag_elem)
+        return self.getElements(hostname, 'dag', iface_elem, dag_elem)
 
     # Assign a Network dag to a given host
-    def assignDAG(self, hostname, hosttype, dag):
-        for element in self.networkDagElements(hostname, hosttype):
+    def assignDAG(self, hostname, dag):
+        for element in self.networkDagElements(hostname):
             if not self.writeCommand(element + ' ' + dag):
                 return False
         # Add a route to the local AD
@@ -244,11 +247,8 @@ class ClickControl:
             print 'ClickControl.setADXARPEntry invalid AD {}'.format(xid)
             return False
 
-        addrconf = AddrConf()
-        hosttype = addrconf.hosttype()
-        hostname = addrconf.hostname()
-        for i in range(numIfaces[hosttype]):
-            cmd = '{}/xlc{}/xarpr.ad {}'.format(hostname, i, xid)
+        for i in range(self.num_ifaces):
+            cmd = '{}/xlc{}/xarpr.ad {}'.format(self.hostname, i, xid)
             if not self.writeCommand(cmd):
                 return False
         return True
