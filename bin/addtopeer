@@ -6,6 +6,7 @@ import os
 import argparse
 import xiapyutils
 import subprocess
+from configparser import ConfigParser
 
 VER = '%(prog)s 1.0'
 RESOLV_CONF = 'resolv.conf'
@@ -60,13 +61,25 @@ def add_to_trusted():
 
     
 def update_trusted():
-    peer = os.path.join(xiapyutils.xia_etcdir(), 'peer.tmp')
-    if os.path.isfile(peer):
-        with open(peer, 'r') as pf:
-            with open(os.path.join(xiapyutils.xia_etcdir(), 'trusted.conf'), 'w+') as tf:
-                for line in pf:
-                    tf.write(line)
-        os.unlink(peer)
+    src = os.path.join(xiapyutils.xia_etcdir(), 'peer.tmp')
+    dst = os.path.join(xiapyutils.xia_etcdir(), 'trusted.conf')
+    if os.path.isfile(src):
+
+        us = ConfigParser()
+        us.read(dst)
+        them = ConfigParser()
+        them.read(src)
+
+        for section in them.sections():
+            if not us.has_section(section):
+                us.add_section(section)
+            for option in them[section]:
+                print them[section]['dag']
+                us[section][option] = them[section][option]
+
+        os.unlink(src)
+        with open(dst, 'wb') as configfile:
+            us.write(configfile)
     else:
         print 'no peer data found'
     exit(0)
