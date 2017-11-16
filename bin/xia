@@ -236,7 +236,7 @@ def start_click():
         element = 'XIAEndHost'
     else:
         script = 'router'
-        if node.numports() == 4:
+        if node.numports() == '4':
             element = 'XIARouter4Port'
         else:
             element = 'XIARouter8Port'
