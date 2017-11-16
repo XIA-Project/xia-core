@@ -8,4 +8,4 @@ RHID.cred
 controller_dag
 controller.conf
 trusted.conf
-
+*.tmp
