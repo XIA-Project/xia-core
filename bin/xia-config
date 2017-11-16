@@ -47,7 +47,6 @@ conf_files = [
     'etc/click/router*.click',
     'etc/*.conf',
     'etc/hosts.xia',
-    'etc/controller_dag',
     'etc/RHID.cred',
     'key/*',
     'ca/*',
@@ -226,7 +225,6 @@ def create_nodeconf(args):
     if args.nodetype == 'controller':
         node.set('ad', genkeys.create_new_AD())
         node.set('controller_sid', genkeys.create_new_SID())
-        node.set('fid', genkeys.create_new_FID())
         if args.nameserver:
             node.set('nameserver_sid', 'SID:1110000000000000000000000000000000001113')
         if args.rendezvous:
@@ -326,16 +324,6 @@ def create_rhid_cred_file():
 
 
 #
-# create the file xcontrold uses to configure itself
-# FIXME: we can probably transition this to use xia.ini
-#
-def create_controller_dag_file():
-    status('creating controller_dag')
-    with open (os.path.join(xiapyutils.xia_etcdir(), 'controller_dag'), 'w') as f:
-        f.write('DAG 0 1 -\n%s 1 -\n%s 2 -\n%s\n' % (node.hid(), node.fid(), node.controller_sid()))
-
-
-#
 # create the controller.conf file that is added to trusted.conf on peer controllers so that we can talk to them
 #
 def create_controller_conf_file():
@@ -391,7 +379,6 @@ def info(args):
         if type == 'controller':
             print 'AD:                 %s' % node.ad()
             print 'Controller SID:     %s' % node.controller_sid()
-            print 'Controller FID:     %s' % node.fid()
             print 'Name Server SID:    %s' % node.nameserver_sid()
             print 'Rendezvous SID:     %s' % node.rendezvous_sid()
             print 'Rendezvous ctl SID: %s' % node.rendezvous_ctl_sid()
@@ -458,8 +445,6 @@ def controller(args):
     common_config(args)
     create_rhid_cred_file()
 
-    # FIXME this info could be merged into the xia.ini file instead
-    create_controller_dag_file()
     create_controller_conf_file()
 
     if node.nameserver_sid() or node.rendezvous_sid():

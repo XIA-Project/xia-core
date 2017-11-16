@@ -19,7 +19,7 @@ import xiapyutils
 from configparser import ConfigParser
 
 xkeys = ['hostname', 'nodetype', 'numports', 'hid']
-ckeys = ['ad', 'fid', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid']
+ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid']
 wkeys = [ 'mac', 'addr', 'port']
 
 class nodeconf:
@@ -105,9 +105,6 @@ class nodeconf:
 
     def controller_sid(self):
         return self._get('controller', 'controller_sid', None)
-
-    def fid(self):
-        return self._get('controller', 'fid', None)
 
     def nameserver_sid(self):
         return self._get('controller', 'nameserver_sid', None)
