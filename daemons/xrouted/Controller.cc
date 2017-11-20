@@ -218,6 +218,21 @@ int Controller::getTrustedADs()
 }
 
 
+Graph Controller::getLocalControllerDAG()
+{
+	char s[2048];
+
+	if (XrootDir(s, sizeof(s)) == NULL) {
+		return Graph();
+	}
+	strncat(s, "/etc/xia.conf", sizeof(s));
+
+	minIni ini(s);
+
+	return Graph(ini.gets("controller", "controller_dag"));
+}
+
+
 std::string Controller::getControllerSID()
 {
 	char s[2048];
@@ -226,11 +241,10 @@ std::string Controller::getControllerSID()
 		// FIXME: handle error
 		return 0;
 	}
-	strncat(s, "/etc/xia.ini", sizeof(s));
+	strncat(s, "/etc/xia.conf", sizeof(s));
 
 	minIni ini(s);
 
-	printf ("%s\n", ini.gets("controller", "controller_sid").c_str());
 	return ini.gets("controller", "controller_sid");
 }
 
@@ -251,17 +265,18 @@ int Controller::makeSockets()
 	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
 
 	// controller socket - flooded & interdomain communication
-	XcreateFID(s, sizeof(s));
-	Node nFID(s);
-	std::string sid;
-
-	if ((sid = getControllerSID()) == "") {
-		syslog(LOG_ERR, "Unable to locate the controller SID in xia.ini");
-		return -1;
-	}
-
-	Node rSID(sid);
-	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
+//	XcreateFID(s, sizeof(s));
+//	Node nFID(s);
+//	std::string sid;
+//
+//	if ((sid = getControllerSID()) == "") {
+//		syslog(LOG_ERR, "Unable to locate the controller SID in xia.conf");
+//		return -1;
+//	}
+//
+//	Node rSID(sid);
+//	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
+	g = getLocalControllerDAG();
 
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
 		return -1;

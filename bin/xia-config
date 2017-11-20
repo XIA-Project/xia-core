@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-# FIXME: 
+# FIXME:
 # - this is calling the python program xconfig.py to make conf files
 #   seems better to merge them together
 # - can we make click always just use xia.click?
@@ -41,7 +41,7 @@ hostname = xiapyutils.getxiaclickhostname()
 
 # list of files and locations to delete when clean is run ####################
 conf_files = [
-    'etc/xia.ini',
+    'etc/xia.conf',
     'etc/click/host*.click',
     'etc/click/router*.click',
     'etc/*.conf',
@@ -193,7 +193,7 @@ def run_xconfig(args):
     # we'll proxy through a waveserver
     if args.waveserver:
         cmdline += ' -W %s,%s:%s' %(args.waveserver['mac'], args.waveserver['addr'], args.waveserver['port'])
-    
+
     cmds = cmdline.split(' ')
     # now make the configuration
     xconfig.verbose = False
@@ -206,7 +206,7 @@ def run_xconfig(args):
 
 
 #
-# create xia.ini
+# create xia.conf
 #
 def create_nodeconf(args):
     status('creating credentials')
@@ -222,6 +222,10 @@ def create_nodeconf(args):
     if args.nodetype == 'controller':
         node.set('ad', genkeys.create_new_AD())
         node.set('controller_sid', genkeys.create_new_SID())
+        fid = genkeys.create_new_FID()
+        dag = 'DAG 0 1 - %s 1 - %s 2 - %s' % (node.hid(), fid, node.controller_sid())
+        node.set('controller_dag', dag)
+
         if args.nameserver:
             node.set('nameserver_sid', 'SID:1110000000000000000000000000000000001113')
         if args.rendezvous:
@@ -236,8 +240,8 @@ def create_nodeconf(args):
         node._set('waveserver', 'mac', args.waveserver['mac'])
         node._set('waveserver', 'addr', args.waveserver['addr'])
         node._set('waveserver', 'port', args.waveserver['port'])
-    
-    status('creating xia.ini')
+
+    status('creating xia.conf')
     node.write()
 
 #
@@ -276,7 +280,7 @@ def create_resolv_conf_file():
 
         if ns_sid:
             resolvconf.write('nameserver=RE %s %s %s\n' % (node.ad(), node.hid(), ns_sid))
-        
+
         if rv_sid and rvc_sid:
             rv_fallback = '%s %s %s' % (ad, hid, rv_sid)
             rvc_dag = 'RE %s %s %s' % (ad, hid, rvc_sid)
@@ -345,7 +349,7 @@ Note:
  * IP connectivity is required for the above commands to function. Hostnames
  or IP addresses may be used.
  * The files will be copied to the same path location as on this machine, so make sure
-   all of your routers and controllers use the same directories.
+   all of your routers and controllers use the same directory trees.
     '''
 
 

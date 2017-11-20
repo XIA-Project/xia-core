@@ -64,6 +64,7 @@ protected:
 
 	int getTrustedADs();
 	std::string getControllerSID();
+	Graph getLocalControllerDAG();
 
 protected:
 	Settings *_settings;

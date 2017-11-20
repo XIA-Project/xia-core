@@ -19,7 +19,7 @@ import xiapyutils
 from configparser import ConfigParser
 
 xkeys = ['hostname', 'nodetype', 'numports', 'hid']
-ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid']
+ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid', 'controller_dag']
 wkeys = [ 'mac', 'addr', 'port']
 
 class nodeconf:
@@ -27,7 +27,7 @@ class nodeconf:
 
     def __init__(self):
         self.conf = ConfigParser()
-        self.fname = os.path.join(xiapyutils.xia_srcdir(), 'etc/xia.ini')
+        self.fname = os.path.join(xiapyutils.xia_srcdir(), 'etc/xia.conf')
 #        self.hostname = xiapyutils.getxiaclickhostname()
 
 
@@ -105,6 +105,9 @@ class nodeconf:
 
     def controller_sid(self):
         return self._get('controller', 'controller_sid', None)
+
+    def controller_dag(self):
+        return self._get('controller', 'controller_dag', None)
 
     def nameserver_sid(self):
         return self._get('controller', 'nameserver_sid', None)

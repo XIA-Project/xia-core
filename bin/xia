@@ -43,7 +43,7 @@ router_services           = ['xrouted']
 host_services             = ['xhostd']
 stats_services            = ['xstats', 'statsserver']
 
-# make a list of all possible services that might be running on a node where the xia.ini file was deleted
+# make a list of all possible services that might be running on a node where the xia.conf file was deleted
 all_services = common_services + router_services + host_services + controller_services + controller_extra_services + stats_services
 
 # files to delete when stop is run

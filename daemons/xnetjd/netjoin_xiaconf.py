@@ -29,6 +29,9 @@ class NetjoinXIAConf(object):
         self.rvpattern = re.compile('rendezvous=(.+)')
         self.rvcpattern = re.compile('rendezvousc=(.+)')
 
+        self.node = nodeconf.nodeconf()
+        self.node.read()
+
 	'''
     # Return serialized SignedMessage
     def sign(self, message):
@@ -113,10 +116,8 @@ class NetjoinXIAConf(object):
 
     # Read address.conf looking for HID of this host
     def get_ad_hid(self):
-        node = nodeconf.nodeconf()
-        node.read()
-        ad = node.ad()
-        hid = node.hid()
+        ad = self.node.ad()
+        hid = self.node.hid()
 
         if ad:
             ad = ad[len("AD:"):]
@@ -154,20 +155,10 @@ class NetjoinXIAConf(object):
         return os.path.join(self.conf_dir, 'controller_dag')
 
     def get_controller_dag(self):
-        controller_dag = None
-        cdag_filepath = self.__controller_dag_filepath()
-
-        if not os.path.exists(cdag_filepath):
-            return controller_dag
-
-        with open(cdag_filepath) as controller_dag_file:
-            controller_dag = controller_dag_file.read()
-
-        return controller_dag
+        return self.node.controller_dag()
 
     def write_controller_dag(self, controller_dag):
-        with open(self.__controller_dag_filepath(), 'w') as outfile:
-            outfile.write(controller_dag)
+        self.node.set('controller_dag', controller_dag)
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
