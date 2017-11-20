@@ -199,7 +199,7 @@ def run_xconfig(args):
     xconfig.verbose = False
 
     if args.nodetype == 'host':
-        status('createing host.click')
+        status('creating host.click')
     else:
         status('creating router.click')
     xconfig.build(cmds)
@@ -378,7 +378,7 @@ def info(args):
         w = node.waveserver()
         if w:
             print 'Waveserver MAC:     %s' % w[0]
-            print 'Waveserver Addrs:   %s:%s' % (w[1], w[2])
+            print 'Waveserver Addr:    %s:%s' % (w[1], w[2])
     else:
         print 'No configuration found'
 
@@ -457,7 +457,7 @@ sub = parser.add_subparsers(help='add -h following arguments for additional opti
 common_parser = argparse.ArgumentParser(add_help=False)
 common_parser.add_argument('-i', '--ignore', nargs='+', type=iface, metavar='iface', help='ignore interface')
 common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='# of interfaces (default=4)')
-common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='MAC,IP:PORT', help='connect via a waveserver')
+common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='DSRC_MAC,ARADA_IP:PORT', help='connect via a waveserver')
 
 # FIXME: add support for these at some point
 #common_parser.add_argument('-s', '--socket', type=socket_server, metavar='port', help='use a TCP socket instead of an ethernet interface')
