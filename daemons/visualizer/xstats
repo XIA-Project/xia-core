@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+import os
 import sys
 import time
 import socket
@@ -22,6 +23,11 @@ import requests
 import clicksock
 import telnetlib
 from optparse import OptionParser
+
+srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+sys.path.append(os.path.join(srcdir, "bin"))
+import xiapyutils
+
 
 # default Click host and port
 CLICK = "localhost"
@@ -293,7 +299,10 @@ def getCounts(s):
 		s = "0 0 0 0 %s 0 0" % (ip)
 
 	else:
-		ad, hid, sid, cid, ip, fid, unknown = s.splitlines()
+		# FIXME: we need to add support for ncid's to statsserver and the visualizer
+		# just throwing them away for now
+
+		ad, hid, sid, cid, ip, fid, ncid, unknown = s.splitlines()
 		#ad, hid, sid, cid, ip, unknown = s.splitlines()
 		ad  = ad[7:]
 		hid = hid[7:]
@@ -301,6 +310,7 @@ def getCounts(s):
 		cid = cid[7:]
 		ip  = ip[7:]
 		fid = fid[7:]
+		ncid = ncid[7:]
 		#fid = 0
 		unknown = unknown[7:]
 		s = "%s %s %s %s %s %s %s" % (ad, hid, sid, cid, ip, fid, unknown)
@@ -385,7 +395,7 @@ def main():
 	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
 	(options, args) = parser.parse_args()
 
-	hostname = socket.gethostname().split('.')[0]
+	hostname = xiapyutils.getxiaclickhostname()
 
 	with clicksock.clicksock() as click:
 		# get the list of hosts/routers from clock
