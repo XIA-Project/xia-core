@@ -326,7 +326,7 @@ def create_trusted_conf_file():
 #
 # how to finish configuring the network
 #
-def display_footer():
+def display_controller_footer():
     print '''
 Next Steps:
  * Run the addrouter command to copy the RHID.cred file to the routers that
@@ -347,6 +347,17 @@ Note:
  * The files will be copied to the same path location as on this machine, so make sure
    all of your routers and controllers use the same directories.
     '''
+
+
+def display_router_footer():
+    print '''
+Next Steps:
+ * On the Controller of the AD this router will be a member of:
+   Run the addrouter command to install the RHID.cred file onto this router.
+
+      addrouter routername
+'''
+
 
 
 
@@ -421,6 +432,7 @@ def host(args):
 def router(args):
     args.nodetype = 'router'
     common_config(args)
+    display_router_footer()
 
 
 #
@@ -437,7 +449,7 @@ def controller(args):
         create_resolv_conf_file()
 
     create_trusted_conf_file()
-    display_footer()
+    display_controller_footer()
 
 
 #
