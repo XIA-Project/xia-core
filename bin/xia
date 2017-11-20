@@ -303,9 +303,11 @@ def start_xnetjd(name):
 
     params.append('--%s' % nodetype)
 
-    # FIXME do the right thing here  for DSRC!!!
     params.append('--layer2')
-    params.append('ethernet')
+    if node.waveserver():
+        params.append('dsrc')
+    else:
+        params.append('ethernet')
     
     subprocess.Popen(params)
 
