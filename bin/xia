@@ -156,9 +156,9 @@ def make_service_list(type, boot=False):
         svcs += stats_services
     else:
         if args.sclient:
-            svcs.append('xstats')
+            svcs += ['xstats']
         if args.sserver:
-            print 'server'
+            svcs += ['statsserver']
 
     return svcs
 
@@ -312,6 +312,26 @@ def start_xnetjd(name):
     subprocess.Popen(params)
 
 
+
+#
+# start any daemon other than click or xnetjd
+#
+def start_stats(name):
+    name = 'daemons/visualizer/%s' % name
+    params = []
+    params.append(os.path.join(xiapyutils.xia_srcdir(), name))
+
+    if args.verbose > 1:
+        params.append('-v')
+
+    if name == 'xstats':
+        params.append('-s')
+        params.append(args.sclient)
+
+    print params
+    subprocess.Popen(params)
+
+
 #
 # start any daemon other than click or xnetjd
 #
@@ -346,6 +366,8 @@ def start_process(name):
     elif args.daemons:
         if name == 'xnetjd':
             start_xnetjd(name)
+        elif name == 'xstats' or name == 'statsserver':
+            start_stats(name)
         else:
             start_daemon(name)
 
