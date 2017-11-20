@@ -4,6 +4,9 @@ sudo apt-get update -qq -y
 sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
 
 sudo pip install pynacl
+sudo pip install psutil
+sudo pip install configparser
+sudo pip install ipaddress
 
 rel=$(lsb_release -d)
 
