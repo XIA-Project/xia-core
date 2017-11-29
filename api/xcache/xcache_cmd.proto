@@ -21,6 +21,7 @@ message xcache_cmd {
 		XCACHE_STORE_NAMED = 18;
 		XCACHE_FETCHNAMEDCHUNK = 19;
 		XCACHE_PUSHCHUNK = 20;
+		XCACHE_NEWPROXY = 21;
 	};
 
 	enum status_type {

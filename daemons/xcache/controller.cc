@@ -26,6 +26,7 @@
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
 #define MAX_XID_SIZE 100
+#define MAX_PUSH_PROXIES 10
 
 // The only xcache_controller. Initialized by first call to
 // xcache_controller::get_instance()
@@ -499,6 +500,45 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	// Verify the downloaded content against Publisher's pubkey
 }
 
+int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	std::cout << "Controller::xcache_new_proxy called" << std::endl;
+	// Set the response to be a failure
+	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+
+	std::cout << "Controller::xcache_new_proxy checking cmd" << std::endl;
+	assert(cmd->cmd() == xcache_cmd::XCACHE_NEWPROXY);
+	std::cout << "Controller::xcache_new_proxy checked cmd" << std::endl;
+
+	// Start a new proxy thread, waiting for pushed chunks
+	if (proxy_threads.size() >= MAX_PUSH_PROXIES) {
+		std::cout << "Controller::xcache_new_proxy "
+			<< "ERROR: Too many proxies already in system" << std::endl;
+		return RET_SENDRESP;
+	}
+	std::cout << "Controller::xcache_new_proxy starting a proxy"<< std::endl;
+	// Create a new PushProxy and start it
+	PushProxy *proxy = new PushProxy();
+	if(proxy == NULL) {
+		std::cout << "ERROR creating PushProxy object" << std::endl;
+		return RET_SENDRESP;
+	}
+	std::cout << "Controller::xcache_new_proxy starting thread"<< std::endl;
+	std::thread *proxy_thread = new std::thread(*proxy, this);
+	if(proxy_thread == NULL) {
+		std::cout << "ERROR failed to create proxy thread" << std::endl;
+		return RET_SENDRESP;
+	}
+	std::cout << "Proxy addr: " << proxy->addr() << std::endl;
+	proxy_threads.push_back(proxy_thread);
+	// TODO: Fill in successful response here with proxy dag
+	std::cout << "Sending success to API" << std::endl;
+	resp->set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+	resp->set_status(xcache_cmd::XCACHE_OK);
+	resp->set_dag(proxy->addr());
+	return RET_SENDRESP;
+}
+
 int xcache_controller::xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int remote_sock;
@@ -633,6 +673,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
 	case xcache_cmd::XCACHE_PUSHCHUNK:
+	case xcache_cmd::XCACHE_NEWPROXY:
 	case xcache_cmd::XCACHE_READ:
 		ret = RET_ENQUEUE;
 		break;
@@ -1254,6 +1295,16 @@ void xcache_controller::process_req(xcache_req *req)
 		// Send requested chunk to the address given
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_push_chunk(&resp, cmd);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_NEWPROXY:
+		// Start a proxy to accept pushed chunks
+		std::cout << "Controller:: got command to start new proxy" << std::endl;
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_new_proxy(&resp, cmd);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());

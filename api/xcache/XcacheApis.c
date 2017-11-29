@@ -1076,6 +1076,38 @@ int XlaunchNotifThread(XcacheHandle *h)
 }
 
 /*!
+** @brief a proxy for receiving pushed chunks
+**
+** Start a proxy process that can receive chunks pushed from remote
+** Xcache instances. The user may start any number of proxies for
+** various publishers or groups of publishers. Eventually we may allow
+** different caching policies for each proxy.
+**
+** @param h the xcache handle
+** @param proxyaddr address of newly created proxy returned to user
+**
+** @returns 0 on success and proxyaddr has proxy address
+** @returns -1 on failure
+*/
+int XnewProxy(XcacheHandle *h)
+{
+	// Request Xcache to start a new Proxy for pushed content
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error starting new proxy\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to new proxy creation\n");
+		return -1;
+	}
+	// TODO read the response code and return error, when necessary
+	return 0;
+}
+
+/*!
 ** @brief push a chunk to the requested address
 **
 ** Send a chunk to a remote service. The user provides the address of

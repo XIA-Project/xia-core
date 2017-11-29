@@ -12,6 +12,7 @@
 #include "policy_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
+#include "push_proxy.h"
 #include "dagaddr.hpp"
 #include <errno.h>
 #include "xcache.h"
@@ -54,6 +55,7 @@ private:
 
 	meta_map *_map;
 	NCIDTable *_ncid_table;
+	std::vector<std::thread *> proxy_threads;
 
 	/**
 	 * Map of contexts.
@@ -144,6 +146,11 @@ public:
 	 */
 	int xcache_fetch_named_content(xcache_cmd *resp, xcache_cmd *cmd,
 			int flags);
+
+	/**
+	 * Create a new proxy to cache pushed chunks
+	 */
+	int xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Send a chunk to a requested address

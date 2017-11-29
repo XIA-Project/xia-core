@@ -87,6 +87,7 @@ extern int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr);
 //extern int XbufReadChunk(XcacheHandle *h, XcacheBuf *xbuf, sockaddr_x *addr, socklen_t addrlen);
 extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen));  //DONE
 extern int XlaunchNotifThread(XcacheHandle *h);  //DONE
+extern int XnewProxy(XcacheHandle *h);
 extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
 
