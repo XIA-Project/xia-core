@@ -1,0 +1,77 @@
+XIA Video Demo with Mobility
+----------------------------
+
+Here are the steps to set up a video demo using this code base.
+
+
+Preparing the videos - see R2 setup below
+--------------------
+
+Get the videos from the following links:
+
+Note: dash5 is long/big, so skip it unless you need it.
+
+https://www.dropbox.com/s/se0hqhoe0tur0ib/dash1.zip
+https://www.dropbox.com/s/v46ppbqg3bumev8/dash5.zip
+
+Create the directory structure:
+resources
+ +--> dash1
+ +--> dash5
+
+Unpack the zip files into the corresponding directories created above.
+
+
+Virtual machine setup
+---------------------
+1. Create three VMs running XIA - 2 Routers and 1 Client
+   - R1 and R2 are connected
+   - Client connects to a free interface on R1 or R2 and can move between them
+2. Run nameservice on router R1.
+3. On router R2:
+   * Prepare the videos as described above
+   * cd applications/video-use-case/src
+   * ./manifest_server
+   * ./video_publisher origin
+      Enter 'dash1 host' on prompt to publish video into xcache
+4. On Client:
+   * cd applications/video-use-case/src
+   * ./proxy 8080
+   * Start Firefox and configure HTTP proxy to 127.0.0.1 port 8080.
+   * go to URL:
+      Note: substitute your-xia-core with actual directory in URL
+
+      file:///your-xia-core/applications/video-use-case/src/visualizer/dash/samples/dash-if-reference-player/index.html
+   * On the Dash player application that opens, enter the URL and press Load:
+      http://www.origin.xia/dash1.mpd
+
+Gotchas
+-------
+1. If the client hasn't buffered enough, video may stall during migration
+   between networks.
+2. Migration between networks is a two step process
+   - A new beacon is seen on new network and netjoin protocol is used to join
+     - Can take up to 10 seconds to favor new beacon and do actual joining
+   - There is a second or so of delay in sending migrate messages
+     - The migrate request is sent as an option with SYN or data packets.
+
+How it works - top-down - may be inaccurate
+-----------------------
+
+You open browser and start the dash player.
+Then enter the URL http://www.origin.xia/dash1.mpd
+Dash player does HTTP GET for the dash1 URL above
+The request goes to proxy
+Proxy queries nameservice for www.origin.xia and gets DAG of manifest server
+Proxy sends command to get manifest to manifest server
+Proxy returns the manifest back to dash player
+Dash player receives manifest with DAGs for chunks
+Manifest contains DAGs of chunks in http format (spaces and colons substituted)
+Each chunk is then requested via HTTP GET from the proxy
+The proxy converts chunk URL to DAG and forwards request to xcache
+Xcache fetches the chunk by sending a SYN request
+The server serving the chunk returns a SYNACK with flattened DAG
+A stream session is established between xcache and server's xcache
+Chunk is sent across and then served by the xcache to proxy
+Proxy returns it to dash player
+Dash player plays it to the user

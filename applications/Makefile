@@ -9,6 +9,7 @@ all:
 #	make -C tinyhttpd
 	make -C example
 	make -C video-use-case/src
+	make -C video-use-case-with-broker/src
 #	make -C demo
 #	make -C irc
 #	make -C multicast
@@ -25,6 +26,7 @@ clean:
 	make -C xregister clean
 #	make -C tinyhttpd clean
 	make -C example clean
+	make -C video-use-case-with-broker/src clean
 	make -C video-use-case/src clean
 #	make -C demo clean
 #	make -C irc clean

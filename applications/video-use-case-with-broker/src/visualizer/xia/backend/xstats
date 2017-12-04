@@ -1,0 +1,554 @@
+#! /usr/bin/python
+#
+# Copyright 2012 Carnegie Mellon University
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#	http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import sys
+import time
+import telnetlib
+import requests
+from optparse import OptionParser
+
+# default Click host and port
+CLICK = "localhost"
+CLICK_PORT = 7777
+
+# stats server URLs
+PORT = '8888'
+STATS_HOST = 'localhost'
+CONNECT_PATH = '/connections'
+STATS_PATH = '/stats'
+FINAL_PATH = '/final'
+NEXT_PATH = '/next'
+
+# retrieval intervals
+STATS_INTERVAL = 1
+ROUTE_INTERVAL = 1
+
+# Minimum Click version required
+MAJOR = 1
+MINOR = 3
+
+
+#
+# print the message if configured to be noisy
+#
+def say(msg):
+	if options.verbose:
+		print msg
+
+#
+# click controler interface
+#
+class ClickControl:
+	connected = False
+	csock = None
+
+	#
+	# print an error message and exit the app with an error
+	#
+	def errorExit(self, msg):
+		print msg
+		self.shutdown()
+		sys.exit(-1)
+
+
+	#
+	# get the ciick statuscode and message
+	# some operations get 2 lines of status message with the code on each
+	# and the second line is more useful, so the caller can specify if we should
+	# die on error, or keep going and loop back for the 2nd line
+	#
+	def checkStatus(self, die):
+		rc = self.csock.read_until("\n")
+		rc = rc.strip()
+
+		# some result code lines are in the form of 'nnn msg' and some are nnn-msg'
+		# so ignore the odd character by slicing round it
+		code = int(rc[:3])
+		msg = rc[4:-1]
+		if (die and code != 200):
+			self.errorExit("error %d: %s" % (code, msg))
+		return code
+
+
+	#
+	# read the length of data sent by click so we can consume the right
+	# amout of text
+	#
+	def readLength(self):
+		text = self.csock.read_until("\n")
+		text.strip()
+		(data, length) = text.split()
+		if data != "DATA":
+			self.errorExit("error retreiving data length")
+		return int(length)
+
+
+	#
+	# connect to the click control socket
+	#
+	def connect(self):
+		global options
+
+		try:
+			self.csock = telnetlib.Telnet(options.click, CLICK_PORT)
+			self.connected = True
+
+			data = self.csock.read_until("\n")
+		except:
+			self.errorExit("Unable to connect to Click")
+
+		# make sure it's really click we're talking to
+		data = data.strip()
+		[name, ver] = data.split("/")
+		[major, minor] = ver.split(".")
+		if name != "Click::ControlSocket":
+			self.errorExit("Socket is not a click ControlSocket")
+		if int(major) < MAJOR or (int(major) == MAJOR and int(minor) < MINOR):
+			self.errorExit("Click version %d.%d or higher is required" % (MAJOR, MINOR))
+
+
+	#
+	# send a read command to click and return the resulting text
+	#
+	def readData(self, cmd):
+		self.csock.write("READ %s\n" % (cmd))
+		code = self.checkStatus(False)
+
+		if code != 200:
+			return None
+		length = self.readLength()
+		buf = ""
+		while len(buf) < length:
+			buf += self.csock.read_some()
+		return buf
+
+
+	#
+	# close the connection to click
+	#
+	def shutdown(self):
+		if (self.connected):
+			self.csock.write("quit\n")
+
+
+#
+# XIA Route table entry
+#
+class Route:
+	def __init__(self, kind, text):
+		self.kind = kind
+		(self.xid, self.port, self.nexthop, self.flags) = text.split(',')
+
+
+	def __repr__(self):
+		return "Route(kind=%s, xid=%s, port=%s, flags=%s, nexthop=%s)" % (self.kind, self.xid, self.port, self.flags, self.nexthop)
+
+
+#
+# XIA Host/Router definition
+#
+class Router:
+	def __init__(self, name):
+		self.name = name
+		self.hid = None
+		self.ad = None
+		self.routes = []
+		self.connections = []
+		self.nextStats = {}
+		self.finalStats = {}
+		self.nextStatsIp = {}
+		self.finalStatsIp = {}
+		self.ports = []
+
+		for port in range(0, 4):
+			k = '%d:IN' % (port)
+			self.finalStatsIp[k] = Stats('final')
+			self.nextStatsIp[k] = Stats('next')
+			k = '%d:OUT' % (port)
+			self.finalStatsIp[k] = Stats('final')
+			self.nextStatsIp[k] = Stats('next')
+
+
+	def addRoute(self, r):
+		self.routes.append(r)
+		port = int(r.port)
+		kind = r.kind
+		next = r.nexthop
+
+		# ignore fallback, etc ports
+		if port > 4 or port < -2:
+			return
+
+		# if port is -2, get our ad or hid from the route line
+		if port == -2:
+			if kind == 'AD':
+				self.ad = r.xid
+			elif kind == 'HID':
+				self.hid = r.xid
+			return
+
+		if kind == 'IP':
+			return #TODO: next hop for IP on endhost has some problem
+			if port >= 0 and port <= 3:
+				if next == None or next == '':
+					next = '-'
+
+		elif port >= 0 and port <= 3:
+			kind = 'XID'
+			if next == None:
+				return
+
+		if port not in self.nextStats:
+			self.nextStats[port] = Stats('next')
+		if port not in self.finalStats:
+			self.finalStats[port] = Stats('final')
+		if port not in self.ports:
+			self.ports.append(port)
+
+		c = Connection(port, kind, next)
+		self.addConnection(c)
+
+
+	def addConnection(self, c):
+		for cc in self.connections:
+			if cc.port == c.port and cc.next == c.next and cc.kind == c.kind:
+				return
+		self.connections.append(c)
+
+
+	def reset(self):
+		self.connections = []
+		self.routes = []
+
+
+	def __repr__(self):
+		first = 1
+		s = "Router(name=%s, hid=%s, ad=%s, connections=[" % (self.name, self.hid, self.ad)
+		for c in self.connections:
+			if first:
+				first = 0
+			else:
+				s += ', '
+			s += repr(c)
+		s += '])'
+		return s
+
+
+	def csv(self):
+		s = ''
+		for c in self.connections:
+			s += "%s,%s,%s,%s\n" % (self.name, self.ad, self.hid, c.csv())
+		return s
+
+#
+# route info disitlled into an easier to manage object
+#
+class Connection:
+	def __init__(self, port, kind, next):
+		self.port = port
+		self.kind = kind
+		self.next = next
+
+
+	def __repr__(self):
+		return "Connection(kind=%s, port=%d, next=%s)" % (self.kind, self.port, self.next)
+
+
+	def csv(self):
+		return "%d,%s,%s" % (self.port, self.kind, self.next)
+
+#
+# XIA routers/hosts
+#
+class DeviceList:
+
+	def __init__(self):
+		self.devices = {}
+		self.dualStack = False
+
+	def add(self, name, r):
+		self.devices[name] = r
+
+
+	def parse(self, conf):
+		if conf.find('dualrouter') >= 0:
+			self.dualStack = True
+
+		entries = conf.split(";")
+		for entry in entries:
+			entry = entry.strip()
+
+			if entry.find("/cache ::") > 0:
+				# hacky way of finding the devices that are configured
+				sep = entry.find("/")
+				dev = entry[:sep]
+				r = Router(dev)
+				self.add(dev, r)
+
+
+	def resetRoutes(self):
+		for d in self.devices.itervalues():
+			d.reset()
+
+
+	def getList():
+		return self.devices
+
+
+	def __repr__(self):
+		first = 1
+		s = "DeviceList({"
+		for r in self.devices:
+			if first:
+				first = 0
+			else:
+				s += ', '
+			s += r + " : " + repr(self.devices[r])
+		s += '})'
+		return s
+
+
+	def csv(self):
+		s = ''
+		for d in self.devices.itervalues():
+			s += d.csv()
+		return s
+
+#
+# statistics
+#
+class Stats:
+	def __init__(self, name):
+		self.data = {}
+		self.last = {}
+		self.name = name
+		self.timestamp = 0
+		for xid in ('AD', 'HID', 'SID', 'CID', 'IP', 'UNKNOWN'):
+			self.data[xid] = 0
+			self.last[xid] = 0
+
+
+	def update(self, text, name):
+		cur = time.time()
+
+		(ad, hid, sid, cid, ip, unknown) = text.split()
+		ad = int(ad)
+		hid = int(hid)
+		sid = int(sid)
+		cid = int(cid)
+		ip = int(ip)
+		unknown = int(unknown)
+
+		if self.timestamp != 0:
+			elapsed = int(max(1, cur - self.timestamp))
+			self.data['AD'] = (ad - self.last['AD']) / elapsed
+			self.data['HID'] = (hid - self.last['HID']) / elapsed
+			self.data['SID'] = (sid - self.last['SID']) / elapsed
+			self.data['CID'] = (cid - self.last['CID']) / elapsed
+			self.data['IP'] = (ip - self.last['IP']) /elapsed
+			self.data['UNKNOWN'] = (unknown - self.last['UNKNOWN']) / elapsed
+
+		self.timestamp = cur
+		self.last['AD'] = ad
+		self.last['HID'] = hid
+		self.last['SID'] = sid
+		self.last['CID'] = cid
+		self.last['IP'] = ip
+		self.last['UNKNOWN'] = unknown
+
+
+	def csv(self):
+		return "%d,%d,%d,%d,%d,%d,0,0,0,0,0,0" % (self.data['AD'], self.data['HID'], self.data['SID'], self.data['CID'], self.data['IP'], self.data['UNKNOWN'])
+
+
+#
+# get the route entries for each of the devices and populate the router objects
+#
+def updateRoutes(click):
+	devices.resetRoutes()
+	for device in devices.devices.itervalues():
+		for kind in ('AD', 'HID', 'IP'):
+			lines = click.readData("%s/xrc/n/proc/rt_%s.list" % (device.name, kind))
+
+			for line in lines.splitlines():
+				rt = Route(kind, line)
+				device.addRoute(rt)
+
+	return devices.csv()
+
+
+def getCounts(s):
+	if s == None:
+		return None
+
+	counts = s.splitlines()
+	if len(counts) == 1:
+		ip = counts[0][7:]
+		s = "0 0 0 0 %s 0" % (ip)
+
+	else:
+		ad, hid, sid, cid, ip, unknown = s.splitlines()
+		ad  = ad[7:]
+		hid = hid[7:]
+		sid = sid[7:]
+		cid = cid[7:]
+		ip  = ip[7:]
+		unknown = unknown[7:]
+		s = "%s %s %s %s %s %s" % (ad, hid, sid, cid, ip, unknown)
+
+	return s
+
+
+def updateDualStats(click, kind):
+	s = ''
+	for device in devices.devices.itervalues():
+		for port in range(0, 4):
+
+			counts = getCounts(click.readData("%s/dualrouter_%s_%d.count" % (device.name, kind, port)))
+			fromip = getCounts(click.readData("%s/dualrouter_fromip_%s_%d.count" % (device.name, kind, port)))
+
+			kin = '%d:IN' % (port)
+			kout = '%d:OUT' % (port)
+
+			if kind == 'final':
+				if counts != None:
+					device.finalStatsIp[kout].update(counts, device.name)
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStatsIp[kout].csv())
+				if fromip != None:
+					device.finalStatsIp[kin].update(fromip, device.name)
+					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.finalStatsIp[kin].csv())
+
+			else:
+				if counts != None:
+					device.nextStatsIp[kout].update(counts, device.name)
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStatsIp[kout].csv())
+				if fromip != None:
+					device.nextStatsIp[kin].update(fromip, device.name)
+					s += '%s,%s,%d,IN,%s\n' % (kind, device.hid, port, device.nextStatsIp[kin].csv())
+
+
+	return s
+
+
+def updateStats(click, kind):
+	s = ''
+	for device in devices.devices.itervalues():
+		if len(device.ports) == 1: #a host: xlc
+			port = device.ports[0]
+			counts = getCounts(click.readData("%s/xlc/count_%s_out.count" % (device.name, kind)))
+
+			if counts == None:
+				continue
+				
+			if kind == 'final':
+				device.finalStats[port].update(counts, device.name)
+				txt= '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStats[port].csv())
+				s += txt
+
+			else:
+				device.nextStats[port].update(counts, device.name)
+				s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStats[port].csv())
+		else:
+			for port in device.ports: #a router: xlc#port
+				counts = getCounts(click.readData("%s/xlc%d/count_%s_out.count" % (device.name, port, kind)))
+
+				if counts == None:
+					continue
+					
+				if kind == 'final':
+					device.finalStats[port].update(counts, device.name)
+					txt= '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.finalStats[port].csv())
+					s += txt
+
+				else:
+					device.nextStats[port].update(counts, device.name)
+					s += '%s,%s,%d,OUT,%s\n' % (kind, device.hid, port, device.nextStats[port].csv())
+
+	return s
+
+
+
+def sendData(path, data):
+	global base_url
+
+	try:
+		req = requests.put(base_url + path, data=data)
+	except:
+		say ('PUT ' + path + ' failed')
+
+
+#
+# go speed racer go!
+#
+def main():
+	global devices
+	global options
+	global base_url
+
+	parser = OptionParser()
+	parser.add_option("-c", "--click", dest="click", help="Click instance address", default=CLICK)
+	parser.add_option("-s", "--server", dest="host", help="Stats server host", default=STATS_HOST)
+	parser.add_option("-p", "--port", dest="port", help="Stats server port", default=PORT)
+	parser.add_option("-i", "--interval", dest="stats_interval", type='int', help="stats update interval", default=STATS_INTERVAL)
+	parser.add_option("-r", "--rinterval", dest="route_interval", type='int', help="connections update interval", default=ROUTE_INTERVAL)
+	parser.add_option("-v", "--verbose", dest="verbose", help="print status messages", default=False, action="store_true")
+	(options, args) = parser.parse_args()
+
+	click = ClickControl()
+	click.connect()
+
+	# get the list of hosts/routers from clock
+	devices = DeviceList()
+	devices.parse(click.readData("flatconfig"))
+
+	rts = updateRoutes(click)
+	sendData(CONNECT_PATH, rts)
+
+	# query and send info to the stats server
+	base_url = 'http://%s:%s' %(options.host, options.port)
+	lastStat = lastRoute = 0
+	try:
+		while 1:
+			now = time.time()
+			if now - lastStat > options.stats_interval:
+				lastStat = now
+
+				if devices.dualStack:
+					s = updateDualStats(click, 'final')
+					s += updateDualStats(click, 'next')
+					if s != '':
+						sendData(STATS_PATH, s)
+
+				s = updateStats(click, 'final')
+				s += updateStats(click, 'next')
+				if s != '':
+					sendData(STATS_PATH, s)
+
+			if now - lastRoute > options.route_interval:
+				lastRoute = now
+				rts = updateRoutes(click)
+				sendData(CONNECT_PATH, rts)
+
+			time.sleep(1)
+	except KeyboardInterrupt:
+		print
+
+	click.shutdown()
+
+
+if __name__ == "__main__":
+	main()

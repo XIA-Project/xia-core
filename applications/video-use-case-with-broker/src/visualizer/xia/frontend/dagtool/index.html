@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>XIA DAG Tool</title>
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+  </head>
+  <body>
+	<p>
+	<div class="container">
+		<div class="row">
+			<div class="span12">
+				<div class="hero-unit">
+    				<h1 text-align="center">DAG Tool</h1>
+					<p>Quickly visualize an XIA address. 
+				</div>
+			</div>
+		</div>
+		<div class="row">
+			<div class="span6">
+				<textarea class="span6" rows="7" id="dag-textarea"></textarea>
+				
+				<a class="btn btn-primary btn-large btn-block" onclick="drawDAG(document.getElementById('dag-textarea').value, document.getElementById('dag-canvas'))">
+    	  			Draw DAG
+    			</a>
+			</div>
+			<div class="span6">
+				<strong>Example:</strong>
+				<pre>DAG 2 0 - 
+AD:4349445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 1 - 
+HID:4849445f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f 2 - 
+SID:534944305f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f</pre>
+
+				Note: If you are using our DAG maniuplation library, the <tt>.dag_string()</tt> method yields a string in the correct format.</p>
+			</div>
+		</div>
+		<div class="row">
+			<div class="span12">
+				<canvas style="height: 400px" id="dag-canvas"></canvas>
+			</div>
+		</div>
+	</div>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+	<script src="js/dag.js"></script>
+  </body>
+</html>
