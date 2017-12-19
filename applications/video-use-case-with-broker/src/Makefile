@@ -32,4 +32,5 @@ clean:
 	-rm -f *.txt
 	-rm -f video_publisher
 	-rm -f manifest_server
+	-rm -f broker_server
 	-rm -f proxy
