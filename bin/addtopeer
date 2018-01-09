@@ -16,7 +16,7 @@ def send_file(fname, destname=None):
 
     if not destname:
         destname = fname
-    
+
     source = os.path.join(xiapyutils.xia_etcdir(), fname)
     if not os.path.isfile(source):
         print 'ERROR: %s not found' % fname
@@ -56,10 +56,10 @@ def add_to_trusted():
     else:
         cmdline += ['%s' % host]
 
-    cmdline += ['cd %s && bin/addpeer -l' % destpath]
+    cmdline += ['cd %s && bin/addtopeer -l' % destpath]
     subprocess.check_call(cmdline)
 
-    
+
 def update_trusted():
     src = os.path.join(xiapyutils.xia_etcdir(), 'peer.tmp')
     dst = os.path.join(xiapyutils.xia_etcdir(), 'trusted.conf')
