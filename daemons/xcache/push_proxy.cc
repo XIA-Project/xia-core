@@ -217,6 +217,7 @@ void PushProxy::operator() (xcache_controller *ctrl)
 			continue;
 		}
 		while(remaining) {
+			// TODO: Add an Xselect here in case data never comes
 			count = Xrecv(sock, databuf+offset, remaining, 0);
 			std::cout << "Got bytes: " << count << std::endl;
 			offset += count;
@@ -239,6 +240,6 @@ void PushProxy::operator() (xcache_controller *ctrl)
 		}
         Xclose(sock);
 		free(databuf);
-        std::cout << "Got " << data_len << "data  bytes" << std::endl;
+        std::cout << "Got " << data_len << " data bytes" << std::endl;
     }
 }
