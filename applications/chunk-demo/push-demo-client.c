@@ -63,7 +63,7 @@ int PushDemoClient::fetch()
 		int n = 0;
 		int sock;
 		sockaddr_x sa;
-		socklen_t addrlen;
+		socklen_t addrlen = sizeof(sockaddr_x);
 		char buf[BUFSIZE];
 
 		std::cout << "Socket " << _sockfd << " waiting" << std::endl;
