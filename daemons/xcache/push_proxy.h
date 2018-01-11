@@ -5,6 +5,7 @@
 #include <dagaddr.hpp>
 #include <thread>
 #include <iostream>
+#include "controller.h"
 
 /**
  * A proxy to handle pushed chunks
