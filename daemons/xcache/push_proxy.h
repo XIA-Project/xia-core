@@ -16,6 +16,8 @@ private:
 	size_t _sid_strlen;
 	char *_sid_string;
 	Graph *_proxy_addr;
+	int _sockfd;
+	sockaddr_x *_sa;
 
 	static void *run(void *);
 public:

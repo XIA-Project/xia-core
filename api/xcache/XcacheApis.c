@@ -1089,21 +1089,34 @@ int XlaunchNotifThread(XcacheHandle *h)
 ** @returns 0 on success and proxyaddr has proxy address
 ** @returns -1 on failure
 */
-int XnewProxy(XcacheHandle *h)
+int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
 {
 	// Request Xcache to start a new Proxy for pushed content
 	xcache_cmd cmd;
 
 	cmd.set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+
 	if(send_command(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "Error starting new proxy\n");
 		return -1;
 	}
+
 	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "No valid response to new proxy creation\n");
 		return -1;
 	}
-	// TODO read the response code and return error, when necessary
+
+	if(cmd.cmd() != xcache_cmd::XCACHE_NEWPROXY
+			|| cmd.status() != xcache_cmd::XCACHE_OK) {
+		fprintf(stderr, "Failed starting proxy\n");
+		return -1;
+	}
+
+	printf("XnewProxy: started at: %s\n", cmd.dag().c_str());
+
+	// The command was successful, get the dag for proxy
+	proxyaddr.assign(cmd.dag());
+
 	return 0;
 }
 

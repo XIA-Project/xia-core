@@ -16,10 +16,15 @@ int main()
 		printf("ERROR talking to xcache\n");
 		return -1;
 	}
-	if (XnewProxy(&_xcache)) {
+
+	// Request a new push proxy
+	std::string proxyaddr;
+	if (XnewProxy(&_xcache, proxyaddr)) {
 		printf("ERROR starting proxy for pushed chunks\n");
 		return -1;
 	}
+	printf("Proxy started at address: %s\n", proxyaddr.c_str());
+
 	if (XcacheHandleDestroy(&_xcache)) {
 		printf("ERROR closing session with Xcache\n");
 		return -1;

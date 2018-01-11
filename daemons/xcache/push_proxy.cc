@@ -34,8 +34,8 @@ PushProxy::PushProxy()
 	if(_sid_string == NULL) {
 		throw "PushProxy: Unable to locate memory for SID";
 	}
-	/*
-	std::cout << "PushProxy started" << std::endl;
+
+	std::cout << "PushProxy being created." << std::endl;
 
 	if((_sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		throw "PushProxy: Unable to create socket";
@@ -51,16 +51,9 @@ PushProxy::PushProxy()
     if(Xgetaddrinfo(NULL, _sid_string, &hints, &ai) != 0) {
         throw "PushProxy: getaddrinfo failed";
     }
-    sockaddr_x *sa = (sockaddr_x *)ai->ai_addr;
-    _proxy_addr = new Graph(sa);
+    _sa = (sockaddr_x *)ai->ai_addr;
+    _proxy_addr = new Graph(_sa);
     std::cout << "PushProxy addr: " << _proxy_addr->dag_string() << std::endl;
-
-    if(Xbind(_sockfd, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
-        throw "Unable to bind to client address";
-    }
-
-    Xlisten(_sockfd, 1);
-	*/
 }
 
 PushProxy::~PushProxy()
@@ -88,7 +81,6 @@ std::string PushProxy::addr()
 
 void PushProxy::operator() (xcache_controller *ctrl)
 {
-	int sockfd;
 	std::cout << "PushProxy:: main loop starting" << std::endl;
 	if(ctrl == NULL) {
 		syslog(LOG_ERR, "PushProxy: ERROR invalid controller\n");
@@ -96,31 +88,11 @@ void PushProxy::operator() (xcache_controller *ctrl)
 	}
 	assert(ctrl != NULL);
 
-	std::cout << "PushProxy started" << std::endl;
-
-	if((sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
-		throw "PushProxy: Unable to create socket";
-	}
-	if(XmakeNewSID(_sid_string, _sid_strlen)) {
-		throw "PushProxy: Unable to create a new SID";
-	}
-    struct addrinfo hints;
-    struct addrinfo *ai;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_family = AF_XIA;
-    if(Xgetaddrinfo(NULL, _sid_string, &hints, &ai) != 0) {
-        throw "PushProxy: getaddrinfo failed";
-    }
-    sockaddr_x *sa = (sockaddr_x *)ai->ai_addr;
-    _proxy_addr = new Graph(sa);
-    std::cout << "PushProxy addr: " << _proxy_addr->dag_string() << std::endl;
-
-    if(Xbind(sockfd, (struct sockaddr *)sa, sizeof(sockaddr_x)) < 0) {
+    if(Xbind(_sockfd, (struct sockaddr *)_sa, sizeof(sockaddr_x)) < 0) {
         throw "Unable to bind to client address";
     }
 
-    Xlisten(sockfd, 1);
+    Xlisten(_sockfd, 1);
 
     while (1) {
         int sock;
@@ -130,8 +102,8 @@ void PushProxy::operator() (xcache_controller *ctrl)
 		memset(buf, 0, BUFSIZE);
 
 		// Accept new connection
-        std::cout << "Socket " << sockfd << " waiting" << std::endl;
-        sock = Xaccept(sockfd, (struct sockaddr *)&sx, &addrlen);
+        std::cout << "Socket " << _sockfd << " waiting" << std::endl;
+        sock = Xaccept(_sockfd, (struct sockaddr *)&sx, &addrlen);
         if(sock < 0) {
             std::cout << "Xaccept failed. Continuing..." << std::endl;
             continue;
