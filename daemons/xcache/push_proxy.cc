@@ -35,11 +35,12 @@ PushProxy::PushProxy()
 		throw "PushProxy: Unable to locate memory for SID";
 	}
 
-	std::cout << "PushProxy being created." << std::endl;
-
+	// Create a socket that this proxy will listen on
 	if((_sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0) {
 		throw "PushProxy: Unable to create socket";
 	}
+
+	// Assign a unique SID and build address this proxy will be on
 	if(XmakeNewSID(_sid_string, _sid_strlen)) {
 		throw "PushProxy: Unable to create a new SID";
 	}
@@ -81,7 +82,6 @@ std::string PushProxy::addr()
 
 void PushProxy::operator() (xcache_controller *ctrl)
 {
-	std::cout << "PushProxy:: main loop starting" << std::endl;
 	if(ctrl == NULL) {
 		syslog(LOG_ERR, "PushProxy: ERROR invalid controller\n");
 		std::cout << "PushProxy:: ERROR invalid controller" << std::endl;
@@ -174,7 +174,17 @@ void PushProxy::operator() (xcache_controller *ctrl)
 		}
 		memset(buf, 0, BUFSIZE);
 
-		// Verify content header and compare against sender's address
+		// Verify content header against sender's address
+		std::string contentID(chdr->id());
+		if(src_intent_xid.to_string().compare(contentID) != 0) {
+			std::cout << "PushProxy: headerSID != src DAG SID" << std::endl;
+			std::cout << "PushProxy: " << src_intent_xid.to_string()
+				<< " != " << contentID << std::endl;
+			std::cout << "PushProxy: dropping connection" << std::endl;
+			Xclose(sock);
+			continue;
+		}
+
 		// Now download content
 		size_t data_len = chdr->content_len();
 		std::cout << "PushProxy: getting data bytes: " << data_len << std::endl;
@@ -202,16 +212,58 @@ void PushProxy::operator() (xcache_controller *ctrl)
 			std::cout << "PushProxy: error getting content" << std::endl;
 			std::cout << "PushProxy:: dropping connection" << std::endl;
 			Xclose(sock);
+			free(databuf);
 			continue;
 		}
 		if (offset != data_len) {
 			std::cout << "PushProxy: entire data not found" << std::endl;
 			std::cout << "PushProxy: dropping connection" << std::endl;
 			Xclose(sock);
+			free(databuf);
 			continue;
 		}
         Xclose(sock);
-		free(databuf);
         std::cout << "Got " << data_len << " data bytes" << std::endl;
+		// Now verify the chunk data and header
+		std::string data(databuf, data_len);
+		if(!chdr->valid_data(data)) {
+			std::cout << "PushProxy: Invalid chunk header/data" << std::endl;
+			std::cout << "PushProxy: not saving chunk" << std::endl;
+			free(databuf);
+			continue;
+		}
+		std::cout << "PushProxy: Valid chunk received" << std::endl;
+
+		// Store the chunk
+		xcache_meta *meta = ctrl->acquire_meta(contentID);
+		if(meta != NULL) {
+			ctrl->release_meta(meta);
+			std::cout << "PushProxy: Chunk already in cache." << std::endl;
+			std::cout << "PushProxy: don't try to cache" << std::endl;
+			free(databuf);
+			continue;
+		}
+		meta = new xcache_meta();
+		if(meta == NULL) {
+			std::cout << "PushProxy: Failed creating meta" << std::endl;
+			free(databuf);
+			continue;
+		}
+		meta->set_state(CACHING);
+		meta->set_content_header(chdr);
+		meta->set_ttl(chdr->ttl());
+		meta->set_created();
+		meta->set_length(chdr->content_len());
+		meta->set_state(READY_TO_SAVE);
+		ctrl->add_meta(meta);
+		assert(ctrl->acquire_meta(contentID) != NULL);
+		xcache_req *req = new xcache_req();
+		req->type = xcache_cmd::XCACHE_CACHE;
+		req->cid = strdup(contentID.c_str());
+		req->data = databuf;
+		req->datalen = chdr->content_len();
+		ctrl->enqueue_request_safe(req);
+		// NOTE: we don't free databuf. Controller will free it.
+		std::cout << "PushProxy: chunk should be cached soon" << std::endl;
     }
 }
