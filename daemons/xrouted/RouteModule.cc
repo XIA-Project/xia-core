@@ -1,18 +1,18 @@
 /*
-** Copyright 2017 Carnegie Mellon University
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**    http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
+ ** Copyright 2017 Carnegie Mellon University
+ **
+ ** Licensed under the Apache License, Version 2.0 (the "License");
+ ** you may not use this file except in compliance with the License.
+ ** You may obtain a copy of the License at
+ **
+ **    http://www.apache.org/licenses/LICENSE-2.0
+ **
+ ** Unless required by applicable law or agreed to in writing, software
+ ** distributed under the License is distributed on an "AS IS" BASIS,
+ ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ ** See the License for the specific language governing permissions and
+ ** limitations under the License.
+ */
 #include "RouteModule.hh"
 #include <syslog.h>
 
@@ -111,62 +111,64 @@ int RouteModule::readMessage(char *recv_message, struct pollfd *pfd, unsigned np
 		int sock = -1;
 
 		for (unsigned i = 0; i < npfds; i++) {
-			if (pfd[i].revents & POLLIN) {
-				sock = pfd[i].fd;
-				break;
+			if (!(pfd[i].revents & POLLIN)) {
+				continue;
 			}
-		}
 
-		if (local) {
-		    *local = (sock == _local_sock);
-		}
+			sock = pfd[i].fd;
 
-		memset(&recv_message[0], 0, BUFFER_SIZE);
-
-		if (sock <= 0) {
-			// something weird happened
-			return 0;
-
-		} else if (sock == _local_sock) {
-			*iface = FALLBACK;
-		    socklen_t sz = sizeof(sockaddr_in);
-
-			if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, (sockaddr*)&_local_sa, &sz)) < 0) {
-				syslog(LOG_WARNING, "local message receive error");
+			printf("sock = %d\n", sock);
+			if (local) {
+				*local = (sock == _local_sock);
 			}
-		} else {
-			struct msghdr mh;
-			struct iovec iov;
-			struct in_pktinfo pi;
-			struct cmsghdr *cmsg;
-			struct in_pktinfo *pinfo;
-			char cbuf[CMSG_SPACE(sizeof pi)];
 
-			iov.iov_base = recv_message;
-			iov.iov_len = BUFFER_SIZE;
+			memset(&recv_message[0], 0, BUFFER_SIZE);
 
-			mh.msg_name = &theirDAG;
-			mh.msg_namelen = sizeof(theirDAG);
-			mh.msg_iov = &iov;
-			mh.msg_iovlen = 1;
-			mh.msg_control = cbuf;
-			mh.msg_controllen = sizeof(cbuf);
+			if (sock <= 0) {
+				// something weird happened
+				return 0;
 
-			cmsg = CMSG_FIRSTHDR(&mh);
-			cmsg->cmsg_level = IPPROTO_IP;
-			cmsg->cmsg_type = IP_PKTINFO;
-			cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+			} else if (sock == _local_sock) {
+				*iface = FALLBACK;
+				socklen_t sz = sizeof(sockaddr_in);
 
-			mh.msg_controllen = cmsg->cmsg_len;
-
-			if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
-				perror("recvfrom");
-
+				if ((rc = recvfrom(sock, recv_message, BUFFER_SIZE, 0, (sockaddr*)&_local_sa, &sz)) < 0) {
+					syslog(LOG_WARNING, "local message receive error");
+				}
 			} else {
-				for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
-					if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
-						pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
-						*iface = pinfo->ipi_ifindex;
+				struct msghdr mh;
+				struct iovec iov;
+				struct in_pktinfo pi;
+				struct cmsghdr *cmsg;
+				struct in_pktinfo *pinfo;
+				char cbuf[CMSG_SPACE(sizeof pi)];
+
+				iov.iov_base = recv_message;
+				iov.iov_len = BUFFER_SIZE;
+
+				mh.msg_name = &theirDAG;
+				mh.msg_namelen = sizeof(theirDAG);
+				mh.msg_iov = &iov;
+				mh.msg_iovlen = 1;
+				mh.msg_control = cbuf;
+				mh.msg_controllen = sizeof(cbuf);
+
+				cmsg = CMSG_FIRSTHDR(&mh);
+				cmsg->cmsg_level = IPPROTO_IP;
+				cmsg->cmsg_type = IP_PKTINFO;
+				cmsg->cmsg_len = CMSG_LEN(sizeof(pi));
+
+				mh.msg_controllen = cmsg->cmsg_len;
+
+				if ((rc = Xrecvmsg(sock, &mh, 0)) < 0) {
+					perror("recvfrom");
+
+				} else {
+					for (cmsg = CMSG_FIRSTHDR(&mh); cmsg != NULL; cmsg = CMSG_NXTHDR(&mh, cmsg)) {
+						if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
+							pinfo = (struct in_pktinfo*) CMSG_DATA(cmsg);
+							*iface = pinfo->ipi_ifindex;
+						}
 					}
 				}
 			}
