@@ -849,11 +849,12 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 				DAGMap::iterator d = _trustedADs.find(neighbor.AD);
 				if (d != _trustedADs.end()) {
 					memcpy(&neighbor.dag, &(_trustedADs[neighbor.AD]), sizeof(sockaddr_x));
-				} else
+				} else {
 					// maybe do a better check here
 					// no dag in the lsa and not in our trusted list so skip
 					syslog(LOG_NOTICE, "%s is not in our trusted AD list", neighbor.AD.c_str());
 					continue;
+				}
 			}
 
 			//syslog(LOG_INFO, "putting %s into neighborAD table\n", neighbor.AD.c_str());
