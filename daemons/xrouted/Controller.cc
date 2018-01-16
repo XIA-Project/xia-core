@@ -229,7 +229,14 @@ Graph Controller::getLocalControllerDAG()
 
 	minIni ini(s);
 
-	return Graph(ini.gets("controller", "controller_dag"));
+	// register route table entry for the fid
+	// FIXME: we need a method to get this from the graph
+	std::string dag = ini.gets("controller", "controller_dag");
+	std::size_t pos = dag.find("FID");
+	std::string fid = dag.substr(pos, 44);
+	XmanageFID(fid.c_str(), true);
+
+	return Graph(dag);
 }
 
 
@@ -265,17 +272,6 @@ int Controller::makeSockets()
 	syslog(LOG_INFO, "Broadcast: %s", g.dag_string().c_str());
 
 	// controller socket - flooded & interdomain communication
-//	XcreateFID(s, sizeof(s));
-//	Node nFID(s);
-//	std::string sid;
-//
-//	if ((sid = getControllerSID()) == "") {
-//		syslog(LOG_ERR, "Unable to locate the controller SID in xia.conf");
-//		return -1;
-//	}
-//
-//	Node rSID(sid);
-//	g = (src * nHID * nFID * rSID) + (src * nFID * rSID);
 	g = getLocalControllerDAG();
 
 	if ((_recv_sock = makeSocket(g, &_recv_dag)) < 0) {
@@ -435,7 +431,6 @@ int Controller::sendInterDomainLSA()
 
 		n->set_dag(&it->second.dag, sockaddr_size(&it->second.dag));
 	}
-
 
 	// FIXME: add sequence # back for interdomain messages
 
@@ -655,9 +650,9 @@ int Controller::processHostLeave(const Xroute::HostLeaveMsg& msg)
 {
 	// FIXME: figure out how we do this
 	// The controller and every router in the AD have to know the host
-	// left so that they can remove it fromm the routing table.
+	// left so that they can remove it from the routing table.
 	// there's an additional problem if the host migrated to a new location
-	// in the same AD as we need to telll everyone except the new router
+	// in the same AD as we need to tell everyone except the new router
 	// that the host is gone
 	// the new router will advertise the host, but if it's not removed, some
 	// routers will get routes to the host's old location
@@ -683,6 +678,7 @@ int Controller::processForeign(const Xroute::ForeignADMsg &msg)
 		NeighborEntry neighbor;
 
 		neighbor.AD    = msg.ad();
+		neighbor.HID    = msg.ad();
 		neighbor.port  = msg.iface();
 		neighbor.flags = 0;
 		neighbor.cost  = 1; // for now, same cost

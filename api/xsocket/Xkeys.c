@@ -488,7 +488,7 @@ int XmakeNewSID(char *randomSID, int randomSIDlen)
 	return 0;
 }
 
-static int manageFID(const char *fid, bool create)
+int XmanageFID(const char *fid, bool create)
 {
 	int rc = -1;
 	int sock = MakeApiSocket(SOCK_DGRAM);
@@ -547,7 +547,7 @@ int XcreateFID(char *fid, int len)
 	}
 
 	// now tell click to bind to it
-	return manageFID(fid, true);
+	return XmanageFID(fid, true);
 }
 
 /*!
@@ -573,7 +573,7 @@ int XremoveFID(const char *fid)
 		return -1;
 	}
 
-	if (manageFID(fid, false) < 0) {
+	if (XmanageFID(fid, false) < 0) {
 		return -1;
 	}
 

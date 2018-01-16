@@ -161,6 +161,7 @@ extern void Xfreeifaddrs(struct ifaddrs *ifa);
 extern int XupdateDefaultInterface(int sockfd, int interface);
 extern int XdefaultInterface(int sockfd);
 
+extern int XmanageFID(const char *fid, bool create);
 extern int XcreateFID(char *fid, int len);
 extern int XremoveFID(const char *fid);
 
