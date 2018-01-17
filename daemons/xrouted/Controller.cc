@@ -388,6 +388,32 @@ int Controller::sendKeepalive()
 
 int Controller::sendInterDomainLSA()
 {
+
+	// FIXME: BIG GIANT HACK
+	{
+		// It seems like the original routing code only populated the routing
+		// tables when an LSA was received.  This is 'fine' if the AD
+		// contains at least one router in addition to the controller,
+		// but in the case of a lone controller, the tables never get updated.
+		//
+		// This change doesn't seem like the right thing to do, but it's a quick
+		// hack until we can take more time to fix it correctly.
+		// By putting this code here, we ensure that the routing tables will be
+		// updated whenever we need to send out an interdomain-lsa.
+
+		// code is lifted from the processLSA method.
+		RouteTable routingTable;
+		RouteTable ADRoutingTable;
+
+		populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
+		populateRoutingTable(_myHID, _networkTable, routingTable);
+
+		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
+		populateADEntries(routingTable, ADRoutingTable);
+		processRoutingTable(routingTable);
+	}
+	// END HACK
+
 	int rc = 1;
 
 	Node a(_myAD);
