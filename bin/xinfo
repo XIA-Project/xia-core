@@ -102,6 +102,13 @@ for c in $cmds; do
 	$XIADIR/bin/$c
 done
 
+# get system info
+header uname
+uname -a
+
+header version
+lsb_release -a
+
 # get the live network adapters
 header "ifconfig"
 ifconfig
