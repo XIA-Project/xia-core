@@ -49,9 +49,8 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 
 # XIA command
-scmds=" \
+cmds=" \
 	xdag \
-	xlog \
 	xroute \
 	xnetstat \
 	psx
@@ -89,9 +88,13 @@ header () {
 }
 
 
+# show config info
+header config
+$XIADIR/bin/xia-config info
+
 # check the processes
-header xianet
-$XIADIR/bin/xianet check
+header status
+$XIADIR/bin/xia status
 
 # run the list of commands
 for c in $cmds; do
