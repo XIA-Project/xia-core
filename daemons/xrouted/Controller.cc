@@ -388,20 +388,10 @@ int Controller::sendKeepalive()
 
 int Controller::sendInterDomainLSA()
 {
+	int rc = 1;
 
-	// FIXME: BIG GIANT HACK
+	// FIXME: HACK for when there are no routers in the ad to trigger a table update
 	{
-		// It seems like the original routing code only populated the routing
-		// tables when an LSA was received.  This is 'fine' if the AD
-		// contains at least one router in addition to the controller,
-		// but in the case of a lone controller, the tables never get updated.
-		//
-		// This change doesn't seem like the right thing to do, but it's a quick
-		// hack until we can take more time to fix it correctly.
-		// By putting this code here, we ensure that the routing tables will be
-		// updated whenever we need to send out an interdomain-lsa.
-
-		// code is lifted from the processLSA method.
 		RouteTable routingTable;
 		RouteTable ADRoutingTable;
 
@@ -412,9 +402,6 @@ int Controller::sendInterDomainLSA()
 		populateADEntries(routingTable, ADRoutingTable);
 		processRoutingTable(routingTable);
 	}
-	// END HACK
-
-	int rc = 1;
 
 	Node a(_myAD);
 	Node h(_myHID);	// FIXME: the original code uses the AD here
@@ -823,6 +810,62 @@ void Controller::processRoutingTable(RouteTable routingTable)
 }
 
 
+int Controller::updateTables()
+{
+	//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
+
+	// Calculate next hop for ADs
+	RouteTable ADRoutingTable;
+	populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
+
+	// For debugging.
+	//printADNetworkTable();
+	//printRoutingTable(_myAD, ADRoutingTable);
+
+	// Calculate next hop for routers
+	NetworkTable::iterator it1;
+	// Iterate through ADs
+	for (it1 = _networkTable.begin(); it1 != _networkTable.end(); ++it1)
+	{
+		if ((it1->second.ad != _myAD) || (it1->second.hid == "")) {
+			// Don't calculate routes for external ADs
+			continue;
+		} else if (it1->second.hid.find(string("SID")) != string::npos) {
+			// Don't calculate routes for SIDs
+			continue;
+		}
+		RouteTable routingTable;
+
+		// Calculate routing table for HIDs instead
+		populateRoutingTable(it1->second.hid, _networkTable, routingTable);
+
+		extractNeighborADs();
+		populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
+		populateADEntries(routingTable, ADRoutingTable);
+		printRoutingTable(it1->second.hid, routingTable);
+
+		sendRoutingTable(&it1->second, routingTable);
+	}
+
+	// HACK HACK HACK!!!!
+	// for some reason some controllers will delete their routing table entries in
+	// populateRoutingTable when they shouldn't. This forces the entries back into the table
+	// it's the same logic from inside the loop above
+	RouteTable routingTable;
+	populateRoutingTable(_myHID, _networkTable, routingTable);
+	if (routingTable.size() == 0) {
+		return 1;
+	}
+
+	populateNeighboringADBorderRouterEntries(_myHID, routingTable);
+	populateADEntries(routingTable, ADRoutingTable);
+	processRoutingTable(routingTable);
+	// END HACK
+
+	return 1;
+}
+
+
 int Controller::processLSA(const Xroute::LSAMsg& msg)
 {
 	Xroute::XID a = msg.node().ad();
@@ -893,60 +936,13 @@ int Controller::processLSA(const Xroute::LSAMsg& msg)
 	}
 	extractNeighborADs();
 	_networkTable[srcHID] = entry;
+
 	_calc_dijstra_ticks++;
 
 	if (_calc_dijstra_ticks >= _settings->calc_dijkstra_interval() || _calc_dijstra_ticks  < 0) {
-		//syslog(LOG_DEBUG, "Calcuating shortest paths\n");
-
-		// Calculate next hop for ADs
-		RouteTable ADRoutingTable;
-		populateRoutingTable(_myAD, _ADNetworkTable, ADRoutingTable);
-
-		// For debugging.
-		//printADNetworkTable();
-		//printRoutingTable(_myAD, ADRoutingTable);
-
-		// Calculate next hop for routers
-		NetworkTable::iterator it1;
-		// Iterate through ADs
-		for (it1 = _networkTable.begin(); it1 != _networkTable.end(); ++it1)
-		{
-			if ((it1->second.ad != _myAD) || (it1->second.hid == "")) {
-				// Don't calculate routes for external ADs
-				continue;
-			} else if (it1->second.hid.find(string("SID")) != string::npos) {
-				// Don't calculate routes for SIDs
-				continue;
-			}
-			RouteTable routingTable;
-
-			// Calculate routing table for HIDs instead
-			populateRoutingTable(it1->second.hid, _networkTable, routingTable);
-
-			extractNeighborADs();
-			populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
-			populateADEntries(routingTable, ADRoutingTable);
-			printRoutingTable(it1->second.hid, routingTable);
-
-			sendRoutingTable(&it1->second, routingTable);
-		}
-
-		// HACK HACK HACK!!!!
-		// for some reason some controllers will delete their routing table entries in
-		// populateRoutingTable when they shouldn't. This forces the entries back into the table
-		// it's the same logic from inside the loop above
-		RouteTable routingTable;
-		populateRoutingTable(_myHID, _networkTable, routingTable);
-		if (routingTable.size() == 0) {
-			return 1;
-		}
-
-		populateNeighboringADBorderRouterEntries(_myHID, routingTable);
-		populateADEntries(routingTable, ADRoutingTable);
-		processRoutingTable(routingTable);
-		// END HACK
-
-		_calc_dijstra_ticks = _calc_dijstra_ticks >0?0:_calc_dijstra_ticks;
+		updateTables();
+		// FIXME: this seems stupid, why woukld the interval ever be < 0?
+		_calc_dijstra_ticks = _calc_dijstra_ticks > 0 ? 0 : _calc_dijstra_ticks;
 	}
 
 	return 1;

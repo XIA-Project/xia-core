@@ -50,6 +50,7 @@ protected:
 	int processSIDRequest(Xroute::XrouteMsg &msg);
 	int processForeign(const Xroute::ForeignADMsg &msg);
 	void processRoutingTable(RouteTable routingTable);
+	int updateTables();
 
 	void purgeStaleRoutes(time_t now);
 	void purgeStaleNeighbors(time_t now);
