@@ -37,7 +37,7 @@ levels = ['LOG_EMERG', 'LOG_ALERT', 'LOG_CRIT', 'LOG_ERR', 'LOG_WARNING', 'LOG_N
 
 # services for the various node types
 common_services           = ['click', 'xnetjd', 'xcache']
-controller_services       = ['xcontrold'] 
+controller_services       = ['xcontrold']
 controller_extra_services = ['xnameservice', 'xrendezvous']
 router_services           = ['xrouted']
 host_services             = ['xhostd']
@@ -237,13 +237,13 @@ def start_click():
         script = 'router'
 
     params = []
-    
+
     if args.valgrind:
         params.append('valgrind')
     params.append(os.path.join(xiapyutils.xia_srcdir(), 'click/userlevel/click'))
     params.append('-R')
     params.append(os.path.join(xiapyutils.xia_etcdir(), 'click/%s.click' % script))
-    
+
     try:
         p = subprocess.Popen(params)
     except:
@@ -267,7 +267,7 @@ def start_click():
             ad = node.ad()
             hid = node.hid()
             click.assignDAG(hostname, 'RE %s %s' % (ad, hid))
-            
+
             click.setADInXARPTable(ad)
 
             # set up rendezvous if we're serving it
@@ -308,7 +308,7 @@ def start_xnetjd(name):
         params.append('dsrc')
     else:
         params.append('ethernet')
-    
+
     subprocess.Popen(params)
 
 
@@ -429,6 +429,13 @@ def stop():
 def start():
     nodetype = get_nodetype()
 
+    # if set, override caching behavior defined in xia.conf
+    cache = node.cache()
+    if args.cache:
+        cache = True
+    if args.nocache:
+        cache = False
+
     # set flags so status displays correctly for us
     args.force = False
 
@@ -442,6 +449,9 @@ def start():
 
     args.force = False
     services = make_service_list(nodetype, True)
+
+    if cache == False:
+        services.remove('xcache')
 
     for service in services:
         start_process(service)
@@ -471,6 +481,11 @@ start_parser.add_argument('-l', '--level', type=loglevel, help='set syslog level
 restrict_parser = start_parser.add_mutually_exclusive_group()
 restrict_parser.add_argument('--click', action='store_false', dest='daemons', help='only start click')
 restrict_parser.add_argument('--daemons', action='store_false', dest='click', help='only start the XIA daemons')
+
+cache_parser = start_parser.add_mutually_exclusive_group(required=False)
+cache_parser.add_argument('--cache', action='store_true', help='override xia.conf and enable xcache caching')
+cache_parser.add_argument('--nocache', action='store_true', help='override xia.conf and disable xcache caching')
+
 start_parser.add_argument('--valgrind', action='store_true', help='run click inside of valgrind')
 start_parser.add_argument('-s', '--sclient', type=ip_addr, metavar='IP-ADDR', help='run the stats client and send output to IP-ADDR')
 start_parser.add_argument('-S', '--sserver', action='store_true', help='run the XIA stats server on this node')

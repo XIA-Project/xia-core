@@ -18,7 +18,7 @@ import os
 import xiapyutils
 from configparser import ConfigParser
 
-xkeys = ['hostname', 'nodetype', 'numports', 'hid']
+xkeys = ['hostname', 'nodetype', 'numports', 'hid', 'cache']
 ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid', 'controller_dag']
 wkeys = [ 'mac', 'addr', 'port']
 
@@ -114,6 +114,10 @@ class nodeconf:
 
     def nodetype(self):
         return self._get('xia', 'nodetype', None)
+
+    def cache(self):
+        enabled = self._get('xia', 'cache', 'True')
+        return enabled.lower() in ['true', '1', 'yes', 'on']
 
     def hostname(self):
         return self._get('xia', 'hostname', 'xia')

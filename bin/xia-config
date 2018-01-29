@@ -215,9 +215,7 @@ def create_nodeconf(args):
     node.set('nodetype', args.nodetype)
     node.set('numports', str(args.ports))
     node.set('hid', genkeys.create_new_HID())
-    node.set('hostname', hostname)
-    node.set('hostname', hostname)
-    node.set('hostname', hostname)
+    node.set('cache', str(args.cache))
 
     if args.nodetype == 'controller':
         node.set('ad', genkeys.create_new_AD())
@@ -474,6 +472,10 @@ common_parser = argparse.ArgumentParser(add_help=False)
 common_parser.add_argument('-i', '--ignore', nargs='+', type=iface, metavar='iface', help='ignore interface')
 common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='# of interfaces (default=4)')
 common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='DSRC_MAC,ARADA_IP:PORT', help='connect via a waveserver')
+
+cache_parser = common_parser.add_mutually_exclusive_group(required=False)
+cache_parser.add_argument('--cache', action='store_true', default=True, help='enable xcache caching (default)')
+cache_parser.add_argument('--nocache', action='store_false', dest='cache', help='disable xcache caching')
 
 # FIXME: add support for these at some point
 #common_parser.add_argument('-s', '--socket', type=socket_server, metavar='port', help='use a TCP socket instead of an ethernet interface')
