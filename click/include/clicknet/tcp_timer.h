@@ -41,6 +41,9 @@
 #define TCP_SLOW_TICK_MS 10
 #define TCP_FAST_TICK_MS 4
 
+#define TCP_TICK_MS 10
+#define TCP FAST_SLOW_RATIO 1
+
 #define	TCPT_NTIMERS	5
 #define	TCPT_REXMT	0		/* retransmit */
 #define	TCPT_PERSIST	1		/* retransmit persistance */

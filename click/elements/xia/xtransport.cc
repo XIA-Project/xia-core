@@ -249,11 +249,11 @@ int XTRANSPORT::initialize(ErrorHandler *)
 
 	_fast_ticks = new Timer(this);
 	_fast_ticks->initialize(this);
-	_fast_ticks->schedule_after_msec(TCP_FAST_TICK_MS);
+	_fast_ticks->schedule_after_msec(TCP_TICK_MS);
 
-	_slow_ticks = new Timer(this);
-	_slow_ticks->initialize(this);
-	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS);
+//	_slow_ticks = new Timer(this);
+//	_slow_ticks->initialize(this);
+//	_slow_ticks->schedule_after_msec(TCP_SLOW_TICK_MS);
 
 	_reaper = new Timer(this);
 	_reaper->initialize(this);
@@ -764,12 +764,10 @@ void XTRANSPORT::CancelRetransmit(sock *sk)
 
 void XTRANSPORT::run_timer(Timer *timer)
 {
-	ConnIterator i = XIDpairToSock.begin();
-	ConnIterator j = XIDpairToConnectPending.begin();
 	XStream *con = NULL;
 
 	if (timer == _fast_ticks) {
-		for (; i; i++) {
+		for (ConnIterator i = XIDpairToSock.begin(); i; i++) {
 			if (i->second->get_type() == SOCK_STREAM &&
 					!i->second->reap)
 			{
@@ -777,7 +775,7 @@ void XTRANSPORT::run_timer(Timer *timer)
 				con->fasttimo();
 			}
 		}
-		for (; j; j++) {
+		for (ConnIterator j = XIDpairToConnectPending.begin(); j; j++) {
 			if (j->second->get_type() == SOCK_STREAM &&
 					!j->second->reap)
 			{
@@ -785,28 +783,31 @@ void XTRANSPORT::run_timer(Timer *timer)
 				con->fasttimo();
 			}
 		}
-		_fast_ticks->reschedule_after_msec(TCP_FAST_TICK_MS);
-	} else if (timer == _slow_ticks) {
-		for (; i; i++) {
-			if (i->second->get_type() == SOCK_STREAM &&
-					!i->second->reap)
-			{
-				con = dynamic_cast<XStream *>(i->second);
-				con->slowtimo();
+
+		// FIXME: uses a ratio make these fire less often
+		if (1) {
+			for (ConnIterator i = XIDpairToSock.begin(); i; i++) {
+				if (i->second->get_type() == SOCK_STREAM &&
+						!i->second->reap)
+				{
+					con = dynamic_cast<XStream *>(i->second);
+					con->slowtimo();
+				}
+			}
+			for (ConnIterator j = XIDpairToConnectPending.begin(); j; j++) {
+				if (j->second->get_type() == SOCK_STREAM &&
+						!j->second->reap)
+				{
+					con = dynamic_cast<XStream *>(j->second);
+					con->slowtimo();
+				}
 			}
 		}
-		for (; j; j++) {
-			if (j->second->get_type() == SOCK_STREAM &&
-					!j->second->reap)
-			{
-				con = dynamic_cast<XStream *>(j->second);
-				con->slowtimo();
-			}
-		}
-		_slow_ticks->reschedule_after_msec(TCP_SLOW_TICK_MS);
+		_fast_ticks->reschedule_after_msec(TCP_TICK_MS);
 		(globals()->tcp_now)++;
+
 	} else if (timer == _reaper) {
-		for (; i; i++) {
+		for (ConnIterator i = XIDpairToSock.begin(); i; i++) {
 			//INFO("This is %d, %d",i->second->id, i->second->reap);
 			if (i->second->reap)
 			{
