@@ -58,7 +58,7 @@
 #define MAX_QUERY_SIZE 10240            // the max length of sql query
 
 // use it to log into PostgreSQL
-#define DB_CONN_INFO "user=qdeng password=61333777 dbname=testdb"
+#define DB_CONN_INFO "user=dbarrett password=xia dbname=testdb"
 
 /**
  * Called by Xforked new process to handle a new connection from client

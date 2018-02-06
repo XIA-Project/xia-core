@@ -1,9 +1,19 @@
 #!/bin/bash
 
 sudo apt-get update -qq
-sudo apt-get install -qq -y git libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+sudo apt-get install -qq -y git libpq-dev libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
 
 sudo pip install pynacl
+sudo pip install psutil
+sudo pip install configparser
+sudo pip install ipaddress
+
+# needed for video broker
+sudo pip install rpyc
+sudo pip install msgpack
+sudo pip install pycountry
+sudo pip install dotmap
+sudo pip install simpleplotlib
 
 rel=$(lsb_release -d)
 
