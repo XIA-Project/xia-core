@@ -38,24 +38,54 @@ class Broker(rpyc.Service):
         msg(data)
 
 
-#
-#>>> scenario['cdn_locations'][26315].keys()
-#['city', 'bw_cost', 'country', 'isp', 'lon', 'state', 'lat', 'ecore', 'id', 'colo_cost']
-#
-#>>> scenario['cdn_locations'][26315]
-#{'city': 'DAEJEON', 'bw_cost': 27.76634054218598, 'country': 'KR', 'isp': 'KISTI-CJJ', 'lon': 127.417, 'state': 'N/A', 'lat': 36.3167, 'ecore': 'ECOR_7056', 'id': 26315, 'colo_cost': 36.7696}
-#
-# what are the cluster scores???
-#>>> scenario['client_locations'][7972]
-#{'cluster_scores': [[20308, 1880], [24785, 2000], [18591, 2200], ...], 'u1': 'A', 'cdn': 'AKAMAI', 'u3': 'Unknown', 'id': 24979, 'regression': [-1.7344193535791483, 2478.077704860205], 'connection_type': 4, 'city': 41480, 'u4': '876875182', 'lon': -76.7260436, 'u0': '0.0', 'object_id': 3032, 'u2': 'A', 'initial_cdn': 'AKAMAI', 'new_session': False, 'mgID': 7972, 'u17': '0', 'timestamp': 70, 'client_id': '2099112440,972236863,914697536,-1968451597,', 'lat': 34.7229391, 'bitrate': 200, 'asn': 7018, 'customer': 1960180524, 'initial_bitrate': -1, 'country': 'US'}
-#
 # >>> scenario['requests'][0]
 #{'cluster_scores': [[23269, 2], [23271, 2], [17214, 400] ...], 'u1': 'A', 'cdn': 'OTHER', 'u3': 'Unknown', 'id': 0, 'regression': [16.061720816622195, 27.822922678390853], 'connection_type': 5, 'city': 42774, 'u4': '1769885781', 'lon': -117.1610838, 'u0': '3.490961899641827E-5', 'object_id': 3002, 'u2': 'A', 'initial_cdn': 'AMAZON', 'new_session': False, 'mgID': 50066, 'u17': '0', 'timestamp': 0, 'client_id': '339614890,1244580285,-2057753536,934873289,', 'lat': 32.715738, 'bitrate': 7000, 'asn': 33363, 'customer': 1960180524, 'initial_bitrate': 1500, 'country': 'US'}]]
 #
-# unused keys
-#   scenario
-#     extra_requests []
-#     extra_cdn_capacity {}
+def load_requests():
+    msg('loading clients')
+    requests = []
+
+    client_list = config.items('clients')
+    for (client, value)  in client_list:
+        # we only want bare keys
+        if value != None and value != '':
+            continue
+
+        msg('loading client %s' % client)
+        request = {}
+
+        id = int(config.get(client, 'id'))
+        request['mgID'] = id
+        request['lat'] = float(config.get(client, 'lat'))
+        request['lon'] = float(config.get(client, 'lon'))
+
+        # is this going to be the ping data or some form of it?
+        request['cluster_scores'] = []
+        request['id'] = ''
+
+        request['asn'] = ''
+        request['bitrate'] = ''
+        request['cdn'] = ''
+        request['city'] = ''
+        request['client_id'] = ''
+        request['connection_type'] = ''
+        request['country'] = ''
+        request['customer'] = ''
+        request['initial_bitrate'] = ''
+        request['initial_cdn'] = ''
+        request['new_session'] = False
+        request['object_id'] = ''
+        request['regression'] = []
+        request['timestamp'] = ''
+        request['u0'] = ''
+        request['u1'] = ''
+        request['u2'] = ''
+        request['u3'] = ''
+        request['u4'] = ''
+        request['u17'] = ''
+
+        scenario['requests'].append(request)
+
 
 
 #>>> len(scenario['CDNs'])
@@ -63,13 +93,16 @@ class Broker(rpyc.Service):
 #>>> scenario['CDNs'][1]
 #[26374, 26439, 26654, 26397, 26324, 25983, 26562, 26577, 15459, 26589, 26636, 26496, 26667, 25328, 24002, 25563, 26662, 26621, 26556, 26552, 24160]
 def load_cdns():
+    msg('loading CDNs')
     cdns = []
+
     cdn_list = config.items('cdns')
     for (cdn, value)  in cdn_list:
         # we only want bare keys
         if value != None and value != '':
             continue
 
+        msg('loading CDN %s' % cdn)
         clusters = []
         for (cluster, value) in config.items(cdn):
             # we only want bare keys
@@ -77,23 +110,126 @@ def load_cdns():
                 continue
             clusters.append(int(config.get(cluster, 'id')))
 
+            load_cluster_location(cluster)
+
         cdns.append(clusters)
     scenario['CDNs'] = cdns
+
+
+
+
+#>>> scenario['cdn_locations'][26315].keys()
+#['city', 'bw_cost', 'country', 'isp', 'lon', 'state', 'lat', 'ecore', 'id', 'colo_cost']
+#
+#>>> scenario['cdn_locations'][26315]
+#{'city': 'DAEJEON', 'bw_cost': 27.76634054218598, 'country': 'KR', 'isp': 'KISTI-CJJ', 'lon': 127.417, 'state': 'N/A', 'lat': 36.3167, 'ecore': 'ECOR_7056', 'id': 26315, 'colo_cost': 36.7696}
+#
+def load_cluster_location(cluster):
+    msg('loading cluster location for %s' % cluster)
+    location =  {}
+
+    id = int(config.get(cluster, 'id'))
+    location['id'] = id
+    location['lat'] = float(config.get(cluster, 'lat'))
+    location['lon'] = float(config.get(cluster, 'lon'))
+
+    # FIXME: what does the cost need to look like? is our simple value good enough?
+    location['bw_cost'] = float(config.get(cluster, 'cost'))
+
+    # FIXME: do I need any of these?
+    location['city'] = ''
+    location['state'] = ''
+    location['country'] = ''
+    location['isp'] = ''
+    location['ecore'] = ''
+    location['colo_cost'] = 1.0
+
+    scenario['cdn_locations'][id] = location
+
+
+#>>> scenario['client_locations'][7972]
+#{'cluster_scores': [[20308, 1880], [24785, 2000], [18591, 2200], ...], 'u1': 'A', 'cdn': 'AKAMAI', 'u3': 'Unknown', 'id': 24979, 'regression': [-1.7344193535791483, 2478.077704860205],
+#    'connection_type': 4, 'city': 41480, 'u4': '876875182', 'lon': -76.7260436, 'u0': '0.0', 'object_id': 3032, 'u2': 'A', 'initial_cdn': 'AKAMAI', 'new_session': False, 'mgID': 7972,
+#    'u17': '0', 'timestamp': 70, 'client_id': '2099112440,972236863,914697536,-1968451597,', 'lat': 34.7229391, 'bitrate': 200, 'asn': 7018, 'customer': 1960180524, 'initial_bitrate': -1, 'country': 'US'}
+def load_client_locations():
+    msg('loading clients')
+    clients = {}
+
+    client_list = config.items('clients')
+    for (client, value)  in client_list:
+        # we only want bare keys
+        if value != None and value != '':
+            continue
+
+        msg('loading client %s' % client)
+        location = {}
+
+        id = int(config.get(client, 'id'))
+        location['mgID'] = id
+        location['lat'] = float(config.get(client, 'lat'))
+        location['lon'] = float(config.get(client, 'lon'))
+
+        # is this going to be the ping data or some form of it?
+        location['cluster_scores'] = []
+        location['id'] = ''
+
+        location['asn'] = ''
+        location['bitrate'] = ''
+        location['cdn'] = ''
+        location['city'] = ''
+        location['client_id'] = ''
+        location['connection_type'] = ''
+        location['country'] = ''
+        location['customer'] = ''
+        location['initial_bitrate'] = ''
+        location['initial_cdn'] = ''
+        location['new_session'] = False
+        location['object_id'] = ''
+        location['regression'] = []
+        location['timestamp'] = ''
+        location['u0'] = ''
+        location['u1'] = ''
+        location['u2'] = ''
+        location['u3'] = ''
+        location['u4'] = ''
+        location['u17'] = ''
+
+        scenario['client_locations'][id] = location
+
+
 
 #>>> scenario['bitrates']
 #{800: 0.0982909090909091, 200: 0.22323636363636365, 400: 0.07638181818181818, 7000: 0.25596363636363634, 3000: 0.17312727272727274, 1500: 0.173}
 #
 def load_bitrates():
+    msg('loading bitrate tables')
     bitrates = {}
     for (bitrate, value)  in config.items('bitrates'):
         bitrates[int(bitrate)] = float(value)
     scenario['bitrates'] = bitrates
 
+
+
+
 #>>> scenario.keys()
 #['cdn_locations', 'bitrates', 'CDNs', 'client_locations', 'extra_requests', 'requests', 'extra_cdn_capacity']
 def load_static_data():
-    load_cdns()
+    scenario['cdn_locations'] = {}
+    scenario['bitrates'] = {}
+    scenario['CDNs'] = []
+    scenario['client_locations'] = {}
+    scenario['requests'] = []
+
+    # FIXME: do I need these 2 in the data?
+    scenario['extra_requests'] = []
+    scenario['extra_cdn_capacity'] = {}
+
     load_bitrates()
+    load_cdns()
+    load_client_locations()
+    load_requests()
+
+
 
 #
 # display status message unless in stealth mode
@@ -104,6 +240,8 @@ def msg(str, *params):
             print str, params
         else:
             print str
+
+
 
 parser = argparse.ArgumentParser(description='gather CDN stats')
 parser.add_argument('-v', '--version', action='version', version=VER)
