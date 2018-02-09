@@ -33,10 +33,129 @@ scenario = {}
 
 
 class Broker(rpyc.Service):
-    def exposed_update_stats(self, stats):
+    #
+    # collect ping stats from client machines
+    # stats include ping latency and packet loss info from the client to each cluster
+    #
+    def exposed_update_client_stats(self, stats):
         data = msgpack.unpackb(stats)
-        msg(data)
+        msg('handling client update from %s' % data['name'])
 
+        id = int(data['id'])
+
+        # find or create new client_location entry
+        client = scenario['client_locations'][id]
+        if client == None:
+            client = make_client_record(stats['name'], stats['id'], stats['lat'], stats['lon'])
+            scenario['client_locations'][id] = client
+
+        # reset score  list
+        client['cluster_scores'] = []
+
+        for cluster, info  in data['clusters'].iteritems():
+            cluster_id = int(config.get(cluster, 'id'))
+            msg('cluster %s (%d) has %s %s' % (cluster, cluster_id, info['latency'], info['loss']))
+
+            # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
+            # lower is better
+            score = info['latency']
+            loss = info['loss']
+
+            if score == None or score < 0 or loss == 100:
+                score = 10000000000
+            else:
+                score *= 1000
+                score += (loss * 100)
+            client['cluster_scores'].append([cluster_id, score])
+
+
+    #
+    # get cache DAG from cdn hosts
+    #
+    def exposed_add_cdn_cluster(self, name, dag):
+        msg('adding dag to %s (%s)', name, dag)
+        id = int(config.get(name, 'id'))
+        scenario['cdn_locations'][id]['dag'] = dag
+        msg(scenario['cdn_locations'][id])
+
+    #
+    # get list of CIDs hosted by the calling CDN cluster
+    #
+    def exposed_register_cids(self, name, list):
+        id = int(config.get(name, 'id'))
+        msg('registering CIDs for %s' % name)
+
+        for cid in list:
+            if cid in scenario['cids']:
+                if id not in scenario['cids'][cid]:
+                    scenario['cids'][cid].append(id)
+                    msg('appending to %s' % cid)
+                else:
+                    msg('already in %s' % cid)
+            else:
+                scenario['cids'][cid] = [id]
+                msg('new entry for %s' % cid)
+        msg(scenario['cids'])
+
+
+    #
+    # remove list of cids from the broker's databae
+    def exposed_remove_cids(self, name, list):
+        id = int(config.get(name, 'id'))
+        msg('deregistering CIDs for %s' % name)
+
+        for cid in list:
+            if cid in scenario['cids']:
+                if id in scenario['cids'][cid]:
+                    msg('removing from %s' % cid)
+                    scenario['cids'][cid].remove(id)
+                    if len (scenario['cids'][cid]) == 0:
+                        scenario['cids'].pop(cid, None)
+                        msg('%s is empty, deleting...' % cid)
+        msg(scenario['cids'])
+
+
+    def exposed_get_cdn(self, client, cid, bitrate):
+        # get client id
+        # send info into engine
+        # return dag of requested cluster's cache
+        pass
+
+
+def make_client_record(name, id, lat, lon):
+        msg('creating client record for %s' % name)
+        client= {}
+
+        client['mgID'] = id
+        client['lat'] = lat
+        client['lon'] = lon
+
+        # is this going to be the ping data or some form of it?
+        client['cluster_scores'] = []
+        client['id'] = ''
+
+        client['asn'] = ''
+        client['bitrate'] = ''
+        client['cdn'] = ''
+        client['city'] = ''
+        client['client_id'] = ''
+        client['connection_type'] = ''
+        client['country'] = ''
+        client['customer'] = ''
+        client['initial_bitrate'] = ''
+        client['initial_cdn'] = ''
+        client['new_session'] = False
+        client['object_id'] = ''
+        client['regression'] = []
+        client['timestamp'] = ''
+        client['u0'] = ''
+        client['u1'] = ''
+        client['u2'] = ''
+        client['u3'] = ''
+        client['u4'] = ''
+        client['u17'] = ''
+
+        return client
 
 # >>> scenario['requests'][0]
 #{'cluster_scores': [[23269, 2], [23271, 2], [17214, 400] ...], 'u1': 'A', 'cdn': 'OTHER', 'u3': 'Unknown', 'id': 0, 'regression': [16.061720816622195, 27.822922678390853], 'connection_type': 5, 'city': 42774, 'u4': '1769885781', 'lon': -117.1610838, 'u0': '3.490961899641827E-5', 'object_id': 3002, 'u2': 'A', 'initial_cdn': 'AMAZON', 'new_session': False, 'mgID': 50066, 'u17': '0', 'timestamp': 0, 'client_id': '339614890,1244580285,-2057753536,934873289,', 'lat': 32.715738, 'bitrate': 7000, 'asn': 33363, 'customer': 1960180524, 'initial_bitrate': 1500, 'country': 'US'}]]
@@ -162,38 +281,12 @@ def load_client_locations():
             continue
 
         msg('loading client %s' % client)
-        location = {}
 
         id = int(config.get(client, 'id'))
-        location['mgID'] = id
-        location['lat'] = float(config.get(client, 'lat'))
-        location['lon'] = float(config.get(client, 'lon'))
+        lat = float(config.get(client, 'lat'))
+        lon = float(config.get(client, 'lon'))
 
-        # is this going to be the ping data or some form of it?
-        location['cluster_scores'] = []
-        location['id'] = ''
-
-        location['asn'] = ''
-        location['bitrate'] = ''
-        location['cdn'] = ''
-        location['city'] = ''
-        location['client_id'] = ''
-        location['connection_type'] = ''
-        location['country'] = ''
-        location['customer'] = ''
-        location['initial_bitrate'] = ''
-        location['initial_cdn'] = ''
-        location['new_session'] = False
-        location['object_id'] = ''
-        location['regression'] = []
-        location['timestamp'] = ''
-        location['u0'] = ''
-        location['u1'] = ''
-        location['u2'] = ''
-        location['u3'] = ''
-        location['u4'] = ''
-        location['u17'] = ''
-
+        location = make_client_record(client, id, lat, lon)
         scenario['client_locations'][id] = location
 
 
@@ -219,6 +312,7 @@ def load_static_data():
     scenario['CDNs'] = []
     scenario['client_locations'] = {}
     scenario['requests'] = []
+    scenario['cids'] = {}
 
     # FIXME: do I need these 2 in the data?
     scenario['extra_requests'] = []
@@ -260,7 +354,7 @@ except Exception as err:
 
 load_static_data()
 print scenario
-sys.exit(0)
+#sys.exit(0)
 
 from rpyc.utils.server import ThreadedServer
 t = ThreadedServer(Broker, port=44444)
