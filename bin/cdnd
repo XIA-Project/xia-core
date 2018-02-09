@@ -40,22 +40,32 @@ host = 'cluster0'
 cdn1 = ['abc', 'def', 'ghi', 'jkl']
 cdn2 = ['abc', 'def', 'mno', 'pqr']
 cdn3 = ['abc', 'pqr']
+cdn4 = ['def']
 
 try:
     broker=rpyc.connect(BROKER, PORT)
     print 'connected to broker: %s:%s' % (BROKER, PORT)
 
     # try adding a cdn cluster
-    broker.root.add_cdn_cluster('cluster0', 'dag-for-cluster-0')
-    broker.root.add_cdn_cluster('cluster1', 'cluster 1''s dag')
+    broker.root.add_cdn_cluster('cluster0', 'cluster-0-dag')
+    broker.root.add_cdn_cluster('cluster1', 'cluster 1-dag')
+    broker.root.add_cdn_cluster('cluster2', 'cluster 2-dag')
+    broker.root.add_cdn_cluster('cluster3', 'cluster 3-dag')
+    broker.root.add_cdn_cluster('cluster4', 'cluster 4-dag')
 
     # test cid list updates
     broker.root.register_cids( 'cluster0', cdn1)
     broker.root.register_cids( 'cluster0', cdn1)
     broker.root.register_cids( 'cluster1', cdn2)
+    broker.root.register_cids( 'cluster2', cdn4)
+    broker.root.register_cids( 'cluster3', cdn4)
+    broker.root.register_cids( 'cluster4', cdn4)
 
     broker.root.remove_cids('cluster1', cdn3)
     broker.root.remove_cids('cluster0', cdn3)
+
+    for i in range(0, 20):
+        print broker.root.get_cdn('host1', 'def', 200)
 
 except Exception as err:
     print 'Unable to connect to the broker on %s:%s: %s' % (BROKER, PORT, str(err))
