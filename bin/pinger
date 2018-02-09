@@ -69,9 +69,9 @@ def ping(dag):
 
 def update_stats():
     host = {'name' : hostname,
-            'id' : config.get(hostname, 'id'),
+            'id' : int(config.get(hostname, 'id')),
             'latitude' : config.get(hostname, 'lat'),
-            'longitude' : config.get(hostname, 'long'),
+            'longitude' : config.get(hostname, 'lon'),
             'clusters' : {}
             }
     try:
@@ -88,16 +88,18 @@ def update_stats():
 
                 address = config.get(cluster, 'address')
                 latency, loss = ping(address)
+                if latency == None:
+                    latency = -1
                 msg('        latency:%s loss:%s%%' % (latency, loss))
 
-                host['clusters'][cluster] = {'latency':latency, 'loss':loss, 'id' : config.get(cluster, 'id')}
+                host['clusters'][cluster] = {'latency':int(latency), 'loss':int(loss), 'id' : int(config.get(cluster, 'id'))}
     except Exception as err:
         print 'Error: %s' % str(err)
         sys.exit(-1)
 
     try:
         host_msg = msgpack.packb(host)
-        broker.root.update_stats(host_msg)
+        broker.root.update_client_stats(host_msg)
     except Exception as err:
         print 'Error unable to send data: %s' % str(err)
         sys.exit(-1)
