@@ -23,5 +23,8 @@ void FSWorker::operator() (unsigned int id) {
 
 		// Schedule work
 		work->process();
+
+		// Now destroy the work object and free its resources
+		delete work;
 	}
 }

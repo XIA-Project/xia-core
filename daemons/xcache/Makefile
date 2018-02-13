@@ -5,7 +5,7 @@ VPATH=../common
 PROTOS		:= $(wildcard *.proto)
 PROTO_SRCS	:= $(PROTOS:.proto=.pb.cc)
 
-SUBDIRS=publisher
+SUBDIRS=publisher fs
 XCACHE=$(BINDIR)/xcache
 CLEAN=$(addsuffix .build, $(SUBDIRS))
 

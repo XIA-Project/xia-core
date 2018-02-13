@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+message InterestRequest {
+	required string chunk_addr = 1;
+	required string return_addr = 2;
+	required bytes signature = 3;
+}
