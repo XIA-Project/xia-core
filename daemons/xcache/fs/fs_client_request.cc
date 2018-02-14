@@ -1,5 +1,6 @@
 // Project includes
 #include "fs_client_request.h"
+#include "fs_fetch_request.h"
 
 // XIA includes
 #include "Xsocket.h"
@@ -77,16 +78,16 @@ void FSClientRequest::process()
 		std::cout << "Entire client request not received" << std::endl;
 		return;
 	}
+
 	// Retrieve interest request from client protobuf
 	// and convert it into a request to fetch the actual chunk
-	/*
-	FSWorkRequest *work = FSFetchRequest::from_client(buf, req_len);
+	std::string client_buf(buf, req_len);
+	FSWorkRequest *work = FSFetchRequest::from_client(client_buf);
 	if(work == nullptr) {
 		std::cout << "Bad request from client" << std::endl;
 		return;
 	}
 	_pool->queue_work(work);
-	*/
 
 	// Validate the request
 	// Queue up a fetch request to initiate the fetch
