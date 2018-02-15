@@ -3,6 +3,7 @@
 
 #include "fs_work_request.h"
 #include "fs_thread_pool.h"
+#include "fs_irq_table.h"
 #include "irq.pb.h"
 
 #include <chrono>
@@ -19,9 +20,12 @@ class FSFetchRequest : public FSWorkRequest {
 		virtual ~FSFetchRequest();
 		virtual void process();
 	private:
+		std::string chunk_id();
+
 		std::string _chunk_addr;
 		std::string _return_addr;
 		std::string _signature;
 		FSThreadPool *_pool;
+		FSIRQTable *_irqtable;
 };
 #endif //FS_FETCH_REQUEST_H
