@@ -6,7 +6,8 @@ PROTOS := $(wildcard *.proto)
 PROTO_SRCS := $(PROTOS:.proto=.pb.cc)
 
 SOURCES=fs.cc fs_client_request.cc fs_thread_pool.cc fs_worker.cc \
-		fs_fetch_request.cc fs_irq_table.cc $(PROTO_SRCS)
+		fs_fetch_request.cc fs_irq_table.cc fs_push_request.cc \
+		$(PROTO_SRCS)
 
 OBJECTS=$(SOURCES:.cc=.o)
 FS=$(BINDIR)/fs

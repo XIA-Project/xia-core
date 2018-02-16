@@ -44,3 +44,22 @@ bool FSIRQTable::add_fetch_request(std::string cid, std::string requestor)
 	// If yes, append requestor to the chunk_id entry in table
 	return true;
 }
+
+RequestorList FSIRQTable::requestors(std::string cid)
+{
+	RequestorList requestors;
+
+	// Hold a lock to the table
+	std::lock_guard<std::mutex> lock(irq_table_lock);
+
+	// Fetch list of all requestors for this chunk
+	requestors = _irqtable[cid];
+
+	// Now remove entry for this CID from the table
+	// If a caller requests list and is unable to serve every requestor
+	// on the list; It is their responsibility to reinstate entries in table
+	_irqtable.erase(cid);
+
+	// Remove entry for chunk from the table
+	return requestors;
+}

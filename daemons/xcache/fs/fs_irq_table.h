@@ -12,6 +12,7 @@ class FSIRQTable {
 	public:
 		static FSIRQTable *get_table();
 		bool add_fetch_request(std::string cid, std::string requestor);
+		RequestorList requestors(std::string cid);
 	protected:
 		FSIRQTable();
 		~FSIRQTable();

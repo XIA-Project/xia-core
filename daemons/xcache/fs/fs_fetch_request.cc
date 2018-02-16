@@ -1,5 +1,6 @@
 // Project includes
 #include "fs_fetch_request.h"
+#include "fs_push_request.h"
 #include "fs_irq_table.h"
 
 // XIA includes
@@ -24,6 +25,7 @@ FSFetchRequest::FSFetchRequest(InterestRequest &irq)
 
 FSFetchRequest::~FSFetchRequest()
 {
+	XcacheHandleDestroy(&_xcache);
 }
 
 FSFetchRequest *FSFetchRequest::from_client(std::string &buf)
@@ -64,6 +66,8 @@ void FSFetchRequest::process()
 	sockaddr_x addr;
 	g.fill_sockaddr(&addr);
 
+	// TODO: Do we need to guard against multiple threads fetching a chunk?
+	// I believe xcache deduplicates the requests but confirm
 	void *buf;
 	if(XfetchChunk(&_xcache, &buf, 0, &addr, sizeof(addr)) < 0) {
 		std::cout << "Failed fetching chunk " << _chunk_addr << std::endl;
@@ -74,11 +78,16 @@ void FSFetchRequest::process()
 	// We don't need the chunk contents. It just needs to be in local cache
 	free(buf);
 
-	// Now queue up a task to push the chunk back to the requestors
-	/*
-	FSWorkRequest *work = FSPushRequest(chunk_id(), _return_addr);
-	_pool->queue_work(work);
-	*/
+	// Get the list of requestors for this chunk and remove them from table
+	RequestorList requestors = _irqtable->requestors(cid);
+	RequestorList::iterator it;
+	for(it=requestors.begin(); it!=requestors.end(); it++) {
+
+		// Now queue up a task to push the chunk back to each requestor
+		FSWorkRequest *work = new FSPushRequest(chunk_id(), *it);
+		_pool->queue_work(work);
+
+	}
 
 	return;
 }
