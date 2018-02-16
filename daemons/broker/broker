@@ -21,9 +21,11 @@ import rpyc
 import random
 import msgpack
 import argparse
+import threading
 import subprocess
 import numpy as np
 from configparser import ConfigParser
+from rpyc.utils.server import ThreadedServer
 
 import framework
 
@@ -381,6 +383,15 @@ def msg(str, *params):
         else:
             print str
 
+
+def compute_bids():
+    while True:
+        bids = framework.GetBids()
+        accepted_bids = framework.Optimize(bids)
+        print accepted_bids
+        time.sleep(5)
+
+
 parser = argparse.ArgumentParser(description='gather CDN stats')
 parser.add_argument('-v', '--version', action='version', version=VER)
 parser.add_argument('-V', '--verbose', action='store_true', help='print status messages')
@@ -399,14 +410,13 @@ except Exception as err:
     sys.exit(-1)
 
 scenario = BrokerScenario()
-
-#framework.Scenario = scenario.scenario
 framework.SetupScenario(scenario.scenario)
-bids = framework.GetBids()
-accepted_bids = framework.Optimize(bids)
-print accepted_bids
 
-from rpyc.utils.server import ThreadedServer
+
+t = threading.Thread(target = compute_bids)
+t.start()
+
 t = ThreadedServer(Broker, port=44444)
 msg('Starting broker service on port %s' % args.port)
 t.start()
+

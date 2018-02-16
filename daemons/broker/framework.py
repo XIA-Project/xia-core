@@ -440,8 +440,7 @@ def Optimize(bids):
 def GetBids():
     print 'starting cdn bids'
     p = Pool(cpu_count())
-    #cdns_bids = p.map(GetCDNBids, xrange(len(Scenario['CDNs'])))
-    cdns_bids = map(GetCDNBids, xrange(len(Scenario['CDNs'])))
+    cdns_bids = p.map(GetCDNBids, xrange(len(Scenario['CDNs'])))
     p.close()
     print 'done cdn bids'
 
