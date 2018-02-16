@@ -5,6 +5,9 @@
 #include <vector>
 #include <unordered_map>
 
+typedef std::vector<std::string> RequestorList;
+typedef std::unordered_map<std::string, RequestorList> InterestRequestTable;
+
 class FSIRQTable {
 	public:
 		static FSIRQTable *get_table();
@@ -16,6 +19,6 @@ class FSIRQTable {
 		std::mutex irq_table_lock;
 		static FSIRQTable* _instance;
 
-		std::unordered_map<std::string, std::vector<std::string>> _irqtable;
+		InterestRequestTable _irqtable;
 };
 #endif //_FS_IRQ_TABLE_H_
