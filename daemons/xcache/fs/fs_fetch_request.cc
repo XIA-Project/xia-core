@@ -16,6 +16,10 @@ FSFetchRequest::FSFetchRequest(InterestRequest &irq)
 	_signature = irq.signature();
 	_pool = FSThreadPool::get_pool();
 	_irqtable = FSIRQTable::get_table();
+	if(XcacheHandleInit(&_xcache) < 0) {
+		std::cout << "Failed talking to Xcache" << std::endl;
+		throw "XcacheHandleInit failed";
+	}
 }
 
 FSFetchRequest::~FSFetchRequest()
@@ -45,14 +49,36 @@ void FSFetchRequest::process()
 	std::string cid = chunk_id();
 	// Check if the chunk is locally available
 	// If local, simply queue up a FSPushRequest for the chunk
+
 	// See if the requested chunk is already listed in IRQ Table
+	// If yes, append requestor to the list of entities requesting it
+	// If not, create a new IRQ Table entry for this chunk
 	if(_irqtable->add_fetch_request(cid, _return_addr) == false) {
 
 		std::cout << "Failed accounting for fetch request" << std::endl;
 		return;
 	}
-	// If yes, append requestor to the list of entities requesting it
-	// If not, create a new IRQ Table entry for this chunk
+	// The chunk is not local, so fetch it. Synchronously for now.
+	// TODO: Do asynchronous fetch to avoid blocking a thread
+	Graph g(_chunk_addr);
+	sockaddr_x addr;
+	g.fill_sockaddr(&addr);
+
+	void *buf;
+	if(XfetchChunk(&_xcache, &buf, 0, &addr, sizeof(addr)) < 0) {
+		std::cout << "Failed fetching chunk " << _chunk_addr << std::endl;
+		// TODO: Send error by queuing FSErrorPushRequest
+		// TODO: Remove CID from FSIRQTable also
+		return;
+	}
+	// We don't need the chunk contents. It just needs to be in local cache
+	free(buf);
+
+	// Now queue up a task to push the chunk back to the requestors
+	/*
+	FSWorkRequest *work = FSPushRequest(chunk_id(), _return_addr);
+	_pool->queue_work(work);
+	*/
 
 	return;
 }

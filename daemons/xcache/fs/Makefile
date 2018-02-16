@@ -12,7 +12,7 @@ OBJECTS=$(SOURCES:.cc=.o)
 FS=$(BINDIR)/fs
 
 CFLAGS+=-I$(APIDIR)/include -I../../common -L$(XLIB) -Wall
-LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lprotobuf -Wl,-rpath,$(XLIB)
+LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lxcache -lprotobuf -Wl,-rpath,$(XLIB)
 
 all: $(PROTO_SRCS) $(FS)
 
