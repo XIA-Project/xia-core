@@ -85,6 +85,11 @@ private:
 	struct xcache_context *lookup_context(int);
 
 	/**
+	 * Check if the requested cid is in local storage
+	 */
+	bool is_content_local(std::string cid);
+
+	/**
 	 * Manages various content stores.
 	 * @See file store.h for details.
 	 */
@@ -140,6 +145,11 @@ public:
 	static void *__fetch_content(void *__args);
 
 	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
+
+	/**
+	 * Simply check if the intent CID in the given DAG is local
+	 */
+	int xcache_is_content_local(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Fetch named content from Xcache.

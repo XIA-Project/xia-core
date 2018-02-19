@@ -26,6 +26,7 @@ class FSFetchRequest : public FSWorkRequest {
 		virtual void process();
 	private:
 		std::string chunk_id();
+		void pushChunkTo(std::string requestor);
 
 		std::string _chunk_addr;
 		std::string _return_addr;

@@ -828,6 +828,43 @@ int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
 }
 
 /*!
+ * @brief check if a chunk is cached in the local cache
+ *
+ * Requests the local Xcache to check if the requested chunk is in the
+ * local cache.
+ *
+ * @returns 1 if the chunk in local
+ * @returns 0 if the chunk was not found in local cache
+ * @returns -1 if there was an error
+ */
+int XisChunkLocal(XcacheHandle *h, const char *chunk)
+{
+	// Send a request to Xcache to see if the chunk is local
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_ISLOCAL);
+	cmd.set_cid(chunk);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error sending isLocal command to Xcache\n");
+		return -1;
+	}
+
+	// Synchronously wait for Xcache response
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Invalid isLocal response from Xcache\n");
+		return -1;
+	}
+
+	// Return 1 only if xcache explicitly told us that the chunk is local
+	if(cmd.cmd() == xcache_cmd::XCACHE_ISLOCAL
+			&& cmd.status() == xcache_cmd::XCACHE_OK) {
+		return 1;
+	}
+
+	// The chunk was not local
+	return 0;
+}
+
+/*!
 ** @brief fetch a chunk from the network
 **
 ** Fetches the specified chunk from the network. The chunk is retrieved from the origin server specified

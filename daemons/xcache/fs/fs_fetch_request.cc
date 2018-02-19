@@ -43,6 +43,13 @@ FSFetchRequest *FSFetchRequest::from_client(std::string &buf)
 	return req;
 }
 
+// Queue up a task to push this chunk to the requestor address
+void FSFetchRequest::pushChunkTo(std::string requestor)
+{
+	FSWorkRequest *work = new FSPushRequest(chunk_id(), requestor);
+	_pool->queue_work(work);
+}
+
 // ASSUME: An accepted socket for a fetch connection is available
 // Interact with the fetch and retrieve their request for content
 void FSFetchRequest::process()
@@ -52,7 +59,12 @@ void FSFetchRequest::process()
 	bool fetch_needed = false;
 
 	// Check if the chunk is locally available
-	// If local, simply queue up a FSPushRequest for the chunk
+	if(XisChunkLocal(&_xcache, cid.c_str())) {
+
+		// If local, simply queue up a FSPushRequest for the chunk
+		pushChunkTo(_return_addr);
+		return;
+	}
 
 	// See if the requested chunk is already listed in IRQ Table
 	if(_irqtable->has_entry(cid)) {
@@ -92,12 +104,10 @@ void FSFetchRequest::process()
 	// Get the list of requestors for this chunk and remove them from table
 	RequestorList requestors = _irqtable->requestors(cid);
 	RequestorList::iterator it;
+
+	// Now queue up work to push the chunks to all requestors
 	for(it=requestors.begin(); it!=requestors.end(); it++) {
-
-		// Now queue up a task to push the chunk back to each requestor
-		FSWorkRequest *work = new FSPushRequest(chunk_id(), *it);
-		_pool->queue_work(work);
-
+		pushChunkTo(*it);
 	}
 
 	return;

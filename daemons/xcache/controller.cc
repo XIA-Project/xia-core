@@ -294,6 +294,25 @@ fetch_content_remote_done:
 }
 
 /*!
+ * @brief Check if the given CID is in local storage
+ *
+ * Acquire metadata and ensure that the requested content is in local
+ * storage. This is useful for services like Fetching Service that
+ * can immediately return local content separately from remote fetching.
+ *
+ * @returns true if the content is local
+ * @returns false if the content is remote or unavailable
+ */
+bool xcache_controller::is_content_local(std::string cid)
+{
+	xcache_meta *meta = acquire_meta(cid);
+	if(meta && meta->state() == AVAILABLE) {
+		return true;
+	}
+	return false;
+}
+
+/*!
  * @brief Fetch content from local storage
  *
  * Fetch the requested content from local storage, if available.
@@ -465,6 +484,23 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 	}
 
 	return ret;
+}
+
+int xcache_controller::xcache_is_content_local(xcache_cmd *resp,
+		xcache_cmd *cmd)
+{
+	// Unless we find the chunk, we return code XCACHE_ERROR to caller
+	resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
+	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+
+	// Look for the cid requested by the caller
+	std::string cid(cmd->cid());
+	xcache_meta *meta = acquire_meta(cid);
+	if(meta && meta->state() == AVAILABLE) {
+		resp->set_status(xcache_cmd::XCACHE_OK);
+		resp->set_cmd(xcache_cmd::XCACHE_ISLOCAL);
+	}
+	return RET_SENDRESP;
 }
 
 int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
@@ -670,6 +706,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_EVICT:
 	case xcache_cmd::XCACHE_STORE:
 	case xcache_cmd::XCACHE_STORE_NAMED:
+	case xcache_cmd::XCACHE_ISLOCAL:
 	case xcache_cmd::XCACHE_FETCHCHUNK:
 	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
 	case xcache_cmd::XCACHE_PUSHCHUNK:
@@ -1257,6 +1294,16 @@ void xcache_controller::process_req(xcache_req *req)
 	case xcache_cmd::XCACHE_STORE:
 		// Store a chunk provided by the user, creates CID
 		ret = store(&resp, (xcache_cmd *)req->data, req->ttl);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_ISLOCAL:
+		// Check if the cid is local
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_is_content_local(&resp, cmd);
+		syslog(LOG_INFO, "xcache::is_content_local returned %d", ret);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
