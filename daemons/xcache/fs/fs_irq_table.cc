@@ -21,6 +21,16 @@ FSIRQTable::~FSIRQTable()
 	_instance = 0;
 }
 
+bool FSIRQTable::has_entry(std::string cid)
+{
+	std::lock_guard<std::mutex> lock(irq_table_lock);
+	auto irq = _irqtable.find(cid);
+	if(irq == _irqtable.end()) {
+		return false;
+	}
+	return true;
+}
+
 bool FSIRQTable::add_fetch_request(std::string cid, std::string requestor)
 {
 	// TODO: Sanity check that the requestor is a valid graph
@@ -41,7 +51,6 @@ bool FSIRQTable::add_fetch_request(std::string cid, std::string requestor)
 	// TODO: Make sure there are no duplicates in requestor list
 	_irqtable[cid].push_back(requestor);
 
-	// If yes, append requestor to the chunk_id entry in table
 	return true;
 }
 

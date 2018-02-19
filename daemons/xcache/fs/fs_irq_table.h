@@ -11,6 +11,7 @@ typedef std::unordered_map<std::string, RequestorList> InterestRequestTable;
 class FSIRQTable {
 	public:
 		static FSIRQTable *get_table();
+		bool has_entry(std::string cid);
 		bool add_fetch_request(std::string cid, std::string requestor);
 		RequestorList requestors(std::string cid);
 	protected:

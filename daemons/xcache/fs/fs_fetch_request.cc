@@ -49,32 +49,43 @@ void FSFetchRequest::process()
 {
 	std::cout << "Fetching a chunk" << std::endl;
 	std::string cid = chunk_id();
+	bool fetch_needed = false;
+
 	// Check if the chunk is locally available
 	// If local, simply queue up a FSPushRequest for the chunk
 
 	// See if the requested chunk is already listed in IRQ Table
-	// If yes, append requestor to the list of entities requesting it
-	// If not, create a new IRQ Table entry for this chunk
-	if(_irqtable->add_fetch_request(cid, _return_addr) == false) {
+	if(_irqtable->has_entry(cid)) {
+		fetch_needed = true;
+	}
 
+	// Add or append _return_addr to the IRQTable entry for cid
+	if(_irqtable->add_fetch_request(cid, _return_addr) == false) {
 		std::cout << "Failed accounting for fetch request" << std::endl;
 		return;
 	}
-	// The chunk is not local, so fetch it. Synchronously for now.
+
+	// Fetch is only needed for the first request for a CID
+	if(!fetch_needed) {
+		return;
+	}
+
 	// TODO: Do asynchronous fetch to avoid blocking a thread
 	Graph g(_chunk_addr);
 	sockaddr_x addr;
 	g.fill_sockaddr(&addr);
 
 	// TODO: Do we need to guard against multiple threads fetching a chunk?
-	// I believe xcache deduplicates the requests but confirm
+	// Mitigating this by doing a fetch only for the first request for cid
+	// I believe xcache also deduplicates the requests but confirm
 	void *buf;
 	if(XfetchChunk(&_xcache, &buf, 0, &addr, sizeof(addr)) < 0) {
 		std::cout << "Failed fetching chunk " << _chunk_addr << std::endl;
 		// TODO: Send error by queuing FSErrorPushRequest
-		// TODO: Remove CID from FSIRQTable also
+		// TODO: Remove CID from FSIRQTable; Send error message to requestors
 		return;
 	}
+
 	// We don't need the chunk contents. It just needs to be in local cache
 	free(buf);
 
