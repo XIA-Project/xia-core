@@ -14,247 +14,33 @@
 # limitations under the License.
 
 import os
-import re
 import sys
 import time
 import rpyc
 import random
+import logging
+import logging.handlers
 import msgpack
 import argparse
 import threading
-import subprocess
-import numpy as np
-from configparser import ConfigParser
 from rpyc.utils.server import ThreadedServer
 
-import framework
+from scenario import Scenario
+import vdx
 
+VER='1.0'
 
+# FIXME: rpyc config - will go away when switching to xsockets and protobugfs
+PORT='44444'
+
+# default scenario config file
+CONF='etc/scenario.conf'
+
+# FIXME: we get the path in order to get the module to get the path!
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 sys.path.append(os.path.join(srcdir, "bin"))
 import xiapyutils
-
-VER='1.0'
-PORT='44444'
-CONF='etc/scenario.conf'
 CONFPATH=os.path.join(xiapyutils.xia_srcdir(), CONF)
-
-class BrokerScenario:
-    #>>> scenario.keys()
-    #['cdn_locations', 'bitrates', 'CDNs', 'client_locations', 'extra_requests', 'requests', 'extra_cdn_capacity']
-    def __init__(self):
-        self.scenario = {}
-        self.scenario['cdn_locations'] = {}
-        self.scenario['bitrates'] = {}
-        self.scenario['CDNs'] = []
-        self.scenario['client_locations'] = {}
-        self.scenario['requests'] = []
-        self.scenario['capacities'] = {}
-        self.scenario['median_capacity'] = {}
-        self.scenario['CDN_standard_price'] = []
-
-        self.scenario['cids'] = {}
-
-        # FIXME: do I need these 2 in the data?
-#        self.scenario['extra_requests'] = []
-#        self.scenario['extra_cdn_capacity'] = {}
-
-        self.load_bitrates()
-        self.load_cdns()
-        self.load_client_locations()
-
-        # requests should probably start out as empty
-        self.load_requests()
-
-
-    def make_client_record(self, name, id, lat, lon):
-        msg('creating client record for %s' % name)
-        client= {}
-
-        client['mgID'] = id
-        client['lat'] = lat
-        client['lon'] = lon
-        client['timestamp'] = int(time.time())
-
-        # is this going to be the ping data or some form of it?
-        client['cluster_scores'] = []
-        client['id'] = ''
-
-        client['asn'] = ''
-        client['bitrate'] = ''
-        client['cdn'] = ''
-        client['city'] = ''
-        client['client_id'] = ''
-        client['connection_type'] = ''
-        client['country'] = ''
-        client['customer'] = ''
-        client['initial_bitrate'] = ''
-        client['initial_cdn'] = ''
-        client['new_session'] = False
-        client['object_id'] = ''
-        client['regression'] = []
-        client['u0'] = ''
-        client['u1'] = ''
-        client['u2'] = ''
-        client['u3'] = ''
-        client['u4'] = ''
-        client['u17'] = ''
-
-        return client
-
-
-    # >>> scenario['requests'][0]
-    #{'cluster_scores': [[23269, 2], [23271, 2], [17214, 400] ...], 'u1': 'A', 'cdn': 'OTHER', 'u3': 'Unknown', 'id': 0, 'regression': [16.061720816622195, 27.822922678390853], 'connection_type': 5, 'city': 42774, 'u4': '1769885781', 'lon': -117.1610838, 'u0': '3.490961899641827E-5', 'object_id': 3002, 'u2': 'A', 'initial_cdn': 'AMAZON', 'new_session': False, 'mgID': 50066, 'u17': '0', 'timestamp': 0, 'client_id': '339614890,1244580285,-2057753536,934873289,', 'lat': 32.715738, 'bitrate': 7000, 'asn': 33363, 'customer': 1960180524, 'initial_bitrate': 1500, 'country': 'US'}]]
-    #
-    def load_requests(self):
-        msg('loading clients')
-        requests = []
-
-        client_list = config.items('clients')
-        for (client, value)  in client_list:
-            # we only want bare keys
-            if value != None and value != '':
-                continue
-
-            msg('loading client %s' % client)
-            request = {}
-
-            id = config.getint(client, 'id')
-            lat = config.getfloat(client, 'lat')
-            lon = config.getfloat(client, 'lon')
-
-            request = self.make_client_record(client, id, lat, lon)
-
-            request['bitrate'] = 1500
-
-            self.scenario['requests'].append(request)
-
-
-
-    #>>> len(scenario['CDNs'])
-    #14
-    #>>> scenario['CDNs'][1]
-    #[26374, 26439, 26654, 26397, 26324, 25983, 26562, 26577, 15459, 26589, 26636, 26496, 26667, 25328, 24002, 25563, 26662, 26621, 26556, 26552, 24160]
-    def load_cdns(self):
-        msg('loading CDNs')
-        cdns = []
-        median_capacity = []
-
-        cdn_list = config.items('cdns')
-        for cdn, value in cdn_list:
-            # we only want bare keys
-            if value != None and value != '':
-                continue
-
-            msg('loading CDN %s' % cdn)
-            clusters = []
-            for (cluster, value) in config.items(cdn):
-                # we only want bare keys
-                if value != None and value != '':
-                    continue
-                cdn_id = config.getint(cdn, 'id')
-                cluster_id = config.getint(cluster, 'id')
-                capacity = config.getint(cluster, 'capacity')
-
-                clusters.append(cluster_id)
-                self.load_cluster_location(cluster)
-
-                if cdn_id == 1:
-
-                    self.scenario['capacities'][(cdn_id, cluster_id)] = 7000
-                else:
-                    self.scenario['capacities'][(cdn_id, cluster_id)] = self.max_bitrate * capacity
-
-
-                # FIXME see framework.py line 174
-                # is this the right thing to do here??
-                # since we have small #'s of connection in the scenario, don't scale anything up
-                median_capacity.append(self.scenario['capacities'][(cdn_id, cluster_id)])
-
-
-
-            cdns.append(clusters)
-        self.scenario['CDNs'] = cdns
-
-
-
-
-
-
-    #>>> scenario['cdn_locations'][26315].keys()
-    #['city', 'bw_cost', 'country', 'isp', 'lon', 'state', 'lat', 'ecore', 'id', 'colo_cost']
-    #
-    #>>> scenario['cdn_locations'][26315]
-    #{'city': 'DAEJEON', 'bw_cost': 27.76634054218598, 'country': 'KR', 'isp': 'KISTI-CJJ', 'lon': 127.417, 'state': 'N/A', 'lat': 36.3167, 'ecore': 'ECOR_7056', 'id': 26315, 'colo_cost': 36.7696}
-    #
-    def load_cluster_location(self, cluster):
-        msg('loading cluster location for %s' % cluster)
-        location =  {}
-
-        id = config.getint(cluster, 'id')
-        location['id'] = id
-        location['lat'] = config.getfloat(cluster, 'lat')
-        location['lon'] = config.getfloat(cluster, 'lon')
-
-        # FIXME: what does the cost need to look like? is our simple value good enough?
-        location['bw_cost'] = config.getfloat(cluster, 'cost')
-
-        # FIXME: do I need any of these?
-        location['city'] = ''
-        location['state'] = ''
-        location['country'] = ''
-        location['isp'] = ''
-        location['ecore'] = ''
-        location['colo_cost'] = 1.0
-
-        self.scenario['cdn_locations'][id] = location
-
-
-    #>>> scenario['client_locations'][7972]
-    #{'cluster_scores': [[20308, 1880], [24785, 2000], [18591, 2200], ...], 'u1': 'A', 'cdn': 'AKAMAI', 'u3': 'Unknown', 'id': 24979, 'regression': [-1.7344193535791483, 2478.077704860205],
-    #    'connection_type': 4, 'city': 41480, 'u4': '876875182', 'lon': -76.7260436, 'u0': '0.0', 'object_id': 3032, 'u2': 'A', 'initial_cdn': 'AKAMAI', 'new_session': False, 'mgID': 7972,
-    #    'u17': '0', 'timestamp': 70, 'client_id': '2099112440,972236863,914697536,-1968451597,', 'lat': 34.7229391, 'bitrate': 200, 'asn': 7018, 'customer': 1960180524, 'initial_bitrate': -1, 'country': 'US'}
-    def load_client_locations(self):
-        msg('loading clients')
-        clients = {}
-
-        client_list = config.items('clients')
-        for (client, value)  in client_list:
-            # we only want bare keys
-            if value != None and value != '':
-                continue
-
-            msg('loading client %s' % client)
-
-            id = config.getint(client, 'id')
-            lat = config.getfloat(client, 'lat')
-            lon = config.getfloat(client, 'lon')
-
-            location = self.make_client_record(client, id, lat, lon)
-
-            # give every client cluster pair a large default starting value
-            for idc in self.scenario['cdn_locations'].keys():
-                location['cluster_scores'].append([idc, 100000])
-
-            self.scenario['client_locations'][id] = location
-
-
-    #>>> scenario['bitrates']
-    #{800: 0.0982909090909091, 200: 0.22323636363636365, 400: 0.07638181818181818, 7000: 0.25596363636363634, 3000: 0.17312727272727274, 1500: 0.173}
-    #
-    def load_bitrates(self):
-        msg('loading bitrate tables')
-        bitrates = {}
-        for (bitrate, value)  in config.items('bitrates'):
-            bitrates[int(bitrate)] = float(value)
-        self.scenario['bitrates'] = bitrates
-        self.max_bitrate = sorted(bitrates.keys())[-1]
-
-
-
-
-
-
 
 
 
@@ -265,7 +51,7 @@ class Broker(rpyc.Service):
     #
     def exposed_update_client_stats(self, stats):
         data = msgpack.unpackb(stats)
-        msg('handling client update from %s' % data['name'])
+        logging.info('handling client update from %s' % data['name'])
 
         id = int(data['id'])
 
@@ -279,8 +65,8 @@ class Broker(rpyc.Service):
         client['cluster_scores'] = []
 
         for cluster, info  in data['clusters'].iteritems():
-            cluster_id = config.getint(cluster, 'id')
-            msg('cluster %s (%d) has %s %s' % (cluster, cluster_id, info['latency'], info['loss']))
+            cluster_id = scenario.getID(cluster)
+            logging.debug('cluster %s (%d) has %s %s' % (cluster, cluster_id, info['latency'], info['loss']))
 
             # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
             # lower is better
@@ -294,21 +80,21 @@ class Broker(rpyc.Service):
                 score += (loss * 100)
             client['cluster_scores'].append([cluster_id, score])
 
-        msg(scenario.scenario['client_locations'])
+        logging.debug(scenario.scenario['client_locations'])
 
 
     #
     # get cache DAG from cdn hosts
     #
     def exposed_add_cdn_cluster(self, name, dag):
-        msg('adding dag to %s (%s)', name, dag)
-        id = config.getint(name, 'id')
+        logging.debug('adding dag to %s (%s)', name, dag)
+        id = scenario.getID(name)
         scenario.scenario['cdn_locations'][id]['dag'] = dag
-        msg(scenario.scenario['cdn_locations'][id])
+        logging.debug(scenario.scenario['cdn_locations'][id])
 
     def exposed_get_cdn(self, name, bitrate):
-        msg("handling request from %s for %s at %d" % (name, item, bitrate))
-        id = config.getint(client, 'id')
+        logging.debug("handling request from %s for %s at %d" % (name, item, bitrate))
+        id = scenario.getID(client)
         req = scenario['client_locations'][id]
 
         req['bitrate'] = bitrate
@@ -317,47 +103,10 @@ class Broker(rpyc.Service):
         # return something
 
 
-    #
-    # get list of CIDs hosted by the calling CDN cluster
-    #
-    def exposed_register_cids(self, name, list):
-        id = config.getint(name, 'id')
-        msg('registering CIDs for %s' % name)
-
-        for cid in list:
-            if cid in scenario.scenario['cids']:
-                if id not in scenario.scenario['cids'][cid]:
-                    scenario.scenario['cids'][cid].append(id)
-                    msg('appending to %s' % cid)
-                else:
-                    msg('already in %s' % cid)
-            else:
-                scenario.scenario['cids'][cid] = [id]
-                msg('new entry for %s' % cid)
-        msg(scenario.scenario['cids'])
-
-
-    #
-    # remove list of cids from the broker's databae
-    def exposed_remove_cids(self, name, list):
-        id = config.getint(name, 'id')
-        msg('deregistering CIDs for %s' % name)
-
-        for cid in list:
-            if cid in scenario.scenario['cids']:
-                if id in scenario.scenario['cids'][cid]:
-                    msg('removing from %s' % cid)
-                    scenario.scenario['cids'][cid].remove(id)
-                    if len (scenario.scenario['cids'][cid]) == 0:
-                        scenario.scenario['cids'].pop(cid, None)
-                        msg('%s is empty, deleting...' % cid)
-        msg(scenario.scenario['cids'])
-
-
     def exposed_get_cdn(self, client, cid, bitrate):
-        id = config.getint(client, 'id')
+        id = scenario.getID(client)
 
-        msg('computing optimal cluster to deliver %s to %s' % (cid, client))
+        logging.debug('computing optimal cluster to deliver %s to %s' % (cid, client))
 
         clusters = scenario.scenario['cids'][cid]
 
@@ -373,50 +122,98 @@ class Broker(rpyc.Service):
 
 
 
-#
-# display status message unless in stealth mode
-#
-def msg(str, *params):
-    if args.verbose:
-        if params:
-            print str, params
-        else:
-            print str
-
-
 def compute_bids():
     while True:
-        bids = framework.GetBids()
-        accepted_bids = framework.Optimize(bids)
+        bids = vdx.GetBids()
+        accepted_bids = vdx.Optimize(bids)
         print accepted_bids
         time.sleep(5)
 
 
-parser = argparse.ArgumentParser(description='gather CDN stats')
-parser.add_argument('-v', '--version', action='version', version=VER)
-parser.add_argument('-V', '--verbose', action='store_true', help='print status messages')
-parser.add_argument('-f', '--file',    type=argparse.FileType('r'), help='cdn config file (default: %s)' % CONF)
-parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
-parser.set_defaults(file=CONFPATH, port=PORT)
-args=parser.parse_args()
+#
+# custom argparse handler to choose syslog levels
+#
+def loglevel(arg):
+    levels = {
+            0 : logging.CRITICAL,   # LOG_EMERG
+            1 : logging.CRITICAL,   # LOG_ALERT
+            2 : logging.CRITICAL,   # LOG_CRIT
+            3 : logging.ERROR,      # LOG_ERR
+            4 : logging.WARNING,    # LOG_WARNING
+            5 : 25,                 # LOG_NOTICE
+            6 : logging.INFO,       # LOG_INFO
+            7 : logging.DEBUG       # LOG_DEBUG
+            }
+    try:
+        value = int(arg)
+    except ValueError as err:
+       raise argparse.ArgumentTypeError(str(err))
+
+    if value < 0 or value > 7:
+        message = "Expected a value in 0..7, got {}".format(value)
+        raise argparse.ArgumentTypeError(message)
+
+    # now convert to a python logging level value
+    return levels[value]
 
 
-random.seed()
-try:
-    config = ConfigParser(allow_no_value = True)
-    config.readfp(args.file)
-except Exception as err:
-    print str(err)
-    sys.exit(-1)
+#
+# set up system
+#
+def configure():
+    random.seed() # FIXME - for initial testing only, not needed in real code
 
-scenario = BrokerScenario()
-framework.SetupScenario(scenario.scenario)
+    parser = argparse.ArgumentParser(description='gather CDN stats')
+    parser.add_argument('-v', '--version', action='version', version=VER)
+    parser.add_argument('-V', '--verbose', action='store_true', help='enable console logging')
+    parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
+    parser.add_argument('-f', '--file',    type=argparse.FileType('r'), help='cdn config file (default: %s)' % CONF)
+    parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
+    parser.set_defaults(file=CONFPATH, port=PORT, level=3)
+    return parser.parse_args()
+
+#
+# initialize logging stuff
+#
+def initLogging():
+    xlog = logging.getLogger()
+    xlog.setLevel(args.level)
+
+    formatter = logging.Formatter('broker: %(message)s')
+
+    sysloghandler = logging.handlers.SysLogHandler('/dev/log')
+    sysloghandler.setFormatter(formatter)
+    xlog.addHandler(sysloghandler)
+
+    if args.verbose:
+        consolehandler = logging.StreamHandler()
+        consolehandler.setFormatter(formatter)
+        xlog.addHandler(consolehandler)
 
 
-t = threading.Thread(target = compute_bids)
-t.start()
+#
+# let's go
+#
+def main():
+    global args, scenario, vdx
 
-t = ThreadedServer(Broker, port=44444)
-msg('Starting broker service on port %s' % args.port)
-t.start()
+    args = configure()
+    initLogging()
+
+    # initialize scenario and prime vdx engine
+    scenario = Scenario(args.file)
+    vdx.setup(scenario)
+
+    # compute optimal CDNs in a background thread
+    t = threading.Thread(target = compute_bids)
+    t.start()
+
+    # handle client connections
+    # FIXME: need to change this to use xsockets
+    t = ThreadedServer(Broker, port=44444)
+    logging.info('Starting broker service on port %s' % args.port)
+    t.start()
+
+if __name__ == "__main__":
+    main()
 

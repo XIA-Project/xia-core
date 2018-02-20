@@ -1,7 +1,6 @@
-#!/usr/bin/env python
-
 import msgpack
 import sys
+import scenario
 
 import gurobipy
 import numpy as np
@@ -36,8 +35,6 @@ BG_TRAFFIC_PERCENTAGE = 4.0
 # weights for optimization
 w_c = 0.1  # cost
 w_p = 1.0 - w_c  # performance
-
-Scenario = {}
 
 closest_clusters_lookup = {}
 bid_ordering = defaultdict(dict)
@@ -81,15 +78,11 @@ def get_closest_clusters(cluster):
     return (cluster, cc)
 
 
-def SetupScenario(initial_scenario):
+def setup(scenario):
     global Scenario, bid_ordering
 
     print 'reading scenario...'
-    Scenario = initial_scenario
-
-#    Scenario['capacities'] = {}
-#    Scenario['median_capacity'] = {}
-#    Scenario['CDN_standard_price'] = []
+    Scenario = scenario.scenario
 
     for cdn in xrange(len(Scenario['CDNs'])):
         Scenario['CDNs'][cdn] = set(Scenario['CDNs'][cdn])
@@ -111,103 +104,6 @@ def SetupScenario(initial_scenario):
     print 'done cluster distances'
 
     p.close()
-
-    print 'estimating capacities and brokered price...'
-#    for cdn in xrange(len(Scenario['CDNs'])):
-#        cdn_backup = copy(Scenario['CDNs'])
-#
-#        # consider one CDN at a time
-#        for c in xrange(len(Scenario['CDNs'])):
-#            if c != cdn:
-#                Scenario['CDNs'][c] = []
-#
-#        print 'estimating capacities for cdn %s' % cdn
-#
-#        #########################
-#        # Get starting capacities
-#        #########################
-#        max_bitrate = sorted(Scenario['bitrates'].keys())[-1]
-#        infinite_capacity = 2 * len(Scenario['requests']) * max_bitrate
-#        for cluster in Scenario['CDNs'][cdn]:
-#            Scenario['capacities'][(cdn, cluster)] = infinite_capacity
-#
-#        print 'starting brokering for cdn %s' % cdn
-#
-#        METHOD_SETTINGS['Brokered'][2] = True
-#        accepted_bids = Optimize(GetBids())
-#        METHOD_SETTINGS['Brokered'][2] = False
-#        if not accepted_bids:
-#            print "no bids from optimization"
-#            sys.exit(-1)
-#
-#        print 'brokering done for cdn %s' % cdn
-#
-#        print 'getting bw'
-#        bw = defaultdict(int)
-#        for i, r in enumerate(Scenario['requests']):
-#            bw[accepted_bids[i][1]] += r['bitrate']
-#
-#        print 'assigning nearby clusters'
-#        clusters_near_me = defaultdict(list)
-#        for cluster in Scenario['CDNs'][cdn]:
-#            if cluster not in bw:
-#                for other_cluster, dist in closest_clusters[cluster]:
-#                    if other_cluster in Scenario['CDNs'][cdn]:
-#                        clusters_near_me[other_cluster].append((cluster,
-#                                                                1.0 / dist))
-#                        break
-#
-#        print 'assigning bandwidth'
-#        for cluster in bw:
-#            output_bw = bw[cluster] * 2
-#            if cluster in clusters_near_me:
-#                Scenario['capacities'][(cdn, cluster)] = output_bw / 2.0
-#                residule = output_bw - Scenario['capacities'][(cdn, cluster)]
-#                s = float(sum(zip(*clusters_near_me[cluster])[1]))
-#                for cl, d in clusters_near_me[cluster]:
-#                    Scenario['capacities'][(cdn, cl)] = d / s * residule
-#            else:
-#                Scenario['capacities'][(cdn, cluster)] = output_bw
-#
-#        median_capacity = []
-#        for cluster in Scenario['CDNs'][cdn]:
-#            if Scenario['capacities'][(cdn, cluster)] == infinite_capacity:
-#                Scenario['capacities'][(cdn, cluster)] = 10 * max_bitrate
-#            else:
-#                Scenario['capacities'][(cdn, cluster)] = max(
-#                    Scenario['capacities'][(cdn, cluster)], 10 * max_bitrate)
-#            median_capacity.append(Scenario['capacities'][(cdn, cluster)])
-#        print 'done capacities for cdn %s' % cdn
-#
-#        Scenario['median_capacity'][cdn] = np.median(median_capacity)
-#
-#        #########################
-#        # Get Brokered Price
-#        #########################
-#        print 'getting brokered price for cdn %s' % cdn
-#        avg_price = 0
-#        for cluster, c in Scenario['cdn_locations'].items():
-#            avg_price += (c['bw_cost'] + c['colo_cost']) * bw[cluster]
-#        avg_price /= float(sum(bw.values()))
-#        Scenario['CDN_standard_price'].append(avg_price)
-#
-#        print 'Contract price for CDN %s = %s' % (cdn, avg_price)
-#
-#        Scenario['CDNs'] = cdn_backup
-#
-#    if 'extra_requests' in Scenario:
-#        print 'adding extra requests...'
-#        Scenario['requests'] += Scenario['extra_requests']
-#        print 'done adding extra requests'
-#
-#    if 'extra_cdn_capacity' in Scenario:
-#        print 'adjusting cdn capacities...'
-#        for cdn in Scenario['extra_cdn_capacity'].keys():
-#            for (cluster, capacity) in Scenario['extra_cdn_capacity'][cdn]:
-#                Scenario['capacities'][(cdn, cluster)] = capacity * \
-#                                                         2 * max_bitrate
-#        print 'done adjusting cdn capacities'
-
 
 def GetCDNBids(cdn):
     if len(Scenario['CDNs'][cdn]) == 0:
