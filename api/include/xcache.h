@@ -92,6 +92,8 @@ extern int XlaunchNotifThread(XcacheHandle *h);  //DONE
 extern int XnewProxy(XcacheHandle *h, std::string &proxyaddr);
 extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
+extern int XrequestPushedChunk(std::string &chunkaddr,
+		std::string &fetchservice, std::string &returnaddr);
 
 #ifdef __cplusplus
 }

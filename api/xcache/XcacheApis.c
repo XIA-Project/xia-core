@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xcache_cmd.pb.h"
+#include "irq.pb.h"
 #include "xcache_sock.h"
 #include "cid.h"
 #include <sys/types.h>
@@ -1155,6 +1156,84 @@ int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
 	proxyaddr.assign(cmd.dag());
 
 	return 0;
+}
+
+
+int XrequestPushedChunk(std::string &chunkaddr,
+		std::string &fetchservice, std::string &returnaddr)
+{
+	int sockfd;
+	int state = 0;
+	sockaddr_x fs_addr;
+	Graph *g;
+	InterestRequest irq;
+	std::string irqstr;
+	uint32_t irqstrlen, nirqstrlen;
+	int remaining, offset;
+	char *buf;
+	int sent;
+	int retval = -1;
+
+	// Build the client request to be sent to fetchservice
+	irq.set_chunk_addr(chunkaddr);
+	irq.set_return_addr(returnaddr);
+	irq.SerializeToString(&irqstr);
+
+	// Connect to the fetchservice
+	sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	if(sockfd < 0) {
+		fprintf(stderr, "Error creating sock to talk to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	g = new Graph(fetchservice);
+	g->fill_sockaddr(&fs_addr);
+	if(Xconnect(sockfd, (sockaddr *)&fs_addr, sizeof(sockaddr_x))) {
+		fprintf(stderr, "Error connecting to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 1;	// close sockfd
+
+	// Send length of the interest request to fetchservice
+	irqstrlen = irqstr.size();
+	nirqstrlen = htonl(irqstrlen);	// Network byte order
+	if(Xsend(sockfd, &nirqstrlen, sizeof(nirqstrlen),0)
+			!= sizeof(nirqstrlen)) {
+		fprintf(stderr, "Error sending interest request size\n");
+		goto request_pushed_chunk_done;
+	}
+
+	// Now send the serialized irqstr to the fetchservice
+	buf = (char *) malloc(irqstrlen);
+	if(buf == NULL) {
+		fprintf(stderr, "Error allocating memory for interest request\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 2;	// free buf
+	bzero(buf, irqstrlen);
+
+	remaining = irqstrlen;
+	offset = 0;
+	while(remaining) {
+		sent = Xsend(sockfd, &buf[offset], remaining, 0);
+		if(sent < 0) {
+			fprintf(stderr, "Error sending interest request\n");
+			goto request_pushed_chunk_done;
+		}
+		remaining -= sent;
+		offset += sent;
+	}
+	if(remaining != 0) {
+		fprintf(stderr, "Error sending entire request\n");
+		goto request_pushed_chunk_done;
+	}
+	retval = 0;
+
+request_pushed_chunk_done:
+	switch(state) {
+		case 2: free(buf);
+		case 1: Xclose(sockfd);
+	};
+	return retval;
 }
 
 /*!
