@@ -243,8 +243,13 @@ def Optimize(bids):
                         price = Scenario['CDN_standard_price'][cdn]
                     else:
                         price = 0
-                obj_coeff = w_p * (-100.0 * score) - w_c * (price *
-                                                            avg_bitrate[id])
+                try:
+                    obj_coeff = w_p * (-100.0 * score) - w_c * (price * avg_bitrate[id])
+                except:
+                    # we don't have any outstanding requests for this client id
+                    # default its avg bitrate to 0
+                    obj_coeff = 0.0
+                    avg_bitrate[id] = 0.0
                 coeffs.append(obj_coeff)
 
     # bid "used"
