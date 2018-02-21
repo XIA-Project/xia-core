@@ -27,6 +27,8 @@ from rpyc.utils.server import ThreadedServer
 
 from scenario import Scenario
 import vdx
+import cdn_pb2
+import requesthandler
 
 VER='1.0'
 
@@ -39,9 +41,11 @@ CONF='etc/scenario.conf'
 # FIXME: we get the path in order to get the module to get the path!
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 sys.path.append(os.path.join(srcdir, "bin"))
+sys.path.append(os.path.join(srcdir, "api/lib"))
 import xiapyutils
 CONFPATH=os.path.join(xiapyutils.xia_srcdir(), CONF)
 
+import c_xsocket
 
 
 class Broker(rpyc.Service):

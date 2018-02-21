@@ -1,0 +1,42 @@
+/*
+** cdn/broker message definitions
+*/
+
+package CDN;
+//syntax = "proto2";
+
+enum constants {
+	CDN_PROTO_VERSION = 1;
+}
+
+message CDNRequest {
+	required string client = 1; // client requesting a cdn
+	optional string dag    = 2;	// return only, dag of cdn cluster to use
+}
+
+message Score {
+	required string cluster = 1;	// hostname of the 'cluster'
+	optional uint32 rtt     = 2;	// avg ping rtt time in ms. Infinate if blank
+	optional uint32 loss    = 3;	// packet loss percentage 0-100
+}
+
+message Scores {
+	required string client = 1;	// client hostname
+	repeated Score  scores = 2; // list of scores for conn ections to CDN clusters
+}
+
+enum msg_type {
+	CDN_REQUEST_MSG  = 1;
+	PING_SCORES_MSG  = 2;
+}
+
+message CDNMsg {
+	required uint32   version = 1;
+	required msg_type type    = 2;
+
+	oneof payload {
+		CDNRequest request = 3;
+		Scores     scores  = 4;
+	}
+}
+
