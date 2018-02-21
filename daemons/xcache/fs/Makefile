@@ -12,7 +12,7 @@ SOURCES=fs.cc fs_client_request.cc fs_thread_pool.cc fs_worker.cc \
 OBJECTS=$(SOURCES:.cc=.o)
 FS=$(BINDIR)/fs
 
-CFLAGS+=-I$(APIDIR)/include -I../../common -L$(XLIB) -Wall
+CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I../../common -L$(XLIB) -Wall
 LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lxcache -lprotobuf -Wl,-rpath,$(XLIB)
 
 all: $(PROTO_SRCS) $(FS)
