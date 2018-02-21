@@ -14,8 +14,11 @@
 
 import sys
 import time
+import random
 import logging
 from configparser import ConfigParser
+
+MAX_REQUEST_AGE = 30
 
 class Scenario:
     def __init__(self, fname):
@@ -44,24 +47,16 @@ class Scenario:
         self.scenario['CDN_standard_price'] = []
         self.scenario['ids'] = {}
 
-        print fname
         try:
             self.config = ConfigParser(allow_no_value = True)
-            print 'created'
             self.config.readfp(fname)
-            print 'read'
         except Exception as err:
-            print ' damn it!'
-            print str(err)
+            logging.crit(str(err))
             sys.exit(-1)
 
-        print 'loaded'
         self.load_bitrates()
         self.load_cdns()
         self.load_client_locations()
-
-        # FIXME: requests should probably start out as empty
-        self.load_requests()
 
 
     #
@@ -75,6 +70,7 @@ class Scenario:
         lat = self.config.getfloat(name, 'lat')
         lon = self.config.getfloat(name, 'lon')
 
+        client['name'] = name
         client['mgID'] = id
         client['lat'] = lat
         client['lon'] = lon
@@ -107,12 +103,11 @@ class Scenario:
 
 
     #
-    # initialize the requests table
-    # FIXME: we probably won't need to do this once everything is running
+    # load static client information
     #
-    def load_requests(self):
+    def load_client_locations(self):
         logging.debug('loading clients')
-        requests = []
+        clients = {}
 
         client_list = self.config.items('clients')
         for (client, value)  in client_list:
@@ -121,15 +116,40 @@ class Scenario:
                 continue
 
             logging.debug('loading client %s' % client)
-            request = {}
 
             id = self.config.getint(client, 'id')
-            request = self.make_client_record(client, id)
+            location = self.make_client_record(client, id)
 
-            request['bitrate'] = 1500
+            # give every client cluster pair a large default starting value
+            for idc in self.scenario['cdn_locations'].keys():
+                location['cluster_scores'].append([idc, 100000])
 
-            self.scenario['requests'].append(request)
+            self.scenario['client_locations'][id] = location
             self.scenario['ids'][client] = id
+
+    #
+    # add a new entry to the requests table
+    # assumes that there is a matching client_location entry
+    #
+    def add_request(self, id, bitrate):
+        try:
+            request = dict(self.scenario['client_locations'][id])
+            request['bitrate'] = bitrate
+            request['timestamp'] = int(time.time())
+            self.scenario['requests'].append(request)
+            logging.debug('added new request for %d at %d' % (id, bitrate))
+        except:
+            logging.warning('unable to add request for %d %d' % (id, bitrate))
+
+
+    #
+    # for debugging, create a random request
+    #
+    def add_random_request(self):
+        # make up a random request
+        client = random.choice(self.scenario['client_locations'].keys())
+        bitrate = random.choice(self.scenario['bitrates'].keys())
+        self.add_request(client, bitrate)
 
 
     #
@@ -202,31 +222,6 @@ class Scenario:
         self.scenario['cdn_locations'][id] = location
 
 
-    #
-    # load static client information
-    #
-    def load_client_locations(self):
-        logging.debug('loading clients')
-        clients = {}
-
-        client_list = self.config.items('clients')
-        for (client, value)  in client_list:
-            # we only want bare keys
-            if value != None and value != '':
-                continue
-
-            logging.debug('loading client %s' % client)
-
-            id = self.config.getint(client, 'id')
-            location = self.make_client_record(client, id)
-
-            # give every client cluster pair a large default starting value
-            for idc in self.scenario['cdn_locations'].keys():
-                location['cluster_scores'].append([idc, 100000])
-
-            self.scenario['client_locations'][id] = location
-            self.scenario['ids'][client] = id
-            print self.scenario['client_locations'][id]
 
 
     #
@@ -240,6 +235,37 @@ class Scenario:
             bitrates[int(bitrate)] = float(value)
         self.scenario['bitrates'] = bitrates
         self.max_bitrate = sorted(bitrates.keys())[-1]
+
+
+    #
+    # clear out old requests
+    #
+    def prune_requests(self):
+        now = int(time.time())
+        requests = self.scenario['requests']
+        last = -1
+
+        for i in range(len(requests)):
+            request = self.scenario
+            timestamp = requests[i]['timestamp']
+
+            # stop once we find an unexpired request
+            if now - timestamp < MAX_REQUEST_AGE:
+                last = i
+                break
+
+        if last < 0:
+            self.scenario['requests'] = []
+            length = 0
+            logging.debug('the request table is empty')
+        else:
+            self.scenario['requests'] = requests[last:]
+            length = len(requests)
+            logging.debug('there are %d requests in the queue' % length)
+
+        return length
+
+
 
 
 # test driver
