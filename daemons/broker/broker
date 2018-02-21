@@ -16,122 +16,51 @@
 import os
 import sys
 import time
-import rpyc
 import random
 import logging
 import logging.handlers
-import msgpack
 import argparse
 import threading
 from rpyc.utils.server import ThreadedServer
 
-from scenario import Scenario
 import vdx
-import cdn_pb2
-import requesthandler
+from scenario import Scenario
+from brokerserver import BrokerServer
 
-VER='1.0'
-
-# FIXME: rpyc config - will go away when switching to xsockets and protobugfs
-PORT='44444'
-
-# default scenario config file
-CONF='etc/scenario.conf'
+VER='1.0'                   # app version
+REQUEST_RATE = 1            # default debug connection rate in seconds
+BID_RATE = 5                # default bid calculation rate in seconds
+PRELOAD = 20                # when debugging preload n requests
+PORT=44444                  # default port for the BrokerServer
+CONF='etc/scenario.conf'    # default scenario config file
 
 # FIXME: we get the path in order to get the module to get the path!
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 sys.path.append(os.path.join(srcdir, "bin"))
-sys.path.append(os.path.join(srcdir, "api/lib"))
 import xiapyutils
 CONFPATH=os.path.join(xiapyutils.xia_srcdir(), CONF)
-
-import c_xsocket
-
-
-class Broker(rpyc.Service):
-    #
-    # collect ping stats from client machines
-    # stats include ping latency and packet loss info from the client to each cluster
-    #
-    def exposed_update_client_stats(self, stats):
-        data = msgpack.unpackb(stats)
-        logging.info('handling client update from %s' % data['name'])
-
-        id = int(data['id'])
-
-        # find or create new client_location entry
-        client = scenario.scenario['client_locations'][id]
-        if client == None:
-            client = make_client_record(stats['name'], stats['id'], stats['lat'], stats['lon'])
-            scenario.scenario['client_locations'][id] = client
-
-        # reset score  list
-        client['cluster_scores'] = []
-
-        for cluster, info  in data['clusters'].iteritems():
-            cluster_id = scenario.getID(cluster)
-            logging.debug('cluster %s (%d) has %s %s' % (cluster, cluster_id, info['latency'], info['loss']))
-
-            # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
-            # lower is better
-            score = info['latency']
-            loss = info['loss']
-
-            if score == None or score < 0 or loss == 100:
-                score = 10000000000
-            else:
-                score *= 1000
-                score += (loss * 100)
-            client['cluster_scores'].append([cluster_id, score])
-
-        logging.debug(scenario.scenario['client_locations'])
-
-
-    #
-    # get cache DAG from cdn hosts
-    #
-    def exposed_add_cdn_cluster(self, name, dag):
-        logging.debug('adding dag to %s (%s)', name, dag)
-        id = scenario.getID(name)
-        scenario.scenario['cdn_locations'][id]['dag'] = dag
-        logging.debug(scenario.scenario['cdn_locations'][id])
-
-    def exposed_get_cdn(self, name, bitrate):
-        logging.debug("handling request from %s for %s at %d" % (name, item, bitrate))
-        id = scenario.getID(client)
-        req = scenario['client_locations'][id]
-
-        req['bitrate'] = bitrate
-        scenario['requests'] = [req]
-        # run the algorithm
-        # return something
-
-
-    def exposed_get_cdn(self, client, cid, bitrate):
-        id = scenario.getID(client)
-
-        logging.debug('computing optimal cluster to deliver %s to %s' % (cid, client))
-
-        clusters = scenario.scenario['cids'][cid]
-
-        if clusters == None:
-            return ''
-
-        # just randomize for now
-        index = random.randint(0, len(clusters) - 1)
-        cluster_id = clusters[index]
-        dag = scenario.scenario['cdn_locations'][cluster_id]['dag']
-        print dag
-        return dag
 
 
 
 def compute_bids():
     while True:
-        bids = vdx.GetBids()
-        accepted_bids = vdx.Optimize(bids)
-        print accepted_bids
-        time.sleep(5)
+        print 'checking for requests'
+        if scenario.prune_requests() > 0:
+            print 'getting bids'
+            bids = vdx.GetBids()
+            scenario.scenario['accepted_bids']  = vdx.Optimize(bids)
+            print 'got bids'
+        else:
+            logging.debug('no requests, skipping bid generation')
+
+        print 'sleeping'
+        time.sleep(args.bids)
+
+
+def new_connections():
+    while True:
+        scenario.add_random_request()
+        time.sleep(args.requests)
 
 
 #
@@ -165,7 +94,8 @@ def loglevel(arg):
 # set up system
 #
 def configure():
-    random.seed() # FIXME - for initial testing only, not needed in real code
+    global args
+    random.seed()
 
     parser = argparse.ArgumentParser(description='gather CDN stats')
     parser.add_argument('-v', '--version', action='version', version=VER)
@@ -173,8 +103,22 @@ def configure():
     parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
     parser.add_argument('-f', '--file',    type=argparse.FileType('r'), help='cdn config file (default: %s)' % CONF)
     parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
-    parser.set_defaults(file=CONFPATH, port=PORT, level=3)
-    return parser.parse_args()
+    parser.add_argument('-b', '--bids', type=int, help='calculate new bids every BIDS seconds')
+    parser.add_argument('-d', '--debug', action='store_true', help='generate random connections locally')
+    parser.add_argument('-r', '--requests', type=int, help='generate new random requests every REQUESTS seconds')
+    parser.set_defaults(file=CONFPATH, port=PORT, level=3, bids=BID_RATE, requests=REQUEST_RATE)
+    args = parser.parse_args()
+
+    initLogging()
+
+    logging.info('regenerating bids every %d seconds' % args.bids)
+
+    if args.debug:
+        logging.info('running in debug mode')
+        logging.info('generating new connections every %d seconds' % args.requests)
+    else:
+        logging.info('Starting broker service on port %s' % args.port)
+
 
 #
 # initialize logging stuff
@@ -201,22 +145,42 @@ def initLogging():
 def main():
     global args, scenario, vdx
 
-    args = configure()
-    initLogging()
+    configure()
 
     # initialize scenario and prime vdx engine
     scenario = Scenario(args.file)
     vdx.setup(scenario)
 
+    shutdown_event = threading.Event()
     # compute optimal CDNs in a background thread
-    t = threading.Thread(target = compute_bids)
-    t.start()
+    compute_thread = threading.Thread(target = compute_bids)
+    compute_thread.daemon = True
+    compute_thread.start()
 
-    # handle client connections
-    # FIXME: need to change this to use xsockets
-    t = ThreadedServer(Broker, port=44444)
-    logging.info('Starting broker service on port %s' % args.port)
-    t.start()
+    if args.debug:
+        # generate random connection requests
+
+        # preload some initial requests
+        logging.debug('preloading %d connections' % PRELOAD)
+        for i in range(PRELOAD):
+            scenario.add_random_request()
+
+        # start a request generating thread
+        generator_thread = threading.Thread(target = new_connections)
+        generator_thread.daemon = True
+        generator_thread.start()
+
+        # we'll exit unless we block here
+        while True:
+            time.sleep(10)
+    else:
+        # handle client connections
+        server_thread = ThreadedServer(BrokerServer, str(args.port))
+        server_thread.start()
+        threads.append(server_thread)
+
+
+
 
 if __name__ == "__main__":
     main()
