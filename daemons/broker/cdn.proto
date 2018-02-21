@@ -10,8 +10,8 @@ enum constants {
 }
 
 message CDNRequest {
-	required string client = 1; // client requesting a cdn
-	optional string dag    = 2;	// return only, dag of cdn cluster to use
+	required string client  = 1; // client requesting a cdn
+	optional uint32 bitrate = 2; // return only, dag of cdn cluster to use
 }
 
 message Score {
