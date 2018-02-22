@@ -207,6 +207,7 @@ class Scenario:
         location['id'] = id
         location['lat'] = self.config.getfloat(cluster, 'lat')
         location['lon'] = self.config.getfloat(cluster, 'lon')
+        location['name'] = cluster
 
         # FIXME: what does the cost need to look like? is our simple value good enough?
         location['bw_cost'] = self.config.getfloat(cluster, 'cost')
