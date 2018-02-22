@@ -1,43 +1,42 @@
 /*
-** cdn/broker message definitions
-*/
+ ** cdn/broker message definitions
+ */
 
 package CDN;
 //syntax = "proto2";
 
 enum constants {
-	CDN_PROTO_VERSION = 1;
+  CDN_PROTO_VERSION = 1;
 }
 
 message Request {
-	required string client  = 1; // client requesting a cdn
-	optional uint32 bitrate = 2; // video bitrate
-    optional string cluster = 3; // on return contains CDN cluster to use
+  optional uint32 bitrate = 1; // video bitrate
+  optional string cluster = 2; // on return contains CDN cluster to use
 }
 
 message Cluster {
-	required string name = 1;	// hostname of the 'cluster'
-	optional uint32 rtt  = 2;	// avg ping rtt time in ms. Infinate if blank
-	optional uint32 loss = 3;	// packet loss percentage 0-100
+  required string name = 1;	// hostname of the 'cluster'
+  optional uint32 rtt  = 2;	// avg ping rtt time in ms. Infinate if blank
+  optional uint32 loss = 3;	// packet loss percentage 0-100
 }
 
 message Scores {
-	required string  client   = 1;	// client hostname
-	repeated Cluster clusters = 2;  // list of scores for conn ections to CDN clusters
+  repeated Cluster clusters = 1; // list of scores for conn ections to CDN clusters
 }
 
 enum msg_type {
-	CDN_REQUEST_MSG  = 1;
-	PING_SCORES_MSG  = 2;
+  CDN_REQUEST_MSG  = 1;
+  PING_SCORES_MSG  = 2;
 }
 
 message CDNMsg {
-	required uint32   version = 1;
-	required msg_type type    = 2;
+  required uint32   version = 1;
+  required msg_type type    = 2;
+  required string   client  = 3; // client requesting a cdn
 
-	oneof payload {
-		Request request = 3;
-		Scores  scores  = 4;
-	}
+  oneof payload {
+    Request request = 4;
+    Scores  scores  = 5;
+  }
 }
 
