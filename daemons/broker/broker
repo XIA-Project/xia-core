@@ -21,11 +21,12 @@ import logging
 import logging.handlers
 import argparse
 import threading
-from rpyc.utils.server import ThreadedServer
+#from rpyc.utils.server import ThreadedServer
 
 import vdx
 from scenario import Scenario
 from brokerserver import BrokerServer
+import brokerhandler
 
 VER='1.0'                   # app version
 REQUEST_RATE = 1            # default debug connection rate in seconds
@@ -175,10 +176,14 @@ def main():
             time.sleep(10)
     else:
         # handle client connections
-        server_thread = ThreadedServer(BrokerServer, str(args.port))
-        server_thread.start()
-        threads.append(server_thread)
+        #server_thread = ThreadedServer(BrokerServer, str(args.port))
+        #server_thread.start()
+        #threads.append(server_thread)
 
+        SocketServer.TCPServer.allow_reuse_address = True
+        server = SocketServer.TCPServer((HOST, PORT), BrokerHandler)
+        server.RequestHandlerClass.scenario = s
+        server.serve_forever()
 
 
 
