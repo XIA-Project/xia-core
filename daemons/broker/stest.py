@@ -2,11 +2,13 @@ import SocketServer
 import struct
 import cdn_pb2
 
+PORT = 44444
+HOST = 'localhost'
 
 class RequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
-        # get the length of the msg
-        length = struct.unpack("H", self.request.recv(2))[0]
+        length = struct.unpack("!L", self.request.recv(4))[0]
+        print length
 
         try:
             msg = cdn_pb2.CDNMsg()
@@ -18,9 +20,8 @@ class RequestHandler(SocketServer.BaseRequestHandler):
                 self.handle_scores(msg)
             else:
                 print 'unknown msg type'
-        except:
-            print 'boom!'
-
+        except Exception as err:
+            print str(err)
 
 
     def handle_request(self, msg):
@@ -32,7 +33,6 @@ class RequestHandler(SocketServer.BaseRequestHandler):
         print 'Returning cluster: ', cluster
         msg.request.cluster = cluster
 
-        print 'sending'
         self.send_message(msg)
 
 
@@ -47,12 +47,11 @@ class RequestHandler(SocketServer.BaseRequestHandler):
     def send_message(self, msg):
         msgstr = msg.SerializeToString()
         length = len(msgstr)
-        self.request.send(struct.pack("H", length), 2)
+        self.request.send(struct.pack("!L", length), 4)
         self.request.sendall(msgstr)
 
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 9999
     SocketServer.TCPServer.allow_reuse_address = True
     server = SocketServer.TCPServer((HOST, PORT), RequestHandler)
     server.serve_forever()
