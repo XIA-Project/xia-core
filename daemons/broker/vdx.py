@@ -320,7 +320,8 @@ def Optimize(bids):
                 results[(id, j)] -= 1
                 break
         if bid:
-            accepted_bids[q] = bid
+            # FIXME: is this OK? was using q before to map to a particular request
+            accepted_bids[r['mgID']] = bid
         else:
             logging.debug("client didn't get a bid")
             logging.debug(i, j)
