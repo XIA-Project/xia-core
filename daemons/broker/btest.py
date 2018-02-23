@@ -39,7 +39,7 @@ def send_msg(sock, msg):
     msgstr = msg.SerializeToString()
     length = len(msgstr)
 
-    sock.send(struct.pack("H", length))
+    sock.send(struct.pack("!L", length))
 
     sent = 0
     while sent < length:
@@ -51,7 +51,7 @@ def recv_msg(sock):
     msgstr = ''
     received = 0
 
-    length = struct.unpack("H", sock.recv(2))[0]
+    length = struct.unpack("!L", sock.recv(4))[0]
     while received < length:
         msgstr += sock.recv(length - received)
         received = len(msgstr)
@@ -64,7 +64,7 @@ def recv_msg(sock):
 
 def connect(addr, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('localhost', 9999))
+    s.connect(('localhost', 44444))
     return s
 
 
