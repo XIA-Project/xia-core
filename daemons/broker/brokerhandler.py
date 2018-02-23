@@ -114,7 +114,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 9999
+    HOST, PORT = "localhost", 44444
     log = logging.getLogger()
     log.setLevel(logging.DEBUG)
 
