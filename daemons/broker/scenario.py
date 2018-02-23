@@ -46,6 +46,7 @@ class Scenario:
         self.scenario['median_capacity'] = {}
         self.scenario['CDN_standard_price'] = []
         self.scenario['ids'] = {}
+        self.scenario['accepted_bids'] = {}
 
         try:
             self.config = ConfigParser(allow_no_value = True)

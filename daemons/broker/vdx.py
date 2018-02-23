@@ -335,6 +335,7 @@ def Optimize(bids):
             print i, j
 #            sys.exit(-1)
 
+    Scenario['accepted_bids'] = accepted_bids
     print 'done optimization'
     return accepted_bids
 
