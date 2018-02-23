@@ -27,7 +27,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
     def handle(self):
         # get the length of the msg
-        length = struct.unpack("H", self.request.recv(2))[0]
+        length = struct.unpack("!L", self.request.recv(4))[0]
 
         try:
             msg = cdn_pb2.CDNMsg()
@@ -39,7 +39,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
                 self.handle_scores(msg)
             else:
                 logging.warn('unknown msg type')
-        except err:
+        except Exception as err:
             logging.warn('invalid message data')
 
 
@@ -62,7 +62,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
             dag = 'AD:1234567890 HID:1234567890'
 
 
-        except:
+        except Exception as err:
             logging.debug('no valid bids found for %s' % client)
             dag = ''
 
@@ -109,7 +109,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
     def send_message(self, msg):
         msgstr = msg.SerializeToString()
         length = len(msgstr)
-        self.request.send(struct.pack("H", length), 2)
+        self.request.send(struct.pack("!L", length), 4)
         self.request.sendall(msgstr)
 
 
