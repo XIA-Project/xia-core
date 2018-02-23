@@ -143,9 +143,9 @@ def GetCDNBids(cdn):
         selected = 0
         for (cluster, score) in bo:
             if score == 0:
-#                sys.exit(-1)
-                break
-            capacity = Scenario['capacities'][(cdn, cluster)]
+                capacity = 0
+            else:
+                capacity = Scenario['capacities'][(cdn, cluster)]
             if not METHOD_SETTINGS[METHOD][3]:
                 capacity *= BG_TRAFFIC_PERCENTAGE
             else:
@@ -312,7 +312,6 @@ def Optimize(bids):
             print i, s, clients_at_location[i]
             print "ERROR"
 #            sys.exit(-1)
-            break
 
     accepted_bids = {}
     for q, r in enumerate(Scenario['requests']):
@@ -329,14 +328,12 @@ def Optimize(bids):
             print "client didn't get a bid"
             print i, j
 #            sys.exit(-1)
-            break
 
     for i, j in [(i, j) for i in index for j in index[i]]:
         if results[(i, j)]:
             print 'ACCEPTED TWO BIDS FOR SAME CLIENT?'
             print i, j
 #            sys.exit(-1)
-            break
 
     print 'done optimization'
     return accepted_bids
