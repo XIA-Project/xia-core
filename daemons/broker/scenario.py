@@ -138,8 +138,9 @@ class Scenario:
             request['timestamp'] = int(time.time())
             self.scenario['requests'].append(request)
             logging.debug('added new request for %d at %d' % (id, bitrate))
-        except:
+        except Exception as err:
             logging.warning('unable to add request for %d %d' % (id, bitrate))
+            logging.warning(str(err))
 
 
     #
