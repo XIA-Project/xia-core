@@ -1,7 +1,6 @@
-import msgpack
 import sys
-import scenario
-
+import logging
+import msgpack
 import gurobipy
 import numpy as np
 
@@ -9,6 +8,8 @@ from multiprocessing import Pool, cpu_count
 from collections import defaultdict
 from copy import copy
 from scipy.spatial import distance
+
+import scenario
 
 METHOD = 'Exchange'
 
@@ -81,7 +82,6 @@ def get_closest_clusters(cluster):
 def setup(scenario):
     global Scenario, bid_ordering
 
-    print 'reading scenario...'
     Scenario = scenario.scenario
 
     for cdn in xrange(len(Scenario['CDNs'])):
@@ -89,19 +89,17 @@ def setup(scenario):
 
     p = Pool(cpu_count())
 
-    print 'calculating bid_ordering'
+    logging.debug('calculating bid_ordering')
     bo = p.map(build_bid_ordering, [
         (cdn, location) for location in Scenario['client_locations'] for
         cdn in xrange(len(Scenario['CDNs']))])
     bid_ordering = defaultdict(dict)
     for cdn, location, ordering in bo:
         bid_ordering[cdn][location] = ordering
-    print 'done bid_ordering'
 
-    print 'calculating cluster distances'
+    logging.debug('calculating cluster distances')
     closest_clusters = dict(p.map(get_closest_clusters,
                                   Scenario['cdn_locations']))
-    print 'done cluster distances'
 
     p.close()
 
@@ -109,7 +107,7 @@ def GetCDNBids(cdn):
     if len(Scenario['CDNs'][cdn]) == 0:
         return {}
 
-    print 'generating bids for CDN %s' % cdn
+    logging.debug('generating bids for CDN %s' % cdn)
 
     bids = defaultdict(list)
 
@@ -196,7 +194,6 @@ def GetCDNBids(cdn):
             bids[location].append((cdn, cluster, score, capacity,
                                    bw_cst / avbw * standard_price,
                                    colo_cst / avcolo * standard_price))
-    print 'done bid generation for CDN %s' % cdn
 
     return dict(bids)
 
@@ -206,7 +203,7 @@ def Optimize(bids):
     if len(bids) == 0:
         return {}
 
-    print 'starting optimization'
+    logging.debug('starting optimization')
 
     m = gurobipy.Model("broker")
 
@@ -226,7 +223,7 @@ def Optimize(bids):
     ################################
     # create variables and objective
     ################################
-    print 'starting variables'
+    logging.debug('starting variables')
     index = defaultdict(dict)
     coeffs = []
 
@@ -254,17 +251,17 @@ def Optimize(bids):
                 coeffs.append(obj_coeff)
 
     # bid "used"
-    print 'adding variables'
+    logging.debug('adding variables')
     U = m.addVars(len(coeffs), lb=0, vtype=gurobipy.GRB.INTEGER, obj=coeffs)
 
     m.modelSense = gurobipy.GRB.MAXIMIZE
-    print 'updating model'
+    logging.debug('updating model')
     m.update()
 
     #############
     # Constraints
     #############
-    print 'starting constraints'
+    logging.debug('starting constraints')
     Capacities = {}
     U_cluster = defaultdict(list)
     Bitrates_cluster = defaultdict(list)
@@ -279,29 +276,29 @@ def Optimize(bids):
 
     # don't exceede cluster capacity
     if METHOD_SETTINGS[METHOD][2]:
-        print 'adding constraint 1 (proper capacities)'
+        logging.debug('adding constraint 1 (proper capacities)')
         m.addConstrs(gurobipy.LinExpr(Bitrates_cluster[c], U_cluster[c]) <=
                      Capacities[c] for c in cdn_clusters)
     else:
-        print 'adding constraint 1 (median capacities)'
+        logging.debug('adding constraint 1 (median capacities)')
         m.addConstrs(gurobipy.LinExpr(Bitrates_cluster[c], U_cluster[c]) <=
                      Scenario['median_capacity'][c[0]] for c in cdn_clusters)
 
     # Make sure all clients are served
-    print 'adding constraint 2'
+    logging.debug('adding constraint 2')
     m.addConstrs(gurobipy.quicksum([U[index[i][j]] for j in index[i]]) ==
                  clients_at_location[i] for i in index)
 
     ##########
     # Optimize
     ##########
-    print 'optimizing'
+    logging.debug('optimizing')
     m.optimize()
 
     #############
     # Get Results
     #############
-    print 'getting results'
+    logging.debug('getting results')
 
     results = {(i, j): round(U[index[i][j]].x)
                for i in index for j in index[i]}
@@ -309,8 +306,8 @@ def Optimize(bids):
     for i in index:
         s = sum([results[(i, j)] for j in index[i]])
         if s != clients_at_location[i]:
-            print i, s, clients_at_location[i]
-            print "ERROR"
+            logging.debug(i, s, clients_at_location[i])
+            logging.debug("ERROR")
 #            sys.exit(-1)
 
     accepted_bids = {}
@@ -325,35 +322,32 @@ def Optimize(bids):
         if bid:
             accepted_bids[q] = bid
         else:
-            print "client didn't get a bid"
-            print i, j
+            logging.debug("client didn't get a bid")
+            logging.debug(i, j)
 #            sys.exit(-1)
 
     for i, j in [(i, j) for i in index for j in index[i]]:
         if results[(i, j)]:
-            print 'ACCEPTED TWO BIDS FOR SAME CLIENT?'
-            print i, j
+            logging.debug('ACCEPTED TWO BIDS FOR SAME CLIENT?')
+            logging.debug(i, j)
 #            sys.exit(-1)
 
     Scenario['accepted_bids'] = accepted_bids
-    print 'done optimization'
     return accepted_bids
 
 
 def GetBids():
-    print 'starting cdn bids'
+    logging.debug('starting cdn bids')
     p = Pool(cpu_count())
     cdns_bids = p.map(GetCDNBids, xrange(len(Scenario['CDNs'])))
     p.close()
-    print 'done cdn bids'
 
-    print 'combining cdn bids'
+    logging.debug('combining cdn bids')
     bids = defaultdict(list)
     for cdn_bids in cdns_bids:
         if cdn_bids:
             for location, bs in cdn_bids.items():
                 bids[location] += bs
-    print 'done combining cdn bids'
     return dict(bids)
 
 

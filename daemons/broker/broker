@@ -46,16 +46,13 @@ CONFPATH=os.path.join(xiapyutils.xia_srcdir(), CONF)
 
 def compute_bids():
     while True:
-        print 'checking for requests'
+        logging.debug('checking for requests')
         if scenario.prune_requests() > 0:
-            print 'getting bids'
             bids = vdx.GetBids()
             scenario.scenario['accepted_bids']  = vdx.Optimize(bids)
-            print 'got bids'
         else:
             logging.debug('no requests, skipping bid generation')
 
-        print 'sleeping'
         time.sleep(args.bids)
 
 
@@ -99,7 +96,7 @@ def configure():
     global args
     random.seed()
 
-    parser = argparse.ArgumentParser(description='gather CDN stats')
+    parser = argparse.ArgumentParser(description='CDN content broker')
     parser.add_argument('-v', '--version', action='version', version=VER)
     parser.add_argument('-V', '--verbose', action='store_true', help='enable console logging')
     parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
@@ -139,6 +136,10 @@ def initLogging():
         consolehandler = logging.StreamHandler()
         consolehandler.setFormatter(formatter)
         xlog.addHandler(consolehandler)
+    else:
+        # when in quiet mode,  hide gurobi output on stdout
+        # FIXME: there's got to be a setting in gurobi somewhere to do this
+        sys.stdout = open('/dev/null', 'w')
 
 
 #
