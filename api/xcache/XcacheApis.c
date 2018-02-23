@@ -1210,6 +1210,7 @@ int XrequestPushedChunk(std::string &chunkaddr,
 	}
 	state = 2;	// free buf
 	bzero(buf, irqstrlen);
+	memcpy(buf, irqstr.c_str(), irqstrlen);
 
 	remaining = irqstrlen;
 	offset = 0;
