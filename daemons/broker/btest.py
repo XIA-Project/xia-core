@@ -3,7 +3,6 @@ import time
 import socket
 import struct
 import random
-import logging
 
 import cdn_pb2
 from scenario import Scenario
@@ -96,8 +95,6 @@ def prime_scores():
 
 if __name__ == '__main__':
     random.seed
-    log = logging.getLogger()
-    log.setLevel(logging.DEBUG)
 
     scenario = Scenario(open('../../etc/scenario.conf'))
     prime_scores()
@@ -109,7 +106,7 @@ if __name__ == '__main__':
 
 
         cluster = get_cluster(client, bitrate)
-        logging.info('%s at %d got %s' % (client, bitrate, cluster))
+        print '%s at %d got %s' % (client, bitrate, cluster)
         time.sleep(1)
 
         count += 1
