@@ -94,7 +94,7 @@ class BrokerServer(rpyc.Service):
             cluster_id = 0
             dag = scenario.scenario['cdn_locations'][cluster_id]['dag']
 
-        except:
+        except Exception as err:
             logging.debug('no valid bids found for %s' % client)
             dag = ''
 
