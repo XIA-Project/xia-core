@@ -25,6 +25,7 @@ int main()
 	int sock;			// Xsocket to listen on
 	int state = 0;		// cleanup state
 	int retval = -1;	// Return error by default
+	Graph *g;
 
 	char sid_string[XIA_XID_STR_SIZE];
 	int sid_strlen = sizeof(sid_string);
@@ -65,6 +66,8 @@ int main()
 		goto fs_done;
 	}
 	state = 3;
+	g = new Graph(sa);
+	std::cout << "FetchingService address: " << g->dag_string() << std::endl;
 
 	if(Xlisten(sock, 5)) {
 		std::cout << "Error listening on our address" << std::endl;
