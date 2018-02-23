@@ -45,7 +45,10 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
 
     def handle_request(self, msg):
-        logging.debug('computing optimal cluster for %s' % msg.client)
+        logging.debug('finding optimal cluster for %s' % msg.client)
+
+        # FIXME: for testing
+        dag = 'AD:1234567890 HID:1234567890'
 
         try:
             id = self.scenario.getID(msg.client)
@@ -53,18 +56,16 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
             # add a new request entry
             self.scenario.add_request(id, msg.request.bitrate)
 
-            # fetch the bid from accepted_bids
             bids = self.scenario.scenario['accepted_bids']
             cluster_id = 0
 
             # FIXME: we need live data for testing
             #dag = self.scenario.scenario['cdn_locations'][cluster_id]['dag']
-            dag = 'AD:1234567890 HID:1234567890'
 
 
         except Exception as err:
-            logging.debug('no valid bids found for %s' % client)
-            dag = ''
+            logging.debug('no valid bids found for %s' % msg.client)
+            dag = 'NOT FOUND'
 
         logging.debug('Returning dag: %s' % dag)
         msg.request.cluster = dag
@@ -109,7 +110,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
     def send_message(self, msg):
         msgstr = msg.SerializeToString()
         length = len(msgstr)
-        self.request.send(struct.pack("!L", length), 4)
+        self.request.sendall(struct.pack("!L", length))
         self.request.sendall(msgstr)
 
 

@@ -21,12 +21,12 @@ import logging
 import logging.handlers
 import argparse
 import threading
+import SocketServer
 #from rpyc.utils.server import ThreadedServer
 
 import vdx
 from scenario import Scenario
-from brokerserver import BrokerServer
-import brokerhandler
+from brokerhandler import BrokerHandler
 
 VER='1.0'                   # app version
 REQUEST_RATE = 1            # default debug connection rate in seconds
@@ -34,6 +34,7 @@ BID_RATE = 5                # default bid calculation rate in seconds
 PRELOAD = 20                # when debugging preload n requests
 PORT=44444                  # default port for the BrokerServer
 CONF='etc/scenario.conf'    # default scenario config file
+HOST='0.0.0.0'
 
 # FIXME: we get the path in order to get the module to get the path!
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
@@ -181,8 +182,8 @@ def main():
         #threads.append(server_thread)
 
         SocketServer.TCPServer.allow_reuse_address = True
-        server = SocketServer.TCPServer((HOST, PORT), BrokerHandler)
-        server.RequestHandlerClass.scenario = s
+        server = SocketServer.TCPServer((HOST, args.port), BrokerHandler)
+        server.RequestHandlerClass.scenario = scenario
         server.serve_forever()
 
 
