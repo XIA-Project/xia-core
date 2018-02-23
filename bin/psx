@@ -14,4 +14,4 @@ EOH
 fi
 
 pgrep -l "click|xroute|xcache|xname|statsserver|xstats"
-pgrep -fa xnetj | cut -d\  -f1,3 | sed 's/\.\///'
+pgrep -fa 'xnetj|broker|pinger' | cut -d\  -f1,3 | sed 's/\.\///'

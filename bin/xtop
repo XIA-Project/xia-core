@@ -19,11 +19,10 @@ EOH
 	exit 0
 fi
 
-# because it's a python script, xnetj needs to be treated differently
-x=$(pgrep -f xnetj)
+# because they are python scripts, these daemons needs to be treated differently
+x=$(pgrep -f 'xnetj|broker|pinger' | tr '\n' ',')
 
 # get the rest of the click processes (replace \n in pgrep output with ,)
-[ "$x" ] && x="$x,"
 x="$x$(pgrep 'click|xroute|xcache|xname|statsserver|xstats' | tr '\n ' ',')"
 
 # add anything from the command line
@@ -35,4 +34,4 @@ done
 #strip the trailing ,
 x=${x%?}
 
-[ "$x" ] && top -p "$x"
+[ "$x" ] && top -c -p "$x"

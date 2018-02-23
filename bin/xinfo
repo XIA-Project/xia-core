@@ -131,4 +131,5 @@ ls -l /tmp/content
 # print the XIA related entries from syslog
 # NOTE: we don't look at the syslog.n files
 header "syslog"
-egrep "Click|xcache|xroute|xname|xnetj" /var/log/syslog
+egrep "Click|xcache|xroute|xname|xnetj|broker|pinger" /var/log/syslog
+
