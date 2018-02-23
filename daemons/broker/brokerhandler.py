@@ -26,6 +26,9 @@ from scenario import Scenario
 class BrokerHandler(SocketServer.BaseRequestHandler):
     scenario = None
 
+    #
+    # handle incoming requests & validate protobuf
+    #
     def handle(self):
         # get the length of the msg
         length = struct.unpack("!L", self.request.recv(4))[0]
@@ -45,31 +48,19 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
 
 
+    #
+    # handle requests for a target CDN
+    #
     def handle_request(self, msg):
         logging.debug('finding optimal cluster for %s' % msg.client)
 
-        dag = 'NOT_FOUND'
+        id = self.scenario.getID(msg.client)
 
-        try:
-            id = self.scenario.getID(msg.client)
+        # add a new request entry
+        self.scenario.add_request(id, msg.request.bitrate)
 
-            # add a new request entry
-            self.scenario.add_request(id, msg.request.bitrate)
-
-            bids = self.scenario.scenario['accepted_bids']
-
-            if len(bids) == 0:
-                # pick a random cluster
-                cluster_id = random.choice(self.scenario.scenario['cdn_locations'].keys())
-            else:
-                # FIXME: get the bid
-                cluster_id = 13
-
-            dag = self.scenario.scenario['cdn_locations'][cluster_id]['dag']
-
-        except Exception as err:
-            logging.debug('no valid bids found for %s' % msg.client)
-            logging.debug(str(err))
+        # find the best cluster for this client
+        dag = self.scenario.get_optimal_cluster(id, msg.request.bitrate)
 
         logging.debug('Returning dag: %s' % dag)
         msg.request.cluster = dag
@@ -77,45 +68,25 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
 
 
+    #
+    # handle client score updates
+    $
     def handle_scores(self, msg):
         logging.info('handling client update from %s' % msg.client)
-
-        id = self.scenario.getID(msg.client)
-
-        # find or create new client_location entry
-        client = self.scenario.scenario['client_locations'][id]
-        if client == None:
-            # FIXME: what do we do about lat/long?
-            client = make_client_record(msg.client, id, 0.0, 0.0)
-            self.scenario.scenario['client_locations'][id] = client
-
-        # reset score  list
-        client['cluster_scores'] = []
-
-        for cluster in msg.scores.clusters:
-            cluster_id = self.scenario.getID(cluster.name)
-            rtt = cluster.rtt
-            loss = cluster.loss
-
-            logging.debug('cluster %s (%d) has %s %s' % (cluster.name, cluster_id, rtt, loss))
-
-            # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
-            # lower is better
-
-            if rtt == None or rtt <= 0 or loss == 100:
-                score = 10000000000
-            else:
-                score = (rtt * 1000) + (loss * 100)
-            client['cluster_scores'].append([cluster_id, score])
-
-        logging.debug(client)
+        self.scenario.update_scores(msg)
 
 
+
+    #
+    # send a protobuf msg reply
+    #
     def send_message(self, msg):
         msgstr = msg.SerializeToString()
         length = len(msgstr)
         self.request.sendall(struct.pack("!L", length))
         self.request.sendall(msgstr)
+
+
 
 
 if __name__ == "__main__":

@@ -18,7 +18,8 @@ import random
 import logging
 from configparser import ConfigParser
 
-MAX_REQUEST_AGE = 30
+import cdn_pb2
+MAX_REQUEST_AGE = 60
 
 class Scenario:
     def __init__(self, fname):
@@ -270,6 +271,56 @@ class Scenario:
         return length
 
 
+    def get_optimal_cluster(self, client_id, bitrate):
+        try:
+            bid = self.scenario['accepted_bids'][client_id]
+
+            logging.debug(bid)
+            cluster_id = bid[1]
+            dag = self.scenario['cdn_locations'][cluster_id]['dag']
+
+        except Exception as err:
+            # we couldn't find a bid, pick a cluster at random
+            # FIXME: change to use best score for client
+
+            cluster_id = random.choice(self.scenario['cdn_locations'].keys())
+            dag = self.scenario['cdn_locations'][cluster_id]['dag']
+            logging.debug('no valid bids found using %s' % dag)
+
+        print len(self.scenario['requests']), len(self.scenario['accepted_bids'])
+        return dag
+
+
+    def update_scores(self, msg):
+        id = self.getID(msg.client)
+
+        # find or create new client_location entry
+        client = self.scenario['client_locations'][id]
+        if client == None:
+            # FIXME: what do we do about lat/long?
+            client = self.make_client_record(msg.client, id, 0.0, 0.0)
+            self.scenario['client_locations'][id] = client
+
+        # reset score  list
+        client['cluster_scores'] = []
+
+        for cluster in msg.scores.clusters:
+            cluster_id = self.getID(cluster.name)
+            rtt = cluster.rtt
+            loss = cluster.loss
+
+            logging.debug('cluster %s (%d) has %s %s' % (cluster.name, cluster_id, rtt, loss))
+
+            # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
+            # lower is better
+
+            if rtt == None or rtt <= 0 or loss == 100:
+                score = 10000000000
+            else:
+                score = (rtt * 1000) + (loss * 100)
+            client['cluster_scores'].append([cluster_id, score])
+
+        logging.debug(client)
 
 
 # test driver
