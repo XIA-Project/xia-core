@@ -5,3 +5,5 @@ ncid-demo-client
 push-demo-server
 push-demo-client
 push-demo-proxy
+fetch-demo-client
+make-random-chunk
