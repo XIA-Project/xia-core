@@ -65,6 +65,7 @@ enum {
 	RET_NORESP,
 	RET_REMOVEFD,
 	RET_ENQUEUE,
+	RET_DISCONNECT,
 };
 
 
@@ -751,7 +752,7 @@ int xcache_controller::free_context(xcache_cmd *cmd)
 		free(c);
 	}
 
-	return RET_NORESP;
+	return RET_DISCONNECT;
 }
 
 int xcache_controller::alloc_context(xcache_cmd *resp, xcache_cmd *cmd)
@@ -1585,6 +1586,8 @@ repeat:
 			}
 		} else if(ret == RET_REMOVEFD) {
 			/* Remove this fd from the pool */
+			// Used only to remove notification socket that
+			// xcache doesn't have to read from.
 			goto removefd;
 		} else if(ret == RET_ENQUEUE) {
 			/*
@@ -1601,6 +1604,11 @@ repeat:
 			req->datalen = sizeof(xcache_cmd);
 
 			enqueue_request_safe(req);
+		} else if(ret == RET_DISCONNECT) {
+			// User called XcacheHandleDestroy() resulting in
+			// XCACHE_FREE_CONTEXT command coming in. Close socket
+			// associated with the user's XcacheHandle
+			goto disconnected;
 		}
 
 next:
