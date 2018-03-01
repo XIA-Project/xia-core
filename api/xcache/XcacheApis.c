@@ -123,9 +123,7 @@ static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 		remaining -= ret;
 	}
 
-	// FIXME: there must be a better way of doing this!
-	std::string temp(buf, total);
-	buffer = temp;
+	buffer.assign(buf, total);
 	free(buf);
 
 	return 1;
