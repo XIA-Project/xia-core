@@ -500,6 +500,9 @@ int xcache_controller::xcache_is_content_local(xcache_cmd *resp,
 		resp->set_status(xcache_cmd::XCACHE_OK);
 		resp->set_cmd(xcache_cmd::XCACHE_ISLOCAL);
 	}
+	if(meta != NULL) {
+		release_meta(meta);
+	}
 	return RET_SENDRESP;
 }
 
