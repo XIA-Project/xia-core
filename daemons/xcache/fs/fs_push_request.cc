@@ -32,8 +32,9 @@ void FSPushRequest::process()
 	std::cout << "Pushing a chunk" << std::endl;
 
 	// Build an address for the chunk - *->CID
+	Node src;
 	Node cidnode(_cid);
-	Graph g(cidnode);
+	Graph g = src * cidnode;
 	sockaddr_x chunkaddr;
 	g.fill_sockaddr(&chunkaddr);
 
@@ -42,6 +43,8 @@ void FSPushRequest::process()
 	sockaddr_x requestoraddr;
 	rg.fill_sockaddr(&requestoraddr);
 
+	std::cout << "XpushChunk " << g.dag_string() << " to "
+		<< rg.dag_string() << " called" << std::endl;
 	if(XpushChunk(&_xcache, &chunkaddr, &requestoraddr) < 0) {
 		std::cout << "Failed pushing chunk " << g.dag_string() << std::endl;
 		// TODO: Send error by queuing FSErrorPushRequest
