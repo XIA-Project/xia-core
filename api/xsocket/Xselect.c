@@ -401,7 +401,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	if (rc > 0) {
 
 		// get the regular fds
-		for (int i = 0; i < largest; i++) {
+		for (int i = 0; i <= largest; i++) {
 			if (i != sock) {
 				if (readfds && FD_ISSET(i, &rfds)) {
 					FD_SET(i, readfds);
