@@ -154,28 +154,31 @@ void PushProxy::operator() (xcache_controller *ctrl)
 			Xclose(sock);
 			continue;
 		}
+
+		// Parse the header protobuf to determine type of header
 		std::string headerstr(buf, chdr_len);
-
-		// Chunk ID from sender's address
-		Node src_intent_xid = g.get_final_intent();
-		std::cout << "Chunk ID: " << src_intent_xid.to_string() << std::endl;
-
-		// Build the ContentHeader object for this chunk
-		ContentHeader *chdr = NULL;
-		switch (src_intent_xid.type()) {
-			case CLICK_XIA_XID_TYPE_CID:
-				chdr = new CIDHeader(headerstr);
-				break;
-			case CLICK_XIA_XID_TYPE_NCID:
-				chdr = new NCIDHeader(headerstr);
-				break;
-			default:
-				assert(0);
+		ContentHeaderBuf chdr_buf;
+		if(chdr_buf.ParseFromString(headerstr) == false) {
+			assert(0);
 		}
+
+		// Now create the header object for the received header
+		ContentHeader *chdr = NULL;
+		if(chdr_buf.has_cid_header()) {
+			chdr = new CIDHeader(headerstr);
+		} else if(chdr_buf.has_ncid_header()) {
+			chdr = new NCIDHeader(headerstr);
+		} else {
+			assert(0);
+		}
+
 		memset(buf, 0, BUFSIZE);
+		std::string contentID(chdr->id());
 
 		// Verify content header against sender's address
-		std::string contentID(chdr->id());
+		// NOT NEEDED because sender can be anyone, as long as they
+		// provide a valid chunk
+		/*
 		if(src_intent_xid.to_string().compare(contentID) != 0) {
 			std::cout << "PushProxy: headerSID != src DAG SID" << std::endl;
 			std::cout << "PushProxy: " << src_intent_xid.to_string()
@@ -184,6 +187,9 @@ void PushProxy::operator() (xcache_controller *ctrl)
 			Xclose(sock);
 			continue;
 		}
+		*/
+
+		// FIXME: add code to verify if this chunk should be accepted
 
 		// Now download content
 		size_t data_len = chdr->content_len();
