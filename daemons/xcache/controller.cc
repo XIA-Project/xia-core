@@ -583,6 +583,7 @@ int xcache_controller::xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	int remote_sock;
 	int addrlen = sizeof(sockaddr_x);
+	std::cout <<  "Controller: Push chunk" << std::endl;
 	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 
 	assert(cmd->cmd() == xcache_cmd::XCACHE_PUSHCHUNK);
@@ -593,31 +594,30 @@ int xcache_controller::xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd)
 	memcpy(&chunk_addr, cmd->data().c_str(), cmd->data().length());
 	memcpy(&remote_addr, cmd->dag().c_str(), cmd->dag().length());
 
-	// Connect to the remote end
+	// A socket used for pushing the chunk to requestor
 	if ((remote_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
 		syslog(LOG_ERR, "Xsocket not created: %s\n", strerror(errno));
 		return RET_SENDRESP;
 		//return -1;
 	}
-	// Bind to the CID DAG provided by user
-	if (Xbind(remote_sock, (struct sockaddr *)&chunk_addr,
-				sizeof(sockaddr_x)) < 0) {
-		syslog(LOG_ERR, "Xbind to chunk dag failed\n");
-		return RET_SENDRESP;
-	}
+
 	Graph g(&chunk_addr);
 	syslog(LOG_INFO, "Xcache: pushing: %s\n", g.dag_string().c_str());
 
+	Graph r(&remote_addr);
+	syslog(LOG_INFO, "Xcache: connecting to %s\n", r.dag_string().c_str());
+
+	// Connect to the requestor
 	if (Xconnect(remote_sock, (struct sockaddr *)&remote_addr, addrlen) < 0) {
 		syslog(LOG_ERR, "Xconnect failed: %s\n", strerror(errno));
 		return RET_SENDRESP;
-		//return -1;
 	}
 
 	// Now fetch the chunk from local storage and send it over
 	xcache_req req;
 	req.type = xcache_cmd::XCACHE_SENDCHUNK;
 	req.to_sock = remote_sock;
+	// FIXME: missing check to ensure chunk was available and got pushed
 	send_content_remote(&req, &chunk_addr);
 	Xclose(remote_sock);
 
@@ -690,17 +690,17 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_FLAG_DATASOCKET:
 		c = lookup_context(cmd->context_id());
 
-		if (!c)
-			syslog(LOG_ALERT, "Should Not Happen");
-		else
+		if (!c) {
+			syslog(LOG_ALERT, "Context not found for DATASOCKET");
+		} else {
 			c->xcacheSock = fd;
-
+		}
 		break;
 
 	case xcache_cmd::XCACHE_FLAG_NOTIFSOCK:
 		c = lookup_context(cmd->context_id());
 		if(!c) {
-			syslog(LOG_ALERT, "Should Not Happen");
+			syslog(LOG_ALERT, "Context not found for NOTIFSOCK");
 		} else {
 			c->notifSock = fd;
 			ret = RET_REMOVEFD;
@@ -1353,7 +1353,6 @@ void xcache_controller::process_req(xcache_req *req)
 		break;
 	case xcache_cmd::XCACHE_NEWPROXY:
 		// Start a proxy to accept pushed chunks
-		std::cout << "Controller:: got command to start new proxy" << std::endl;
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_new_proxy(&resp, cmd);
 		if(ret == RET_SENDRESP) {
@@ -1433,22 +1432,20 @@ void xcache_controller::run(void)
 	fd_set fds, allfds;
 	int max, libsocket, rc, sendersocket;
 	struct cache_args args;
+	xcache_req *req;
 	pthread_t gc_thread;
 
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
 
-	/* Application interface */
+	// Application interface
 	libsocket = xcache_create_lib_socket();
 
-	/* Arguments for the cache thread */
+	// Arguments for the cache thread
 	args.cache = &cache;
 	args.ctrl = this;
 
-	/*
-	 * Caching is performed by an independent thread
-	 * Please see cache.cc for details
-	 */
+	// Caching is performed by an independent thread. See cache.cc
 	cache.spawn_thread(&args);
 
 	if((rc = xr.connect()) != 0) {
@@ -1456,175 +1453,204 @@ void xcache_controller::run(void)
 		return;
 	}
 
+	// Connect to Click implementation of XIA Router
 	xr.setRouter(hostname);
+
+	// A socket to receive chunk requests from remote Xcaches
 	sendersocket = create_sender();
 
+	// Start by monitoring only the libsocket and sendersocket
 	FD_ZERO(&allfds);
 	FD_SET(libsocket, &allfds);
 	FD_SET(sendersocket, &allfds);
 
-	/* Launch all the worker threads */
+	// Launch all the worker threads
 	for(int i = 0; i < n_threads; i++) {
 		pthread_create(&threads[i], NULL, worker_thread, (void *)this);
 	}
 
-	// start the garbage collector
+	// Start the garbage collector
 	pthread_create(&gc_thread, NULL, garbage_collector, NULL);
 
-	syslog(LOG_INFO, "Entering The Loop\n");
+	syslog(LOG_INFO, "Xcache::Controller Entering main loop\n");
 
-repeat:
-	memcpy(&fds, &allfds, sizeof(fd_set));
+	// Main select loop to monitor allfds
+	while(true) {
+		FD_ZERO(&fds);
+		fds = allfds;
 
-	max = MAX(libsocket, sendersocket);
+		max = MAX(libsocket, sendersocket);
 
-	/* FIXME: do something better */
-	for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
-		max = MAX(max, *iter);
-	}
-
-	rc = Xselect(max + 1, &fds, NULL, NULL, NULL);
-
-	if(FD_ISSET(libsocket, &fds)) {
-		int new_connection = accept(libsocket, NULL, 0);
-
-		if (new_connection > 0) {
-
-			active_conns.push_back(new_connection);
-			FD_SET(new_connection, &allfds);
-		}
-	}
-
-	if(FD_ISSET(sendersocket, &fds)) {
-		int accept_sock;
-		sockaddr_x mypath;
-		socklen_t mypath_len = sizeof(mypath);
-
-		syslog(LOG_INFO, "Accepting!");
-		if((accept_sock = XacceptAs(sendersocket, (struct sockaddr *)&mypath,
-									&mypath_len, NULL, NULL)) < 0) {
-			syslog(LOG_ERR, "XacceptAs failed");
-		} else {
-			// FIXME: reply back the hop count
-			xcache_req *req = new xcache_req();
-
-			syslog(LOG_INFO, "XacceptAs Succeeded\n");
-			Graph g(&mypath);
-			g.print_graph();
-
-			/* Create a request to add to worker queue */
-
-			/* Send chunk Request */
-			req->type = xcache_cmd::XCACHE_SENDCHUNK;
-			req->from_sock = sendersocket;
-			req->to_sock = accept_sock;
-			req->data = malloc(mypath_len);
-			memcpy(req->data, &mypath, mypath_len);
-			req->datalen = mypath_len;
-			/* Indicates that after sending, remove the fd */
-			req->flags = XCFI_REMOVEFD;
-
-			enqueue_request_safe(req);
-			syslog(LOG_INFO, "Request Enqueued\n");
-		}
-	}
-
-	for(iter = active_conns.begin(); iter != active_conns.end(); ) {
-		if(!FD_ISSET(*iter, &fds)) {
-			++iter;
-			continue;
+		// FIXME: do something better
+		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
+			max = MAX(max, *iter);
 		}
 
-		char buf[XIA_MAXBUF];
-		std::string buffer("");
-		xcache_cmd resp, cmd;
-		int ret;
-		uint32_t msg_length, remaining;
-		bool parse_success = false;
+		// Wait for read data on all active and library sockets
+		rc = Xselect(max + 1, &fds, NULL, NULL, NULL);
 
-		ret = recv(*iter, &msg_length, sizeof(msg_length), 0);
-		if(ret <= 0)
-			goto disconnected;
+		// 2 new connections on libsocket when XcacheHandleInit() called
+		if(FD_ISSET(libsocket, &fds)) {
+			int new_connection = accept(libsocket, NULL, 0);
 
-		remaining = ntohl(msg_length);
-
-		if (remaining == 0)
-			goto next;
-
-		while(remaining > 0) {
-			ret = recv(*iter, buf, MIN(sizeof(buf), remaining), 0);
-			syslog(LOG_DEBUG, "Recv returned %d, remaining = %d\n", ret, remaining);
-			if(ret <= 0)
-				goto disconnected;
-
-			buffer.append(buf, ret);
-			remaining -= ret;
-		}
-
-		parse_success = cmd.ParseFromString(buffer);
-
-		syslog(LOG_INFO, "Controller received %lu bytes\n", buffer.length());
-		if(!parse_success) {
-			syslog(LOG_ERR, "Protobuf could not parse\n");
-			goto next;
-		}
-
-		/*
-		 * Try to see if we can process request in the fast path
-		 */
-		ret = fast_process_req(*iter, &resp, &cmd);
-
-		if(ret == RET_SENDRESP) {
-			/*
-			 * Send response back to the client
-			 */
-			resp.SerializeToString(&buffer);
-			if(send_response(*iter, buffer.c_str(), buffer.length()) < 0) {
-				syslog(LOG_ERR, "FIXME: handle failed return from write\n");
-			} else {
-				syslog(LOG_INFO, "Data sent to client\n");
+			// Add newly connected socket to list of fds to monitor
+			if (new_connection > 0) {
+				if(FD_ISSET(new_connection, &allfds)) {
+					syslog(LOG_ERR, "Controller: socket already monitored\n");
+				} else {
+					active_conns.push_back(new_connection);
+					FD_SET(new_connection, &allfds);
+				}
 			}
-		} else if(ret == RET_REMOVEFD) {
-			/* Remove this fd from the pool */
-			// Used only to remove notification socket that
-			// xcache doesn't have to read from.
-			goto removefd;
-		} else if(ret == RET_ENQUEUE) {
-			/*
-			 * Fast path processing not possible:
-			 * Enqueue the request into worker queue
-			 */
-			xcache_req *req = new xcache_req();
-
-			req->type = cmd.cmd();
-			req->ttl = cmd.ttl();
-			req->from_sock = *iter;
-			req->to_sock = *iter;
-			req->data = new xcache_cmd(cmd);
-			req->datalen = sizeof(xcache_cmd);
-
-			enqueue_request_safe(req);
-		} else if(ret == RET_DISCONNECT) {
-			// User called XcacheHandleDestroy() resulting in
-			// XCACHE_FREE_CONTEXT command coming in. Close socket
-			// associated with the user's XcacheHandle
-			goto disconnected;
 		}
 
-next:
-		++iter;
-		continue;
+		if(FD_ISSET(sendersocket, &fds)) {
+			int accept_sock;
+			sockaddr_x mypath;
+			socklen_t mypath_len = sizeof(mypath);
 
-disconnected:
-		// FIXME: this should clean up the context somehow
-		syslog(LOG_INFO, "Client %d disconnected.\n", *iter);
-		close(*iter);
-removefd:
-		FD_CLR(*iter, &allfds);
-		active_conns.erase(iter);
+			syslog(LOG_INFO, "Accepting sender connection!");
+			if((accept_sock=XacceptAs(sendersocket, (struct sockaddr *)&mypath,
+										&mypath_len, NULL, NULL)) < 0) {
+				syslog(LOG_ERR, "XacceptAs failed");
+			} else {
+				// FIXME: reply back the hop count
+				req = new xcache_req();
+
+				syslog(LOG_INFO, "XacceptAs Succeeded\n");
+				Graph g(&mypath);
+				g.print_graph();
+
+				// Create a request to add to worker queue
+
+				// Send chunk Request
+				req->type = xcache_cmd::XCACHE_SENDCHUNK;
+				req->from_sock = sendersocket;
+				req->to_sock = accept_sock;
+				req->data = malloc(mypath_len);
+				memcpy(req->data, &mypath, mypath_len);
+				req->datalen = mypath_len;
+				// Indicates that after sending, remove the fd
+				req->flags = XCFI_REMOVEFD;
+
+				enqueue_request_safe(req);
+				syslog(LOG_INFO, "Request Enqueued\n");
+			}
+		}
+
+		// Look for XcacheHandle sockets ready for a read
+		for(iter = active_conns.begin(); iter != active_conns.end(); ) {
+
+			// Skip sockets not ready for read
+			if(!FD_ISSET(*iter, &fds)) {
+				++iter;
+				continue;
+			}
+
+			char buf[XIA_MAXBUF];
+			std::string buffer("");
+			xcache_cmd resp, cmd;
+			int ret;
+			uint32_t msg_length, remaining;
+			bool parse_success = false;
+
+			// Read user command length
+			ret = recv(*iter, &msg_length, sizeof(msg_length), 0);
+			if(ret <= 0) {
+				// Close socket and remove from active_conns and any context
+				// FIXME: dangling context entry
+				close(*iter);
+				iter = active_conns.erase(iter);
+				FD_CLR(*iter, &allfds);
+				continue;
+			}
+
+			remaining = ntohl(msg_length);
+			assert(remaining > 0);
+
+			while(remaining > 0) {
+				ret = recv(*iter, buf, MIN(sizeof(buf), remaining), 0);
+				if(ret < 0) {
+					break;
+				}
+
+				buffer.append(buf, ret);
+				remaining -= ret;
+			}
+			if(remaining != 0) {
+				// Close socket and remove from active_conns and any context
+				// FIXME: dangling context entry
+				close(*iter);
+				iter = active_conns.erase(iter);
+				FD_CLR(*iter, &allfds);
+				continue;
+			}
+
+			parse_success = cmd.ParseFromString(buffer);
+
+			syslog(LOG_INFO, "Controller received %lu bytes\n", buffer.length());
+			if(!parse_success) {
+				// Close socket and remove from active_conns and any context
+				// FIXME: dangling context entry
+				close(*iter);
+				iter = active_conns.erase(iter);
+				FD_CLR(*iter, &allfds);
+				continue;
+			}
+
+			// Try to see if we can process request in the fast path
+			bool erasefd = false;
+			ret = fast_process_req(*iter, &resp, &cmd);
+
+			switch(ret) {
+				case RET_SENDRESP:
+					// Send response to XcacheHandleInit() request
+					resp.SerializeToString(&buffer);
+					if(send_response(*iter, buffer.c_str(), buffer.length())
+							< 0) {
+						syslog(LOG_ERR, "FIXME: handle failed write\n");
+					} else {
+						syslog(LOG_INFO, "Response sent to client\n");
+					}
+					break;
+				case RET_REMOVEFD:
+					// Notification socket. No need to monitor for read
+					FD_CLR(*iter, &allfds);
+					erasefd = true;
+					break;
+				case RET_ENQUEUE:
+					// Enqueue request for slow path workers to complete
+					req = new xcache_req();
+					req->type = cmd.cmd();
+					req->ttl = cmd.ttl();
+					req->from_sock = *iter;
+					req->to_sock = *iter;
+					req->data = new xcache_cmd(cmd);
+					req->datalen = sizeof(xcache_cmd);
+
+					enqueue_request_safe(req);
+					break;
+				case RET_DISCONNECT:
+					// XcacheHandleDestroy() closes *iter & removes context
+					// Stop monitoring *iter for read
+					FD_CLR(*iter, &allfds);
+					erasefd = true;
+					break;
+				case RET_NORESP:
+					// Usually happens when client is telling us DATASOCKET
+					break;
+				default:
+					syslog(LOG_ERR, "Xcache: unhandled fast_process code\n");
+			};
+
+			// Advance the iterator. Erase current entry if needed.
+			if(erasefd) {
+				iter = active_conns.erase(iter);
+			} else {
+				++iter;
+			}
+		}
 	}
-
-	goto repeat;
 }
 
 void xcache_controller::set_conf(struct xcache_conf *conf)
