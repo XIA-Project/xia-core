@@ -1,6 +1,11 @@
+xia.conf
 nodes.conf
 address.conf
 resolv.conf
 sidmap.conf
 hosts.xia
-
+RHID.cred
+controller_dag
+controller.conf
+trusted.conf
+*.tmp

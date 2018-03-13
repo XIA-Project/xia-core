@@ -134,6 +134,7 @@ public:
 	void print_graph() const;
 	std::string http_url_string() const;
 	std::string dag_string() const;
+	bool has_intent_AD() const;
 	const Node& intent_AD() const;
 	const Node& intent_HID() const;
 	const Node& intent_SID() const;

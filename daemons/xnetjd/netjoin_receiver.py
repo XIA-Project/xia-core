@@ -9,6 +9,7 @@ import threading
 from netjoin_policy import NetjoinBeacon
 from netjoin_policy import NetjoinPolicy
 from netjoin_session import NetjoinSession
+from netjoin_announcer import NetjoinAnnouncer
 from netjoin_message_pb2 import NetjoinMessage
 
 # Receiver thread, only responsible for receiving netjoin related packets
@@ -16,7 +17,7 @@ from netjoin_message_pb2 import NetjoinMessage
 class NetjoinReceiver(threading.Thread):
 
     def __init__(self, hostname, policy, announcer, shutdown,
-            xnetjd_addr=("127.0.0.1", 9228)):
+            xnetjd_addr=("127.0.0.1", 9228), is_router=False):
         threading.Thread.__init__(self)
         self.BUFSIZE = 1024
         self.sockfd = None
@@ -24,6 +25,7 @@ class NetjoinReceiver(threading.Thread):
         self.hostname = hostname
         self.policy = policy
         self.announcer = announcer    # None, unless running as access point
+        self.is_router = is_router
         self.client_sessions = {}
         self.server_sessions = {}
         self.existing_sessions = {}
@@ -34,6 +36,18 @@ class NetjoinReceiver(threading.Thread):
         # A socket we will bind to and listen on
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockfd.bind(xnetjd_addr)
+
+    def announce(self, l2_type, net_id, beacon_interval):
+
+        if self.announcer != None:
+            self.announcer.stop()
+
+	self.announcer = NetjoinAnnouncer(l2_type, net_id, beacon_interval,
+		self.shutdown)
+	self.announcer.announce()
+
+    def get_net_id(self):
+        return self.announcer.get_net_id()
 
     def handle_net_descriptor(self, message_tuple):
 
@@ -54,6 +68,7 @@ class NetjoinReceiver(threading.Thread):
         # Initiate a NetjoinSession thread to join the network
         session = NetjoinSession(self.hostname, self.shutdown,
                 receiver=self,
+                is_router=self.is_router,
                 beacon_id=beacon.get_ID(), policy=self.policy)
         session.daemon = True
         session.start()
@@ -189,9 +204,6 @@ class NetjoinReceiver(threading.Thread):
             # A new session is started if client decides to join a network
             # or if an access point receives a handshake one reqest to join
             if message_type == "net_descriptor":
-                # Ignore announcements from peer routers
-                if self.announcer:
-                    continue
                 self.handle_net_descriptor(message_tuple)
 
             elif message_type == "handshake_one":

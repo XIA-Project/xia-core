@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+#
+# copy the RHID.cred file to the routers in this AD
+
+import os
+import argparse
+import xiapyutils
+import subprocess
+
+VER = '%(prog)s 1.0'
+
+parser = argparse.ArgumentParser(description='Copy RHID.cred to other routers in this AD')
+parser.add_argument('-v', '--version', action='version', version=VER)
+parser.add_argument('host', nargs='+', help='one or more addresses')
+parser.add_argument('-u', '--user', help='remote host username')
+parser.add_argument('-p', '--port', help='ssh server port')
+parser.add_argument('-d', '--dest', type=str, help='path to the destination directory')
+args = parser.parse_args()
+
+rfile = os.path.join(xiapyutils.xia_etcdir(), 'RHID.cred')
+if not os.path.isfile(rfile):
+    print 'RHID.cred not found'
+    print 'Run xia-config to create a controller node configuration if one doesn\'t already exist'
+    print 'Or run daemons/xnetjd/credmgr.py -r to recreate the crendetinal file.'
+    exit(1)
+
+if args.dest:
+    dest = os.path.join(args.dest, 'RHID.cred')
+else:
+    dest = rfile
+
+for host in args.host:
+    cmdline = ['scp']
+    if args.port:
+        cmdline += ['-p']
+        cmdline += [args.port]
+    cmdline += [rfile]
+    if args.user:
+        cmdline += ['%s@%s:%s' % (args.user, host, dest)]
+    else:
+        cmdline += ['%s:%s' % (host, dest)]
+    
+    try:
+        subprocess.check_call(cmdline)
+    except:
+        print 'ERROR: unable to copy to %s' % host
+

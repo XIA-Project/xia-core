@@ -2,12 +2,14 @@
 #
 
 from google.protobuf import text_format as protobuf_text_format
+import os.path
 import struct
 import logging
 import jacp_pb2
 import threading
 import nacl.utils
 import netjoin_session
+from credmgr import CredMgr
 from netjoin_xiaconf import NetjoinXIAConf
 from netjoin_l2_handler import NetjoinL2Handler
 from netjoin_message_pb2 import SignedMessage
@@ -15,12 +17,15 @@ from netjoin_message_pb2 import SignedMessage
 # Build a HandshakeOne protobuf in response to a NetDescriptor beacon
 class NetjoinHandshakeOne(object):
 
-    def __init__(self, session, mymac, challenge=None):
+    def __init__(self, session, mymac, is_router=False, challenge=None):
         self.handshake_one = jacp_pb2.HandshakeOne()
         self.payload = jacp_pb2.HandshakeOne.HandshakeOneEncrypted.Payload()
         self.session = session
         self.conf = NetjoinXIAConf()
         self.challenge = challenge
+        self.is_router = is_router
+        self.cred_mgr = CredMgr()
+        self.rcredfilepath = os.path.join(self.conf.get_conf_dir(), 'RHID.cred')
 
         # No challenge, means AP got this handshake
         # It will use from_wire_handshake_one() to fill in everything
@@ -42,8 +47,31 @@ class NetjoinHandshakeOne(object):
         #core.client_l3_req.xip.single.ClientAIPPubKey = self.conf.get_der_key()
         core.client_l3_req.xip.single.configXIP.pxhcp.SetInParent()
         #core.client_l3_req.xip.single.XIPChallengeResponse = signed_challenge
-        core.client_credentials.null.SetInParent()
+        if (self.is_router):
+            # Get the router credential from file
+            router_cred = self.get_router_creds()
+            if router_cred is not None:
+                # Verify cred matches network being advertised
+                ap_net_id = self.conf.raw_hid_to_hex(
+                        self.session.beacon.xip_netid)
+                cred_net_id = router_cred.adonly.ad
+                if ap_net_id != cred_net_id:
+                    logging.error("AP advertized: {} and our cred is {}".format(
+                        ap_net_id, cred_net_id))
+                else:
+                    logging.info("We have creds to join this network")
+                core.router_credentials.CopyFrom(router_cred)
+            else:
+                core.router_credentials.null.SetInParent()
+        else:
+            core.client_credentials.null.SetInParent()
         core.client_session_id = session.get_ID()
+
+    def get_router_creds(self):
+        return self.cred_mgr.get_router_cred(self.rcredfilepath)
+
+    def is_from_router(self):
+        return self.payload.core.HasField('router_credentials')
 
     def hex_client_hid(self):
         raw_hid = self.payload.core.client_l3_req.xip.single.ClientHID
@@ -142,6 +170,31 @@ class NetjoinHandshakeOne(object):
         #    return False
         return True
 
+    def valid_adonly_cred(self, adonly_cred):
+        ad = adonly_cred.ad
+        logging.info("AD in credential: {}".format(ad))
+        logging.info("Local AD: {}".format(self.conf.get_ad()))
+        session_netid = self.session.receiver.get_net_id()
+        session_ad = self.session.conf.raw_ad_to_hex(session_netid)
+        logging.info("Announced AD: {}".format(session_ad))
+        # TODO Ensure it matches our AD else return False
+        if ad != self.conf.get_ad():
+            if ad != session_ad:
+                logging.warning("AD in credential doesn't match local AD")
+                return False
+        logging.info("Valid AD credential");
+        return True
+
+    def valid_router_creds(self, router_creds):
+        if router_creds.HasField('adonly'):
+            return self.valid_adonly_cred(router_creds.adonly)
+        elif router_creds.HasField('null'):
+            logging.info("Accepted null router credential")
+            return True
+        else:
+            logging.error("ERROR: BAD router credential")
+            return False
+
     def is_valid(self):
         # Verify that headers were untouched in transit
         hash_of_headers = self.get_hash_of_headers()
@@ -154,7 +207,18 @@ class NetjoinHandshakeOne(object):
         if not self.is_l3_valid():
             logging.error("L3 creds invalid")
             return False
-        # Handle client credentials
+        # Handle client/router credentials
+        if (self.payload.core.HasField('client_credentials')):
+            logging.info("Join request from a client")
+        elif (self.payload.core.HasField('router_credentials')):
+            if self.valid_router_creds(self.payload.core.router_credentials):
+                logging.info("Join request from a router")
+            else:
+                logging.warning("Invalid router credentials")
+                return False
+        else:
+            logging.warning("No credentials in join request")
+            return False
         return True
 
 if __name__ == "__main__":

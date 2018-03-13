@@ -64,6 +64,9 @@ int FIDRouteEngine::configure(Vector<String> &conf, ErrorHandler *errh)
 	String broadcast_xid(BFID);  // broadcast FID
 	_bcast_xid.parse(broadcast_xid);
 
+	String flood_xid(FFID);  // flood FID
+	_flood_xid.parse(flood_xid);
+
 	return 0;
 }
 
@@ -213,7 +216,7 @@ int FIDRouteEngine::set_handler4(const String &conf, Element *e, void *thunk, Er
 
 	cp_argvec(conf, args);
 
-	if (args.size() < 2 || args.size() > 4)
+	if (args.size() < 2 || args.size() > 6)
 		return errh->error("invalid route: ", conf.c_str());
 
 	xid_str = args[0];
@@ -323,17 +326,17 @@ void FIDRouteEngine::push(int in_ether_port, Packet *p)
 		// we'll handle it locally
 		output(1).push(p);
 
-	} else if (port == DESTINED_FOR_FLOOD_ALL) {
+	} else if (port == DESTINED_FOR_FLOOD) {
 		// reflood the packet
 
 		// FIXME: treat the FID as a broadcast until the router is fixed to work correctly
-		// for (int i = 0; i <= _num_ports; i++) {
-		// 	if (i != in_ether_port) {
-		// 		Packet *q = p->clone();
-		// 		SET_XIA_PAINT_ANNO(q, i);
-		// 		output(0).push(q);
-		// 	}
-		// }
+		for (int i = 0; i < _num_ports; i++) {
+			if (i != in_ether_port) {
+				Packet *q = p->clone();
+				SET_XIA_PAINT_ANNO(q, i);
+				output(0).push(q);
+			}
+		}
 
 		// and handle it locally
 		output(1).push(p);
@@ -341,13 +344,16 @@ void FIDRouteEngine::push(int in_ether_port, Packet *p)
 	} else if (port == DESTINED_FOR_BROADCAST) {
 		// send it out on all interfaces except the one it came in on
 		// FIXME: eventually restrict external interfaces as well
-		for (int i = 0; i <= _num_ports; i++) {
+		for (int i = 0; i < _num_ports; i++) {
 			if (i != in_ether_port) {
 				Packet *q = p->clone();
 				SET_XIA_PAINT_ANNO(q, i);
 				output(0).push(q);
 			}
 		}
+		p->kill();
+
+	} else if (port == DESTINED_FOR_DISCARD) {
 		p->kill();
 
 	} else {
@@ -368,8 +374,8 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 	seq_info si;
 	uint32_t new_ts = fhdr.tstamp();
 
+	//INFO("seq = %lu", seq);
 	//xt.dump();
-	//INFO("seq# = %u", seq);
 
 	it = _seq_nos.find(xt);
 
@@ -379,11 +385,9 @@ bool FIDRouteEngine::check(XIDtuple &xt, Packet *p)
 		uint32_t forward = ((uint32_t)(seq - si.seq));
 		uint32_t reverse = ((uint32_t)(si.seq - seq));
 
-		//INFO("FID seq# found: old = %u new = %u\n", old, seq);
-
 		if (seq == si.seq) {
 			// duplicate
-			INFO("FID Engine: dup sequence #");
+			INFO("FID Engine: dup sequence # %lu %u", seq, si.seq);
 			return false;
 
 		} else if (forward > reverse) {
@@ -445,18 +449,22 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	if (in_ether_port == DESTINED_FOR_LOCALHOST) {
 		// Mark packet for flooding
 		//  which will duplicate the packet and send to every interface
+		//INFO("flooding to %s", fid.unparse().c_str());
 		p->set_nexthop_neighbor_xid_anno(fid);
 		return DESTINED_FOR_BROADCAST;
 	}
 
 	// get the source and destination intent xids
-	// HACK HACK HACK until new routing is in place. All route code is using the same SIDs
-	// which causes conflicts. Use the source HID instead for now
-	//const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
-	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 2];
+	const struct click_xia_xid_node& snode = hdr->node[hdr->dnode + hdr->snode - 1];
 	const struct click_xia_xid_node& dnode = hdr->node[hdr->dnode - 1];
 	XID src(snode.xid);
 	XID dst(dnode.xid);
+
+	//INFO("tuple: f:%s s:%s d:%s ", fid.unparse().c_str(), src.unparse().c_str(), dst.unparse().c_str());
+	if (src == _local_hid) {
+		INFO("(%s) got our own packet back, discarding...\n", fid.unparse().c_str());
+		return DESTINED_FOR_DISCARD;
+	}
 
 	// create the index into the sequence number table
 	XIDtuple xt(fid, src, dst);
@@ -471,12 +479,22 @@ int FIDRouteEngine::lookup_route(int in_ether_port, Packet *p)
 	// FIXME: if we keep the global value, should we handle it like
 	// this or use the routing table like below?
 	if (fid == _bcast_xid) {
+		// FIXME: is this the right change??
+		//p->set_nexthop_neighbor_xid_anno(fid);
+		//return DESTINED_FOR_BROADCAST;
+
+		//handle broadcast packet locally and don't resend
+		return DESTINED_FOR_LOCALHOST;
+
+	} else if (fid == _flood_xid) {
 		// it's the global FID
 		// FIXME: is this a temporary case?
 
 		// we want to handle this locally and also reflood it
+
+		printf("got a global flood packet\n");
 		p->set_nexthop_neighbor_xid_anno(fid);
-		return DESTINED_FOR_FLOOD_ALL;
+		return DESTINED_FOR_FLOOD;
 	}
 
 	HashTable<XID, XIARouteData*>::const_iterator it = _rts.find(fnode.xid);

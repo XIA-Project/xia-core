@@ -34,6 +34,7 @@
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "xia.h"
 
@@ -126,6 +127,7 @@ extern int Xaccept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int f
 extern int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xconnect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 extern int Xpoll(struct pollfd *ufds, unsigned nfds, int timeout);
+extern int Xppoll(struct pollfd *ufds, unsigned nfds, const struct timespec *tmo_p, const sigset_t *sigmask);
 extern int Xlisten(int sockfd, int backlog);
 extern int Xrecvfrom(int sockfd,void *rbuf, size_t len, int flags, struct sockaddr *addr, socklen_t *addrlen);
 extern ssize_t Xrecvmsg(int fd, struct msghdr *msg, int flags);
@@ -136,6 +138,8 @@ extern int Xrecv(int sockfd, void *rbuf, size_t len, int flags);
 extern int Xsend(int sockfd, const void *buf, size_t len, int flags);
 extern int Xfcntl(int sockfd, int cmd, ...);
 extern int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struct timeval *timeout);
+//extern int Xpselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, const struct timespec *timeout, const sigset_t *sigmask);
+
 extern int Xfork(void);
 extern int Xnotify(void);
 
@@ -157,11 +161,13 @@ extern void Xfreeifaddrs(struct ifaddrs *ifa);
 extern int XupdateDefaultInterface(int sockfd, int interface);
 extern int XdefaultInterface(int sockfd);
 
+extern int XmanageFID(const char *fid, bool create);
 extern int XcreateFID(char *fid, int len);
 extern int XremoveFID(const char *fid);
 
 /* internal only functions */
-extern int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id);
+extern int XupdateDAG(int sockfd, int interface, const char *rdag,
+		const char *r4id, bool is_router);
 extern int XupdateRV(int sockfd, int interface);
 extern int XupdateNameServerDAG(int sockfd, const char *nsDAG);
 extern int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG);
@@ -181,8 +187,9 @@ extern int checkXid(const char *xid, const char *type);
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
 
-const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
-int xia_pton(int af, const char *src, sockaddr_x *dst);
+extern const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
+extern int xia_pton(int af, const char *src, sockaddr_x *dst);
+extern size_t sockaddr_size(const sockaddr_x *s);
 
 #ifdef __cplusplus
 }

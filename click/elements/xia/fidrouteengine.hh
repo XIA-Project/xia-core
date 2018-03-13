@@ -32,7 +32,7 @@ so use the XIACheckDest element before using this element.
 #define TOTAL_SPECIAL_CASES 8
 #define DESTINED_FOR_DISCARD -1
 #define DESTINED_FOR_LOCALHOST -2
-#define DESTINED_FOR_DHCP -3
+#define DESTINED_FOR_FLOOD -3
 #define DESTINED_FOR_BROADCAST -4
 #define REDIRECT -5
 #define UNREACHABLE -6
@@ -50,31 +50,31 @@ struct seq_info {
 
 class FIDRouteEngine : public Element { public:
 
-    FIDRouteEngine();
-    ~FIDRouteEngine();
+	FIDRouteEngine();
+	~FIDRouteEngine();
 
-    const char *class_name() const		{ return "FIDRouteEngine"; }
-    const char *port_count() const		{ return "-/-"; }
-    const char *processing() const		{ return PUSH; }
+	const char *class_name() const		{ return "FIDRouteEngine"; }
+	const char *port_count() const		{ return "-/-"; }
+	const char *processing() const		{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *);
+	int configure(Vector<String> &, ErrorHandler *);
 	int initialize(ErrorHandler *);
-    void add_handlers();
+	void add_handlers();
 
-    void push(int in_ether_port, Packet *);
+	void push(int in_ether_port, Packet *);
 
 	int set_enabled(int e);
 	int get_enabled();
 
 protected:
-    int lookup_route(int in_ether_port, Packet *);
+	int lookup_route(int in_ether_port, Packet *);
 
-    static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
-    static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
-    static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
+	static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 	static String read_handler(Element *e, void *thunk);
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
-    static String list_routes_handler(Element *e, void *thunk);
+	static String list_routes_handler(Element *e, void *thunk);
 
 	void run_timer(Timer *timer);
 
@@ -89,9 +89,10 @@ private:
 	Timer _timer;
 
 	int _principal_type_enabled;
-    int _num_ports;
-    XID _local_hid;
-    XID _bcast_xid;
+	int _num_ports;
+	XID _local_hid;
+	XID _bcast_xid;
+	XID _flood_xid;
 };
 
 CLICK_ENDDECLS

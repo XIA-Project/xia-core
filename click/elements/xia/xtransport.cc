@@ -215,7 +215,7 @@ int XTRANSPORT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	_local_4id = local_4id;
 	_hostname = hostname;
-	click_chatter("XTRANSPORT: hostname is %s", _hostname.c_str());
+//	INFO("XTRANSPORT: hostname is %s", _hostname.c_str());
 
 	// IP:0.0.0.0 indicates NULL 4ID
 	_null_4id.parse("IP:0.0.0.0");
@@ -328,13 +328,13 @@ int XTRANSPORT::write_param(const String &conf, Element *e, void *vparam, ErrorH
 						 cpEnd) < 0)
 			return -1;
 		f->_local_addr = dag;
-		click_chatter("XTRANSPORT: DAG or Local addr is now %s", f->_local_addr.unparse().c_str());
+		DBG("XTRANSPORT: DAG or Local addr is now %s", f->_local_addr.unparse().c_str());
 		String local_addr_str = f->_local_addr.unparse().c_str();
 		// If a dag was assigned, this is a router.
 		// So assign the same DAG to all interfaces
 		for(int i=0; i<f->_num_ports; i++) {
 			if(!f->_interfaces.update(i, local_addr_str)) {
-				click_chatter("ERROR: Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
+				ERROR("Updating dag: %s to iface: %d", local_addr_str.c_str(), i);
 				return -1;
 			}
 		}
@@ -495,6 +495,41 @@ String XTRANSPORT::Netstat(Element *e, void *)
 }
 
 
+String XTRANSPORT::default_addr(Element *e, void *)
+{
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	return xt->_local_addr.unparse();
+}
+
+String XTRANSPORT::ns_addr(Element *e, void *)
+{
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	return xt->_nameserver_addr.unparse();
+}
+
+String XTRANSPORT::rv_addr(Element *e, void *)
+{
+	String rv_dag = "";
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	if (xt->_interfaces.hasRVDAG(0)) {
+		rv_dag = xt->_interfaces.getRVDAG(0);
+	}
+	return rv_dag;
+}
+
+String XTRANSPORT::rv_control_addr(Element *e, void *)
+{
+	String rv_control_dag = "";
+	XTRANSPORT* xt = static_cast<XTRANSPORT*>(e);
+
+	if (xt->_interfaces.hasRVControlDAG(0)) {
+		rv_control_dag = xt->_interfaces.getRVControlDAG(0);
+	}
+	return rv_control_dag;
+}
 
 void XTRANSPORT::add_handlers()
 {
@@ -506,6 +541,10 @@ void XTRANSPORT::add_handlers()
 	add_write_handler("purge", purge, (void*)1);
 	add_write_handler("flush", purge, 0);
 	add_read_handler("netstat", Netstat, 0);
+	add_read_handler("address", default_addr, 0);
+	add_read_handler("nameserver", ns_addr, 0);
+	add_read_handler("rendezvous", rv_addr, 0);
+	add_read_handler("rendezvous_control", rv_control_addr, 0);
 }
 
 
@@ -2144,9 +2183,10 @@ void XTRANSPORT::update_route(String xid, String table,
 	// TODO: Add checks to ensure table is valid, e.g. rt_*
 	// TODO: Add check to ensure iface is between 0 and max interfaces
 	// TODO: Add check to ensure next is a valid XID
+	uint32_t flags = 0xeeeeeeee;	// e's make this code easy to find when it's time to change!
 	String cmd = table + ".set4";
 	String cmdargs = xid + "," + String(iface) + ","
-		+ next + "," + String(0xffff);
+		+ next + "," + String(flags);
 	click_chatter("XTRANSPORT: %s ...%s.", cmd.c_str(), cmdargs.c_str());
 
 	// <host>/xrc/n/proc/rt_<table>.set4, "<xid>, <iface>, <next>, <flags>"
@@ -2191,6 +2231,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	XIAPath router_dag;
 	xia::X_Updatedag_Msg *x_updatedag_msg
 		= xia_socket_msg->mutable_x_updatedag();
+
+	bool is_router = x_updatedag_msg->is_router();
 
 	interface = x_updatedag_msg->interface();
 	click_chatter("XTRANSPORT:Xupdatedag Updating interface: %d", interface);
@@ -2239,7 +2281,7 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 
 	// If default interface, update default_AD, default_4ID, default_HID
 	//    so they all point to new RHID
-	if(interface == _interfaces.default_interface()) {
+	if(interface == _interfaces.default_interface() && !is_router) {
 		change_default_routes(interface, new_rhid);
 	}
 
@@ -2270,6 +2312,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	String linecardstr(linecardname);
 	String linecardelem = _hostname + "/" + linecardstr;
 
+	printf("interface = %d\n", interface);
+
 	// XIAChallengeSource in XIALineCard being updated
 	String xchal_handler_str = linecardelem + "/xchal.dag";
 	click_chatter("XTRANSPORT:Xupdatedag notifying: %s", xchal_handler_str.c_str());
@@ -2281,7 +2325,8 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 	HandlerCall::call_write(xlc_xcmp_handler_str.c_str(), new_dag.unparse().c_str(), this);
 
 	// If default interface:
-	if(interface == _interfaces.default_interface()) {
+	if(interface == _interfaces.default_interface() ||
+			!_local_addr.has_intent_ad()) {
 		// XCMP in RoutingCore
 		String xrc_str = _hostname + "/xrc/x.dag";
 		HandlerCall::call_write(xrc_str.c_str(), new_dag.unparse().c_str(), this);

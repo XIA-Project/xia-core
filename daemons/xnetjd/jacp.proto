@@ -61,7 +61,8 @@ message HandshakeOneCore {
     optional LayerTwoRequest client_l2_req = 1;
     optional LayerThreeRequest client_l3_req = 2;
     optional ClientCredentials client_credentials = 3;
-    optional uint32 client_session_id = 4;
+    optional RouterCredentials router_credentials = 4;
+    optional uint32 client_session_id = 5;
 }
 
 // Initiation\ \(Handshake\ Message\ 1\):1 ends here
@@ -158,6 +159,13 @@ message PXHCPConfigRequest {
 message ClientCredentials {
    oneof client_cred_option {
        NullClientCredential null = 1;
+   }
+}
+
+message RouterCredentials {
+   oneof router_cred_option {
+       NullRouterCredential null = 1;
+       ADOnlyRouterCredential adonly = 2;
    }
 }
 
@@ -266,6 +274,8 @@ message PXHCPConfigDeclaration {
     optional string router_rv_dag = 3;
     optional string control_rv_dag = 4;
     optional bytes router_4id = 5;
+    optional string controller_dag = 6;
+    optional string router_sid = 7;
 }
 
 // XIP\ Configuration:1 ends here
@@ -419,6 +429,11 @@ message IPv4Request {
 // [[file:~/work/git/xia-vehicular/veh/jacp-spec.orgmk::*Some%20dummy%20/%20placeholder%20stubs][Some\ dummy\ /\ placeholder\ stubs:1]]
 
 message NullClientCredential {
+}
+message NullRouterCredential {
+}
+message ADOnlyRouterCredential {
+    required string ad = 1;
 }
 
 // Some\ dummy\ /\ placeholder\ stubs:1 ends here

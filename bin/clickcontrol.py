@@ -19,9 +19,7 @@ import re
 import sys
 import socket
 import xiapyutils
-
-# Number of interfaces for each host type
-numIfaces = {'XIAEndHost':4, 'XIARouter4Port':4, 'XIARouter8Port':8, 'XIARouter2Port':2}
+import nodeconf
 
 # Principal types
 principals = ['AD', 'HID', 'SID', 'CID', 'FID', 'IP']
@@ -41,13 +39,12 @@ def getxiaconstants():
     global xiaconstantsclick
     xia_constants = {}
     xiaconstantsclick = os.path.join(get_srcdir(), xiaconstantsclick)
-    print 'Reading in %s' % xiaconstantsclick
+
     with open(xiaconstantsclick) as constants:
         for line in constants:
             match = xiaconstantpattern.match(line)
             if match:
                 xia_constants[match.group(1)] = match.group(2)
-    print xia_constants
     return xia_constants
 
 class ClickControl:
@@ -59,6 +56,12 @@ class ClickControl:
     # Initialize a socket to talk to Click
     def __init__(self, clickhost='localhost', port=7777):
         self.initialized = False
+
+        n = nodeconf.nodeconf()
+        n.read()
+        self.hostname = n.hostname()
+        self.num_ifaces = int(n.numports())
+
         self.xia_constants = getxiaconstants()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -67,8 +70,6 @@ class ClickControl:
             click_ver = self.sock.recv(1024)
             if "Click::ControlSocket" not in click_ver:
                 print 'ERROR: Click did not provide version info on connect'
-            else:
-                print 'Connected to {}'.format(click_ver)
         except:
             print 'ERROR: Unable to connect to Click'
             sys.exit(-1)
@@ -91,6 +92,13 @@ class ClickControl:
     # Receive data from Click
     def receive(self):
         return self.sock.recv(1024)
+
+    # Call a read handler in Click
+    def readCommand(self, command):
+        cmd = 'read %s\n' % command
+        self.send(cmd)
+        response = self.receive()
+        return response.split('\r\n')[-1]
 
     # Call a write handler in Click
     def writeCommand(self, command):
@@ -115,20 +123,20 @@ class ClickControl:
         # Call write handler for
         destined_for_localhost = self.xia_constants['$DESTINED_FOR_LOCALHOST']
         cmd = '%s/%s.add %s %s' % (hostname, table, xid, destined_for_localhost)
-        print 'Adding route: %s' % cmd
+
         if not self.writeCommand(cmd):
             return False
         return True
 
     # Get a list of elements' write handlers
-    def getElements(self, hostname, hosttype, handler_name, iface_elem, elements):
+    def getElements(self, hostname, handler_name, iface_elem, elements):
 		# FIXME: delete these lines?
         # Routing tables for each principal type
         #for principal in principals:
         #    elements.append('xrc/n/proc/rt_%s' % principal)
 
         # Iterate over the number of interfaces for this host type
-        for i in range(numIfaces[hosttype]):
+        for i in range(self.num_ifaces):
             # Elements inside each interface card
             for elem in iface_elem:
                 elements.append('xlc%d/%s' % (i, elem))
@@ -137,18 +145,18 @@ class ClickControl:
         return [hostname + '/' + e + '.' + handler_name for e in elements]
 
     # A list of all elements with HID write handler
-    def hidElements(self, hostname, hosttype):
+    def hidElements(self, hostname):
         # Elements in line card that need to be notified
         iface_elem = ['x', 'xarpq', 'xarpr', 'xchal', 'xresp']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         # FIXME: HACK - remove the FID entry once routing is correct
         hid_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_FID']
-        return self.getElements(hostname, hosttype, 'hid', iface_elem, hid_elem)
+        return self.getElements(hostname, 'hid', iface_elem, hid_elem)
 
     # Assign an HID to a given host
-    def assignHID(self, hostname, hosttype, hid):
-        for element in self.hidElements(hostname, hosttype):
+    def assignHID(self, hostname, hid):
+        for element in self.hidElements(self.hostname):
             if not self.writeCommand(element + ' ' + hid):
                 return False
         if not self.addLocalRoute(hostname, hid):
@@ -156,17 +164,17 @@ class ClickControl:
         return True
 
     # A list of all elements with Network DAG write handler
-    def networkDagElements(self, hostname, hosttype):
+    def networkDagElements(self, hostname):
         # Elements in line card that need to be notified
         iface_elem = ['x', 'xchal']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
         dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
-        return self.getElements(hostname, hosttype, 'dag', iface_elem, dag_elem)
+        return self.getElements(hostname, 'dag', iface_elem, dag_elem)
 
     # Assign a Network dag to a given host
-    def assignDAG(self, hostname, hosttype, dag):
-        for element in self.networkDagElements(hostname, hosttype):
+    def assignDAG(self, hostname, dag):
+        for element in self.networkDagElements(hostname):
             if not self.writeCommand(element + ' ' + dag):
                 return False
         # Add a route to the local AD
@@ -179,15 +187,30 @@ class ClickControl:
             return False
         return True
 
+    def getParam(self, hostname, param):
+        return self.readCommand(hostname + '/xrc/xtransport.' + param)
+
+    def getDefaultAddr(self, hostname):
+        return self.getParam(hostname, 'address')
+
+    def getNSAddr(self, hostname):
+        return self.getParam(hostname, 'nameserver')
+
+    def getRVAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous')
+
+    def getRVControlAddr(self, hostname):
+        return self.getParam(hostname, 'rendezvous_control')
+
     # Assign a Rendezvous DAG to an interface. All interfaces by default.
-    def assignRVDAG(self, hostname, hosttype, dag, iface=-1):
+    def assignRVDAG(self, hostname, dag, iface=-1):
         cmd = '%s/xrc/xtransport.rvDAG %d,%s' % (hostname, iface, dag)
         if not self.writeCommand(cmd):
             return False
         return True
 
     # Assign a Rendezvous Control-plane DAG to an interface. default=all.
-    def assignRVControlDAG(self, hostname, hosttype, dag, iface=-1):
+    def assignRVControlDAG(self, hostname, dag, iface=-1):
         cmd = '%s/xrc/xtransport.rvcDAG %d,%s' % (hostname, iface, dag)
         if not self.writeCommand(cmd):
             return False
@@ -217,6 +240,18 @@ class ClickControl:
     # TODO: Add setRVControlDAG function here.
     def setRVControlDAG(self, interface, control_plane_dag):
         print "setRVControlDAG called, but ignored"
+
+    # Set XARP entry
+    def setADInXARPTable(self, xid):
+        if not xid.startswith('AD:'):
+            print 'ClickControl.setADXARPEntry invalid AD {}'.format(xid)
+            return False
+
+        for i in range(self.num_ifaces):
+            cmd = '{}/xlc{}/xarpr.ad {}'.format(self.hostname, i, xid)
+            if not self.writeCommand(cmd):
+                return False
+        return True
 
 # If this library is run by itself, it does a unit test that
 # connects to Click and configures its elements as an XIAEndHost

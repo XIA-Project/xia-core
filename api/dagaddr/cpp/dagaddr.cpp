@@ -1091,6 +1091,12 @@ Graph::intent_AD() const
 	return nodes_[ad_index];
 }
 
+bool
+Graph::has_intent_AD() const
+{
+	return (intent_AD_index() != INVALID_GRAPH_INDEX);
+}
+
 /*
  * @brief Return the HID for the Graph's intent node
  *

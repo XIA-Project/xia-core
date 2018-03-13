@@ -2,19 +2,56 @@
 #
 
 import logging
+import binascii
 import hashlib
 import networkx
 import ndap_pb2
+import uuid
+import os.path
+from credmgr import CredMgr
 from netjoin_beacon import NetjoinBeacon
+from netjoin_xiaconf import NetjoinXIAConf
+from netjoin_xrouted import NetjoinXrouted
 from netjoin_affinity import NetjoinAffinity
 from google.protobuf import text_format as protobuf_text_format
 
+"""Network Joining Policy Module
+
+This module defines the policy for networks that can or should be joined
+
+The join_sender_of_beacon() method is the primary entry point for the
+decision making process. Each incoming network announcement beacon is
+forwarded to the policy module for a policy decision.
+
+Since each beacon must be processed as it comes in, it is imperative that
+the policy decisions are made as efficiently and quickly as possible.
+
+Attributes:
+    is_controller: Is the policy module representing a controller?
+    is_router: Is the policy module representing a router?
+    conf: Interface to read local configuration and process it
+    xrouted: Interface to forward relevant messages to the routing daemon
+    known_beacons: Beacons for which joining decisions are pre-decided
+    affinity: Affinity metric storage for each beacon
+    home_xip_network: The Network/AD that this router/controller belongs to
+
+Notes:
+    1. home_xip_network is calculated only at __init__. If the credentials
+    change at run time, this should also be recalculated.
+    2. It might make sense to split NetjoinPolicy to NetjoinControllerPolicy,
+    NetjoinRouterPolicy and NetjoinClientPolicy to allow different roles.
+    For now, the differences are small so we are just using if-else.
+"""
 class NetjoinPolicy:
 
     JOINED, JOINING, UNJOINABLE = range(3)
 
-    def __init__(self):
+    def __init__(self, is_controller=False, is_router=False):
         logging.debug("Policy module initialized")
+        self.is_controller = is_controller
+        self.is_router = is_router
+        self.conf = NetjoinXIAConf()
+        self.xrouted = NetjoinXrouted()
 
         # Beacons seen before. One set for each policy instance
         # (beacon_ID, iface) = <current state>
@@ -26,6 +63,28 @@ class NetjoinPolicy:
 
         #TODO Load list of available auth providers from config file
         #TODO Load list of XIP networks we can join?
+        # For now, we only join the network in router cred or address.conf
+        self.home_xip_network = self.__home_xip_network()
+
+    # Called only once by __init__
+    # NOTE may need to make it dynamic if creds can change at runtime
+    def __home_xip_network(self):
+        """The XIP network that this router/controller belongs to
+        NOTE: may be None if the network is not known or running on a client
+        """
+        home_xip_network = None
+
+        # Controllers have XIP Network ID in etc/address.conf
+        if self.is_controller:
+            home_xip_network = self.conf.get_raw_ad()
+        elif self.is_router:
+            credfilepath = os.path.join(self.conf.get_conf_dir(), 'RHID.cred')
+            if os.path.exists(credfilepath):
+                credmgr = CredMgr()
+                router_cred = credmgr.get_router_cred(credfilepath)
+                home_xip_network = binascii.unhexlify(router_cred.adonly.ad)
+
+        return home_xip_network
 
     def print_known_beacons(self):
         logging.info(self.known_beacons.keys())
@@ -179,6 +238,29 @@ class NetjoinPolicy:
         if self.is_known_beacon_id(beacon_ID, iface):
             return False
 
+        # Routers only join network defined by their credential
+        # Edge routers notify controller if a foreign network is seen
+        # Controller may be an edge router, so check foreign networks on it too
+        if self.is_router or self.is_controller:
+            # Find the network being announced by the beacon
+            beacon_from_network = beacon.find_xip_netid();
+            if beacon_from_network == None:
+                logging.error("Could not find NetworkId in beacon")
+                return False
+
+            # If not our home network, tell xrouted about it and return False
+            if self.home_xip_network != beacon_from_network:
+                logging.debug("Informing xrouted of a foreign network")
+                ad_hex_str = self.conf.raw_ad_to_hex(beacon_from_network)
+                beacon_ad_str = "AD:{}".format(ad_hex_str)
+                self.xrouted.send_foreign_ad(iface, beacon_ad_str)
+                # NOTE add to known beacons to stop notifying xrouted, if needed
+                return False
+
+        # Controllers don't join routers
+        if self.is_controller:
+            return False
+
         # Try to find a set of steps we can take to join a desirable network
         path = self.get_shortest_joinable_path(beacon)
         joining_state = None
@@ -208,9 +290,10 @@ class NetjoinPolicy:
 # Unit test this module when run by itself
 if __name__ == "__main__":
     iface = 0
+    net_id = uuid.uuid4().bytes
     policy = NetjoinPolicy()
     beacon = NetjoinBeacon()
-    beacon.initialize() # A default beacon announcing this network
+    beacon.initialize(net_id) # A default beacon announcing this network
     serialized_test_beacon = beacon.update_and_get_serialized_beacon()
     test_beacon = ndap_pb2.NetDescriptor()
     test_beacon.ParseFromString(serialized_test_beacon)

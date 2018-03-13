@@ -39,7 +39,8 @@
  * @returns -1 on failure
  * @returns 0 on success
  */
-int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
+int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id,
+		bool is_router) {
   int rc;
 
   if (!rdag) {
@@ -60,6 +61,7 @@ int XupdateDAG(int sockfd, int interface, const char *rdag, const char *r4id) {
   xsm.set_sequence(seq);
 
   xia::X_Updatedag_Msg *x_updatedag_msg = xsm.mutable_x_updatedag();
+  x_updatedag_msg->set_is_router(is_router);
   x_updatedag_msg->set_interface(interface);
   x_updatedag_msg->set_dag(rdag);
   x_updatedag_msg->set_ip4id(r4id);
@@ -150,7 +152,7 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 		return -1;
 	}
 
-	if (localhostDAG == NULL || local4ID == NULL) {
+	if (localhostDAG == NULL) {
 		LOG("NULL pointer!");
 		errno = EINVAL;
 		return -1;
@@ -185,12 +187,14 @@ int XreadLocalHostAddr(int sockfd, char *localhostDAG, unsigned lenDAG, char *lo
 			LOGF("ERROR: DAG buffer too short: %u, needed: %u", lenDAG, actualdaglen);
 			return -1;
 		}
-		if(len4ID < actual4idlen) {
+		if(local4ID && (len4ID < actual4idlen)) {
 			LOGF("ERROR: 4ID buffer too short: %u, needed: %u", len4ID, actual4idlen);
 			return -1;
 		}
 		strncpy(localhostDAG, (_msg->dag()).c_str(), lenDAG);
-		strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
+		if (local4ID) {
+			strncpy(local4ID, (_msg->ip4id()).c_str(), len4ID);
+		}
 		rc = 0;
 	} else {
 		LOG("XreadlocalHostAddr: ERROR: Invalid response for XREADLOCALHOSTADDR request");

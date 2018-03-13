@@ -23,6 +23,8 @@ dualrouterclick = 'dual_stack_router.click'
 if os.uname()[-1] == 'mips':
 	ext = 'mips.template'
 
+verbose = True
+
 # Find where we are running out of
 srcdir = xiapyutils.xia_srcdir()
 
@@ -72,6 +74,13 @@ waveserver_ip = None
 waveserver_port = None
 socket_ips_ports = None
 num_router_ports = 4
+
+def message(msg, *params):
+    if verbose:
+        if params:
+            print msg, params
+        else:
+            print msg
 
 #
 # create a globally unique HID based off of our mac address
@@ -247,7 +256,7 @@ def makeHostConfig():
         print "no available interface"
         exit(1)
     elif (len(interfaces) > 1):
-        print "multiple interfaces found, using " + interfaces[0][0]
+        message("multiple interfaces found, using " + interfaces[0][0])
 
     try:
         f = open(hosttemplate, "r")
@@ -315,10 +324,10 @@ def makeRouterConfigToFile(template, outfile):
     global interface_filter
 
     interfaces = getInterfaces(interface_filter)
-    print "Got these interfaces:", interfaces
+    message("Got these interfaces:", interfaces)
 
     socket_ip_port_list = [p.strip() for p in socket_ips_ports.split(',')] if socket_ips_ports else []
-    print "Socket ip port list contains:", socket_ip_port_list
+    message("Socket ip port list contains:", socket_ip_port_list)
 
     makeGenericRouterConfig(num_router_ports, socket_ip_port_list, interfaces, [], template, outfile)
 
@@ -328,7 +337,7 @@ def makeGenericRouterConfig(num_ports, socket_ip_port_list, xia_interfaces, ip_i
     dummy_ip = '0.0.0.0'
     dummy_mac = '00:00:00:00:00:00'
 
-    print "Opening template and output click file"
+    message("Opening template and output click file")
     try:
         f = open(template, 'r')
         text = f.read()
@@ -656,7 +665,7 @@ def makeDualRouterConfig(ad):
 #
 # parse the command line so we can do stuff
 #
-def getOptions():
+def getOptions(cmdline):
     global hostname
     global nodetype
     global dual_stack
@@ -678,7 +687,8 @@ def getOptions():
     global num_router_ports
     try:
         shortopt = "hr48ni:a:m:f:I:W:tP:"
-        opts, args = getopt.getopt(sys.argv[1:], shortopt,
+        #opts, args = getopt.getopt(sys.argv[1:], shortopt,
+        opts, args = getopt.getopt(cmdline, shortopt,
             ["help", "router", "host", "dual-stack", "nameserver", "manual-address=", "interface-filter=", "host-interface=", "waveserver=", "socket-ports="])
     except getopt.GetoptError, err:
         # print     help information and exit:
@@ -764,18 +774,21 @@ where:
 # do it
 #
 def main():
+    build(sys.argv[1:])
 
-    getOptions()
 
-    print "Checking type of node to create"
+def build(cmds):
+    getOptions(cmds)
+
+    message("Checking type of node to create")
     if (nodetype == "host"):
-        print "Creating host"
+        message("Creating host")
         if dual_stack:
-            print "Creating dual stack host"
+            message("Creating dual stack host")
             ad = createAD()
             makeDualHostConfig(ad)
         else:
-            print "Calling makeRouterConfig"
+            message("Calling makeRouterConfig")
             makeRouterConfigToFile(hosttemplate, hostconfig)
     elif nodetype == "router":
         ad = createAD()

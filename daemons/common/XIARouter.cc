@@ -1,4 +1,5 @@
 #include <string.h>
+#include <map>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -25,7 +26,7 @@ int XIARouter::connect(std::string clickHost, unsigned short controlPort)
 
 	if ((_cserr = _cs.configure(addr, controlPort)) != 0)
 		return XR_NOT_CONNECTED;
-	
+
 	_connected = true;
 	return XR_OK;
 }
@@ -70,7 +71,7 @@ int XIARouter::listRouters(std::vector<std::string> &rlist)
 }
 
 // get the current set of route entries, return value is number of entries returned or < 0 on err
-int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
+int XIARouter::getRoutes(std::string xidtype, std::map<std::string, XIARouteEntry> &xrt)
 {
 	std::string result;
 	vector<string> lines;
@@ -128,7 +129,7 @@ int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 			s = line.substr(start, line.length() - start);
 			entry.flags = atoi(s.c_str());
 
-			xrt.push_back(entry);
+			xrt[entry.xid] = entry;
 			n++;
 		}
 		current++;
@@ -147,7 +148,15 @@ std::string XIARouter::itoa(signed i)
 	return s;
 }
 
-int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags)
+int XIARouter::rawWrite(const std::string &element, const std::string &cmd, const std::string &data)
+{
+    if ((_cserr == _cs.write(element, cmd, data)))
+        return XR_CLICK_ERROR;
+
+    return XR_OK;
+}
+
+int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
 {
 	string xidtype;
 	string mutableXID(xid);
@@ -169,42 +178,59 @@ int XIARouter::updateRoute(string cmd, const std::string &xid, int port, const s
 	if (getRouter().length() == 0)
 		return  XR_ROUTER_NOT_SET;
 
+	if (weight > 100) // weight <= 0 means to delete it
+		return XR_INVALID_WEIGHT;
+
 	xidtype = mutableXID.substr(0, n);
 
 	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
-	
-	string default_xid("-"); 
+
+	string default_xid("-");
 	if (mutableXID.compare(n+1, 1, default_xid) == 0)
 		mutableXID = default_xid;
-		
+
 	std::string entry;
 
 	// remove command only takes an xid
-	if (cmd == "remove") 
+	if (cmd == "remove")
 		entry = mutableXID;
+	else if (cmd == "sel_remove")
+		entry = mutableXID + "," + index;
 	else
-		entry = mutableXID + "," + itoa(port) + "," + next + "," + itoa(flags);
+		entry = mutableXID + "," + itoa(port) + "," + next + "," + itoa(flags) + "," + itoa(weight) + "," + index;
 
 	if ((_cserr = _cs.write(table, cmd, entry)) != 0)
 		return XR_CLICK_ERROR;
-	
+
 	return XR_OK;
 }
 
 int XIARouter::addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
-	return updateRoute("add4", xid, port, next, flags);
+	string index = "";
+	return updateRoute("add4", xid, port, next, flags, 100, index);
 }
 
 int XIARouter::setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags)
 {
-	return updateRoute("set4", xid, port, next, flags);
+	string index = "";
+	return updateRoute("set4", xid, port, next, flags, 100, index);
+}
+
+int XIARouter::appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
+{
+	return updateRoute("app4", xid, port, next, flags, weight, index);
+}
+
+int XIARouter::seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index)
+{
+	return updateRoute("sel_set4", xid, port, next, flags, weight, index);
 }
 
 int XIARouter::delRoute(const std::string &xid)
 {
 	string next = "";
-	return updateRoute("remove", xid, 0, next, 0);
+	return updateRoute("remove", xid, 0, next, 0, 100, next);
 }
 
 const char *XIARouter::cserror()
@@ -235,5 +261,3 @@ const char *XIARouter::cserror()
 	}
 	return "unknown";
 }
-
-

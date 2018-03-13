@@ -181,6 +181,7 @@ message X_Updatedag_Msg {
   required int32 interface = 1;
   required string dag = 2;
   optional string ip4id = 3;
+  optional bool is_router = 4;
 }
 
 message X_ReadLocalHostAddr_Msg {

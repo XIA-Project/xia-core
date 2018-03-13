@@ -7,3 +7,8 @@ xnetcat
 xrendezvous
 xcache
 announce_publisher
+xcontrold
+xhostd
+manifest_server
+proxy
+video_publisher

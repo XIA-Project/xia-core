@@ -236,35 +236,38 @@ XARPResponder::remove_handler(const String &s, Element *e, void *, ErrorHandler 
     return errh->error("%s not found", xid.unparse().c_str());
 }
 
-enum {DAG, HID};
+enum {DAG, XXID};
 
 int XARPResponder::write_param(const String &conf, Element *e, void *vparam, ErrorHandler *errh)
 {
     XARPResponder *ar = static_cast<XARPResponder *>(e);
     switch(reinterpret_cast<intptr_t>(vparam)) {
-    case HID:
+    case XXID:
     {
-        XID hid;
+        XID xid;
         if (cp_va_kparse(conf, ar, errh,
-                    "HID", cpkP + cpkM, cpXID, &hid, cpEnd) < 0)
+                    "XID", cpkP + cpkM, cpXID, &xid, cpEnd) < 0)
             return -1;
-		// Remove entry for old HID from HID->MAC table, if any
-		for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it) {
-			if(ar->_my_xid == it->xida) {
-				ar->_v.erase(it);
-				break;
-			}
-		}
-		// Assign the new HID
-        ar->_my_xid = hid;
-		// Add new entry for this HID to the HID->MAC table
+//		don't delete existing entries in the table so that we can have HID and AD entries
+//		this shouldn't be a problem since routers and controllers will never switch ADs or HIDs
+//		while running
+//		// Remove entry for old XID from XID->MAC table, if any
+//		for (Vector<Entry>::iterator it = ar->_v.begin(); it != ar->_v.end(); ++it) {
+//			if(ar->_my_xid == it->xida) {
+//				ar->_v.erase(it);
+//				break;
+//			}
+//		}
+		// Assign the new XID
+        ar->_my_xid = xid;
+		// Add new entry for this XID to the XID->MAC table
 		Vector<Entry> v(ar->_v);
 		v.push_back(Entry());
-		v.back().xida = hid;
+		v.back().xida = xid;
 		v.back().ena = ar->_my_en;
 		normalize(v, true, errh);
 		ar->_v.swap(v);
-        click_chatter("XARPResponder: HID assigned: %s", ar->_my_xid.unparse().c_str());
+        click_chatter("XARPResponder: XID assigned: %s", ar->_my_xid.unparse().c_str());
         break;
     }
     default:
@@ -281,7 +284,8 @@ XARPResponder::add_handlers()
     set_handler("lookup", Handler::OP_READ | Handler::READ_PARAM, lookup_handler);
     add_write_handler("add", add_handler, 0);
     add_write_handler("remove", remove_handler, 0);
-    add_write_handler("hid", write_param, (void *)HID);
+    add_write_handler("hid", write_param, (void *)XXID);
+    add_write_handler("ad", write_param, (void *)XXID);
 }
 
 EXPORT_ELEMENT(XARPResponder)

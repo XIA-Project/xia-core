@@ -48,15 +48,15 @@ XARPTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Timestamp timeout(300);
     if (Args(conf, this, errh)
-	.read("CAPACITY", _packet_capacity)
-	.read("ENTRY_CAPACITY", _entry_capacity)
-	.read("TIMEOUT", timeout)
-	.complete() < 0)
-	return -1;
+        .read("CAPACITY", _packet_capacity)
+        .read("ENTRY_CAPACITY", _entry_capacity)
+        .read("TIMEOUT", timeout)
+        .complete() < 0)
+        return -1;
     set_timeout(timeout);
     if (_timeout_j) {
-	_expire_timer.initialize(this);
-	_expire_timer.schedule_after_sec(_timeout_j / CLICK_HZ);
+        _expire_timer.initialize(this);
+        _expire_timer.schedule_after_sec(_timeout_j / CLICK_HZ);
     }
     return 0;
 }
@@ -72,13 +72,13 @@ XARPTable::clear()
 {
     // Walk the arp cache table and free any stored packets and arp entries.
     for (Table::iterator it = _table.begin(); it; ) {
-	XARPEntry *ae = _table.erase(it);
-	while (Packet *p = ae->_head) {
-	    ae->_head = p->next();
-	    p->kill();
-	    ++_drops;
-	}
-	_alloc.deallocate(ae);
+        XARPEntry *ae = _table.erase(it);
+        while (Packet *p = ae->_head) {
+            ae->_head = p->next();
+            p->kill();
+            ++_drops;
+        }
+        _alloc.deallocate(ae);
     }
     _entry_count = _packet_count = 0;
     _age.__clear();
@@ -89,10 +89,10 @@ XARPTable::take_state(Element *e, ErrorHandler *errh)
 {
     XARPTable *xarpt = (XARPTable *)e->cast("XARPTable");
     if (!xarpt)
-	return;
+        return;
     if (_table.size() > 0) {
-	errh->error("late take_state");
-	return;
+        errh->error("late take_state");
+        return;
     }
 
     _table.swap(xarpt->_table);
@@ -113,34 +113,34 @@ XARPTable::slim(click_jiffies_t now)
 
     // Delete old entries.
     while ((ae = _age.front())
-	   && (ae->expired(now, _timeout_j)
-	   || (_entry_capacity && _entry_count > _entry_capacity))
-	   && ae->_perm == false) {
-	_table.erase(ae->_xid);
-	_age.pop_front();
+           && (ae->expired(now, _timeout_j)
+           || (_entry_capacity && _entry_count > _entry_capacity))
+           && ae->_perm == false) {
+        _table.erase(ae->_xid);
+        _age.pop_front();
 
-	while (Packet *p = ae->_head) {
-	    ae->_head = p->next();
-	    p->kill();
-	    --_packet_count;
-	    ++_drops;
-	}
+        while (Packet *p = ae->_head) {
+            ae->_head = p->next();
+            p->kill();
+            --_packet_count;
+            ++_drops;
+        }
 
-	_alloc.deallocate(ae);
-	--_entry_count;
+        _alloc.deallocate(ae);
+        --_entry_count;
     }
 
     // Mark entries for polling, and delete packets to make space.
     while (_packet_capacity && _packet_count > _packet_capacity) {
-	while (ae->_head && _packet_count > _packet_capacity) {
-	    Packet *p = ae->_head;
-	    if (!(ae->_head = p->next()))
-		ae->_tail = 0;
-	    p->kill();
-	    --_packet_count;
-	    ++_drops;
-	}
-	ae = ae->_age_link.next();
+        while (ae->_head && _packet_count > _packet_capacity) {
+            Packet *p = ae->_head;
+            if (!(ae->_head = p->next()))
+                ae->_tail = 0;
+            p->kill();
+            --_packet_count;
+            ++_drops;
+        }
+        ae = ae->_age_link.next();
     }
 }
 
@@ -153,7 +153,7 @@ XARPTable::run_timer(Timer *timer)
     slim(click_jiffies());
     _lock.release_write();
     if (_timeout_j)
-	timer->schedule_after_sec(_timeout_j / CLICK_HZ + 1);
+        timer->schedule_after_sec(_timeout_j / CLICK_HZ + 1);
 }
 
 XARPTable::XARPEntry *
@@ -162,22 +162,22 @@ XARPTable::ensure(XID xid, click_jiffies_t now)
     _lock.acquire_write();
     Table::iterator it = _table.find(xid);
     if (!it) {
-	void *x = _alloc.allocate();
-	if (!x) {
-	    _lock.release_write();
-	    return 0;
-	}
+        void *x = _alloc.allocate();
+        if (!x) {
+            _lock.release_write();
+            return 0;
+        }
 
-	++_entry_count;
-	if (_entry_capacity && _entry_count > _entry_capacity)
-	    slim(now);
+        ++_entry_count;
+        if (_entry_capacity && _entry_count > _entry_capacity)
+            slim(now);
 
-	XARPEntry *ae = new(x) XARPEntry(xid);
-	ae->_live_at_j = now;
-	ae->_polled_at_j = ae->_live_at_j - CLICK_HZ;
-	_table.set(it, ae);
+        XARPEntry *ae = new(x) XARPEntry(xid);
+        ae->_live_at_j = now;
+        ae->_polled_at_j = ae->_live_at_j - CLICK_HZ;
+        _table.set(it, ae);
 
-	_age.push_back(ae);
+        _age.push_back(ae);
     }
     return it.get();
 }
@@ -188,25 +188,25 @@ XARPTable::insert(XID xid, bool perm, const EtherAddress &eth, Packet **head)
     click_jiffies_t now = click_jiffies();
     XARPEntry *ae = ensure(xid, now);
     if (!ae)
-	return -ENOMEM;
+        return -ENOMEM;
 
     ae->_eth = eth;
     ae->_known = !eth.is_broadcast();
-	ae->_perm = perm;
+        ae->_perm = perm;
 
     ae->_live_at_j = now;
     ae->_polled_at_j = ae->_live_at_j - CLICK_HZ;
 
     if (ae->_age_link.next()) {
-	_age.erase(ae);
-	_age.push_back(ae);
+        _age.erase(ae);
+        _age.push_back(ae);
     }
 
     if (head) {
-	*head = ae->_head;
-	ae->_head = ae->_tail = 0;
-	for (Packet *p = *head; p; p = p->next())
-	    --_packet_count;
+        *head = ae->_head;
+        ae->_head = ae->_tail = 0;
+        for (Packet *p = *head; p; p = p->next())
+            --_packet_count;
     }
 
     _table.balance();
@@ -220,11 +220,11 @@ XARPTable::append_query(XID xid, Packet *p)
     click_jiffies_t now = click_jiffies();
     XARPEntry *ae = ensure(xid, now);
     if (!ae)
-	return -ENOMEM;
+        return -ENOMEM;
 
     if (ae->known(now, _timeout_j)) {
-	_lock.release_write();
-	return -EAGAIN;
+        _lock.release_write();
+        return -EAGAIN;
     }
 
     // Since we're still trying to send to this address, keep the entry just
@@ -232,38 +232,38 @@ XARPTable::append_query(XID xid, Packet *p)
     // Tetsukawa, and verified via testie, where the slim() below could delete
     // the "ae" XARPEntry when "ae" was the oldest entry in the system.
     if (_timeout_j) {
-	click_jiffies_t live_at_j_min = now - _timeout_j;
-	if (click_jiffies_less(ae->_live_at_j, live_at_j_min)) {
-	    ae->_live_at_j = live_at_j_min;
-	    // Now move "ae" to the right position in the list by walking
-	    // forward over other elements (potentially expensive?).
-	    XARPEntry *ae_next = ae->_age_link.next(), *next = ae_next;
-	    while (next && click_jiffies_less(next->_live_at_j, ae->_live_at_j))
-		next = next->_age_link.next();
-	    if (ae_next != next) {
-		_age.erase(ae);
-		_age.insert(next /* might be null */, ae);
-	    }
-	}
+        click_jiffies_t live_at_j_min = now - _timeout_j;
+        if (click_jiffies_less(ae->_live_at_j, live_at_j_min)) {
+            ae->_live_at_j = live_at_j_min;
+            // Now move "ae" to the right position in the list by walking
+            // forward over other elements (potentially expensive?).
+            XARPEntry *ae_next = ae->_age_link.next(), *next = ae_next;
+            while (next && click_jiffies_less(next->_live_at_j, ae->_live_at_j))
+                next = next->_age_link.next();
+            if (ae_next != next) {
+                _age.erase(ae);
+                _age.insert(next /* might be null */, ae);
+            }
+        }
     }
 
     ++_packet_count;
     if (_packet_capacity && _packet_count > _packet_capacity)
-	slim(now);
+        slim(now);
 
     if (ae->_tail)
-	ae->_tail->set_next(p);
+        ae->_tail->set_next(p);
     else
-	ae->_head = p;
+        ae->_head = p;
     ae->_tail = p;
     p->set_next(0);
 
     int r;
     if (!click_jiffies_less(now, ae->_polled_at_j + CLICK_HZ / 10)) {
-	ae->_polled_at_j = now;
-	r = 1;
+        ae->_polled_at_j = now;
+        r = 1;
     } else
-	r = 0;
+        r = 0;
 
     _table.balance();
     _lock.release_write();
@@ -277,10 +277,10 @@ XARPTable::reverse_lookup(const EtherAddress &eth)
 
     XID xid;
     for (Table::iterator it = _table.begin(); it; ++it)
-	if (it->_eth == eth) {
-	    xid = it->_xid;
-	    break;
-	}
+        if (it->_eth == eth) {
+            xid = it->_xid;
+            break;
+        }
 
     _lock.release_read();
     return xid;
@@ -289,25 +289,25 @@ XARPTable::reverse_lookup(const EtherAddress &eth)
 String
 XARPTable::read_handler(Element *e, void *user_data)
 {
-	XARPTable *xarpt = (XARPTable *) e;
-	StringAccum sa;
-	click_jiffies_t now = click_jiffies();
+        XARPTable *xarpt = (XARPTable *) e;
+        StringAccum sa;
+        click_jiffies_t now = click_jiffies();
 
-	switch (reinterpret_cast<uintptr_t>(user_data)) {
-	case h_table:
-		for (XARPEntry *ae = xarpt->_age.front(); ae; ae = ae->_age_link.next()) {
-				int ok = ae->known(now, xarpt->_timeout_j);
+        switch (reinterpret_cast<uintptr_t>(user_data)) {
+        case h_table:
+                for (XARPEntry *ae = xarpt->_age.front(); ae; ae = ae->_age_link.next()) {
+                                int ok = ae->known(now, xarpt->_timeout_j);
 
-				if (ok) {
-					sa  << ae->_xid << ' ' << ae->_eth << ' '
-						<< Timestamp::make_jiffies(now - ae->_live_at_j) << ' '
-						<< (ae->_perm ? 1 : 0)
-						<< '\n';
-				}
-		}
-		break;
-	}
-	return sa.take_string();
+                                if (ok) {
+                                        sa  << ae->_xid << ' ' << ae->_eth << ' '
+                                                << Timestamp::make_jiffies(now - ae->_live_at_j) << ' '
+                                                << (ae->_perm ? 1 : 0)
+                                                << '\n';
+                                }
+                }
+                break;
+        }
+        return sa.take_string();
 }
 
 int
@@ -316,32 +316,32 @@ XARPTable::write_handler(const String &str, Element *e, void *user_data, ErrorHa
     XARPTable *xarpt = (XARPTable *) e;
     switch (reinterpret_cast<uintptr_t>(user_data)) {
       case h_insert: {
-	  XID xid;
-	  EtherAddress eth;
-	  bool perm;
-	  if (Args(xarpt, errh).push_back_words(str)
-	      .read_mp("XID", xid)
-	      .read_mp("ETH", eth)
-		  .read_mp("STATIC", perm)
-	      .complete() < 0)
-	      return -1;
-	  xarpt->insert(xid, perm, eth);
-	  return 0;
+          XID xid;
+          EtherAddress eth;
+          bool perm;
+          if (Args(xarpt, errh).push_back_words(str)
+              .read_mp("XID", xid)
+              .read_mp("ETH", eth)
+                  .read_mp("STATIC", perm)
+              .complete() < 0)
+              return -1;
+          xarpt->insert(xid, perm, eth);
+          return 0;
       }
       case h_delete: {
-	  XID xid;
-	  if (Args(xarpt, errh).push_back_words(str)
-	      .read_mp("XID", xid)
-	      .complete() < 0)
-	      return -1;
-	  xarpt->insert(xid, false, EtherAddress::make_broadcast()); // XXX?
-	  return 0;
+          XID xid;
+          if (Args(xarpt, errh).push_back_words(str)
+              .read_mp("XID", xid)
+              .complete() < 0)
+              return -1;
+          xarpt->insert(xid, false, EtherAddress::make_broadcast()); // XXX?
+          return 0;
       }
       case h_clear:
-	xarpt->clear();
-	return 0;
+        xarpt->clear();
+        return 0;
       default:
-	return -1;
+        return -1;
     }
 }
 

@@ -9,6 +9,7 @@ import binascii
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 sys.path.append(os.path.join(srcdir, "bin"))
 import xiapyutils
+import nodeconf
 
 '''
 from Crypto.Signature import PKCS1_v1_5
@@ -24,10 +25,12 @@ class NetjoinXIAConf(object):
         self.src_dir = cwd[:cwd.rindex('xia-core')+len('xia-core')]
         self.conf_dir = os.path.join(self.src_dir, "etc")
         self.key_dir = os.path.join(self.src_dir, "key")
-        self.addrconfpattern = re.compile('^(\w+)\s+(\w+)\s+\((.+)\)')
         self.resolvconfpattern = re.compile('nameserver=(RE.+)')
         self.rvpattern = re.compile('rendezvous=(.+)')
         self.rvcpattern = re.compile('rendezvousc=(.+)')
+
+        self.node = nodeconf.nodeconf()
+        self.node.read()
 
 	'''
     # Return serialized SignedMessage
@@ -108,25 +111,13 @@ class NetjoinXIAConf(object):
             router_dag = "RE AD:{} HID:{}".format(ad, hid)
         return router_dag
 
+    def get_conf_dir(self):
+        return self.conf_dir
+
     # Read address.conf looking for HID of this host
     def get_ad_hid(self):
-        hid = None
-        ad = None
-        addrconfpath = os.path.join(self.conf_dir, "address.conf")
-        with open(addrconfpath, "r") as addrconf:
-            for line in addrconf:
-                match = self.addrconfpattern.match(line)
-                if not match:
-                    continue
-
-                host_name = match.group(1)
-                if self.hostname != host_name:
-                    continue
-                host_type = match.group(2)
-                hid = match.group(3)
-                if "Router" in host_type:
-                    ad, hid = hid.split(' ')
-                break
+        ad = self.node.ad()
+        hid = self.node.hid()
 
         if ad:
             ad = ad[len("AD:"):]
@@ -159,6 +150,15 @@ class NetjoinXIAConf(object):
 
     def get_clickcontrol_path(self):
         return os.path.join(self.src_dir, "bin")
+
+    def __controller_dag_filepath(self):
+        return os.path.join(self.conf_dir, 'controller_dag')
+
+    def get_controller_dag(self):
+        return self.node.controller_dag()
+
+    def write_controller_dag(self, controller_dag):
+        self.node.set('controller_dag', controller_dag)
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()

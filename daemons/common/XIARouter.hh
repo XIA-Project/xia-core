@@ -1,4 +1,3 @@
-/* ts=4 */
 /*
 ** Copyright 2012 Carnegie Mellon University
 **
@@ -19,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 // FIXME: stupid hack because csclient.hh requires it, need to modify that code
 // to prefix string and vector woth std::
@@ -40,6 +40,7 @@ using namespace std;
 #define XR_ROUTER_NOT_SET		-7
 #define XR_BAD_HOSTNAME			-8
 #define XR_INVALID_XID			-9
+#define XR_INVALID_WEIGHT		-10
 
 #define TOTAL_SPECIAL_CASES 8
 #define DESTINED_FOR_DISCARD -1
@@ -56,6 +57,8 @@ typedef struct {
 	unsigned short port;
 	unsigned long  flags;
 } XIARouteEntry;
+
+typedef std::map<std::string, XIARouteEntry> XIARouteTable;
 
 class XIARouter {
 public:
@@ -83,21 +86,27 @@ public:
 	std::string getRouter() { return _router; };
 
 	// get the current set of route entries, return value is number of entries returned or < 0 on err
-	int getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt);
+	int getRoutes(std::string xidtype, std::map<std::string, XIARouteEntry> &xrt);
 
 	// returns 0 success, < 0 on error
 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int appRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
+	int seletiveSetRoute(const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	int delRoute(const std::string &xid);
+	int selectiveDelRoute(const std::string &xid, const std::string &index);
 
 	const char *cserror();
+
+    int rawWrite(const std::string &element, const std::string &cmd, const std::string &data);
+
 private:
 	bool _connected;
 	std::string _router;
 	ControlSocketClient _cs;
 	ControlSocketClient::err_t _cserr;
 
-	int updateRoute(std::string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags);
+	int updateRoute(string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags, int weight, const std::string &index);
 	string itoa(signed);
 };
 

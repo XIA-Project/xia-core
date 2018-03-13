@@ -8,7 +8,6 @@ import logging
 import threading
 from clickcontrol import ClickControl
 from netjoin_beacon import NetjoinBeacon
-from netjoin_xiaconf import NetjoinXIAConf
 from netjoin_authsession import NetjoinAuthsession
 from netjoin_message_pb2 import NetjoinMessage
 
@@ -21,6 +20,10 @@ class NetjoinAnnouncer(object):
         # Exit immediately if shutting down
         if self.shutdown_event.is_set():
             logging.debug("Stopping network announcement")
+            return
+
+        if self.exit:
+            logging.debug("Exiting announcer");
             return
 
         # Send beacon to XIANetJoin
@@ -39,27 +42,26 @@ class NetjoinAnnouncer(object):
         # Call ourselves from a new thread after some time
         threading.Timer(self.beacon_interval, self.announce).start()
 
-    def __init__(self, l2_type, beacon_interval, shutdown_event):
+    def __init__(self, l2_type, net_id, beacon_interval, shutdown_event):
         self.beacon_interval = beacon_interval
         self.auth = NetjoinAuthsession()
         self.xianetjoin = ("127.0.0.1", 9882)
         self.shutdown_event = shutdown_event
-        self.conf = NetjoinXIAConf()
+        self.net_id = net_id
+        self.exit = False
 
         # A socket for sending messages to XIANetJoin
         self.sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # A beacon object we will send to announce the network
-        self.beacon = NetjoinBeacon()
+        self.beacon = NetjoinBeacon(self.net_id)
         self.beacon.initialize(self.auth.get_raw_verify_key(), l2_type)
 
-        # TODO: Find a better place to setup ns_dag in click
-        # Inform click about the nameserver dag we will be advertising
-        ns_dag = self.conf.get_ns_dag()
-        with ClickControl() as click:
-            if click.setNSDAG(ns_dag) == False:
-                logging.error("Failed updating NS DAG in XIA Stack")
-        logging.info("Nameserver DAG is now known to Click stack")
+    def stop(self):
+        self.exit = True
+
+    def get_net_id(self):
+        return self.net_id
 
 # Parse arguments and launch necessary threads
 def main():

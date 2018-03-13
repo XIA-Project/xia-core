@@ -91,11 +91,15 @@ int XreadNameServerDAG(int sockfd, sockaddr_x *nsDAG) {
 
 	if (xsm1.type() == xia::XREADNAMESERVERDAG) {
 		xia::X_ReadNameServerDag_Msg *_msg = xsm1.mutable_x_readnameserverdag();
-
-		Graph g(_msg->dag().c_str());
-		if (g.num_nodes() > 0) {
-			g.fill_sockaddr(nsDAG);
-			rc = 0;
+		try {
+			Graph g(_msg->dag().c_str());
+			if (g.num_nodes() > 0) {
+				g.fill_sockaddr(nsDAG);
+				rc = 0;
+			}
+		} catch (std::exception e) {
+			rc = -1;
+			errno = EWOULDBLOCK;
 		}
 	}
 	return rc;

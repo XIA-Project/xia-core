@@ -40,8 +40,8 @@
 #define XIA_MAX_DAG_STR_SIZE (XIA_XID_STR_SIZE)*(CLICK_XIA_ADDR_MAX_NODES)
 
 struct click_xia_xid {
-    uint32_t type;
-    uint8_t id[CLICK_XIA_XID_ID_LEN];
+	uint32_t type;
+	uint8_t id[CLICK_XIA_XID_ID_LEN];
 };
 
 #pragma pack(push)
@@ -49,11 +49,11 @@ struct click_xia_xid {
 struct click_xia_xid_edge
 {
 #if CLICK_BYTE_ORDER == CLICK_LITTLE_ENDIAN
-    unsigned idx : 7;                   /* index of node this edge points to */
-    unsigned visited : 1;               /* visited edge? */
+	unsigned idx : 7;                   /* index of node this edge points to */
+	unsigned visited : 1;               /* visited edge? */
 #elif CLICK_BYTE_ORDER == CLICK_BIG_ENDIAN
-    unsigned visited : 1;
-    unsigned idx : 7;
+	unsigned visited : 1;
+	unsigned idx : 7;
 #else
 #   error "unknown byte order"
 #endif
@@ -64,27 +64,27 @@ struct click_xia_xid_edge
 #define CLICK_XIA_XID_EDGE_UNUSED   127u
 
 struct click_xia_xid_node {
-    click_xia_xid xid;
-    click_xia_xid_edge edge[CLICK_XIA_XID_EDGE_NUM];
+	click_xia_xid xid;
+	click_xia_xid_edge edge[CLICK_XIA_XID_EDGE_NUM];
 };
 
 struct click_xia_common {
-    uint8_t ver;
-    uint8_t rest[0];
+	uint8_t ver;
+	uint8_t rest[0];
 };
 
 // XIA network layer packet header
 struct click_xia {
-    uint8_t ver;			/* header version */
-    uint8_t nxt;			/* next header */
-    uint16_t plen;			/* payload length */
-    uint8_t hlim;			/* hop limit */
-    uint8_t dnode;			/* total number of dest nodes */
-    uint8_t snode;			/* total number of src nodes */
-    //uint8_t dints;
-    //uint8_t sints;
-    int8_t last;			/* index of last visited node (note: integral) */
-    click_xia_xid_node node[0];         /* XID node list */
+	uint8_t ver;			/* header version */
+	uint8_t nxt;			/* next header */
+	uint16_t plen;			/* payload length */
+	uint8_t hlim;			/* hop limit */
+	uint8_t dnode;			/* total number of dest nodes */
+	uint8_t snode;			/* total number of src nodes */
+	//uint8_t dints;
+	//uint8_t sints;
+	int8_t last;			/* index of last visited node (note: integral) */
+	click_xia_xid_node node[0];         /* XID node list */
 };
 
 typedef struct click_xia_xid xid_t;
@@ -92,23 +92,23 @@ typedef struct click_xia_xid xid_t;
 typedef struct click_xia_xid_node node_t;
 
 typedef struct {
-    unsigned char s_count;
-    node_t        s_addr[CLICK_XIA_ADDR_MAX_NODES];
+	unsigned char s_count;
+	node_t        s_addr[CLICK_XIA_ADDR_MAX_NODES];
 } x_addr_t;
 
 
 
 typedef struct {
-    // common sockaddr fields
+	// common sockaddr fields
 #ifdef __APPLE__
-    unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
-    unsigned char sx_family;
+	unsigned char sx_len; // not actually large enough for sizeof(sockaddr_x)
+	unsigned char sx_family;
 #else
-    unsigned short sx_family;
+	unsigned short sx_family;
 #endif
 
-    // XIA specific fields
-    x_addr_t      sx_addr;
+	// XIA specific fields
+	x_addr_t      sx_addr;
 } sockaddr_x;
 
 #define CLICK_XIA_NXT_DATA		0
@@ -121,19 +121,19 @@ typedef struct {
 #pragma pack(push)
 #pragma pack(1)
 struct click_xia_ext {
-    uint8_t nxt;     /* next header */
-    uint8_t hlen;     /* header length (not payload length) */
-    uint8_t type;     /* type of packet (TEMPORARY HACK!) */
-    int8_t padding;  /* pad header to 4 bytes */
-    uint8_t data[0];  /* extension data */
+	uint8_t nxt;     /* next header */
+	uint8_t hlen;     /* header length (not payload length) */
+	uint8_t type;     /* type of packet (TEMPORARY HACK!) */
+	int8_t padding;  /* pad header to 4 bytes */
+	uint8_t data[0];  /* extension data */
 };
 
 // XIA control message protocol header (followed by initial packet data)
 struct click_xia_xcmp {
-    uint8_t type;
-    uint8_t code;
-    uint16_t cksum;
-    uint8_t rest[0];
+	uint8_t type;
+	uint8_t code;
+	uint16_t cksum;
+	uint8_t rest[0];
 };
 #pragma pack(pop)
 
@@ -177,7 +177,8 @@ struct click_xia_xcmp {
 #define	  XCMP_TIMXCEED_REASSEMBLY	1	/*   ttl==0 in reassembly    */
 
 
-#define BFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+#define BFID "FID:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+#define FFID "FID:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
 
 // changed from 0xff to 0xfe for BU compatability
 #define LAST_NODE_DEFAULT	0x7e

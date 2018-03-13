@@ -49,9 +49,8 @@ XIADIR="$(dirname "$(cd "$(dirname "$0")" && pwd)")"
 
 
 # XIA command
-scmds=" \
+cmds=" \
 	xdag \
-	xlog \
 	xroute \
 	xnetstat \
 	psx
@@ -62,8 +61,9 @@ scmds=" \
 files=" \
 	etc/click/router.click \
 	etc/click/host.click \
-	etc/address.conf \
-	etc/nodes.conf \
+	etc/xia.conf
+	etc/trusted.conf \
+	etc/controller.conf \
 	etc/resolv.conf \
 	etc/xcache.ini \
 	etc/xids \
@@ -88,15 +88,26 @@ header () {
 }
 
 
+# show config info
+header config
+$XIADIR/bin/xia-config info
+
 # check the processes
-header xianet
-$XIADIR/bin/xianet check
+header status
+$XIADIR/bin/xia status
 
 # run the list of commands
 for c in $cmds; do
 	header $c
 	$XIADIR/bin/$c
 done
+
+# get system info
+header uname
+uname -a
+
+header version
+lsb_release -a
 
 # get the live network adapters
 header "ifconfig"

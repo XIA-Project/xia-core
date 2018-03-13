@@ -1,0 +1,42 @@
+#! /usr/bin/env bash
+# create etc/hosts.xia by getting the host dag for our machine
+# plus the specified machines and appending it to the hosts file
+# then copy the file to the specified machines
+
+[ "$1" == "-v" ] || [ "$1" == "--version" ] && echo "xput 1.0" && exit 0
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ $# -lt 2 ]; then
+	cat << EOH
+
+xput file host [host] ...
+
+copy a file to the same location on another host
+
+options:
+  file          file to copy
+  host          host(s) to copy to
+  -h, --help    display this help
+  -v, --version display the version number
+
+example:
+  xput etc/resolv.conf host1 router1 www.example.com 192.168.1.1
+
+notes:
+  hosts specified on the command line can be IP addresses or resolveable host names
+
+  Connections are made via TCP/IP using ssh & scp rather than over XIA
+EOH
+	exit 0
+fi
+
+XDIR=$(pwd | sed 's/xia-core.*/xia-core/')
+
+FILENAME=$XDIR/$1
+shift
+
+# copy to all of the specified hosts
+for h in $*; do
+	scp $FILENAME $h:$FILENAME
+done
+
+
