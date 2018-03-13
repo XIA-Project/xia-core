@@ -85,6 +85,9 @@ arada/waveserveripudp/waveserveripudp
 # but don't ignore the .orig files that are in the click/driver tree. But why are they there???
 !click/drivers/*.orig
 
+# tool config files
+compile_commands.json
+
 applications/video-use-case/src/manifest_server
 applications/video-use-case/src/proxy
 applications/video-use-case/src/video_publisher
