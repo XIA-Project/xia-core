@@ -1,31 +1,39 @@
 include ../../../xia.mk
 
-.PHONY: clean
+VPATH=$(XIADIR)/daemons/broker
+
+.PHONY: clean all
 
 LDFLAGS += $(LIBS) -lprotobuf -lpthread -lxml2
-TARGETS = video_publisher manifest_server proxy
+BINARIES = video_publisher manifest_server proxy
+TARGETS = $(addprefix $(BINDIR)/, $(BINARIES))
 CFLAGS += -I/usr/include/libxml2
 CFLAGS += -I/usr/local/include/libxml2
 CFLAGS += -Wno-write-strings -Wno-sign-compare -std=c++11
 
 all: $(TARGETS)
 
+cdn.pb.cc: cdn.proto
+	protoc -I$(XIADIR)/daemons/broker --cpp_out=. $<
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-proxy: proxy.o csapp.o utils.o
+%.o: %.cc
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BINDIR)/proxy: proxy.o csapp.o utils.o cdn.pb.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-video_publisher: video_publisher.o manifest.o utils.o
+$(BINDIR)/video_publisher: video_publisher.o manifest.o utils.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-manifest_server: manifest_server.o utils.o
+$(BINDIR)/manifest_server: manifest_server.o utils.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
-	-rm -f *.o
-	-rm -f *.mpd
-	-rm -f *.txt
-	-rm -f video_publisher
-	-rm -f manifest_server
-	-rm -f proxy
+	@-rm -f *.o
+	@-rm -f *.mpd
+	@-rm -f *.txt
+	@-rm -f cdn.pb.*
+	@-rm -f $(TARGETS)
