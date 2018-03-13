@@ -585,7 +585,12 @@ clean_conf_and_keys()
 	echo "Deleting Publisher files"
 	rm -rf $XIADIR/publishers/*
 	echo "Deleting config files in etc"
+
+	# FIXME: temp hack to avoid deleting scenario.conf
+	mv $XIADIR/etc/scenario.conf $XIADIR/etc/scenario.conf.save
 	rm -f $XIADIR/etc/*.conf
+	mv $XIADIR/etc/scenario.conf.save $XIADIR/etc/scenario.conf
+
 	rm -f $XIADIR/etc/hosts.xia
 	echo "Deleting temp files"
 	sudo rm -f /tmp/xcache*
