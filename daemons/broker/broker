@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+    Simple broker deamon to find the optimal CDN for a client to use
+    using the VDX bid engine
+"""
+
 import os
 import sys
 import time
@@ -28,28 +33,26 @@ import vdx
 from scenario import Scenario
 from brokerhandler import BrokerHandler
 
-VER='1.0'                   # app version
+VER = '1.0'                 # app version
 REQUEST_RATE = 1            # default debug connection rate in seconds
 BID_RATE = 5                # default bid calculation rate in seconds
 PRELOAD = 20                # when debugging preload n requests
-PORT=44444                  # default port for the BrokerServer
-CONF='etc/scenario.conf'    # default scenario config file
-HOST='0.0.0.0'
+PORT = 44444                # default port for the BrokerServer
+CONF = 'etc/scenario.conf'  # default scenario config file
+HOST = '0.0.0.0'
 
-# FIXME: we get the path in order to get the module to get the path!
-srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
-sys.path.append(os.path.join(srcdir, "bin"))
-import xiapyutils
-CONFPATH=os.path.join(xiapyutils.xia_srcdir(), CONF)
+SRCDIR = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+CONFPATH = os.path.join(SRCDIR, CONF)
 
 
 
 def compute_bids():
+    """thread to periodically update the vdx bids table"""
     while True:
         logging.debug('checking for requests')
         if scenario.prune_requests() > 0:
             bids = vdx.GetBids()
-            scenario.scenario['accepted_bids']  = vdx.Optimize(bids)
+            scenario.scenario['accepted_bids'] = vdx.Optimize(bids)
         else:
             logging.debug('no requests, skipping bid generation')
 
@@ -57,29 +60,30 @@ def compute_bids():
 
 
 def new_connections():
+    """thread to generate new random client requests"""
+
     while True:
         scenario.add_random_request()
         time.sleep(args.requests)
 
 
-#
-# custom argparse handler to choose syslog levels
-#
 def loglevel(arg):
+    """custom argparse handler to choose syslog levels"""
+
     levels = {
-            0 : logging.CRITICAL,   # LOG_EMERG
-            1 : logging.CRITICAL,   # LOG_ALERT
-            2 : logging.CRITICAL,   # LOG_CRIT
-            3 : logging.ERROR,      # LOG_ERR
-            4 : logging.WARNING,    # LOG_WARNING
-            5 : 25,                 # LOG_NOTICE
-            6 : logging.INFO,       # LOG_INFO
-            7 : logging.DEBUG       # LOG_DEBUG
-            }
+        0 : logging.CRITICAL,   # LOG_EMERG
+        1 : logging.CRITICAL,   # LOG_ALERT
+        2 : logging.CRITICAL,   # LOG_CRIT
+        3 : logging.ERROR,      # LOG_ERR
+        4 : logging.WARNING,    # LOG_WARNING
+        5 : 25,                 # LOG_NOTICE
+        6 : logging.INFO,       # LOG_INFO
+        7 : logging.DEBUG       # LOG_DEBUG
+        }
     try:
         value = int(arg)
     except ValueError as err:
-       raise argparse.ArgumentTypeError(str(err))
+        raise argparse.ArgumentTypeError(str(err))
 
     if value < 0 or value > 7:
         message = "Expected a value in 0..7, got {}".format(value)
@@ -93,36 +97,44 @@ def loglevel(arg):
 # set up system
 #
 def configure():
+    """parse the command line arguements and set up logging"""
+
     global args
     random.seed()
 
     parser = argparse.ArgumentParser(description='CDN content broker')
     parser.add_argument('-v', '--version', action='version', version=VER)
     parser.add_argument('-V', '--verbose', action='store_true', help='enable console logging')
-    parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
-    parser.add_argument('-f', '--file',    type=argparse.FileType('r'), help='cdn config file (default: %s)' % CONF)
+    parser.add_argument('-l', '--level', type=loglevel,
+            help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
+    parser.add_argument('-f', '--file', type=argparse.FileType('r'),
+                        help='cdn config file (default: %s)' % CONF)
     parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
     parser.add_argument('-b', '--bids', type=int, help='calculate new bids every BIDS seconds')
-    parser.add_argument('-d', '--debug', action='store_true', help='generate random connections locally')
-    parser.add_argument('-r', '--requests', type=int, help='generate new random requests every REQUESTS seconds')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='generate random connections locally')
+    parser.add_argument('-r', '--requests', type=int,
+                        help='generate new random requests every REQUESTS seconds')
     parser.set_defaults(file=CONFPATH, port=PORT, level=3, bids=BID_RATE, requests=REQUEST_RATE)
     args = parser.parse_args()
 
-    initLogging()
+    init_logging()
 
-    logging.info('regenerating bids every %d seconds' % args.bids)
+    logging.info('regenerating bids every %d seconds', args.bids)
 
     if args.debug:
         logging.info('running in debug mode')
-        logging.info('generating new connections every %d seconds' % args.requests)
+        logging.info('generating new connections every %d seconds', args.requests)
     else:
-        logging.info('Starting broker service on port %s' % args.port)
+        logging.info('Starting broker service on port %s', args.port)
 
 
 #
 # initialize logging stuff
 #
-def initLogging():
+def init_logging():
+    """configure syslog/console logging"""
+
     xlog = logging.getLogger()
     xlog.setLevel(args.level)
 
@@ -146,7 +158,7 @@ def initLogging():
 # let's go
 #
 def main():
-    global args, scenario, vdx
+    global scenario
 
     configure()
 
@@ -154,9 +166,8 @@ def main():
     scenario = Scenario(args.file)
     vdx.setup(scenario)
 
-    shutdown_event = threading.Event()
     # compute optimal CDNs in a background thread
-    compute_thread = threading.Thread(target = compute_bids)
+    compute_thread = threading.Thread(target=compute_bids)
     compute_thread.daemon = True
     compute_thread.start()
 
@@ -164,12 +175,12 @@ def main():
         # generate random connection requests
 
         # preload some initial requests
-        logging.debug('preloading %d connections' % PRELOAD)
+        logging.debug('preloading %d connections', PRELOAD)
         for i in range(PRELOAD):
             scenario.add_random_request()
 
         # start a request generating thread
-        generator_thread = threading.Thread(target = new_connections)
+        generator_thread = threading.Thread(target=new_connections)
         generator_thread.daemon = True
         generator_thread.start()
 
