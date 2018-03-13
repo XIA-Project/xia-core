@@ -17,4 +17,5 @@ $(XROUTED): $(SOURCES)
 
 clean:
 	@-rm -f $(XROUTED)
+	@-rm -f xroute.pb.*
 
