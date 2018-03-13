@@ -2,7 +2,7 @@ all:
 #	make -C xnetcat
 	make -C xftp
 	make -C cachetools
-	make -C chunk-demo
+##	make -C chunk-demo
 	make -C xping
 	make -C xtraceroute
 	make -C xregister
