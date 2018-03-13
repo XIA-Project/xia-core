@@ -1120,6 +1120,7 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		xcache_meta *meta = acquire_meta(cid_str);
 		assert(meta);
 		header = meta->content_header_str();
+		release_meta(meta);
 	}
 	size_t remaining;
 	size_t offset;
