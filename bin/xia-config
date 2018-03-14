@@ -230,6 +230,15 @@ def create_nodeconf(args):
             node.set('rendezvous_sid', genkeys.create_new_SID())
             node.set('rendezvous_ctl_sid', genkeys.create_new_SID())
 
+    if args.client:
+        node.set('client', 'True')
+    if args.broker:
+        node.set('broker', 'True')
+    if args.publisher:
+        node.set('publisher', 'True')
+    if args.manifest:
+        node.set('manifest', 'True')
+
     if args.ignore:
         for iface in args.ignore:
             node._set('ignore', iface, 'True')
@@ -382,6 +391,16 @@ def info(args):
             print 'Rendezvous SID:     %s' % node.rendezvous_sid()
             print 'Rendezvous ctl SID: %s' % node.rendezvous_ctl_sid()
 
+        if node.client():
+            print 'CDN Client'
+        if node.broker():
+            print 'CDN Broker'
+        if node.publisher():
+            print 'CDN Publisher'
+        if node.broker():
+            print 'CDN Manifest Server'
+
+
         print 'Number of ports:    %s' % node.numports()
 
         ifaces = node.interfaces()
@@ -410,6 +429,11 @@ def clean(args):
             files = os.path.join(xiapyutils.xia_srcdir(), files)
 
             for f in glob(files):
+
+                # don't delete the scenario config file
+                if 'scenario.conf' in f:
+                    continue
+
                 status('removing {}'.format(f))
                 os.remove(f)
 
@@ -472,6 +496,10 @@ common_parser = argparse.ArgumentParser(add_help=False)
 common_parser.add_argument('-i', '--ignore', nargs='+', type=iface, metavar='iface', help='ignore interface')
 common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='# of interfaces (default=4)')
 common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='DSRC_MAC,ARADA_IP:PORT', help='connect via a waveserver')
+common_parser.add_argument('--broker',action='store_true', help='run the CDN broker on this node')
+common_parser.add_argument('--manifest',action='store_true', help='run the CDN manifest server on this node')
+common_parser.add_argument('--publisher',action='store_true', help='run a CDN publisher on this node')
+common_parser.add_argument('--client',action='store_true', help='run the CDN client services on this node')
 
 cache_parser = common_parser.add_mutually_exclusive_group(required=False)
 cache_parser.add_argument('--cache', action='store_true', default=True, help='enable xcache caching (default)')

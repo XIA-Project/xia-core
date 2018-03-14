@@ -18,7 +18,7 @@ import os
 import xiapyutils
 from configparser import ConfigParser
 
-xkeys = ['hostname', 'nodetype', 'numports', 'hid', 'cache']
+xkeys = ['hostname', 'nodetype', 'numports', 'hid', 'cache', 'broker', 'publisher', 'manifest', 'client']
 ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid', 'controller_dag']
 wkeys = [ 'mac', 'addr', 'port']
 
@@ -96,6 +96,9 @@ class nodeconf:
             return False
         return True
 
+    def _common_bool(self, name, flag):
+        enabled = self._get('xia', name, flag)
+        return enabled.lower() in ['true', '1', 'yes', 'on']
 
     def ad(self):
         return self._get('controller', 'ad', None)
@@ -116,8 +119,19 @@ class nodeconf:
         return self._get('xia', 'nodetype', None)
 
     def cache(self):
-        enabled = self._get('xia', 'cache', 'True')
-        return enabled.lower() in ['true', '1', 'yes', 'on']
+        return self._common_bool('cache', 'True')
+
+    def client(self):
+        return self._common_bool('client', 'False')
+
+    def broker(self):
+        return self._common_bool('broker', 'False')
+
+    def publisher(self):
+        return self._common_bool('publisher', 'False')
+
+    def manifest(self):
+        return self._common_bool('manifest', 'False')
 
     def hostname(self):
         return self._get('xia', 'hostname', 'xia')

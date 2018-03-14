@@ -23,7 +23,7 @@ fi
 x=$(pgrep -f 'xnetj|broker|pinger' | tr '\n' ',')
 
 # get the rest of the click processes (replace \n in pgrep output with ,)
-x="$x$(pgrep 'click|xroute|xcache|xname|statsserver|xstats' | tr '\n ' ',')"
+x="$x$(pgrep 'click|xrouted|xcontrold|xhostd|xcache|xname|xiaproxy|video_publisher|manifest_server|statsserver|xstats' | tr '\n ' ',')"
 
 # add anything from the command line
 for p in $@; do

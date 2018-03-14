@@ -13,5 +13,5 @@ EOH
 	exit 0
 fi
 
-pgrep -l "click|xrouted|xhostd|xcontrold|xcache|xname|statsserver|xstats"
+pgrep -l "click|xrouted|xhostd|xcontrold|xcache|xname|manifest_server|video_publisher|xiaproxy|statsserver|xstats"
 pgrep -fa 'xnetj|broker|pinger' | cut -d\  -f1,3 | sed 's/\.\///'

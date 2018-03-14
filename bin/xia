@@ -41,7 +41,11 @@ controller_services       = ['xcontrold']
 controller_extra_services = ['xnameservice', 'xrendezvous']
 router_services           = ['xrouted']
 host_services             = ['xhostd']
+cdn_services              = ['broker', 'video_publisher', 'manifest_server']
+cdn_client_services       = ['xiaproxy', 'pinger']
 stats_services            = ['xstats', 'statsserver']
+
+python_apps               = ['xnetjd', 'broker', 'pinger']
 
 # make a list of all possible services that might be running on a node where the xia.conf file was deleted
 all_services = common_services + router_services + host_services + controller_services + controller_extra_services + stats_services
@@ -100,7 +104,7 @@ def msg(str, *params):
 # get the process info for the named process
 #
 def get_process(name):
-    if name == 'xnetjd':
+    if name in python_apps:
         # this is in the cmdline, not name, and has the full path the the process
         name = os.path.join(xiapyutils.xia_bindir(), name)
 
@@ -151,6 +155,15 @@ def make_service_list(type, boot=False):
         svcs += host_services
     else:
         return None
+
+    if node.broker():
+        svcs += ['broker']
+    if node.publisher():
+        svcs += ['video_publisher']
+    if node.manifest():
+        svcs += ['manifest_server']
+    if node.client():
+        svcs += cdn_client_services
 
     if not boot:
         svcs += stats_services
@@ -284,6 +297,40 @@ def start_click():
 
 
 #
+# start a broker process
+#
+def start_broker_service(name):
+    params = []
+    dir = os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker')
+    # cd
+    d = os.getcwd()
+    os.chdir(dir)
+    params.append(name)
+
+    nodetype = get_nodetype()
+    if nodetype == 'host':
+        nodetype = 'client'
+
+    params.append('--hostname')
+    params.append(hostname)
+
+    if args.verbose > 1:
+        params.append('-v')
+    params.append('-l%s' % args.level)
+
+    params.append('--%s' % nodetype)
+
+    params.append('--layer2')
+    if node.waveserver():
+        params.append('dsrc')
+    else:
+        params.append('ethernet')
+
+    subprocess.Popen(params)
+
+
+
+#
 # start the joining daemon
 #
 def start_xnetjd(name):
@@ -314,7 +361,7 @@ def start_xnetjd(name):
 
 
 #
-# start any daemon other than click or xnetjd
+# start stats services
 #
 def start_stats(name):
     name = 'daemons/visualizer/%s' % name
@@ -337,7 +384,11 @@ def start_stats(name):
 #
 def start_daemon(name):
         params = []
-        params.append(os.path.join(xiapyutils.xia_bindir(), name))
+
+        if name in python_apps:
+            params.append(os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name))
+        else:
+            params.append(os.path.join(xiapyutils.xia_bindir(), name))
 
         params.append('-h')
         params.append(hostname)
@@ -350,6 +401,8 @@ def start_daemon(name):
             params.append('-d')
             params.append(node.rendezvous_sid())
 
+        print params
+
         subprocess.Popen(params)
 
 
@@ -360,6 +413,8 @@ def start_daemon(name):
 def start_process(name):
     params = []
 
+    print 'starting ', name
+
     if name == 'click' and args.click:
         start_click()
 
@@ -368,6 +423,8 @@ def start_process(name):
             start_xnetjd(name)
         elif name == 'xstats' or name == 'statsserver':
             start_stats(name)
+#        elif name in python_apps:
+#            start_broker_service(name)
         else:
             start_daemon(name)
 

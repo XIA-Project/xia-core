@@ -10,5 +10,5 @@ announce_publisher
 xcontrold
 xhostd
 manifest_server
-proxy
+xiaproxy
 video_publisher

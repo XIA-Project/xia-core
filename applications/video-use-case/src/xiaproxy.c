@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include <iostream>
 #include <pthread.h>
-#include "proxy.h"
+#include "xiaproxy.h"
 
 static int port = 0;                    // port this server runs on
 static int list_s;                      // listening socket of this proxy
