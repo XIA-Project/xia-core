@@ -15,6 +15,7 @@
 
 """
     Simple broker deamon to find the optimal CDN for a client to use
+
     using the VDX bid engine
 """
 
@@ -29,6 +30,9 @@ import threading
 import SocketServer
 #from rpyc.utils.server import ThreadedServer
 
+SRCDIR = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+sys.path.append(os.path.join(SRCDIR, "daemons/broker"))
+
 import vdx
 from scenario import Scenario
 from brokerhandler import BrokerHandler
@@ -41,7 +45,6 @@ PORT = 44444                # default port for the BrokerServer
 CONF = 'etc/scenario.conf'  # default scenario config file
 HOST = '0.0.0.0'
 
-SRCDIR = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 CONFPATH = os.path.join(SRCDIR, CONF)
 
 
