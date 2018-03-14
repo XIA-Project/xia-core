@@ -104,9 +104,11 @@ def msg(str, *params):
 # get the process info for the named process
 #
 def get_process(name):
-    if name in python_apps:
-        # this is in the cmdline, not name, and has the full path the the process
+    # detect python apps correctly
+    if name == 'xnetjd':
         name = os.path.join(xiapyutils.xia_bindir(), name)
+    elif name in python_apps:
+        name = os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name)
 
     return [p.info for p in psutil.process_iter(attrs=['pid', 'name', 'cmdline']) if (name in p.info['name'] or name in p.info['cmdline'])]
 
@@ -386,12 +388,25 @@ def start_daemon(name):
         params = []
 
         if name in python_apps:
+            # GUROBI variables are not in root's environment
+            # FIXME: should we only run click as root instead?
+            GUROBI_HOME = '/opt/gurobi/linux64'
+            GUROBI_LIB = '%s/lib' % GUROBI_HOME
+            GUROBI_BIN = '%s/bin' % GUROBI_HOME
+            os.environ['GUROBI_HOME'] = GUROBI_HOME
+            os.environ['PATH'] += ':%s' % GUROBI_BIN
+            if 'LD_LIBRARY_PATH' in os.environ:
+                os.environ['LD_LIBRARY_PATH'] += ':%s' % GUROBI_LIB
+            else:
+                os.environ['LD_LIBRARY_PATH'] = GUROBI_LIB
+
             params.append(os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name))
         else:
             params.append(os.path.join(xiapyutils.xia_bindir(), name))
 
-        params.append('-h')
-        params.append(hostname)
+            # -h isn't used in the python apps, it's help there so only set for the others
+            params.append('-h')
+            params.append(hostname)
 
         if args.verbose > 1:
             params.append('-v')

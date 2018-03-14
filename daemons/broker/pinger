@@ -260,8 +260,8 @@ def configure():
     global args
 
     parser = argparse.ArgumentParser(description='gather CDN stats')
-    parser.add_argument('-v', '--version', action='version', version=VER)
-    parser.add_argument('-V', '--verbose', action='store_true', help='enable console logging')
+    parser.add_argument('-V', '--version', action='version', version=VER)
+    parser.add_argument('-v', '--verbose', action='store_true', help='enable console logging')
     parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
     parser.add_argument('-F', '--frequency', type=freq_val, help='check every COUNT seconds (default: %(default)s)')
     parser.add_argument('-c', '--count',   type=count_val, help='# of pings to send (default:%(default)d)')
