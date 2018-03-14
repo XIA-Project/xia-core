@@ -70,7 +70,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
     #
     # handle client score updates
-    $
+    #
     def handle_scores(self, msg):
         logging.info('handling client update from %s' % msg.client)
         self.scenario.update_scores(msg)
