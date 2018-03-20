@@ -38,7 +38,8 @@ FSThreadPool* FSThreadPool::get_pool()
  */
 int FSThreadPool::queue_work(FSWorkRequest *work)
 {
-	if(_workers.size() == 0) {
+	// Initialize the worker threads once
+	std::call_once(_initialized, [&]() {
 		for (unsigned int i=0; i< _num_threads; i++) {
 			std::cout << "Creating thread: " << i << std::endl;
 			FSWorker *worker = new FSWorker();
@@ -50,7 +51,8 @@ int FSThreadPool::queue_work(FSWorkRequest *work)
 			_worker_threads.push_back(std::thread(_workers.back()));
 			*/
 		}
-	}
+	});
+
 	std::cout << "Queuing work" << std::endl;
 	// TODO: Do we need to validate the 'work' request here?
 	// Block others from accessing the work queue and push "work" to it

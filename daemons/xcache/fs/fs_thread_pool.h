@@ -43,6 +43,9 @@ class FSThreadPool {
 		// Workers wait on condition that there is work in queue
 		std::condition_variable _work_in_queue;
 
+		// Ensure that the threads are created only once
+		std::once_flag _initialized;
+
 };
 #endif //_FS_THREAD_POOL_H
 
