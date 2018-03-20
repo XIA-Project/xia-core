@@ -32,7 +32,7 @@
 // every 15 request on the same CDN, try others.
 #define CDN_TRY_OTHERS_NUM_REQ 15
 
-// if the current throughput is 40% lower than the average for a CDN, then need 
+// if the current throughput is 40% lower than the average for a CDN, then need
 // to reselect a CDN
 #define CDN_RESELECT_THRESH 0.6
 
@@ -44,7 +44,7 @@
 #define BOOTSTRAP_NUM_REQS 3
 
 using namespace std;
-       
+
 /* for proxy http header back to the browser */
 static const char *connection_str = "Connection: close\r\n";
 static const char *http_chunk_header_status_ok = "HTTP/1.0 200 OK\r\n";
@@ -59,15 +59,15 @@ static const char *http_chunk_header_end_marker = "\r\n";
 static const char *http_chunk_header_mp4_content_type = "Content-Type: application\r\n";
 static const char *http_chunk_header_mpd_content_type = "Content-Type: application\r\n";
 
-typedef struct _CDN{
+typedef struct _CDNInfo{
 	int num_reqs; 		// number of request serviced
-	
+
 	// running average of throughput observed for this CDN
-	// 
+	//
 	// running average is compated as:
 	// 		avg_throughput = (1 - AVG_THROUGHPUT_ALPHA) * avg_throughput + AVG_THROUGHPUT_ALPHA * curr_throughput
-	double avg_throughput;		
-} CDN;
+	double avg_throughput;
+} CDNInfo;
 
 typedef struct _ProxyRequestCtx{
     int xia_sock;				// xia socket to server inside XIA
@@ -146,8 +146,8 @@ int handle_stream_requests(ProxyRequestCtx *ctx);
 
 /**
  * main part of proxy jobs, include video segment request handling and
- * manifest request handling 
- * 
+ * manifest request handling
+ *
  * @param  browser_sock socket to browser so the chunk can be sent back.
  */
 int xia_proxy_handle_request(int browser_sock);
@@ -155,7 +155,7 @@ int xia_proxy_handle_request(int browser_sock);
 /**
  * sent back the chunks in DAG identified by chunkAddresses back to the browser with
  * the socket back to the browser.
- * 
+ *
  * @param  ctx            has the browser socket
  * @param  chunkAddresses DAG addresses of the chunks
  */
@@ -189,7 +189,7 @@ int parse_request_line(char *buf, char *method, char *protocol, char *host_port,
 string capitalize_XID(string dagUrl);
 
 /**
- * given CID, AD, HID, construct a DAG with CID as intent and 
+ * given CID, AD, HID, construct a DAG with CID as intent and
  * 	AD:HID:CID as fallback
  */
 Graph cid2addr(std::string CID, std::string AD, std::string HID);
@@ -222,4 +222,4 @@ string multicdn_name_to_CDN_name(char* origin, char* options);
  */
 vector<string> split_string_on_delimiter(char* str, char* delimiter);
 
-#endif 
+#endif

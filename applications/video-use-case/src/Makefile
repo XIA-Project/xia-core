@@ -10,16 +10,17 @@ TARGETS = $(addprefix $(BINDIR)/, $(BINARIES))
 CFLAGS += -I/usr/include/libxml2
 CFLAGS += -I/usr/local/include/libxml2
 CFLAGS += -Wno-write-strings -Wno-sign-compare -std=c++11
+CFLAGS += -I$(APIDIR)/xsocket/minini
 
-all: $(TARGETS)
+all: $(TARGETS) cdn.pb.cc
 
-cdn.pb.cc: cdn.proto
+cdn.pb.cc cdn.pb.h: cdn.proto
 	protoc -I$(XIADIR)/daemons/broker --cpp_out=. $<
 
-%.o: %.c
+%.o: %.c cdn.pb.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.cc
+%.o: %.cc cdn.pb.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BINDIR)/xiaproxy: xiaproxy.o csapp.o utils.o cdn.pb.o
