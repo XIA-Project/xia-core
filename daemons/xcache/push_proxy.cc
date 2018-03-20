@@ -80,7 +80,7 @@ std::string PushProxy::addr()
 	return _proxy_addr->dag_string();
 }
 
-void PushProxy::operator() (xcache_controller *ctrl)
+void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 {
 	if(ctrl == NULL) {
 		syslog(LOG_ERR, "PushProxy: ERROR invalid controller\n");
@@ -240,7 +240,13 @@ void PushProxy::operator() (xcache_controller *ctrl)
 		}
 		std::cout << "PushProxy: Valid chunk received" << std::endl;
 
+		// Send chunk contents to application that started this PushProxy
+		ctrl->xcache_notify_contents(context_ID, chdr->id(), data);
+
 		// Store the chunk
+		// NOTE: Policy change. For now, we just deliver the chunk contents
+		// to the application that created this PushProxy.
+		/*
 		xcache_meta *meta = ctrl->acquire_meta(contentID);
 		if(meta != NULL) {
 			ctrl->release_meta(meta);
@@ -271,5 +277,6 @@ void PushProxy::operator() (xcache_controller *ctrl)
 		ctrl->enqueue_request_safe(req);
 		// NOTE: we don't free databuf. Controller will free it.
 		std::cout << "PushProxy: chunk should be cached soon" << std::endl;
+		*/
     }
 }

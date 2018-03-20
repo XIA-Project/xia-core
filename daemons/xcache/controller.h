@@ -236,6 +236,8 @@ public:
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
+	int xcache_notify_contents(int context_id, const std::string &cid,
+			const std::string &data);
 	std::string addr2cid(sockaddr_x *addr);
 	int cid2addr(std::string cid, sockaddr_x *sax);
 

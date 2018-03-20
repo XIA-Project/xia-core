@@ -1,5 +1,10 @@
 #include "fetch-demo-client.h"
 
+#include "xcache_cmd.pb.h"
+
+#include <chrono>
+#include <thread>
+
 FetchDemoClient::FetchDemoClient()
 {
 	std::cout << "Starting FetchDemoClient" << std::endl;
@@ -8,12 +13,35 @@ FetchDemoClient::FetchDemoClient()
 	if(XcacheHandleInit(&_xcache)) {
 		throw "Unable to talk to xcache";
 	}
+	// Register the callback for arriving chunk
+	XregisterNotif(XCE_CHUNKCONTENTS, gotChunkData);
+	XlaunchNotifThread(&_xcache);
 }
 
 FetchDemoClient::~FetchDemoClient()
 {
 	// Cleanup state before exiting
 	XcacheHandleDestroy(&_xcache);
+}
+
+void FetchDemoClient::gotChunkData(XcacheHandle* /*h*/, int /*event*/,
+		void *data, size_t datalen)
+{
+	// 'data' contains a protobuf of type notif_contents
+	notif_contents contents;
+	std::string buffer((char *)data, datalen);
+	contents.ParseFromString(buffer);
+	// notify get_chunk() that the data is ready
+	std::cout << "Got " << contents.cid() << std::endl;
+	std::cout << "of length " << contents.data().length() << std::endl;
+
+}
+
+void FetchDemoClient::get_chunk(std::string &cid, std::string &data)
+{
+	// Wait for notification from getChunkData that data is ready
+	// Fill in data and cid for caller
+	std::this_thread::sleep_for(std::chrono::seconds(20));
 }
 
 int FetchDemoClient::request(std::string &chunk_dag, std::string &fs_dag)
@@ -52,8 +80,13 @@ int main(int argc, char **argv)
 		std::cout << "Error submitting request for a chunk fetch" << std::endl;
 	}
 
-	// We simply submit a request for the chunk and exit at this time.
-	// In future, we'll block waiting for requested chunk to arrive
+	// Block, waiting for the chunk to be delivered by PushProxy to us
+	std::string cid;
+	std::string data;
+	client->get_chunk(cid, data);
+	std::cout << "Got " << cid << std::endl;
+	std::cout << "of length " << data.length() << std::endl;
 	delete client;
+
 	return retval;
 }

@@ -40,7 +40,7 @@
 
 #define IO_BUF_SIZE (1024 * 1024)
 
-static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, sockaddr_x *, socklen_t) = {
+static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, void *, size_t) = {
 	NULL,
 	NULL,
 };
@@ -894,9 +894,11 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
+	/*
 	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
 		return _XfetchRemoteChunkBlocking(buf, addr, len);
 	}
+	*/
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
@@ -1043,21 +1045,21 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 ** @note this API is not currently working correctly,
 **
 ** @param h the cache handle used when XfetchChunk was called
-** @param event the type of event to return notificatioins for. It is not clear what the difference
-**  between these events is.
-** \n XCE_CHUNKARRIVED
-** \n XCE_CHUNKAVAILABLE
-** @param addr the DAG of the chunk to receive notifications for
-** @param addrlen the length of addr (should be sizeof(sockaddr_x))
+** @param event the type of event to return notificatioins for.
+** @param data the data to be passed to the callback function
+** @param datalen the length of data
 **
 ** @returns 0 on success
 ** @returns an error code on failure (see the man page for pthread_create() for more details)
 **
 */
-int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen))
+int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen))
 {
-	notif_handlers[event] = func;
-	return 0;
+	if(event < XCE_MAX) {
+		notif_handlers[event] = func;
+		return 0;
+	}
+	return -1;
 }
 
 static void *__notifThread(void *arg)
@@ -1085,8 +1087,26 @@ static void *__notifThread(void *arg)
 			std::cout << "Error while receiving.\n";
 			continue;
 		}
+		// TODO: The application should just take xcache_notif protobuf
+		// For now, we call different handlers with different data
+		// based on the type of notification
 		notif.ParseFromString(buffer);
-		notif_handlers[notif.cmd()](h, notif.cmd(), (sockaddr_x *)notif.dag().c_str(), notif.dag().length());
+
+		// Notify application of a chunk that is now cached
+		if(notif.has_arrived()) {
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)notif.arrived().dag().c_str(),
+					notif.arrived().dag().length());
+		}
+
+		// Notify application with entire chunk contents as accepted
+		// and verified by PushProxy in Xcache
+		if(notif.has_contents()) {
+			std::string buf;
+			notif.contents().SerializeToString(&buf);
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)buf.c_str(), buf.length());
+		}
 
 	} while(1);
 }
@@ -1131,6 +1151,7 @@ int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
 	xcache_cmd cmd;
 
 	cmd.set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+	cmd.set_context_id(h->contextID);
 
 	if(send_command(h->xcacheSock, &cmd) < 0) {
 		fprintf(stderr, "Error starting new proxy\n");

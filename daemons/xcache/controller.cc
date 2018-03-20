@@ -387,14 +387,34 @@ int xcache_controller::xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 				     socklen_t addrlen, int event)
 {
 	xcache_notif notif;
+	notif_arrived *arrived = notif.mutable_arrived();
 	std::string buffer("");
 
+	assert(event == XCE_CHUNKARRIVED);
 	notif.set_cmd(event);
-	notif.set_dag(addr, addrlen);
+	arrived->set_dag(addr, addrlen);
 	notif.SerializeToString(&buffer);
 
 	syslog(LOG_INFO, "Sent Notification to %d\n", c->notifSock);
 
+	return send_response(c->notifSock, buffer.c_str(), buffer.length());
+}
+
+int xcache_controller::xcache_notify_contents(int context_id,
+		const std::string &cid, const std::string &data)
+{
+	xcache_context *c = lookup_context(context_id);
+	if(c == NULL) {
+		syslog(LOG_ERR, "Controller: context %d not found", context_id);
+		return -1;
+	}
+	xcache_notif notif;
+	notif_contents *contents = notif.mutable_contents();
+	std::string buffer("");
+	notif.set_cmd(XCE_CHUNKCONTENTS);
+	contents->set_cid(cid);
+	contents->set_data(data.c_str(), data.length());
+	notif.SerializeToString(&buffer);
 	return send_response(c->notifSock, buffer.c_str(), buffer.length());
 }
 
@@ -550,6 +570,8 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 	assert(cmd->cmd() == xcache_cmd::XCACHE_NEWPROXY);
 	std::cout << "Controller::xcache_new_proxy checked cmd" << std::endl;
 
+	auto context_ID = cmd->context_id();
+
 	// Start a new proxy thread, waiting for pushed chunks
 	if (proxy_threads.size() >= MAX_PUSH_PROXIES) {
 		std::cout << "Controller::xcache_new_proxy "
@@ -564,7 +586,7 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 		return RET_SENDRESP;
 	}
 	std::cout << "Controller::xcache_new_proxy starting thread"<< std::endl;
-	std::thread *proxy_thread = new std::thread(*proxy, this);
+	std::thread *proxy_thread = new std::thread(*proxy, this, context_ID);
 	if(proxy_thread == NULL) {
 		std::cout << "ERROR failed to create proxy thread" << std::endl;
 		return RET_SENDRESP;

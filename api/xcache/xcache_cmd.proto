@@ -54,5 +54,17 @@ message xcache_cmd {
 
 message xcache_notif {
 	required int32 cmd = 1;
-	optional bytes dag = 2;
+	oneof notif_type{
+		notif_arrived arrived = 2;
+		notif_contents contents = 3;
+	};
+};
+
+message notif_arrived {
+	required bytes dag = 1;
+};
+
+message notif_contents {
+	required string cid = 1;
+	required bytes data = 2;
 };

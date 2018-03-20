@@ -46,7 +46,7 @@ typedef struct {
 /** EVENTS **/
 enum {
 	XCE_CHUNKARRIVED = 0,
-	XCE_CHUNKAVAILABLE,
+	XCE_CHUNKCONTENTS,
 	XCE_MAX,
 };
 
@@ -87,7 +87,7 @@ extern int XisChunkLocal(XcacheHandle *h, const char *chunk);
 //extern int XchunkRead(XchunkHandle *, void *buf, size_t len);
 
 //extern int XbufReadChunk(XcacheHandle *h, XcacheBuf *xbuf, sockaddr_x *addr, socklen_t addrlen);
-extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen));  //DONE
+extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen));  //DONE
 extern int XlaunchNotifThread(XcacheHandle *h);  //DONE
 extern int XnewProxy(XcacheHandle *h, std::string &proxyaddr);
 extern int XgetNotifSocket(XcacheHandle *h);

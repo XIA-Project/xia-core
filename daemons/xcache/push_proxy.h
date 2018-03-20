@@ -25,7 +25,7 @@ public:
 	 * A Constructor.
 	 */
 	PushProxy();
-	void operator() (xcache_controller *);
+	void operator() (xcache_controller *, int context_ID);
 	~PushProxy();
 	std::string addr();
 };
