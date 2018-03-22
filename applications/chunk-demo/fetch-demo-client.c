@@ -5,10 +5,27 @@
 #include <chrono>
 #include <thread>
 
+FetchDemoClient *client;
+
+// Callback function that Xcache API will call on receiving an async event
+void gotChunkData(XcacheHandle* /*h*/, int /*event*/,
+		void *data, size_t datalen)
+{
+	// 'data' contains a protobuf of type notif_contents
+	notif_contents contents;
+	std::string buffer((char *)data, datalen);
+	contents.ParseFromString(buffer);
+	// notify get_chunk() that the data is ready
+	std::cout << "Got " << contents.cid() << std::endl;
+	std::cout << "of length " << contents.data().length() << std::endl;
+	client->got_chunk(contents.cid(), contents.data());
+}
+
 FetchDemoClient::FetchDemoClient()
 {
 	std::cout << "Starting FetchDemoClient" << std::endl;
 
+	_chunk_ready = false;
 	// Get a handle to Xcache
 	if(XcacheHandleInit(&_xcache)) {
 		throw "Unable to talk to xcache";
@@ -24,24 +41,29 @@ FetchDemoClient::~FetchDemoClient()
 	XcacheHandleDestroy(&_xcache);
 }
 
-void FetchDemoClient::gotChunkData(XcacheHandle* /*h*/, int /*event*/,
-		void *data, size_t datalen)
-{
-	// 'data' contains a protobuf of type notif_contents
-	notif_contents contents;
-	std::string buffer((char *)data, datalen);
-	contents.ParseFromString(buffer);
-	// notify get_chunk() that the data is ready
-	std::cout << "Got " << contents.cid() << std::endl;
-	std::cout << "of length " << contents.data().length() << std::endl;
 
+void FetchDemoClient::got_chunk(const std::string &cid,
+		const std::string &data)
+{
+	// Hold lock and copy data over to this object
+	std::lock_guard<std::mutex> lock(_cr_lock);
+	_cid.assign(cid);
+	_data.assign(data);
+	_chunk_ready = true;
+	_cr.notify_all();
 }
 
 void FetchDemoClient::get_chunk(std::string &cid, std::string &data)
 {
-	// Wait for notification from getChunkData that data is ready
-	// Fill in data and cid for caller
-	std::this_thread::sleep_for(std::chrono::seconds(20));
+	// Wait for chunk to be ready - condition _cr
+	std::unique_lock<std::mutex> lk(_cr_lock);
+	_cr.wait(lk, [&] { return _chunk_ready == true;});
+	// Copy over the cid and data to user buffers
+	cid.assign(_cid);
+	data.assign(_data);
+	_cid = "";
+	_data = "";
+	_chunk_ready = false;
 }
 
 int FetchDemoClient::request(std::string &chunk_dag, std::string &fs_dag)
@@ -74,18 +96,18 @@ int main(int argc, char **argv)
 	std::string chunk_dag(argv[1]);
 	std::string fs_dag(argv[2]);
 
-	FetchDemoClient *client = new FetchDemoClient();
+	client = new FetchDemoClient();
 	int retval = client->request(chunk_dag, fs_dag);
 	if(retval) {
-		std::cout << "Error submitting request for a chunk fetch" << std::endl;
+		std::cout << "Error submitting chunk fetch request" << std::endl;
 	}
 
 	// Block, waiting for the chunk to be delivered by PushProxy to us
 	std::string cid;
 	std::string data;
 	client->get_chunk(cid, data);
-	std::cout << "Got " << cid << std::endl;
-	std::cout << "of length " << data.length() << std::endl;
+	std::cout << "main: Got " << cid << std::endl;
+	std::cout << "main: of length " << data.length() << std::endl;
 	delete client;
 
 	return retval;
