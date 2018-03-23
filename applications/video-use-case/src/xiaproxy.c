@@ -58,10 +58,10 @@ void *cdn_locator(void *)
 		connect(sock, broker_addr->ai_addr, sizeof(struct sockaddr));
 
 		CDN::CDNMsg msg;
+		msg.Clear();
 		msg.set_type(CDN::CDN_REQUEST_MSG);
 		msg.set_version(CDN::CDN_PROTO_VERSION);
 		msg.set_client(hostname);
-
 
 		CDN::Request *req_msg = msg.mutable_request();
 		req_msg->set_bitrate(bitrate);
@@ -82,10 +82,12 @@ void *cdn_locator(void *)
 
 		close(sock);
 
+		msg.Clear();
 		std::string result(buf, rc);
 		msg.ParseFromString(result);
 
-		req_msg = msg.mutable_request();
+		CDN::Reply *reply_msg = msg.mutable_reply();
+		reply_msg = msg.mutable_reply();
 
 		// lock mutex
 		if (pthread_mutex_lock(&cdn_lock)) {
@@ -94,10 +96,9 @@ void *cdn_locator(void *)
 			break;
 		}
 
-		cdn_ad = req_msg->ad();
-		cdn_hid = req_msg->hid();
-		cdn_host = req_msg->cluster();
-		// save cdn
+		cdn_ad = reply_msg->ad();
+		cdn_hid = reply_msg->hid();
+		cdn_host = reply_msg->cluster();
 		pthread_mutex_unlock(&cdn_lock);
 
 		printf("%s\n%s\n%s\n", cdn_ad.c_str(), cdn_hid.c_str(), cdn_host.c_str());
@@ -112,13 +113,11 @@ int run_cdn_locator()
 	char s[2048];
 
 	if (XrootDir(s, sizeof(s)) == NULL) {
-		// FIXME: handle error
 		return -1;
 	}
-	strncat(s, "/etc/scenario.conf", sizeof(s));
+	strncat(s, "/etc/scenario.conf", sizeof(s)-1);
 
 	minIni ini(s);
-
 	std::string addr = ini.gets("broker", "address");
 	std::string port = ini.gets("broker", "port");
 
@@ -142,9 +141,9 @@ void usage(){
 void cleanup(int sig) {
 	UNUSED(sig);
 
-	// FIXME: this really shouldn't be done in an interrupt handler
 	alive = 0;
 
+	// FIXME: this really shouldn't be done in an interrupt handler
 	// try to close the listening socket
 	if (close(list_s) < 0) {
 		fprintf(stderr, "Error calling close()\n");
@@ -334,6 +333,8 @@ int handle_manifest_requests(ProxyRequestCtx *ctx){
 int handle_stream_requests(ProxyRequestCtx *ctx){
 	string cname;
 	vector<string> dagUrls;
+
+	printf("host:%s\npath:%s\n", ctx->remote_host, ctx->remote_path);
 
 	if (strstr(ctx->remote_host, XIA_DAG_URL) != NULL){
 		dagUrls = split_string_on_delimiter(ctx->remote_host, " ");
