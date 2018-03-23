@@ -16,6 +16,12 @@ message Request {
   optional string hid     = 4;
 }
 
+message Reply {
+  optional string cluster = 1;
+  optional string ad      = 2;
+  optional string hid     = 3;
+}
+
 message Cluster {
   required string name = 1;	// hostname of the 'cluster'
   optional uint32 rtt  = 2;	// avg ping rtt time in ms. Infinate if blank
@@ -31,18 +37,20 @@ message Scores {
 enum msg_type {
   CDN_REQUEST_MSG  = 1;
   PING_SCORES_MSG  = 2;
+  CDN_REPLY_MSG    = 3;
 }
 
 message CDNMsg {
   required uint32   version = 1;
   required msg_type type    = 2;
-  required string   client  = 3; // client requesting a cdn
+  optional string   client  = 3; // client requesting a cdn
   optional string   ad      = 7;
   optional string   hid     = 8;
 
   oneof payload {
     Request request = 4;
     Scores  scores  = 5;
+    Reply   reply   = 6;
   }
 }
 

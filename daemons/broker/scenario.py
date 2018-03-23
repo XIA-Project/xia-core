@@ -211,6 +211,8 @@ class Scenario:
         location['lat'] = self.config.getfloat(cluster, 'lat')
         location['lon'] = self.config.getfloat(cluster, 'lon')
         location['dag'] = self.config.get(cluster, 'dag')
+        location['ad'] = self.config.get(cluster, 'ad')
+        location['hid'] = self.config.get(cluster, 'hid')
         location['name'] = cluster
 
         # FIXME: what does the cost need to look like? is our simple value good enough?
@@ -278,6 +280,8 @@ class Scenario:
             logging.debug(bid)
             cluster_id = bid[1]
             dag = self.scenario['cdn_locations'][cluster_id]['dag']
+            ad = self.scenario['cdn_locations'][cluster_id]['ad']
+            hid = self.scenario['cdn_locations'][cluster_id]['hid']
 
         except Exception as err:
             # we couldn't find a bid, pick a cluster at random
@@ -285,10 +289,12 @@ class Scenario:
 
             cluster_id = random.choice(self.scenario['cdn_locations'].keys())
             dag = self.scenario['cdn_locations'][cluster_id]['dag']
+            ad = self.scenario['cdn_locations'][cluster_id]['ad']
+            hid = self.scenario['cdn_locations'][cluster_id]['hid']
             logging.debug('no valid bids found using %s' % dag)
 
         print len(self.scenario['requests']), len(self.scenario['accepted_bids'])
-        return dag
+        return (dag, ad, hid)
 
 
     def update_scores(self, msg):

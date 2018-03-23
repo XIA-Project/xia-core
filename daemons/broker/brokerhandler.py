@@ -60,11 +60,18 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
         self.scenario.add_request(id, msg.request.bitrate)
 
         # find the best cluster for this client
-        dag = self.scenario.get_optimal_cluster(id, msg.request.bitrate)
+        (dag, ad, hid) = self.scenario.get_optimal_cluster(id, msg.request.bitrate)
 
         logging.debug('Returning dag: %s' % dag)
-        msg.request.cluster = dag
-        self.send_message(msg)
+
+        reply_msg = cdn_pb2.CDNMsg()
+        reply_msg.version = cdn_pb2.CDN_PROTO_VERSION
+        reply_msg.type = cdn_pb2.CDN_REPLY_MSG
+        reply_msg.reply.cluster = dag
+        reply_msg.reply.ad = ad
+        reply_msg.reply.hid = hid
+
+        self.send_message(reply_msg)
 
 
 
