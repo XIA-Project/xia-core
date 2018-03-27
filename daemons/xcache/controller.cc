@@ -594,7 +594,6 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 	std::cout << "Proxy addr: " << proxy->addr() << std::endl;
 	proxy_threads.push_back(proxy_thread);
 	// TODO: Fill in successful response here with proxy dag
-	std::cout << "Sending success to API" << std::endl;
 	resp->set_cmd(xcache_cmd::XCACHE_NEWPROXY);
 	resp->set_status(xcache_cmd::XCACHE_OK);
 	resp->set_dag(proxy->addr());
