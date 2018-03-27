@@ -52,8 +52,9 @@ PushProxy::PushProxy()
     if(Xgetaddrinfo(NULL, _sid_string, &hints, &ai) != 0) {
         throw "PushProxy: getaddrinfo failed";
     }
-    _sa = (sockaddr_x *)ai->ai_addr;
-    _proxy_addr = new Graph(_sa);
+    memcpy(&_sa, (sockaddr_x *)ai->ai_addr, sizeof(sockaddr_x));
+    Xfreeaddrinfo(ai);
+    _proxy_addr = new Graph(&_sa);
     std::cout << "PushProxy addr: " << _proxy_addr->dag_string() << std::endl;
 }
 
@@ -88,7 +89,7 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 	}
 	assert(ctrl != NULL);
 
-    if(Xbind(_sockfd, (struct sockaddr *)_sa, sizeof(sockaddr_x)) < 0) {
+    if(Xbind(_sockfd, (struct sockaddr *)&_sa, sizeof(sockaddr_x)) < 0) {
         throw "Unable to bind to client address";
     }
 
