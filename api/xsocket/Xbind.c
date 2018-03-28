@@ -78,16 +78,21 @@ int Xbind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 		// Extract source SID from g
 		std::string intent_type = g.get_final_intent().type_string();
 //		LOGF("Xbind: Intent type:%s:", intent_type.c_str());
-		if(intent_type.compare("SID") != 0) {
-			LOGF("ERROR: Final intent %s is not SID", intent_type.c_str());
+		if(intent_type.compare("SID") != 0 &&
+				intent_type.compare("CID") != 0 &&
+				intent_type.compare("NCID") != 0) {
+			LOGF("ERROR: Final intent %s is invalid", intent_type.c_str());
+			printf("ERROR: Final intent %s is invalid\n", intent_type.c_str());
 			errno = EINVAL;
 			return -1;
 		}
-		std::string intent = g.get_final_intent().to_string();
-//		LOGF("Xbind: Intent:%s:", intent.c_str());
+		std::string intent = g.intent_SID_str();
+		LOGF("Xbind: Intent SID is %s:", intent.c_str());
+		printf("Xbind: Intent SID is %s:\n", intent.c_str());
 		// Stat <keydir>/<SID>{,.pub}
 		if(!XexistsSID(intent.c_str())) {
-			LOGF("ERROR: Keys for SID:%s not found", intent.c_str());
+			LOGF("ERROR: Keys for SID %s not found", intent.c_str());
+			printf("ERROR: Keys for SID %s not found\n", intent.c_str());
 			errno = EINVAL;
 			return -1;
 		}

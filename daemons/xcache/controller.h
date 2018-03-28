@@ -12,6 +12,7 @@
 #include "policy_manager.h"
 #include "XIARouter.hh"
 #include "cache.h"
+#include "push_proxy.h"
 #include "dagaddr.hpp"
 #include <errno.h>
 #include "xcache.h"
@@ -54,6 +55,7 @@ private:
 
 	meta_map *_map;
 	NCIDTable *_ncid_table;
+	std::vector<std::thread *> proxy_threads;
 
 	/**
 	 * Map of contexts.
@@ -81,6 +83,11 @@ private:
 	 * Lookup a context based on context ID.
 	 */
 	struct xcache_context *lookup_context(int);
+
+	/**
+	 * Check if the requested cid is in local storage
+	 */
+	bool is_content_local(std::string cid);
 
 	/**
 	 * Manages various content stores.
@@ -140,10 +147,25 @@ public:
 	int xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd, int flags);
 
 	/**
+	 * Simply check if the intent CID in the given DAG is local
+	 */
+	int xcache_is_content_local(xcache_cmd *resp, xcache_cmd *cmd);
+
+	/**
 	 * Fetch named content from Xcache.
 	 */
 	int xcache_fetch_named_content(xcache_cmd *resp, xcache_cmd *cmd,
 			int flags);
+
+	/**
+	 * Create a new proxy to cache pushed chunks
+	 */
+	int xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd);
+
+	/**
+	 * Send a chunk to a requested address
+	 */
+	int xcache_push_chunk(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Chunk reading
@@ -214,6 +236,8 @@ public:
 
 	int xcache_notify(struct xcache_context *c, sockaddr_x *addr,
 					  socklen_t addrlen, int event);
+	int xcache_notify_contents(int context_id, const std::string &cid,
+			const std::string &data);
 	std::string addr2cid(sockaddr_x *addr);
 	int cid2addr(std::string cid, sockaddr_x *sax);
 

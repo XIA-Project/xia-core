@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xcache_cmd.pb.h"
+#include "irq.pb.h"
 #include "xcache_sock.h"
 #include "cid.h"
 #include <sys/types.h>
@@ -39,7 +40,7 @@
 
 #define IO_BUF_SIZE (1024 * 1024)
 
-static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, sockaddr_x *, socklen_t) = {
+static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, void *, size_t) = {
 	NULL,
 	NULL,
 };
@@ -122,9 +123,7 @@ static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 		remaining -= ret;
 	}
 
-	// FIXME: there must be a better way of doing this!
-	std::string temp(buf, total);
-	buffer = temp;
+	buffer.assign(buf, total);
 	free(buf);
 
 	return 1;
@@ -828,6 +827,43 @@ int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
 }
 
 /*!
+ * @brief check if a chunk is cached in the local cache
+ *
+ * Requests the local Xcache to check if the requested chunk is in the
+ * local cache.
+ *
+ * @returns 1 if the chunk in local
+ * @returns 0 if the chunk was not found in local cache
+ * @returns -1 if there was an error
+ */
+int XisChunkLocal(XcacheHandle *h, const char *chunk)
+{
+	// Send a request to Xcache to see if the chunk is local
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_ISLOCAL);
+	cmd.set_cid(chunk);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error sending isLocal command to Xcache\n");
+		return -1;
+	}
+
+	// Synchronously wait for Xcache response
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Invalid isLocal response from Xcache\n");
+		return -1;
+	}
+
+	// Return 1 only if xcache explicitly told us that the chunk is local
+	if(cmd.cmd() == xcache_cmd::XCACHE_ISLOCAL
+			&& cmd.status() == xcache_cmd::XCACHE_OK) {
+		return 1;
+	}
+
+	// The chunk was not local
+	return 0;
+}
+
+/*!
 ** @brief fetch a chunk from the network
 **
 ** Fetches the specified chunk from the network. The chunk is retrieved from the origin server specified
@@ -858,9 +894,11 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
-//	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
-//		return _XfetchRemoteChunkBlocking(buf, addr, len);
-//	}
+	/*
+	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
+		return _XfetchRemoteChunkBlocking(buf, addr, len);
+	}
+	*/
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
@@ -1007,21 +1045,21 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 ** @note this API is not currently working correctly,
 **
 ** @param h the cache handle used when XfetchChunk was called
-** @param event the type of event to return notificatioins for. It is not clear what the difference
-**  between these events is.
-** \n XCE_CHUNKARRIVED
-** \n XCE_CHUNKAVAILABLE
-** @param addr the DAG of the chunk to receive notifications for
-** @param addrlen the length of addr (should be sizeof(sockaddr_x))
+** @param event the type of event to return notificatioins for.
+** @param data the data to be passed to the callback function
+** @param datalen the length of data
 **
 ** @returns 0 on success
 ** @returns an error code on failure (see the man page for pthread_create() for more details)
 **
 */
-int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen))
+int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen))
 {
-	notif_handlers[event] = func;
-	return 0;
+	if(event < XCE_MAX) {
+		notif_handlers[event] = func;
+		return 0;
+	}
+	return -1;
 }
 
 static void *__notifThread(void *arg)
@@ -1049,8 +1087,26 @@ static void *__notifThread(void *arg)
 			std::cout << "Error while receiving.\n";
 			continue;
 		}
+		// TODO: The application should just take xcache_notif protobuf
+		// For now, we call different handlers with different data
+		// based on the type of notification
 		notif.ParseFromString(buffer);
-		notif_handlers[notif.cmd()](h, notif.cmd(), (sockaddr_x *)notif.dag().c_str(), notif.dag().length());
+
+		// Notify application of a chunk that is now cached
+		if(notif.has_arrived()) {
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)notif.arrived().dag().c_str(),
+					notif.arrived().dag().length());
+		}
+
+		// Notify application with entire chunk contents as accepted
+		// and verified by PushProxy in Xcache
+		if(notif.has_contents()) {
+			std::string buf;
+			notif.contents().SerializeToString(&buf);
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)buf.c_str(), buf.length());
+		}
 
 	} while(1);
 }
@@ -1075,6 +1131,164 @@ int XlaunchNotifThread(XcacheHandle *h)
 	return pthread_create(&thread, NULL, __notifThread, (void *)h);
 }
 
+/*!
+** @brief a proxy for receiving pushed chunks
+**
+** Start a proxy process that can receive chunks pushed from remote
+** Xcache instances. The user may start any number of proxies for
+** various publishers or groups of publishers. Eventually we may allow
+** different caching policies for each proxy.
+**
+** @param h the xcache handle
+** @param proxyaddr address of newly created proxy returned to user
+**
+** @returns 0 on success and proxyaddr has proxy address
+** @returns -1 on failure
+*/
+int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
+{
+	// Request Xcache to start a new Proxy for pushed content
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+	cmd.set_context_id(h->contextID);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error starting new proxy\n");
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to new proxy creation\n");
+		return -1;
+	}
+
+	if(cmd.cmd() != xcache_cmd::XCACHE_NEWPROXY
+			|| cmd.status() != xcache_cmd::XCACHE_OK) {
+		fprintf(stderr, "Failed starting proxy\n");
+		return -1;
+	}
+
+	printf("XnewProxy: started at: %s\n", cmd.dag().c_str());
+
+	// The command was successful, get the dag for proxy
+	proxyaddr.assign(cmd.dag());
+
+	return 0;
+}
+
+
+int XrequestPushedChunk(std::string &chunkaddr,
+		std::string &fetchservice, std::string &returnaddr)
+{
+	int sockfd;
+	int state = 0;
+	sockaddr_x fs_addr;
+	Graph *g;
+	InterestRequest irq;
+	std::string irqstr;
+	uint32_t irqstrlen, nirqstrlen;
+	int remaining, offset;
+	char *buf;
+	int sent;
+	int retval = -1;
+
+	// Build the client request to be sent to fetchservice
+	irq.set_chunk_addr(chunkaddr);
+	irq.set_return_addr(returnaddr);
+	irq.SerializeToString(&irqstr);
+
+	// Connect to the fetchservice
+	sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	if(sockfd < 0) {
+		fprintf(stderr, "Error creating sock to talk to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	g = new Graph(fetchservice);
+	g->fill_sockaddr(&fs_addr);
+	if(Xconnect(sockfd, (sockaddr *)&fs_addr, sizeof(sockaddr_x))) {
+		fprintf(stderr, "Error connecting to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 1;	// close sockfd
+
+	// Send length of the interest request to fetchservice
+	irqstrlen = irqstr.size();
+	nirqstrlen = htonl(irqstrlen);	// Network byte order
+	if(Xsend(sockfd, &nirqstrlen, sizeof(nirqstrlen),0)
+			!= sizeof(nirqstrlen)) {
+		fprintf(stderr, "Error sending interest request size\n");
+		goto request_pushed_chunk_done;
+	}
+
+	// Now send the serialized irqstr to the fetchservice
+	buf = (char *) malloc(irqstrlen);
+	if(buf == NULL) {
+		fprintf(stderr, "Error allocating memory for interest request\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 2;	// free buf
+	bzero(buf, irqstrlen);
+	memcpy(buf, irqstr.c_str(), irqstrlen);
+
+	remaining = irqstrlen;
+	offset = 0;
+	while(remaining) {
+		sent = Xsend(sockfd, &buf[offset], remaining, 0);
+		if(sent < 0) {
+			fprintf(stderr, "Error sending interest request\n");
+			goto request_pushed_chunk_done;
+		}
+		remaining -= sent;
+		offset += sent;
+	}
+	if(remaining != 0) {
+		fprintf(stderr, "Error sending entire request\n");
+		goto request_pushed_chunk_done;
+	}
+	retval = 0;
+
+request_pushed_chunk_done:
+	switch(state) {
+		case 2: free(buf);
+		case 1: Xclose(sockfd);
+	};
+	return retval;
+}
+
+/*!
+** @brief push a chunk to the requested address
+**
+** Send a chunk to a remote service. The user provides the address of
+** the chunk to be sent and the recipient service address.
+** Typically, the recipient service should know how to handle the
+** incoming chunk header and contents.
+**
+** @param h The cache handle
+** @param chunk DAG of the chunk to be sent. Must be local
+** @param addr Recipient address
+**
+** @returns 0 on success
+** @returns -1 on failure
+*/
+int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_PUSHCHUNK);
+	cmd.set_data(chunk, sizeof(sockaddr_x));
+	cmd.set_dag(addr, sizeof(sockaddr_x));
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error pushing chunk to remote address\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to chunk push\n");
+		return -1;
+	}
+	// TODO: read the response code and return error, when necessary
+	return 0;
+}
 /*!
 ** @brief fetch a partial chunk
 **

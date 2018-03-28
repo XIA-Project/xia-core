@@ -4,6 +4,7 @@
 #include "Xsocket.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <string>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,7 +46,7 @@ typedef struct {
 /** EVENTS **/
 enum {
 	XCE_CHUNKARRIVED = 0,
-	XCE_CHUNKAVAILABLE,
+	XCE_CHUNKCONTENTS,
 	XCE_MAX,
 };
 
@@ -76,6 +77,8 @@ extern int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags,
 		const char *name);
 extern int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t addrlen);  //DONE
 extern int _XfetchRemoteChunkBlocking(void **buf, sockaddr_x *addr, socklen_t len);
+extern int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr);
+extern int XisChunkLocal(XcacheHandle *h, const char *chunk);
 
 //extern int XbufGetChunk(XcacheHandle *h, XcacheBuf *buf, sockaddr_x *addr, socklen_t addrlen, int *flags);
 //
@@ -84,10 +87,13 @@ extern int _XfetchRemoteChunkBlocking(void **buf, sockaddr_x *addr, socklen_t le
 //extern int XchunkRead(XchunkHandle *, void *buf, size_t len);
 
 //extern int XbufReadChunk(XcacheHandle *h, XcacheBuf *xbuf, sockaddr_x *addr, socklen_t addrlen);
-extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen));  //DONE
+extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen));  //DONE
 extern int XlaunchNotifThread(XcacheHandle *h);  //DONE
+extern int XnewProxy(XcacheHandle *h, std::string &proxyaddr);
 extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
+extern int XrequestPushedChunk(std::string &chunkaddr,
+		std::string &fetchservice, std::string &returnaddr);
 
 #ifdef __cplusplus
 }

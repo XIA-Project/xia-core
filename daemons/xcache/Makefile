@@ -5,7 +5,7 @@ VPATH=../common
 PROTOS		:= $(wildcard *.proto)
 PROTO_SRCS	:= $(PROTOS:.proto=.pb.cc)
 
-SUBDIRS=publisher
+SUBDIRS=publisher fs
 XCACHE=$(BINDIR)/xcache
 CLEAN=$(addsuffix .build, $(SUBDIRS))
 
@@ -13,6 +13,7 @@ CLEAN=$(addsuffix .build, $(SUBDIRS))
 
 SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 		cache_download.cc \
+		push_proxy.cc \
 		publisher_list.cc cid_header.cc ncid_header.cc\
 	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc $(PROTO_SRCS)
 OBJS=$(SOURCES:.cc=.o)

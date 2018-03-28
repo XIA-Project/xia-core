@@ -7,6 +7,7 @@ xnetcat
 xrendezvous
 xcache
 announce_publisher
+fs
 xcontrold
 xhostd
 manifest_server

@@ -252,7 +252,7 @@ Node::acquire() const
 {
 	if (ptr_ == &dummy_source_)
 		return;
-	++ptr_->ref_count;
+	++(ptr_->ref_count);
 }
 
 void
@@ -2210,7 +2210,7 @@ Graph::first_hop_is_sid() const
 	std::vector<std::size_t> edges = out_edges_[source];
 	size_t first_hop = edges[0];
 	// Test type of first hop
-	Node first_hop_node = get_node(first_hop);
+	Node first_hop_node = nodes_[first_hop];
 	if (first_hop_node.type() == XID_TYPE_SID) {
 		return true;
 	}
