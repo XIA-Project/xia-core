@@ -43,7 +43,7 @@ int FSThreadPool::queue_work(FSWorkRequest *work)
 		for (unsigned int i=0; i< _num_threads; i++) {
 			std::cout << "Creating thread: " << i << std::endl;
 			FSWorker *worker = new FSWorker();
-			std::thread work_thread(*worker, i);
+			std::thread work_thread(std::ref(*worker), i);
 			_workers.push_back(worker);
 			_worker_threads.push_back(std::move(work_thread));
 			/*
