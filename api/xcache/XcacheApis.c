@@ -441,10 +441,10 @@ static inline int __XputMetaChunk(XcacheHandle *h, const char *data, size_t leng
 /*!
 ** @brief load a chunk into the local content cache
 **
-** Creates a CID based on the hash of the content supplied in data, caches the chunk locally, and 
+** Creates a CID based on the hash of the content supplied in data, caches the chunk locally, and
 ** returns a DAG in the form of "RE (AD HID) CID" that refers to the local address of the newly created chunk.
 ** A route to the CID is added to the node's routing table.
-** The chunk will expire out of the local cache (and any other locations where it is subsequently 
+** The chunk will expire out of the local cache (and any other locations where it is subsequently
 ** cached) if a TTL has been set in in the XcacheHandle.
 **
 ** @param h the cache handle
@@ -534,7 +534,7 @@ int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 ** cached locally, and a DAG in the form of "RE (AD HID) CID" that refers to the local address of
 ** the meta chunk is returned.
 ** A route to the meta chunk's CID is added to the node's routing table.
-** The meta chunk will expire out of the local cache (and any other locations where it is subsequently 
+** The meta chunk will expire out of the local cache (and any other locations where it is subsequently
 ** cached) if a TTL has been set in in the XcacheHandle.
 **
 ** @note This function should be modified to condense the space required for each sockaddr_x otherwise
@@ -579,10 +579,10 @@ int XputMetaChunk(XcacheHandle *h, sockaddr_x *metachunk, sockaddr_x *addrs, soc
 **
 ** Chunks the file fname into one or more chunks each containing up to chunkSize bytes.
 ** A block of memory large enough to hold the list of new DAGs is created and should be freed by
-** the calling code when it is done with the addresses. Each DAG is in the form of 
+** the calling code when it is done with the addresses. Each DAG is in the form of
 ** "RE (AD HID) CID".
 ** A route for each chunk's CID is added to the node's routing table.
-** The chunks will expire out of the local cache (and any other locations where it is subsequently 
+** The chunks will expire out of the local cache (and any other locations where it is subsequently
 ** cached) if a TTL has been set in in the XcacheHandle.
 **
 ** @param h the cache handle
@@ -672,10 +672,10 @@ int XputFile(XcacheHandle *h, const char *fname, size_t chunkSize, sockaddr_x **
 **
 ** Chunks the buffer into one or more chunks each containing up to chunkSize bytes.
 ** A block of memory large enough to hold the list of new DAGs is created and should be freed by
-** the calling code when it is done with the addresses. Each DAG is in the form of 
+** the calling code when it is done with the addresses. Each DAG is in the form of
 ** "RE (AD HID) CID".
 ** A route for each chunk's CID is added to the node's routing table.
-** The chunks will expire out of the local cache (and any other locations where it is subsequently 
+** The chunks will expire out of the local cache (and any other locations where it is subsequently
 ** cached) if a TTL has been set in in the XcacheHandle.
 **
 ** @param h the cache handle
@@ -858,9 +858,9 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
-	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
-		return _XfetchRemoteChunkBlocking(buf, addr, len);
-	}
+//	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
+//		return _XfetchRemoteChunkBlocking(buf, addr, len);
+//	}
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
