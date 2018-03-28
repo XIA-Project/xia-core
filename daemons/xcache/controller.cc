@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <string>
 #include <algorithm>
+#include <functional>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@ xcache_controller::xcache_controller()
 	pthread_mutex_init(&ncid_cid_lock, NULL);
 	context_id = 0;
 	sem_init(&req_sem, 0, 0);
+	_proxy_id = 0;
 }
 
 xcache_controller *xcache_controller::get_instance()
@@ -586,13 +588,17 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 		return RET_SENDRESP;
 	}
 	std::cout << "Controller::xcache_new_proxy starting thread"<< std::endl;
-	std::thread *proxy_thread = new std::thread(*proxy, this, context_ID);
+	std::thread *proxy_thread = new std::thread(std::ref(*proxy), this, context_ID);
 	if(proxy_thread == NULL) {
 		std::cout << "ERROR failed to create proxy thread" << std::endl;
 		return RET_SENDRESP;
 	}
 	std::cout << "Proxy addr: " << proxy->addr() << std::endl;
 	proxy_threads.push_back(proxy_thread);
+	{
+		std::lock_guard<std::mutex> lk(_push_proxies_lock);
+		push_proxies[_proxy_id++] = proxy;
+	}
 	// TODO: Fill in successful response here with proxy dag
 	resp->set_cmd(xcache_cmd::XCACHE_NEWPROXY);
 	resp->set_status(xcache_cmd::XCACHE_OK);

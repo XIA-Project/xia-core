@@ -2,6 +2,7 @@
 #define __XCACHE_CONTROLLER_H__
 #include <map>
 #include <queue>
+#include <mutex>
 #include <iostream>
 #include <semaphore.h>
 #include "xcache_cmd.pb.h"
@@ -56,6 +57,9 @@ private:
 	meta_map *_map;
 	NCIDTable *_ncid_table;
 	std::vector<std::thread *> proxy_threads;
+	std::map<int, PushProxy *> push_proxies;
+	int _proxy_id;
+	std::mutex _push_proxies_lock;
 
 	/**
 	 * Map of contexts.

@@ -60,7 +60,6 @@ PushProxy::PushProxy()
 
 PushProxy::~PushProxy()
 {
-	/*
 	if (_sid_string != NULL) {
 		if (_sid_strlen > XIA_XID_ID_LEN) {
 			XremoveSID(_sid_string);
@@ -70,7 +69,6 @@ PushProxy::~PushProxy()
 		_sid_strlen = 0;
 	}
 	Xclose(_sockfd);
-	*/
 }
 
 std::string PushProxy::addr()
