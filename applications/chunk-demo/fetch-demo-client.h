@@ -26,6 +26,7 @@ class FetchDemoClient{
 		bool _chunk_ready;
 		std::string _cid;
 		std::string _data;
+		int _proxy_id;
 };
 
 void gotChunkData(XcacheHandle *h, int event, void *data, size_t datalen);

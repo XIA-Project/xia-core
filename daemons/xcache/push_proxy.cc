@@ -28,6 +28,7 @@
 PushProxy::PushProxy()
 {
 	_proxy_addr = NULL;
+	_stopping = false;
 	_sid_strlen = 1+ strlen("SID:") + XIA_SHA_DIGEST_STR_LEN;
 	_sid_string = (char *)malloc(_sid_strlen);
 	memset(_sid_string, 0, _sid_strlen);
@@ -79,8 +80,50 @@ std::string PushProxy::addr()
 	return _proxy_addr->dag_string();
 }
 
+// Select on the given list of sockfds
+// return 0 if there is data to read
+// return -1 on error or if _stopping
+int PushProxy::wait_for_read(RfdList &rfdlist)
+{
+	std::cout << "PushProxy: waiting for read" << std::endl;
+	// Convert given fd list into fd_set used by select
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	assert(rfdlist.size() > 0);
+	auto maxfd = rfdlist[0];
+	for (auto fd : rfdlist) {
+		if(maxfd < fd) {
+			maxfd = fd;
+		}
+		FD_SET(fd, &rfds);
+	}
+
+	// Now select waiting for data on given sockets
+	struct timeval timeout;
+	timeout.tv_sec = _timeoutsec;
+	timeout.tv_usec = _timeoutusec;
+	while(true) {
+		auto ret = Xselect(maxfd+1, &rfds, nullptr, nullptr, &timeout);
+		if(ret <= 0) {
+			// Check if controller is asking us to stop
+			if(_stopping) {
+				return -1;
+			}
+		} else {
+			std::cout << "PushProxy:: data ready to read" << std::endl;
+			return 0;
+		}
+	}
+}
+
+void PushProxy::stop()
+{
+	_stopping = true;
+}
+
 void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 {
+	std::cout << "PushProxy: thread started" << std::endl;
 	if(ctrl == NULL) {
 		syslog(LOG_ERR, "PushProxy: ERROR invalid controller\n");
 		std::cout << "PushProxy:: ERROR invalid controller" << std::endl;
@@ -90,15 +133,22 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
     if(Xbind(_sockfd, (struct sockaddr *)&_sa, sizeof(sockaddr_x)) < 0) {
         throw "Unable to bind to client address";
     }
+	std::cout << "PushProxy: bound to socket" << std::endl;
 
     Xlisten(_sockfd, 1);
 
-    while (1) {
+	std::cout << "PushProxy::_stopping: " << _stopping << std::endl;
+    while (!_stopping) {
         int sock;
         sockaddr_x sx;
+		RfdList rfd_list;
         socklen_t addrlen = sizeof(sockaddr_x);
         char buf[BUFSIZE];
 		memset(buf, 0, BUFSIZE);
+
+		// Wait for a new connection
+		rfd_list.push_back(_sockfd);
+		if(wait_for_read(rfd_list)) break;
 
 		// Accept new connection
         std::cout << "Socket " << _sockfd << " waiting" << std::endl;
@@ -107,6 +157,10 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
             std::cout << "Xaccept failed. Continuing..." << std::endl;
             continue;
         }
+
+		// Will monitor sock for read data
+		rfd_list.clear();
+		rfd_list.push_back(sock);
 
 		std::cout << "Connected to a publisher" << std::endl;
 		std::cout << "Addrlen: " << addrlen << std::endl;
@@ -118,6 +172,8 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 		// Get the content header length
 		uint32_t chdr_len = 0;
 		int count = 0;
+
+		if(wait_for_read(rfd_list)) break;
 		count = Xrecv(sock, &chdr_len, sizeof(chdr_len), 0);
 		if (count != sizeof(chdr_len)) {
 			std::cout << "PushProxy: Failed getting header len." << std::endl;
@@ -132,6 +188,7 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 		int remaining = chdr_len;
 		size_t offset = 0;
 		while(remaining) {
+			if(wait_for_read(rfd_list)) break;
 			count = Xrecv(sock, buf+offset, remaining, 0);
 			offset += count;
 			remaining -= count;
@@ -204,7 +261,7 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
 			continue;
 		}
 		while(remaining) {
-			// TODO: Add an Xselect here in case data never comes
+			if(wait_for_read(rfd_list)) break;
 			count = Xrecv(sock, databuf+offset, remaining, 0);
 			std::cout << "Got bytes: " << count << std::endl;
 			offset += count;

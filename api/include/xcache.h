@@ -90,6 +90,7 @@ extern int XisChunkLocal(XcacheHandle *h, const char *chunk);
 extern int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen));  //DONE
 extern int XlaunchNotifThread(XcacheHandle *h);  //DONE
 extern int XnewProxy(XcacheHandle *h, std::string &proxyaddr);
+extern int XendProxy(XcacheHandle *h, int proxy_id);
 extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
 extern int XrequestPushedChunk(std::string &chunkaddr,

@@ -1132,6 +1132,38 @@ int XlaunchNotifThread(XcacheHandle *h)
 }
 
 /*!
+ * @brief stop a proxy that was receiving pushed chunks
+ *
+ * @param h the xcache handle
+ * @param proxy_id the proxy handle returned by XnewProxy()
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+
+int XendProxy(XcacheHandle *h, int proxy_id)
+{
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_ENDPROXY);
+	cmd.set_context_id(h->contextID);
+	cmd.set_proxy_id(proxy_id);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error stopping a push proxy\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to end proxy request\n");
+		return -1;
+	}
+	if(cmd.cmd() != xcache_cmd::XCACHE_ENDPROXY
+			|| cmd.status() != xcache_cmd::XCACHE_OK) {
+		fprintf(stderr, "Failed stopping proxy\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*!
 ** @brief a proxy for receiving pushed chunks
 **
 ** Start a proxy process that can receive chunks pushed from remote
@@ -1142,7 +1174,7 @@ int XlaunchNotifThread(XcacheHandle *h)
 ** @param h the xcache handle
 ** @param proxyaddr address of newly created proxy returned to user
 **
-** @returns 0 on success and proxyaddr has proxy address
+** @returns proxy_id on success and proxyaddr has proxy address
 ** @returns -1 on failure
 */
 int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
@@ -1174,7 +1206,7 @@ int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
 	// The command was successful, get the dag for proxy
 	proxyaddr.assign(cmd.dag());
 
-	return 0;
+	return cmd.proxy_id();
 }
 
 

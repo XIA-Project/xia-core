@@ -56,7 +56,7 @@ private:
 
 	meta_map *_map;
 	NCIDTable *_ncid_table;
-	std::vector<std::thread *> proxy_threads;
+	std::map<int, std::thread *> proxy_threads;
 	std::map<int, PushProxy *> push_proxies;
 	int _proxy_id;
 	std::mutex _push_proxies_lock;
@@ -165,6 +165,11 @@ public:
 	 * Create a new proxy to cache pushed chunks
 	 */
 	int xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd);
+
+	/**
+	 * End a push proxy specified by the user
+	 */
+	int xcache_end_proxy(xcache_cmd *resp, xcache_cmd *cmd);
 
 	/**
 	 * Send a chunk to a requested address

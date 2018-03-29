@@ -23,6 +23,7 @@ message xcache_cmd {
 		XCACHE_PUSHCHUNK = 20;
 		XCACHE_NEWPROXY = 21;
 		XCACHE_ISLOCAL = 22;
+		XCACHE_ENDPROXY = 23;
 	};
 
 	enum status_type {
@@ -50,6 +51,7 @@ message xcache_cmd {
 	optional bytes msg = 13;
 	optional bytes publisher_name = 16;
 	optional bytes content_name = 17;
+	optional int32 proxy_id = 18;
 };
 
 message xcache_notif {

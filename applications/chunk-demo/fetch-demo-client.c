@@ -38,6 +38,11 @@ FetchDemoClient::FetchDemoClient()
 FetchDemoClient::~FetchDemoClient()
 {
 	// Cleanup state before exiting
+	if(_proxy_id > 0) {
+		std::cout << "Stopping proxy" << std::endl;
+		XendProxy(&_xcache, _proxy_id);
+		std::cout << "Stopped proxy" << std::endl;
+	}
 	XcacheHandleDestroy(&_xcache);
 }
 
@@ -66,12 +71,14 @@ void FetchDemoClient::get_chunk(std::string &cid, std::string &data)
 	_chunk_ready = false;
 }
 
+// Create a new proxy and submit request for a chunk
+// @returns proxy_id returned by XnewProxy, use for stopping proxy later
 int FetchDemoClient::request(std::string &chunk_dag, std::string &fs_dag)
 {
 	// Start a new PushProxy that will accept chunks when they are
 	// pushed back to us by the Fetching Service
 	std::string proxyaddr;
-	if (XnewProxy(&_xcache, proxyaddr)) {
+	if ((_proxy_id = XnewProxy(&_xcache, proxyaddr)) < 0) {
 		std::cout << "Error starting proxy to accept pushed chunk" << std::endl;
 		return -1;
 	}
@@ -80,7 +87,7 @@ int FetchDemoClient::request(std::string &chunk_dag, std::string &fs_dag)
 		std::cout << "Error requesting chunk fetch" << std::endl;
 		return -1;
 	}
-	return 0;
+	return _proxy_id;
 }
 
 int main(int argc, char **argv)
@@ -109,6 +116,7 @@ int main(int argc, char **argv)
 	std::cout << "main: Got " << cid << std::endl;
 	std::cout << "main: of length " << data.length() << std::endl;
 	delete client;
+	std::cout << "main: Done." << std::endl;
 
 	return retval;
 }

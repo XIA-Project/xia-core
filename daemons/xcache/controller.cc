@@ -43,7 +43,7 @@ xcache_controller::xcache_controller()
 	pthread_mutex_init(&ncid_cid_lock, NULL);
 	context_id = 0;
 	sem_init(&req_sem, 0, 0);
-	_proxy_id = 0;
+	_proxy_id = 1;
 }
 
 xcache_controller *xcache_controller::get_instance()
@@ -562,6 +562,44 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	// Verify the downloaded content against Publisher's pubkey
 }
 
+int xcache_controller::xcache_end_proxy(xcache_cmd *resp, xcache_cmd *cmd)
+{
+	std::cout << "Controller::xcache_end_proxy called" << std::endl;
+	// Set the response to be a failure
+	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
+
+	std::cout << "Controller::xcache_end_proxy checking cmd" << std::endl;
+	assert(cmd->cmd() == xcache_cmd::XCACHE_ENDPROXY);
+	std::cout << "Controller::xcache_end_proxy checked cmd" << std::endl;
+
+	//auto context_ID = cmd->context_id();
+	auto proxy_id = cmd->proxy_id();
+
+	// Lookup the proxy object from its ID
+	{
+		// Hold a lock so we are thread safe
+		// FIXME: drop lock before waiting on thread to exit
+		std::lock_guard<std::mutex> lk(_push_proxies_lock);
+
+		auto it = push_proxies.find(proxy_id);
+		auto thread_it = proxy_threads.find(proxy_id);
+		if(it != push_proxies.end() && thread_it != proxy_threads.end()) {
+			// Tell the proxy to stop
+			push_proxies[proxy_id]->stop();
+			// Join the proxy thread to exit
+			proxy_threads[proxy_id]->join();
+			// Now clean up data structures tracking the proxy
+			push_proxies.erase(it);
+			proxy_threads.erase(thread_it);
+		}
+	}
+
+	// TODO: Fill in successful response here with proxy dag
+	resp->set_cmd(xcache_cmd::XCACHE_ENDPROXY);
+	resp->set_status(xcache_cmd::XCACHE_OK);
+	return RET_SENDRESP;
+}
+
 int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	std::cout << "Controller::xcache_new_proxy called" << std::endl;
@@ -593,16 +631,21 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 		std::cout << "ERROR failed to create proxy thread" << std::endl;
 		return RET_SENDRESP;
 	}
+	int proxy_id;
 	std::cout << "Proxy addr: " << proxy->addr() << std::endl;
-	proxy_threads.push_back(proxy_thread);
 	{
 		std::lock_guard<std::mutex> lk(_push_proxies_lock);
-		push_proxies[_proxy_id++] = proxy;
+		proxy_id = ++_proxy_id;
+		std::cout << "Proxy id: " << proxy_id << std::endl;
+		push_proxies[proxy_id] = proxy;
+		proxy_threads[proxy_id] = proxy_thread;
 	}
 	// TODO: Fill in successful response here with proxy dag
+	std::cout << "Controller::xcache_new_proxy created proxy" << std::endl;
 	resp->set_cmd(xcache_cmd::XCACHE_NEWPROXY);
 	resp->set_status(xcache_cmd::XCACHE_OK);
 	resp->set_dag(proxy->addr());
+	resp->set_proxy_id(proxy_id);
 	return RET_SENDRESP;
 }
 
@@ -742,6 +785,7 @@ int xcache_controller::fast_process_req(int fd, xcache_cmd *resp, xcache_cmd *cm
 	case xcache_cmd::XCACHE_FETCHNAMEDCHUNK:
 	case xcache_cmd::XCACHE_PUSHCHUNK:
 	case xcache_cmd::XCACHE_NEWPROXY:
+	case xcache_cmd::XCACHE_ENDPROXY:
 	case xcache_cmd::XCACHE_READ:
 		ret = RET_ENQUEUE;
 		break;
@@ -1383,6 +1427,15 @@ void xcache_controller::process_req(xcache_req *req)
 		// Start a proxy to accept pushed chunks
 		cmd = (xcache_cmd *)req->data;
 		ret = xcache_new_proxy(&resp, cmd);
+		if(ret == RET_SENDRESP) {
+			resp.SerializeToString(&buffer);
+			send_response(req->to_sock, buffer.c_str(), buffer.length());
+		}
+		break;
+	case xcache_cmd::XCACHE_ENDPROXY:
+		// Stop a proxy that was started to accept pushed chunks
+		cmd = (xcache_cmd *)req->data;
+		ret = xcache_end_proxy(&resp, cmd);
 		if(ret == RET_SENDRESP) {
 			resp.SerializeToString(&buffer);
 			send_response(req->to_sock, buffer.c_str(), buffer.length());
