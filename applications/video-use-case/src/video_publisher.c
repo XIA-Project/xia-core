@@ -179,7 +179,7 @@ void publish_each_segment_with_name(const char* name, vector<string> & dagUrls){
 
     if ((count = XputFile(&videoInfo.xcache, name, CHUNKSIZE, &addrs)) < 0) {
         warn("cannot put file for %s\n", name);
-        return; 
+        return;
     }
 
     // push back the cids
@@ -189,7 +189,7 @@ void publish_each_segment_with_name(const char* name, vector<string> & dagUrls){
         Node intent_node = g.get_final_intent();
 
         if(videoInfo.manifestType == MANIFEST_TO_HOST){
-            dagUrls.push_back(g.http_url_string()); 
+            dagUrls.push_back(g.http_url_string());
         } else if (videoInfo.manifestType == MANIFEST_TO_CDN) {
             dagUrls.push_back("http://" + string(CDN_NAME) + "/" + intent_node.to_string());
         } else if (videoInfo.manifestType == MANIFEST_TO_MULTI_CDN) {
@@ -200,6 +200,7 @@ void publish_each_segment_with_name(const char* name, vector<string> & dagUrls){
 
 int create_xia_dash_manifest(ServerVideoInfo *videoInfo){
     int rc;
+
     string manifestName ="xia_manifest_" + videoInfo->videoName + "." + MANIFEST_EXTENSION;
 
     string fullPath = RESOURCE_FOLDER;
@@ -221,18 +222,18 @@ int create_xia_dash_manifest(ServerVideoInfo *videoInfo){
                 char path[MAX_PATH_SIZE];
                 int len = snprintf(path, sizeof(path)-1, "%s%s", fullPath.c_str(), ent->d_name);
                 path[len] = 0;
-    
+
                 string original = path;
 
                 if ((rc = parse_dash_manifest(fullPath.c_str(), original.c_str(), parsed.c_str())) < 0){
                     warn("failed to create the video manifest file\n");
                     return -1;
-                } 
-            
+                }
+
                 if ((rc = generate_XIA_manifest(fullPath.c_str(), parsed.c_str(), generated.c_str(), videoInfo->dagUrls)) < 0){
                     warn("failed to create the video manifest file\n");
                     return -1;
-                } 
+                }
                 videoInfo->manifestName = generated;
             }
         }
@@ -258,7 +259,7 @@ int create_xia_dash_manifest_urls(ServerVideoInfo *videoInfo){
         fprintf(f, "%s\n", videoInfo->manifestUrls[i].c_str());
     }
     fclose(f);
-        
+
     return 1;
 }
 
@@ -268,14 +269,14 @@ int publish_manifest(const char* name){
 
     if ((count = XputFile(&videoInfo.xcache, name, CHUNKSIZE, &addrs)) < 0) {
         warn("cannot put file for %s\n", name);
-        return -1; 
+        return -1;
     }
 
     for(int i =0; i < count; i++){
         Graph g;
         g.from_sockaddr(&addrs[i]);
 
-        videoInfo.manifestUrls.push_back(g.http_url_string()); 
+        videoInfo.manifestUrls.push_back(g.http_url_string());
     }
 
     return 1;
@@ -354,6 +355,7 @@ int main(int argc, char *argv[]){
                 videoInfo.manifestType = manifestType;
             }
             publish_content(&videoInfo);
+			break;
         }
 
     }
