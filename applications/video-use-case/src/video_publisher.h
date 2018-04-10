@@ -21,19 +21,19 @@
 using namespace std;
 
 // name of the CDN to register to nameserver
-// 
+//
 // this name would be used for load balancing by nameserver;
 // load balancing works on equivalent set of servers that share
 // the name.
-static const char* CDN_NAME = "www.cdn1.xia";
+//static const char* CDN_NAME = "www.cdn1.xia";
 
 // name of the video use case domain on GENI running XIA.
-// 
+//
 // this name is not registered at the nameserver, but rather as an
-// hook for the full url in manifest for the multi-CDN use case. 
+// hook for the full url in manifest for the multi-CDN use case.
 // The full url in manifest is:
 // 		www.origin.xia/CID?cdn1=CDN1Name&cdn2=CDN2Name
-static const char* MULTI_CDN_NAME = "www.origin.xia";
+//static const char* MULTI_CDN_NAME = "www.origin.xia";
 
 // all the CDN names for the multi-cdn use case
 static const char * MUTI_CDN_CDN_NAMES[] = {
@@ -46,13 +46,13 @@ static const unsigned MULTI_CDN_CDN_NUMS = (sizeof(MUTI_CDN_CDN_NAMES) / sizeof(
 
 // several options for generating manifest with several options
 // user should enter to the command line prompt
-//  "host": generate plain DAG url so client fetches it directly 
+//  "host": generate plain DAG url so client fetches it directly
 //  	from DAG
 //  "cdn": genereate 'cdn.name/CID' so that nameserver can load
 //  	balance among a set of serves that has the CID
-//  "multicdn": generate "vid.name/CID" so nameserver can load 
+//  "multicdn": generate "vid.name/CID" so nameserver can load
 //  	balance among a set of CDN clusters that has the CID
-//  
+//
 //  Note: system now doesn't recognize which CID belongs to which
 //  server and CDN. So to get load balancing works correctly, it is
 //  best to publish contents on all involving servers/clusters.
@@ -68,17 +68,17 @@ static const char* Q = "q";
 static const char* RESOURCE_FOLDER = "resources/";
 
 // name of the generated manifest files
-// 
+//
 // parsed_dash.mpd is the file without SegmentTemplate. It makes
-// it more specific. SegmentTemplate doesn't work well with the 
+// it more specific. SegmentTemplate doesn't work well with the
 // DAG like urls
-// 	
+//
 // generated_dash.mpd is the manifest generated with DAG urls based
 // on parsed_dash.mpd
 static const char* PARSED_DASH_MANIFEST = "parsed_dash.mpd";
 static const char* GENERATED_DASH_MANIFEST = "generated_dash.mpd";
 
-typedef struct _ServerVideoInfo{    
+typedef struct _ServerVideoInfo{
     string videoName;		//name of the video
     string manifestName;	// name of the manifest
 
@@ -88,7 +88,7 @@ typedef struct _ServerVideoInfo{
     vector<string> manifestUrls;
     // path -> list of dagurls
     map<string, vector<string> > dagUrls;
-    
+
     XcacheHandle xcache;
 } ServerVideoInfo;
 
@@ -103,8 +103,8 @@ void help(const char *name);
 void getLocalAddr();
 
 /*
- ** for debugging mainly. print out all the 
- *  information related to current video that is 
+ ** for debugging mainly. print out all the
+ *  information related to current video that is
  *  being published (dagUrls, manifestUrls etc).
  */
 void print_dash_info(ServerVideoInfo *videoInfo);
@@ -144,16 +144,16 @@ void process_dash_files(const char* dir);
 void publish_each_segment_with_name(const char* name, vector<string> & dagUrls);
 
 /*
- ** create the XIA video manifest based on the video name and 
+ ** create the XIA video manifest based on the video name and
  *	dag urls associated with the name
  */
 int create_xia_dash_manifest(ServerVideoInfo *videoInfo);
 
 /*
- ** save the manifest DAG url to disk so that video server 
+ ** save the manifest DAG url to disk so that video server
  *	can have this information.
  *
- * 	Note for now video server need to be ran AFTER publishing 
+ * 	Note for now video server need to be ran AFTER publishing
  * 	all the content
  */
 int create_xia_dash_manifest_urls(ServerVideoInfo *videoInfo);

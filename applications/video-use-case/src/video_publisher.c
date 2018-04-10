@@ -184,17 +184,15 @@ void publish_each_segment_with_name(const char* name, vector<string> & dagUrls){
 
     // push back the cids
     for(int i =0; i < count; i++){
+		// strip every but the CID from the dag, we only want the CID in the manifest
+		// the proxy will will fill out the complete dag with either the current best cdn,
+		// or if it doesn't exist, the AD/HID or the manifest server
         Graph g;
         g.from_sockaddr(&addrs[i]);
-        Node intent_node = g.get_final_intent();
+		Node cid = g.intent_CID();
 
-        if(videoInfo.manifestType == MANIFEST_TO_HOST){
-            dagUrls.push_back(g.http_url_string());
-        } else if (videoInfo.manifestType == MANIFEST_TO_CDN) {
-            dagUrls.push_back("http://" + string(CDN_NAME) + "/" + intent_node.to_string());
-        } else if (videoInfo.manifestType == MANIFEST_TO_MULTI_CDN) {
-            dagUrls.push_back("http://" + string(MULTI_CDN_NAME) + "/" + intent_node.to_string() + "?" + generateCDNOptionsUrl());
-        }
+		g = Node() * cid;
+        dagUrls.push_back(g.http_url_string());
     }
 }
 
@@ -282,7 +280,8 @@ int publish_manifest(const char* name){
     return 1;
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
     char input[MAX_INPUT_SIZE];
     char videoName[MAX_INPUT_SIZE];
     char manifestType[MAX_INPUT_SIZE];
@@ -297,15 +296,15 @@ int main(int argc, char *argv[]){
     XcacheHandleInit(&videoInfo.xcache);
     getLocalAddr();
 
-    char* type = argv[1];
-    if(strcmp(type, "cdn") == 0){
-        sockaddr_x addr = localAddr2DAG(myAD, myHID);
-
-        // register server DAG to CDN name
-        if(XregisterAnycastName(CDN_NAME, &addr) < 0){
-            die(-1, "cannot register anycast name\n");
-        }
-    }
+//    char* type = argv[1];
+//    if(strcmp(type, "cdn") == 0){
+//        sockaddr_x addr = localAddr2DAG(myAD, myHID);
+//
+//        // register server DAG to CDN name
+//        if(XregisterAnycastName(CDN_NAME, &addr) < 0){
+//            die(-1, "cannot register anycast name\n");
+//        }
+//    }
 
     // finding user input1
     say("[Enter [videoName manifestType] to publish a given video]\n");
@@ -354,12 +353,13 @@ int main(int argc, char *argv[]){
             } else {
                 videoInfo.manifestType = manifestType;
             }
+			// we're going to replace the dags anyway, so use the easy option
+			videoInfo.manifestType = MANIFEST_TO_HOST;
             publish_content(&videoInfo);
 			break;
         }
 
     }
-    say("[Exit content publisher, clean up resources]\n");
 
     return 0;
 }
