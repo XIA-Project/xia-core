@@ -38,7 +38,7 @@ sys.path.append(os.path.join(srcdir, "bin"))
 import xiapyutils
 
 VER='1.0'
-FREQ=60
+FREQ=5
 DELAY=0.3
 COUNT=5
 BROKER='localhost'
@@ -114,8 +114,8 @@ def scores_msg(scores):
     for (name, rtt, loss) in scores:
         c = msg.scores.clusters.add()
         c.name = name
-        c.rtt = rtt
-        c.loss = loss
+        c.rtt = int(rtt)
+        c.loss = int(loss)
 
     return msg
 
