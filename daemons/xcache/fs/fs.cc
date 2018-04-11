@@ -1,5 +1,4 @@
 // Project includes
-#include "fs_worker.h"
 #include "fs_thread_pool.h"
 #include "fs_sleep_request.h"
 #include "fs_client_request.h"
@@ -90,8 +89,8 @@ int main()
 		std::cout << "Connected to " << g.dag_string() << std::endl;
 
 		// A thread in the pool will now interact with client
-		FSWorkRequest *work = new FSClientRequest(t_sock);
-		pool->queue_work(work);
+		FSWorkRequestPtr work(new FSClientRequest(t_sock));
+		pool->queue_work(std::move(work));
 	}
 	// TODO: Build a way to break out of loop when user requests
 	// that will be considered a successful exit.

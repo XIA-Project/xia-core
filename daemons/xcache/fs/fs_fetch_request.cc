@@ -46,8 +46,8 @@ FSFetchRequest *FSFetchRequest::from_client(std::string &buf)
 // Queue up a task to push this chunk to the requestor address
 void FSFetchRequest::pushChunkTo(std::string requestor)
 {
-	FSWorkRequest *work = new FSPushRequest(chunk_id(), requestor);
-	_pool->queue_work(work);
+	FSWorkRequestPtr work(new FSPushRequest(chunk_id(), requestor));
+	_pool->queue_work(std::move(work));
 }
 
 // ASSUME: An accepted socket for a fetch connection is available

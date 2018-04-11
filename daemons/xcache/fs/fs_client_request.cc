@@ -82,12 +82,12 @@ void FSClientRequest::process()
 	// Retrieve interest request from client protobuf
 	// and convert it into a request to fetch the actual chunk
 	std::string client_buf(buf, req_len);
-	FSWorkRequest *work = FSFetchRequest::from_client(client_buf);
+	FSWorkRequestPtr work(FSFetchRequest::from_client(client_buf));
 	if(work == nullptr) {
 		std::cout << "Bad request from client" << std::endl;
 		return;
 	}
-	_pool->queue_work(work);
+	_pool->queue_work(std::move(work));
 
 	// Validate the request
 	// Queue up a fetch request to initiate the fetch
