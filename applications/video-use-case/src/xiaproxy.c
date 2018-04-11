@@ -6,10 +6,14 @@
 #include <time.h>
 #include <stdarg.h>
 #include <iostream>
+#include <syslog.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "xiaproxy.h"
 #include "cdn.pb.h"
 #include "minIni.h"
+
+#define APPNAME "xiaproxy"
 
 static int port = 0;                    // port this server runs on
 static int list_s;                      // listening socket of this proxy
@@ -29,6 +33,7 @@ static std::string cdn_ad;
 static std::string cdn_hid;
 static std::string cdn_host;
 static char hostname[64];
+static char *ident = NULL;
 
 // the lookup cache for CDN nameserver query
 //  CDN name -> server location (AD:HID)
@@ -47,11 +52,11 @@ void *cdn_locator(void *)
 	char buf[2048];
 
 	while(alive) {
-		printf("fetching best cdn\n");
+		syslog(LOG_INFO, "fetching best cdn");
 
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-			printf("can't create broker sock: %s\n", strerror(errno));
-			break;
+			syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
+			exit(EXIT_FAILURE);
 
 		}
 
@@ -78,7 +83,7 @@ void *cdn_locator(void *)
 		len = ntohl(foo);
 		rc = recv(sock, buf, sizeof(buf), 0);
 
-		printf("got %d bytes\n", rc);
+		syslog(LOG_DEBUG, "got %d bytes", rc);
 
 		close(sock);
 
@@ -91,9 +96,8 @@ void *cdn_locator(void *)
 
 		// lock mutex
 		if (pthread_mutex_lock(&cdn_lock)) {
-			printf("cdn_mutex lock error: %s\n", strerror(errno));
-			// raise an error
-			break;
+			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+			exit(EXIT_FAILURE);
 		}
 
 		cdn_ad = reply_msg->ad();
@@ -101,7 +105,7 @@ void *cdn_locator(void *)
 		cdn_host = reply_msg->cluster();
 		pthread_mutex_unlock(&cdn_lock);
 
-		printf("%s\n%s\n%s\n", cdn_ad.c_str(), cdn_hid.c_str(), cdn_host.c_str());
+		syslog(LOG_NOTICE, "New CDN: %s", cdn_host.c_str());
 		sleep(locator_interval);
 	}
 
@@ -127,16 +131,67 @@ int run_cdn_locator()
 	// start new thread to query for best cdn
 	pthread_t locator;
 	if (pthread_create(&locator, NULL, cdn_locator, NULL)) {
-		printf("can't create broker thread: %s\n", strerror(errno));
+		syslog(LOG_ERR, "can't create broker thread: %s", strerror(errno));
 		rc = 1;
 	}
 
 	return rc;
 }
 
-void usage(){
-	say("usage: ./proxy <port>\n");
+void help(const char *name)
+{
+	printf("\nusage: %s [-l level] [-v] port\n", name);
+	printf("where:\n");
+	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
+	printf(" -v          : log to the console as well as syslog\n");
+	printf(" port        : port to accept proxy requests on\n");
+	printf("\n");
+	exit(0);
 }
+
+void config(int argc, char** argv)
+{
+	int c;
+	unsigned level = 3;
+	int verbose = 0;
+
+	opterr = 0;
+
+	while ((c = getopt(argc, argv, "l:v")) != -1) {
+		switch (c) {
+			case 'l':
+				level = MIN(atoi(optarg), LOG_DEBUG);
+				break;
+			case 'v':
+				verbose = LOG_PERROR;
+				break;
+			case '?':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				break;
+		}
+	}
+
+	if (optind != argc - 1) {
+		printf("Invalid # of parameters\n");
+		help(basename(argv[0]));
+	} else {
+		port = atoi(argv[optind]);
+		if (port == 0) {
+			printf("Invalid port #\n");
+			help(basename(argv[0]));
+		}
+	}
+
+	// note: ident must exist for the life of the app
+	ident = (char *)calloc(strlen (APPNAME) + 4, 1);
+	sprintf(ident, "%s", APPNAME);
+	openlog(ident, LOG_CONS|LOG_NDELAY|verbose, LOG_LOCAL4);
+	setlogmask(LOG_UPTO(level));
+}
+
+
 
 void cleanup(int sig) {
 	UNUSED(sig);
@@ -146,7 +201,7 @@ void cleanup(int sig) {
 	// FIXME: this really shouldn't be done in an interrupt handler
 	// try to close the listening socket
 	if (close(list_s) < 0) {
-		fprintf(stderr, "Error calling close()\n");
+		syslog(LOG_ERR, "Error calling close()");
 		exit(EXIT_FAILURE);
 	}
 
@@ -157,7 +212,7 @@ void cleanup(int sig) {
 void close_fd(int browser_sock) {
 	if (browser_sock >= 0) {
 		Close(browser_sock);
-		say("browser socket is closed successfully\n");
+		syslog(LOG_DEBUG, "browser socket is closed successfully");
 	}
 }
 
@@ -174,16 +229,55 @@ void parse_host_port(char *host_port, char *remote_host, char *remote_port) {
 }
 
 void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
+
+	printf("process urls: count = %lu\n", dagUrls.size());
+
+	// get the current cdn provided by the broker
+	if (pthread_mutex_lock(&cdn_lock)) {
+		syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	printf("getting best cdn's ad & hid\n");
+	Node ad = Node(cdn_ad);
+	Node hid = Node(cdn_hid);
+
+	pthread_mutex_unlock(&cdn_lock);
+
+	//process the dags
 	for (unsigned i = 0; i < dagUrls.size(); ++i) {
 		string dagUrl = dagUrls[i];
 
+		// make sure it looks like a dag url
 		size_t found = dagUrl.find("http://");
-		if(found == string::npos){
+		if (found == string::npos) {
 			dagUrl = "http://" + capitalize_XID(dagUrl);
 		}
 
-		Graph parsed(dagUrl);
-		parsed.fill_sockaddr(&chunkAddresses[i]);
+		printf("orig = %s\n", dagUrl.c_str());
+
+		Graph incoming(dagUrl);
+
+		// if it's just a cid, make dag using current best cdn
+		if (incoming.num_nodes() == 1 && incoming.get_final_intent().type() == XID_TYPE_CID) {
+
+			char d[256];
+
+			Node cid = incoming.intent_CID();
+
+			sprintf(d, "DAG 2 0 - %s 2 1 - %s 2 - %s", cdn_ad.c_str(), cdn_hid.c_str(), cid.to_string().c_str());
+			printf("%s\n", d);
+
+			Graph modified(d);
+			modified.fill_sockaddr(&chunkAddresses[i]);
+
+			modified.print_graph();
+
+		} else {
+			// it's a full dag, so just use it
+			incoming.fill_sockaddr(&chunkAddresses[i]);
+			incoming.print_graph();
+		}
 	}
 }
 
@@ -193,7 +287,7 @@ void *job(void *sockptr) {
 
 	rc = xia_proxy_handle_request(browser_sock);
 	if (rc == -1) {
-		warn("warning: something wrong with the xia_proxy_handle_request, close the browser socket\n");
+		syslog(LOG_DEBUG, "something wrong with the xia_proxy_handle_request, close the browser socket");
 	}
 
 	close_fd(browser_sock);
@@ -216,7 +310,7 @@ int send_command(ProxyRequestCtx *ctx, const char *cmd) {
 	int n;
 	if ((n = Xsend(ctx->xia_sock, cmd, strlen(cmd), 0)) < 0) {
 		Xclose(ctx->xia_sock);
-		warn("Unable to communicate\n");
+		syslog(LOG_WARNING, "Unable to communicate");
 		return -1;
 	}
 	return 1;
@@ -226,7 +320,7 @@ int get_server_reply(ProxyRequestCtx *ctx, char *reply, int sz) {
 	int n = -1;
 	if ((n = Xrecv(ctx->xia_sock, reply, sz, 0))  < 0) {
 		Xclose(ctx->xia_sock);
-		warn("Unable to communicate with the server\n");
+		syslog(LOG_WARNING, "Unable to communicate with the server");
 		return -1;
 	}
 
@@ -239,7 +333,7 @@ int send_and_receive_reply(ProxyRequestCtx *ctx, char* cmd, char* reply){
 	int status = send_command(ctx, cmd);
 
 	if (get_server_reply(ctx, reply, XIA_MAXBUF) < 1){
-		warn("could not get chunk count. Aborting. \n");
+		syslog(LOG_WARNING, "could not get chunk count. Aborting.");
 		return -1;
 	}
 	return status;
@@ -254,18 +348,18 @@ int get_xia_socket_for_request(const char* sname){
 
 	// get the service DAG associated with the CDN service name
 	if (XgetDAGbyName(sname, &dag, &daglen) < 0){
-		warn("unable to locate CDN DNS service name: %s\n", sname);
+		syslog(LOG_WARNING, "unable to locate CDN DNS service name: %s", sname);
 		return -1;
 	}
 
 	if ((xia_sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
-		warn("Unable to create the listening socket\n");
+		syslog(LOG_WARNING, "Unable to create the listening socket");
 		return -1;
 	}
 
 	if (Xconnect(xia_sock, (struct sockaddr*)&dag, daglen) < 0) {
 		Xclose(xia_sock);
-		warn("Unable to bind to the dag: %s\n", dag);
+		syslog(LOG_WARNING, "Unable to bind to %s", sname);
 		return -1;
 	}
 
@@ -273,28 +367,13 @@ int get_xia_socket_for_request(const char* sname){
 }
 
 int handle_cross_origin_probe(ProxyRequestCtx *ctx){
-	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_status_ok, strlen(http_chunk_header_status_ok)) == -1) {
-		warn("unable to forward the http status ok\n");
-		return -1;
-	}
+	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_status_ok, strlen(http_chunk_header_status_ok)) == -1 ||
+		Rio_writen(ctx->browser_sock, (char*)http_chunk_header_same_origin, strlen(http_chunk_header_same_origin)) == -1 ||
+		Rio_writen(ctx->browser_sock, (char*)http_header_allow_headers, strlen(http_header_allow_headers)) == -1 ||
+		Rio_writen(ctx->browser_sock, (char*)http_header_allow_methods, strlen(http_header_allow_methods)) == -1 ||
+		Rio_writen(ctx->browser_sock, (char*)http_chunk_header_end_marker, strlen(http_chunk_header_end_marker)) == -1) {
 
-	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_same_origin, strlen(http_chunk_header_same_origin)) == -1) {
-		warn("unable to forward the http status ok\n");
-		return -1;
-	}
-
-	if (Rio_writen(ctx->browser_sock, (char*)http_header_allow_headers, strlen(http_header_allow_headers)) == -1) {
-		warn("unable to forward the http status ok\n");
-		return -1;
-	}
-
-	if (Rio_writen(ctx->browser_sock, (char*)http_header_allow_methods, strlen(http_header_allow_methods)) == -1) {
-		warn("unable to forward the http status ok\n");
-		return -1;
-	}
-
-	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_end_marker, strlen(http_chunk_header_end_marker)) == -1) {
-		warn("unable to forward the http status ok\n");
+		syslog(LOG_WARNING, "unable to forward the http status ok");
 		return -1;
 	}
 
@@ -318,12 +397,12 @@ int handle_manifest_requests(ProxyRequestCtx *ctx){
 	process_urls_to_DAG(dagUrls, chunkAddresses);
 
 	if (forward_http_header_to_client(ctx, CONTENT_MANIFEST) < 0){
-		warn("unable to forward manifest to client\n");
+		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
 	}
 
 	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks, false) < 0){
-		warn("unable to forward chunks to client\n");
+		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
 
@@ -334,7 +413,7 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 	string cname;
 	vector<string> dagUrls;
 
-	printf("host:%s\npath:%s\n", ctx->remote_host, ctx->remote_path);
+	//printf("host:%s\npath:%s\n", ctx->remote_host, ctx->remote_path);
 
 	if (strstr(ctx->remote_host, XIA_DAG_URL) != NULL){
 		dagUrls = split_string_on_delimiter(ctx->remote_host, " ");
@@ -371,24 +450,27 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 	sockaddr_x chunkAddresses[numChunks];
 	process_urls_to_DAG(dagUrls, chunkAddresses);
 
+	printf("forward header\n");
 	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0){
-		warn("unable to forward manifest to client\n");
+		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
 	}
 
+	printf("forward chunks\n");
 	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks, true, cname.c_str(), ctx->remote_host) < 0){
-		warn("unable to forward chunks to client\n");
+		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
 
-	std::cout << "proxy pick CDN: " << cname << ", host within CDN: " << dagUrls[0] << std::endl;
+//	syslog(LOG_NOTICE, "proxy pick CDN: %s host within CDN: %s",  cname.c_str(), dagUrls[0].c_str());
+//
+//	for(auto it = cdns.begin(); it != cdns.end(); it++){
+//		syslog(LOG_NOTICE, "CDN name: %s", it->first.c_str());
+//		syslog(LOG_NOTICE, "CDN num requests: %d", it->second.num_reqs);
+//		syslog(LOG_NOTICE, "CDN average throughput: %f",  it->second.avg_throughput);
+//	}
 
-	for(auto it = cdns.begin(); it != cdns.end(); it++){
-		std::cout << "CDN name: " << it->first << std::endl;
-		std::cout << "\tCDN num requests: " << it->second.num_reqs << std::endl;
-		std::cout << "\tCDN average throughput: " << it->second.avg_throughput << std::endl;
-	}
-
+	printf("all done\n");
 	return 1;
 }
 
@@ -409,7 +491,7 @@ int xia_proxy_handle_request(int browser_sock) {
 
 	n = Rio_readlineb(&rio_client, buf, MAXLINE);
 	if (n == -1) {
-		warn("problem with reading from the socket\n");
+		syslog(LOG_WARNING, "problem with reading from the socket");
 		return -1;
 	} else if(n == 0){
 		return 1;
@@ -431,7 +513,7 @@ int xia_proxy_handle_request(int browser_sock) {
 	parse_host_port(host_port, remote_host, remote_port);
 
 	if (strcmp(remote_host, "") == 0 || (strstr(remote_host, XIA_VID_SERVICE) == NULL && strstr(remote_host, XIA_DAG_URL) == NULL)){
-		warn("[Proxy] service id not XIA type %s\n", remote_host);
+		syslog(LOG_DEBUG, "[Proxy] service id not XIA type %s", remote_host);
 		return -1;
 	}
 
@@ -444,33 +526,34 @@ int xia_proxy_handle_request(int browser_sock) {
 
 		if (strstr(ctx.remote_host, XIA_DAG_URL) != NULL || strstr(ctx.remote_path, "/CID") != NULL){
 			if(handle_stream_requests(&ctx) < 0){
-				warn("failed to return back chunks to browser. Exit\n");
+				syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 				return -1;
 			}
 		} else if (strstr(ctx.remote_host, XIA_VID_SERVICE) != NULL) {
 			// if this is option probe,
 			if (strstr(method, "OPTIONS") != NULL){
 				if(handle_cross_origin_probe(&ctx) < 0){
-					warn("failed to handle cross origin probe back to browser. Exit\n");
+					syslog(LOG_WARNING, "failed to handle cross origin probe back to browser. Exit");
 					return -1;
 				}
 			} else {
 				// manifest request must request .mpd files as extension
+				printf("manifest request\n");
 				if (strstr(ctx.remote_path, ".mpd") == NULL){
-					warn("request remote path not mpd manifest type\n");
+					syslog(LOG_WARNING, "request remote path not mpd manifest type");
 					return -1;
 				}
 
 				// get the XIA socket to the video server
 				int xia_sock = get_xia_socket_for_request(remote_host);
 				if (xia_sock < 0){
-					warn("failed to create socket with the video server. Exit\n");
+					syslog(LOG_WARNING, "failed to create socket with the video server. Exit");
 					return -1;
 				}
 				ctx.xia_sock = xia_sock;
 
 				if(handle_manifest_requests(&ctx) < 0){
-					warn("failed to return back chunks to browser. Exit\n");
+					syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 					return -1;
 				}
 			}
@@ -478,7 +561,7 @@ int xia_proxy_handle_request(int browser_sock) {
 
 		return 0;
 	} else {
-		warn("unsupported request method %s for %s\n", method, host_port);
+		syslog(LOG_WARNING, "unsupported request method %s for %s", method, host_port);
 		return -1;
 	}
 }
@@ -493,7 +576,8 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 
 		gettimeofday(&t1, NULL);
 		if((len = XfetchChunk(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]))) < 0) {
-			die(-1, "XcacheGetChunk Failed\n");
+			syslog(LOG_ERR, "XcacheGetChunk Failed");
+			exit(-1);
 		}
 		gettimeofday(&t2, NULL);
 
@@ -530,20 +614,20 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 			}
 		}
 
-		say("size of data: %d\n", len);
-		say("elapsed time for xfetch: %f\n", elapsedTime);
+		syslog(LOG_INFO, "size of data: %d", len);
+		syslog(LOG_INFO, "elapsed time for xfetch: %f", elapsedTime);
 
 		totalBytes += len;
 
 		gettimeofday(&t1, NULL);
 		// send to browser socket here. Once we reach here, we know it would be success
 		if (forward_http_response_body_to_client(ctx, data, len) < 0){
-			die(-1, "error when sending response body to the browser\n");
+			syslog(LOG_ERR, "error when sending response body to the browser");
 		}
 		gettimeofday(&t2, NULL);
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		say("elapsed time for forwarding: %f\n", elapsedTime);
+		syslog(LOG_INFO, "elapsed time for forwarding: %f", elapsedTime);
 	}
 
 	if (data) {
@@ -555,7 +639,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
 	// forward status line (should be OK if chunk is retrieved correctly)
 	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_status_ok, strlen(http_chunk_header_status_ok)) == -1) {
-		warn("unable to forward the http status ok\n");
+		syslog(LOG_WARNING, "unable to forward the http status ok");
 		return -1;
 	}
 
@@ -565,47 +649,47 @@ int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
 	struct tm tm = *gmtime(&now);
 	strftime(http_chunk_header_date, sizeof(http_chunk_header_date), http_chunk_header_date_fmt, &tm);
 	if (Rio_writen(ctx->browser_sock, http_chunk_header_date, strlen(http_chunk_header_date)) == -1) {
-		warn("unable to forward the http header date\n");
+		syslog(LOG_WARNING, "unable to forward the http header date");
 		return -1;
 	}
 
 	// forward the content-type field
 	if (type == CONTENT_MANIFEST){
 		if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_mpd_content_type, strlen(http_chunk_header_mpd_content_type)) == -1) {
-			warn("unable to forward the http header content type\n");
+			syslog(LOG_WARNING, "unable to forward the http header content type");
 			return -1;
 		}
 	} else if (type == CONTENT_STREAM){
 		if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_mp4_content_type, strlen(http_chunk_header_mp4_content_type)) == -1) {
-			warn("unable to forward the http header content type\n");
+			syslog(LOG_WARNING, "unable to forward the http header content type");
 			return -1;
 		}
 	} else {
-		warn("unknown content type!! \n");
+		syslog(LOG_WARNING, "unknown content type!! ");
 		return -1;
 	}
 
 	// forward the connection field
 	if (Rio_writen(ctx->browser_sock, (char*)connection_str, strlen(connection_str)) == -1) {
-		warn("unable to forward the http status line\n");
+		syslog(LOG_WARNING, "unable to forward the http status line");
 		return -1;
 	}
 
 	// forward the server field
 	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_server, strlen(http_chunk_header_server)) == -1) {
-		warn("unable to forward the http status line\n");
+		syslog(LOG_WARNING, "unable to forward the http status line");
 		return -1;
 	}
 
 	// forward allowing same origin
 	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_same_origin, strlen(http_chunk_header_same_origin)) == -1) {
-		warn("unable to forward the http same origin line\n");
+		syslog(LOG_WARNING, "unable to forward the http same origin line");
 		return -1;
 	}
 
 	// finally terminate with \r\n
 	if (Rio_writen(ctx->browser_sock, (char*)http_chunk_header_end_marker, strlen(http_chunk_header_end_marker)) == -1) {
-		warn("unable to forward the http status line\n");
+		syslog(LOG_WARNING, "unable to forward the http status line");
 		return -1;
 	}
 
@@ -614,7 +698,7 @@ int forward_http_header_to_client(ProxyRequestCtx *ctx, int type) {
 
 int forward_http_response_body_to_client(ProxyRequestCtx *ctx, char* data, int len){
 	if (Rio_writen(ctx->browser_sock, data, len) < 0) {
-		warn("problem with rio write when write data\n");
+		syslog(LOG_WARNING, "problem with rio write when write data");
 		return -1;
 	}
 
@@ -641,13 +725,14 @@ int parse_request_line(char *buf, char *method, char *protocol,
 	return 0;
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char **argv)
 {
 	struct sockaddr_in address;
 	int addrlen = sizeof(address);
 	int new_socket, i;
 	struct sockaddr_in servaddr; //  socket address structure
 
+	config(argc, argv);
 
 	Xgethostname(hostname, sizeof(hostname));
 
@@ -657,22 +742,17 @@ int main(int argc, char const *argv[])
 	// write on closed pipe (socket)
 	(void) signal (SIGPIPE, SIG_IGN);
 
-	if (argc != 2){
-		printf("Must specify a port number and whether to use connection close\n");
-		return -1;
-	}
-	port = atoi(argv[1]);
 
 
 	// create the listening socket
 	if ((list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-		fprintf(stderr, "Error creating listening socket.\n");
+		syslog(LOG_ERR, "Error creating listening socket.");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Enable the socket to reuse the address */
 	if (setsockopt(list_s, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int)) == -1) {
-		printf("Let us reuse the address on the socket\n");
+		syslog(LOG_ERR, "Let us reuse the address on the socket");
 		exit(EXIT_FAILURE);
 	}
 
@@ -684,17 +764,15 @@ int main(int argc, char const *argv[])
 
 	// bind to the socket address
 	if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
-		fprintf(stderr, "Error calling bind()\n");
+		syslog(LOG_ERR, "Error calling bind()");
 		exit(EXIT_FAILURE);
 	}
 
 	// Listen on socket list_s
 	if( (listen(list_s, 10)) == -1) {
-		fprintf(stderr, "Error Listening\n");
+		syslog(LOG_ERR, "Error Listening");
 		exit(EXIT_FAILURE);
 	}
-
-	printf("Listen on the socket\n");
 
 	for (i = 0; i < MAX_CLIENTS; i++) {
 		client_sockets[i] = 0;
@@ -731,11 +809,11 @@ int main(int argc, char const *argv[])
 			// Create a new thread
 			pthread_t worker;
 			if (pthread_create(&worker, NULL, job, (void *)&new_socket)) {
-				printf("proxy: ERROR: creating handler. Dropping request\n");
+				syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
 			}
 		}
 		if (pthread_mutex_unlock(&numthreadslock)) {
-			perror("proxy: ERROR: unlocking numthreads variable");
+			syslog(LOG_WARNING, "proxy: ERROR: unlocking numthreads variable");
 			return -1;
 		}
 	}
@@ -794,12 +872,15 @@ vector<string> cdn_name_to_dag_urls(char* sname, char* cidString){
 	string cid_str = cidString;
 	vector<string> result;
 
+	printf("cdn name to dag urls\n");
+
 	if (!sname || *sname == 0) {
 		return result;
 	}
 
 	// if the CDN name lookup is in cache locally, don't do the resolution
 	if(dagLookupCache.find(sname_str) == dagLookupCache.end()){
+		printf("not in the cache\n");
 		// get the DNS DAG associated with the CDN service name
 		if (XgetDAGbyAnycastName(sname, &dag, &daglen) < 0){
 			warn("unable to locate CDN DNS service name: %s\n", sname);
@@ -823,6 +904,8 @@ vector<string> cdn_name_to_dag_urls(char* sname, char* cidString){
 			}
 		}
 
+		printf("A   %s %s\n", AD.c_str(), HID.c_str());
+
 		Graph g2 = cid2addr(cid_str, AD, HID);
 		result.push_back(g2.http_url_string());
 
@@ -837,6 +920,7 @@ vector<string> cdn_name_to_dag_urls(char* sname, char* cidString){
 		Graph g2 = cid2addr(cid_str, AD, HID);
 		result.push_back(g2.http_url_string());
 
+		printf("B   %s %s\n", AD.c_str(), HID.c_str());
 		return result;
 	}
 }
@@ -876,6 +960,8 @@ string multicdn_select_cdn_strategy(string origin, const vector<string> & option
 
 string multicdn_name_to_CDN_name(char* origin, char* options){
 	vector<string> voptions = split_string_on_delimiter(options, "&");
+
+	printf("multi to CDN\n");
 
 	for(unsigned i = 0; i < voptions.size(); i++){
 		voptions[i] = voptions[i].substr(voptions[i].find("=") + 1);
