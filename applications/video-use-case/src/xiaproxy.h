@@ -18,11 +18,11 @@
 
 #define XIA_VID_SERVICE "xia"
 #define XIA_CDN_SERVICE "cdn"
-#define XIA_DAG_URL "dag"
-#define XIA_AD "ad"
-#define XIA_HID "hid"
-#define XIA_CID "cid"
-#define XIA_SID "sid"
+#define XIA_DAG_URL "DAG"
+#define XIA_AD "AD"
+#define XIA_HID "HID"
+#define XIA_CID "CID"
+#define XIA_SID "SID"
 
 #define MAX_CLIENTS 30
 
