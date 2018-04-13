@@ -105,8 +105,9 @@ int main(int argc, char **argv)
 
 	client = new FetchDemoClient();
 	int retval = client->request(chunk_dag, fs_dag);
-	if(retval) {
+	if(retval < 0) {
 		std::cout << "Error submitting chunk fetch request" << std::endl;
+		return -1;
 	}
 
 	// Block, waiting for the chunk to be delivered by PushProxy to us
