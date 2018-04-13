@@ -1,0 +1,92 @@
+#! /usr/bin/env python
+
+import re
+import sys
+import time
+import requests
+import argparse
+
+VER = '1.0'
+MANIFEST='http://www.origin.xia/%s.mpd'
+DAG='http://DAG\.0\.-\.CID\$[0-9a-zA-Z]{40}'
+
+
+
+def fetch_chunks(manifest):
+    """
+    fetch all chunks from the specified manifest file.
+
+    Currently grabs chunks for all bitrates, we may want to make this smarter in the future.
+    """
+    for dag in re.findall(DAG, manifest):
+        print dag, ' -> ',
+        try:
+            r = session.get(dag)
+            print r.status_code
+            if args.pause != 0:
+                time.sleep(args.pause)
+        except Exception as err:
+            print str(err)
+
+
+
+def fetch(video):
+    """fetch the video manifest file for the specified video"""
+    url = MANIFEST % video
+    try:
+        r = session.get(url)
+        fetch_chunks(r.text)
+    except Exception as err:
+        print 'error fetching: ', url
+        sys.exit(1)
+
+
+
+def config():
+    """parse the command line arguements and set up logging"""
+
+    global args
+
+    parser = argparse.ArgumentParser(description='XIA video stress test')
+    parser.add_argument('videos', nargs='+', metavar='video', help='list of videos to fetch')
+
+    parser.add_argument('-v', '--version', action='version', version=VER)
+    parser.add_argument('-d', '--delay', type=float, default=1, help='inter-video delay (defalut=1000ms)')
+    parser.add_argument('-p', '--pause', type=float, default=0, help='inter-chunk delay (default = 0)')
+
+    loop_parser = parser.add_mutually_exclusive_group(required=False)
+    loop_parser.add_argument('-c', '--continuous', action='store_true', help='broker port (default=%(default)s)')
+    loop_parser.add_argument('-l', '--loops', type=int, default=0, help='# of times to loop through the videos')
+
+    args = parser.parse_args()
+
+
+
+def main():
+    """run the video stress tester"""
+    global session
+
+    config()
+    try:
+        session = requests.Session()
+        session.proxies = {"http": "localhost:8080"}
+
+        loop = True
+        while loop:
+            for video in args.videos:
+                print 'fetching ', video
+                fetch(video)
+                time.sleep(args.delay)
+
+            if args.loops > 0:
+                args.loops -= 1
+
+            if args.continuous == False and args.loops == 0:
+                loop = False
+    except KeyboardInterrupt:
+        pass
+    print '\ndone'
+
+if __name__ == "__main__":
+    main()
+
