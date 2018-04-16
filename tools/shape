@@ -1,0 +1,133 @@
+#! /usr/bin/env python
+
+# FIXME:
+# - figure out the correct bandwidth settings
+# - smarter bandwidth entries on cmd line
+#  tc uses the following units when passed as a parameter.
+
+#  kbps: Kilobytes per second
+#  mbps: Megabytes per second
+#  kbit: Kilobits per second
+#  mbit: Megabits per second
+#  bps: Bytes per second
+#       Amounts of data can be specified in:
+#       kb or k: Kilobytes
+#       mb or m: Megabytes
+#       mbit: Megabits
+#       kbit: Kilobits
+#  To get the byte figure from bits, divide the number by 8 bit
+
+import os
+import sys
+import argparse
+import subprocess
+
+VER = '1.0'
+
+
+
+def clear():
+    print 'clearing shaping for %s:' % args.interface
+
+    cmd = ['tc', 'qdisc', 'delete', 'dev', args.interface, 'root']
+    subprocess.call(cmd)
+    info()
+
+
+
+def info():
+    print
+    cmd = ['tc', '-s', 'qdisc', 'ls', 'dev', args.interface]
+    subprocess.call(cmd)
+
+
+
+def shape():
+    if args.latency != None:
+        cmd = ['tc', 'qdisc', args.cmd, 'dev', args.interface, 'root', 'netem', 'delay', '%sms' % args.latency]
+    else:
+        cmd = ['tc', 'qdisc', args.cmd, 'dev', args.interface, 'root', 'tbf',
+               'rate',     '%dmbit' % args.bandwidth,
+               'peakrate', '%dmbit' % (args.bandwidth * 2),
+               'burst',    '10kb',
+               'latency',  '70ms',
+               'minburst', '1540'
+            ]
+    subprocess.call(cmd)
+    info()
+
+
+def add():
+    print 'Setting shaping parameters for %s:' % args.interface
+    shape()
+
+
+
+def change():
+    print 'Changing shaping for %s:' % args.interface
+    shape()
+
+
+
+def show():
+    print 'Bandwidth shaping status for %s:\n' % args.interface
+    info()
+
+
+
+def iface(arg):
+    """ make sure the specified interface exists on this machine"""
+
+    if not arg in os.listdir('/sys/class/net'):
+        raise argparse.ArgumentTypeError('invalid interface name: {}'.format(arg))
+    return arg
+
+
+
+def config():
+    """parse the command line arguements"""
+
+    global args
+
+    parser = argparse.ArgumentParser(description='XIA traffic shaper')
+    parser.add_argument('-v', '--version', action='version', version=VER)
+
+    parser.add_argument('interface', type=iface, help='interface to modify')
+
+    # add/changeparameters
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument('-l', '--latency', type=int, help='latency in ms')
+    common_parser.add_argument('-b', '--bandwidth', type=int, help='bandwidth in bytes')
+
+    sub = parser.add_subparsers(help='add -h following command for additional arguments')
+
+    add_parser = sub.add_parser('add', parents=[common_parser], help='set shaping parameters')
+    add_parser.set_defaults(func=add, cmd='add')
+
+    clear_parser = sub.add_parser('clear', help='clear shaping parameters')
+    clear_parser.set_defaults(func=clear)
+
+    change_parser = sub.add_parser('change', parents=[common_parser], help='update the shaping parameters')
+    change_parser.set_defaults(func=change, cmd='change')
+
+    show_parser = sub.add_parser('show', help='show current shaping parameters')
+    show_parser.set_defaults(func=show)
+
+    if (len(sys.argv) < 2):
+        args = parser.parse_args(['--help'])
+    else:
+        args = parser.parse_args()
+
+    if args.func == add or args.func == change:
+        if args.latency == None and args.bandwidth == None:
+            print 'error: latency and/or bandwidth must be specified'
+            sys.exit(1)
+
+
+def main():
+    config()
+    args.func()
+
+if __name__ == "__main__":
+    main()
+
