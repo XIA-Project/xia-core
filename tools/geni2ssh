@@ -1,0 +1,92 @@
+#!/bin/bash
+
+VERSION="geni2ssh 1.0"
+prefix="g-"
+user="barrettd"
+id="~/.ssh/id_gen_ssh_rsa"
+
+help() {
+	cat << EOH
+geni2ssh [-u user] [-p prefix] [-i ident_file] [-hv] manifest
+
+create ssh config from GENI manifest file
+
+options:
+  -u user         username
+  -p prefix       hostname prefix for config file
+  -i ident_file   ssh identify key file
+
+  -h display this help
+  -v display the version number
+EOH
+exit 0
+}
+
+
+[ "$1" == "--version" ] && echo $VERSION && exit 0
+
+while getopts "u:p:i:hv" opt; do
+	case $opt in
+		u)
+			user=$OPTARG
+			;;
+		p)
+			prefix=$OPTARG
+			;;
+		i)
+			id=$OPTARG
+			;;
+		v)
+			echo $VERSION
+			exit 0
+			;;
+		h)
+			help
+			;;
+		\?)
+			printf "\nInvalid option: -$OPTARG\n" >&2
+			help
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
+if [ $# != 1 ]; then
+	help
+fi
+
+manifest=$1
+
+cat $manifest | awk -v user=$user -v prefix=$prefix -v id=$id -f <(cat - <<-'EOF'
+BEGIN {
+	RS = "<";
+}
+
+/^node/ {
+	split($3, fields, "\"");
+	host = fields[2];
+	#print "\nhost", prefix fields[2];
+}
+
+/^login/ {
+	split($5, fields, "\"");
+	u = fields[2]
+	if (u == user) {
+		print "\nhost", prefix host;
+		split($3, fields, "\"");
+		print "\thostname", fields[2];
+		split($4, fields, "\"");
+		print "\tport", fields[2];
+	}
+}
+
+END {
+	print "\nhost", prefix "*";
+	print "\tUser", user;
+	print "\tForwardAgent yes";
+	print "\tIdentityFile", id;
+}
+EOF
+)
+
+
