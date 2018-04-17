@@ -415,17 +415,17 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 
 	//printf("host:%s\npath:%s\n", ctx->remote_host, ctx->remote_path);
 
-	if (strstr(ctx->remote_host, XIA_DAG_URL) != NULL){
+	if (strcasestr(ctx->remote_host, XIA_DAG_URL) != NULL){
 		dagUrls = split_string_on_delimiter(ctx->remote_host, " ");
-	} else if (strstr(ctx->remote_path, "/CID") != NULL){
+	} else if (strcasestr(ctx->remote_path, "/CID") != NULL){
 		// if the current url has name with CDN
-		if(strstr(ctx->remote_host, XIA_CDN_SERVICE) != NULL){
+		if(strcasestr(ctx->remote_host, XIA_CDN_SERVICE) != NULL){
 			// jump over the /
 			dagUrls = cdn_name_to_dag_urls(ctx->remote_host, ctx->remote_path+1);
 		}
 		// if the current url says this is multi-cdn use case,
 		// pick a CDN name and get the server DAG in the CDN.
-		else if (strstr(ctx->remote_host, XIA_VID_SERVICE) != NULL){
+		else if (strcasestr(ctx->remote_host, XIA_VID_SERVICE) != NULL){
 			string pname = ctx->remote_path + 1;
 			size_t start = pname.find("CID:");
 			size_t end = pname.find("?");
@@ -512,10 +512,13 @@ int xia_proxy_handle_request(int browser_sock) {
 	}
 	parse_host_port(host_port, remote_host, remote_port);
 
-	if (strcmp(remote_host, "") == 0 || (strstr(remote_host, XIA_VID_SERVICE) == NULL && strstr(remote_host, XIA_DAG_URL) == NULL)){
+
+	if (strcmp(remote_host, "") == 0 || (strcasestr(remote_host, XIA_VID_SERVICE) == NULL && strcasestr(remote_host, XIA_DAG_URL) == NULL)){
 		syslog(LOG_DEBUG, "[Proxy] service id not XIA type %s", remote_host);
 		return -1;
 	}
+
+	printf("%s\nhost:%s port:%s\n", host_port, remote_host, remote_port);
 
 	if (strstr(method, "GET") != NULL || strstr(method, "OPTIONS")) {
 		ProxyRequestCtx ctx;
@@ -524,12 +527,12 @@ int xia_proxy_handle_request(int browser_sock) {
 		strcpy(ctx.remote_port, remote_port);
 		strcpy(ctx.remote_path, resource);
 
-		if (strstr(ctx.remote_host, XIA_DAG_URL) != NULL || strstr(ctx.remote_path, "/CID") != NULL){
+		if (strcasestr(ctx.remote_host, XIA_DAG_URL) != NULL || strcasestr(ctx.remote_path, "/CID") != NULL){
 			if(handle_stream_requests(&ctx) < 0){
 				syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 				return -1;
 			}
-		} else if (strstr(ctx.remote_host, XIA_VID_SERVICE) != NULL) {
+		} else if (strcasestr(ctx.remote_host, XIA_VID_SERVICE) != NULL) {
 			// if this is option probe,
 			if (strstr(method, "OPTIONS") != NULL){
 				if(handle_cross_origin_probe(&ctx) < 0){
@@ -539,7 +542,7 @@ int xia_proxy_handle_request(int browser_sock) {
 			} else {
 				// manifest request must request .mpd files as extension
 				printf("manifest request\n");
-				if (strstr(ctx.remote_path, ".mpd") == NULL){
+				if (strcasestr(ctx.remote_path, ".mpd") == NULL){
 					syslog(LOG_WARNING, "request remote path not mpd manifest type");
 					return -1;
 				}
