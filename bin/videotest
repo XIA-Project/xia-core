@@ -65,13 +65,19 @@ def enable_proxy(enable):
     Note: needs root permission to work
     '''
     if enable:
-        print 'enabling systemwide http proxy settings: localhost:8080'
-        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy.http', 'port', '8080'])
-        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy.http', 'host', 'localhost'])
-        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy', 'mode', 'manual'])
-    else:
-        print 'disabling systemwide http proxy'
-        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy', 'mode', 'none'])
+        print 'For headless systems add the following lines to /etc/firefox/sysprefs.js'
+        print 'pref("network.proxy.http", "127.0.0.1");'
+        print 'pref("network.proxy.http_port", 8080);'
+        print 'pref("network.proxy.type", 1);'
+        sys.exit(1)
+
+#        print 'enabling systemwide http proxy settings: localhost:8080'
+#        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy.http', 'port', '8080'])
+#        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy.http', 'host', 'localhost'])
+#        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy', 'mode', 'manual'])
+#    else:
+#        print 'disabling systemwide http proxy'
+#        subprocess.Popen(['gsettings', 'set', 'org.gnome.system.proxy', 'mode', 'none'])
 
 
 
@@ -118,7 +124,6 @@ def configure():
     parser.add_argument(      '--headless', action='store_true', help='run Firefox in headless mode')
     parser.add_argument('videos', metavar='V', nargs='+', help='list of videos to play')
     args = parser.parse_args()
-
 
 
 def main():
