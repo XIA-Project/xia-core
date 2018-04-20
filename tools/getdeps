@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sudo apt-mark hold grub
 sudo apt-get update -qq -y
 sudo apt-get install -qq -y git libpq-dev libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
 
@@ -13,6 +14,7 @@ sudo pip install rpyc
 sudo pip install msgpack
 sudo pip install pycountry
 sudo pip install dotmap
+sudo pip install scipy
 sudo pip install simpleplotlib
 
 rel=$(lsb_release -d)
@@ -33,4 +35,6 @@ else
     sudo apt-get install -y libprotobuf-dev protobuf-compiler python-protobuf
 fi
 
+echo be sure to install gurobi and the required license file if you intent the run the cdn broker
+echo http://www.gurobi.com/academia/for-universities
 
