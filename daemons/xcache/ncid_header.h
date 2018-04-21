@@ -2,7 +2,6 @@
 #define _NCID_HEADER_H
 
 #include "cid_header.h"
-#include "publisher_list.h"
 #include "publisher/publisher.h"
 
 class NCIDHeader : public CIDHeader {

@@ -1,0 +1,47 @@
+syntax = "proto2";
+
+message PublisherKeyCmdBuf {
+	oneof PublisherKeyCmdType {
+		PublisherKeyRequest key_request = 1;
+		PublisherSignRequest sign_request = 2;
+		PublisherVerifyRequest verify_request = 3;
+	}
+}
+
+message PublisherKeyResponseBuf {
+	oneof PublisherKeyResponseType {
+		PublisherKeyResponse key_response = 1;
+		PublisherSignResponse sign_response = 2;
+		PublisherVerifyResponse verify_response = 3;
+	}
+}
+
+message PublisherKeyRequest {
+	required string publisher_name = 1;
+}
+
+message PublisherKeyResponse {
+	required bool success = 1;
+	optional string publisher_key = 2;
+	optional string cert_dag = 3;
+}
+
+message PublisherSignRequest {
+	required string publisher_name = 1;
+	required string digest = 2;
+}
+
+message PublisherSignResponse {
+	required bool success = 1;
+	optional string signature = 2;
+}
+
+message PublisherVerifyRequest {
+	required string publisher_name = 1;
+	required string signature = 2;
+	required string digest = 3;
+}
+
+message PublisherVerifyResponse {
+	required bool success = 1;
+}

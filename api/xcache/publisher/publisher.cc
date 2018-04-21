@@ -3,13 +3,11 @@
 #include <string.h>
 #include <Xsocket.h>
 #include <Xsecurity.h>
+#include <xcache.h>
 #include "publisher.h"
-#include "publisher_cert.h"
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../controller.h"
-#include "xcache_cmd.pb.h"
 #include <sys/types.h>    // stat
 #include <sys/stat.h>     // stat
 #include <unistd.h>       // stat
@@ -63,11 +61,11 @@ std::string Publisher::pubkey()
 		// Connect to keymanager and get publisher's key and certificate addr
 		char key[MAX_PUBKEY_SIZE];
 		char cert_dag[XIA_MAX_DAG_STR_SIZE];
-		int keylen = sizeof(key);
-		int cert_daglen = sizeof(cert_dag);
+		size_t keylen = sizeof(key);
+		size_t cert_daglen = sizeof(cert_dag);
 
-		if (XgetPublisherCreds(_name.c_str(), key, *keylen,
-					cert_dag, *cert_daglen)) {
+		if (XgetPublisherCreds(_name.c_str(), key, &keylen,
+					cert_dag, &cert_daglen)) {
 			std::cout << "Publisher::pubkey not found" << std::endl;
 			return "";
 		}
@@ -147,8 +145,7 @@ int Publisher::sign(std::string content_URI,
 		const std::string &content,
 		std::string &signature)
 {
-	int retval = -1;
-	unsigned char sig_buf[MAX_SIGNATURE_SIZE];
+	char sig_buf[MAX_SIGNATURE_SIZE];
 	uint16_t siglen = MAX_SIGNATURE_SIZE;
 
 	// Sign (Content URI + Content)
@@ -156,10 +153,11 @@ int Publisher::sign(std::string content_URI,
 
 	// Get the digest of data
 	uint8_t digest[SHA_DIGEST_LENGTH];
-	xs_getSHA1Hash(data.c_str(), data.size(), digest, sizeof(digest));
+	xs_getSHA1Hash((const unsigned char *)data.c_str(), data.size(),
+			digest, sizeof(digest));
 
 	// Now request Key Manager to find key and sign
-	if(XcacheSignContent(name().c_str(), digest, sizeof(digest),
+	if(XcacheSignContent(name().c_str(), (const char *)digest, sizeof(digest),
 				sig_buf, &siglen)) {
 		printf("Publisher::sign() failed signing provided content\n");
 		return -1;
@@ -182,9 +180,10 @@ bool Publisher::isValidSignature(std::string content_URI,
 
 	// Get the digest of data
 	uint8_t digest[SHA_DIGEST_LENGTH];
-	xs_getSHA1Hash(data.c_str(), data.size(), digest, sizeof(digest));
+	xs_getSHA1Hash((const unsigned char *)data.c_str(), data.size(),
+			digest, sizeof(digest));
 
-	if(XcacheVerifyContent(name().c_str(), digest, sizeof(digest),
+	if(XcacheVerifyContent(name().c_str(), (const char *)digest, sizeof(digest),
 				signature.c_str(), signature.size())) {
 		printf("Publisher::isValidSignature() invalid signature\n");
 		return false;

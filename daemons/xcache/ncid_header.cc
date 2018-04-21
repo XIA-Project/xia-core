@@ -9,14 +9,13 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 		std::string publisher_name, std::string content_name)
 	: CIDHeader(data, ttl)
 {
-	PublisherList *publishers = PublisherList::get_publishers();
-	Publisher *publisher = publishers->get(publisher_name);
+	Publisher publisher(publisher_name);
 
-	_id = publisher->ncid(content_name);
-	_uri = publisher->content_URI(content_name);
+	_id = publisher.ncid(content_name);
+	_uri = publisher.content_URI(content_name);
 	_publisher_name = publisher_name;
 	std::string signature;
-	if(publisher->sign(_uri, data, signature)) {
+	if(publisher.sign(_uri, data, signature)) {
 		printf("ERROR: Unable to sign %s\n", _uri.c_str());
 		// TODO throw an exception here
 	}
@@ -76,9 +75,8 @@ NCIDHeader::valid_data(const std::string &data)
 	// Which basically runs the constructor to verify deserialized values
 
 	// Retrieve Publisher name from _uri
-	PublisherList *publishers = PublisherList::get_publishers();
-	Publisher *publisher = publishers->get(_publisher_name);
+	Publisher publisher(_publisher_name);
 
 	// Call Publisher::isValidSignature()
-	return publisher->isValidSignature(_uri, data, _signature);
+	return publisher.isValidSignature(_uri, data, _signature);
 }

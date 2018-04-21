@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include "dagaddr.hpp"
+#include "publisher_key_mgmt.pb.h"
 /*! \endcond */
 
 #define IO_BUF_SIZE (1024 * 1024)
@@ -1364,4 +1365,244 @@ int XreadChunk(XcacheHandle *h, sockaddr_x *addr, socklen_t addrlen, void *buf, 
 	fprintf(stderr, "Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
 
 	return to_copy;
+}
+
+// Send a command to Key Manager and receive a response
+// FIXME: Use same socket for future calls instead of creating/destroying
+static int _process_key_request(PublisherKeyCmdBuf &cmd,
+		PublisherKeyResponseBuf &resp)
+{
+	uint32_t cmdstr_len;
+	uint32_t response_size;
+	char *response;
+	ssize_t rc;
+	int sockfd;
+	struct sockaddr_un mgr_addr;
+
+	int retval = -1;	// Error, unless proved otherwise
+	int state = 0;
+
+	// Using predefined unix domain socket name - see xcache.h
+	std::string publisher_mgr_sock_name(PUBLISHER_MGR_SOCK_NAME);
+
+	// Serialize command into a buffer to go on wire
+	std::string cmdstr;
+	cmd.SerializeToString(&cmdstr);
+	cmdstr_len = cmdstr.size();
+
+	// Connect to the PublisherKeyManager
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		fprintf(stderr, "Unable to create socket for publisher creds\n");
+		goto _process_key_request_done;
+	}
+
+	mgr_addr.sun_family = AF_UNIX;
+	strcpy(mgr_addr.sun_path, publisher_mgr_sock_name.c_str());
+	if (connect (sockfd, (struct sockaddr *)&mgr_addr, sizeof(mgr_addr))) {
+		fprintf(stderr, "Unable to connect to publisher key manager\n");
+		goto _process_key_request_done;
+	}
+	state = 1;
+
+	// Send command size
+	rc = send(sockfd, &cmdstr_len, sizeof(cmdstr_len), 0);
+	if (rc != sizeof(cmdstr_len)) {
+		fprintf(stderr, "Unable to send command len to key manager\n");
+		goto _process_key_request_done;
+	}
+
+	// Send command
+	rc = send(sockfd, cmdstr.c_str(), cmdstr_len, 0);
+	if (rc < (int) cmdstr_len) {
+		fprintf(stderr, "Unable to send command to key manager\n");
+		goto _process_key_request_done;
+	}
+
+	// Get response length
+	rc = recv(sockfd, &response_size, sizeof(response_size), 0);
+	if (rc != sizeof(response_size)) {
+		fprintf(stderr, "Failed getting response size\n");
+		goto _process_key_request_done;
+	}
+
+	// Receive response into a buffer
+	response = (char *)calloc(1, response_size);
+	if (response == NULL) {
+		fprintf(stderr, "Failed allocating buf for key manager response\n");
+		goto _process_key_request_done;
+	}
+	state = 2;
+
+	rc = recv(sockfd, response, response_size, 0);
+	if (rc != (int) response_size) {
+		fprintf(stderr, "Failed getting entire response\n");
+		goto _process_key_request_done;
+	}
+
+	if (resp.ParseFromString(std::string(response, response_size))
+			!= true) {
+		fprintf(stderr, "Unable to parse key manager response\n");
+		goto _process_key_request_done;
+	}
+	retval = 0;
+
+_process_key_request_done:
+	switch(state) {
+		case 2: free(response);
+		case 1: close(sockfd);
+	};
+
+	return retval;
+}
+
+/*!
+ * @brief Fetch a publisher's verified public key and certificate address
+ *
+ * @param publisher name of the publisher
+ * @param key a buffer to hold the public key string
+ * @param keylen length of provided buffer
+ * @param cert_dag a buffer to hold the certificate dag string
+ * @pram cert_daglen length of provided cert_dag buffer
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
+		char *cert_dag, size_t *cert_daglen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	// Prepare command for key manager
+	PublisherKeyRequest *req = command.mutable_key_request();
+	req->set_publisher_name(publisher);
+
+	// Run the command on key manager and get a response
+	if(_process_key_request(command, response)) {
+		fprintf(stderr, "Failed to get publisher creds\n");
+		return -1;
+	}
+
+	// Verify response
+	if (!response.has_key_response()) {
+		fprintf(stderr, "Invalid response sent by key manager\n");
+		return -1;
+	}
+
+	if (!response.key_response().success()) {
+		fprintf(stderr, "Key manager failed to fetch publisher creds\n");
+		return -1;
+	}
+
+	// Extract response components
+	std::string publisher_key = response.key_response().publisher_key();
+	std::string cert_dag_str = response.key_response().cert_dag();
+
+	if (publisher_key.size() > *keylen) {
+		fprintf(stderr, "Publisher key buffer too small. Need:%zu\n",
+				publisher_key.size());
+		return -1;
+	}
+
+	if (cert_dag_str.size() > *cert_daglen) {
+		fprintf(stderr, "Cert dag buffer too small. Need:%zu\n",
+				cert_dag_str.size());
+		return -1;
+	}
+
+	// Zero out the user provided buffers
+	bzero(key, *keylen);
+	bzero(cert_dag, *cert_daglen);
+
+	// Fill in the results from the key manager
+	strncpy(key, publisher_key.c_str(), publisher_key.size());
+	strncpy(cert_dag, cert_dag_str.c_str(), cert_dag_str.size());
+
+	*keylen = publisher_key.size();
+	*cert_daglen= cert_dag_str.size();
+
+	return 0;
+}
+
+/*!
+ * @brief Have the Key Manager sign provided digest with publisher key
+ *
+ * @param publisher_name the publisher's human readable name
+ * @param digest (sha1) of content to be signed
+ * @param digest_len length of the digest
+ * @param signature signature is returned in user provided buffer
+ * @param signature_len length of signature buffer. Correct length returned.
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XcacheSignContent(const char *publisher_name, const char *digest,
+		size_t digest_len, char *signature, uint16_t *siglen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	PublisherSignRequest *req = command.mutable_sign_request();
+	req->set_publisher_name(publisher_name);
+	req->set_digest(std::string(digest, digest_len));
+
+	_process_key_request(command, response);
+
+	if (!response.has_sign_response()) {
+		fprintf(stderr, "Expected sign response, got something else.\n");
+		return -1;
+	}
+
+	if (!response.sign_response().success()) {
+		fprintf(stderr, "Key manager failed to sign\n");
+		return -1;
+	}
+
+	std::string sigstr = response.sign_response().signature();
+	if (*siglen < sigstr.size()) {
+		fprintf(stderr, "signature buffer too small. %zu\n", sigstr.size());
+		return -1;
+	}
+
+	bzero(signature, *siglen);
+	memcpy(signature, sigstr.c_str(), sigstr.size());
+	*siglen = sigstr.size();
+
+	return 0;
+}
+
+/*!
+ * @brief Ask Key Manager to verify provided digest is signed by publisher
+ *
+ * @param publisher_name the publisher that signed this digest
+ * @param signature purported to be from the publisher
+ * @param digest of content signed by publisher
+ * @param digest_len the length of digest
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XcacheVerifyContent(const char *publisher_name, const char *digest,
+		size_t digest_len, const char *signature, size_t signature_len)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	PublisherVerifyRequest *req = command.mutable_verify_request();
+	req->set_publisher_name(publisher_name);
+	req->set_signature(std::string(signature, signature_len));
+	req->set_digest(std::string(digest, digest_len));
+
+	_process_key_request(command, response);
+
+	if (!response.has_verify_response()) {
+		fprintf(stderr, "Invalid response from Key Manager\n");
+		return -1;
+	}
+	if (!response.verify_response().success()) {
+		fprintf(stderr, "Verification of content failed.\n");
+		return -1;
+	}
+	return 0;
 }

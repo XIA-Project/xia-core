@@ -539,10 +539,9 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 	std::string content_name = name.substr(s_pos + 1, name.size());
 	// Get reference to a Publisher object that can build NCID
 	// NOTE: This object cannot sign new content. Just verify it.
-	PublisherList *publishers = PublisherList::get_publishers();
-	Publisher *publisher = publishers->get(publisher_name);
+	Publisher publisher(publisher_name);
 	// Build DAG for retrieving the NCID
-	std::string ncid_dag_str = publisher->ncid_dag(content_name);
+	std::string ncid_dag_str = publisher.ncid_dag(content_name);
 	if(ncid_dag_str == "") {
 		std::cout << "Controller::xcache_fetch_named_content "
 			<< "Cannot find addr for " << name << std::endl;

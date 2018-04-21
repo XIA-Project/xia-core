@@ -83,6 +83,10 @@ int xs_isValidSignature(const unsigned char *data, size_t datalen,
 int xs_isValidSignature(const char *pubfilepath,
 		const unsigned char *data, size_t datalen,
 		unsigned char *signature, unsigned int siglen);
+// Pubkey file path known and digest of data provided
+int xs_isValidDigestSignature(const char *pubfilepath,
+        const unsigned char *digest, size_t digestlen,
+        unsigned char *signature, unsigned int siglen);
 
 // Sign a given buffer
 int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *signature, uint16_t *siglen);
@@ -90,6 +94,11 @@ int xs_sign(const char *xid, unsigned char *data, int datalen, unsigned char *si
 // Sign a given buffer with key stored in given file
 int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
 		          unsigned char *signature, uint16_t *siglen);
+
+// Sign a given digest with key stored in given file
+int xs_signDigestWithKey(const char *privfilepath,
+		uint8_t *digest, int digest_len,
+		unsigned char *signature, uint16_t *siglen);
 
 // Read public key from provided location
 int xs_readPubkeyFile(const char *pubfilepath,

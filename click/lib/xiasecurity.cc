@@ -611,6 +611,44 @@ int xs_isValidSignature(const char *pubfilepath,
 }
 
 /*!
+ * @brief Verify signature using public key against digest of data
+ *
+ * @param pubfilepath path of the file holding the public key
+ * @param digest the sha1 digest of data to be verified
+ * @param digestlen length of digest
+ * @param signature buffer holding the signature to be verified against
+ * @param siglen length of the signature buffer
+ *
+ * @returns 1 if the signature is valid
+ * @returns 0 if the signature does not match the data digest
+ */
+int xs_isValidDigestSignature(const char *pubfilepath,
+		const unsigned char *digest, size_t digestlen,
+		unsigned char *signature, unsigned int siglen)
+{
+	int sig_verified;
+
+	char pem_pub[MAX_PUBKEY_SIZE];
+	uint16_t pem_pub_len = MAX_PUBKEY_SIZE;
+	if(xs_readPubkeyFile(pubfilepath, pem_pub, &pem_pub_len)) {
+		printf("xs_isValidSignature: ERROR reading pubkey\n");
+		return 0;
+	}
+
+	BIO *bio_pub = BIO_new(BIO_s_mem());
+	BIO_write(bio_pub, pem_pub, pem_pub_len);
+	RSA *rsa = PEM_read_bio_RSA_PUBKEY(bio_pub, NULL, NULL, NULL);
+	if(!rsa) {
+		return 0;
+	}
+	// Verify signature against SHA1 hash of data using given public key
+	sig_verified = RSA_verify(NID_sha1, digest, digestlen,
+			signature, siglen, rsa);
+	RSA_free(rsa);
+	return sig_verified;
+}
+
+/*!
  * @brief retrieve XID in hex string form from an XID given as a string
  *
  * Simply strips out the XID: string and returns the hex string. This
@@ -680,21 +718,20 @@ xs_sign_done:
 	return retval;
 }
 
-int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
+int xs_signDigestWithKey(const char *privfilepath,
+		uint8_t *digest, int digest_len,
 		unsigned char *signature, uint16_t *siglen)
 {
 	int rc;
 	int retval = -1;
 	int state = 0;
-	uint8_t digest[SHA_DIGEST_LENGTH];
 	char hex_digest[XIA_SHA_DIGEST_STR_LEN];
 	FILE *fp;
 	RSA *rsa;
 	unsigned char *sig_buf = NULL;
 	unsigned int sig_len = 0;
 
-	// Calculate SHA1 hash of given data
-	xs_getSHA1Hash(data, datalen, digest, sizeof digest);
+	assert(digest_len >= SHA_DIGEST_LENGTH);
 
 	// Print the SHA1 hash in human readable form
 	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
@@ -703,20 +740,20 @@ int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
     fp = fopen(privfilepath, "r");
 	if(fp == NULL) {
 		xs_chatter("xs_sign: ERROR opening private kep file: %s", privfilepath);
-		goto xs_sign_with_key_done;
+		goto xs_sign_digest_with_key_done;
 	}
 	state = 1;
     rsa = PEM_read_RSAPrivateKey(fp,NULL,NULL,NULL);
     if(rsa==NULL) {
         xs_chatter("xs_sign: ERROR reading private key:%s:", privfilepath);
-		goto xs_sign_with_key_done;
+		goto xs_sign_digest_with_key_done;
 	}
 
 	assert(*siglen >= RSA_size(rsa));
     sig_buf = (unsigned char*)calloc(RSA_size(rsa), 1);
 	if(!sig_buf) {
 		xs_chatter("xs_sign: Failed to allocate memory for signature");
-		goto xs_sign_with_key_done;
+		goto xs_sign_digest_with_key_done;
 	}
 	state = 2;
 
@@ -724,7 +761,7 @@ int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
     rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
 	if(rc != 1) {
 		xs_chatter("xs_sign: RSA_sign failed");
-		goto xs_sign_with_key_done;
+		goto xs_sign_digest_with_key_done;
 	}
 
     //xs_chatter("Sig: %X Len: %d", sig_buf[0], sig_len);
@@ -734,13 +771,26 @@ int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
 	// Success
 	retval = 0;
 
-xs_sign_with_key_done:
+xs_sign_digest_with_key_done:
 	switch(state) {
 		case 2: free(sig_buf);
 		case 1: fclose(fp);
 	}
 	return retval;
 }
+
+int xs_signWithKey(const char *privfilepath, unsigned char *data, int datalen,
+		unsigned char *signature, uint16_t *siglen)
+{
+	uint8_t digest[SHA_DIGEST_LENGTH];
+
+	// Calculate SHA1 hash of given data
+	xs_getSHA1Hash(data, datalen, digest, sizeof digest);
+
+	return xs_signDigestWithKey(privfilepath, digest, sizeof(digest),
+			signature, siglen);
+}
+
 
 /*!
  * @brief Read public key into a buffer from given path

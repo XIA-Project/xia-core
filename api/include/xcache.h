@@ -12,6 +12,8 @@ extern "C" {
 
 #define NCID_MAX_STRLEN 1024
 
+#define PUBLISHER_MGR_SOCK_NAME "/tmp/xiapublishkeymgr.sock"
+
 typedef struct {
 	char* cid;
 	size_t cidLen;
@@ -95,6 +97,14 @@ extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
 extern int XrequestPushedChunk(std::string &chunkaddr,
 		std::string &fetchservice, std::string &returnaddr);
+extern int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
+		char *cert_dag, size_t *cert_daglen);
+extern int XcacheSignContent(const char *publisher_name,
+		const char *digest, size_t digest_len,
+		char *signature, uint16_t *siglen);
+extern int XcacheVerifyContent(const char *publisher_name,
+		const char *signature, size_t signature_len,
+		const char *digest, size_t digest_len);
 
 #ifdef __cplusplus
 }
