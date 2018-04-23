@@ -69,7 +69,9 @@ std::string Publisher::pubkey()
 			std::cout << "Publisher::pubkey not found" << std::endl;
 			return "";
 		}
-		_cert_dag = new Graph(std::string(cert_dag, cert_daglen));
+		if(cert_daglen != 0) {
+			_cert_dag = new Graph(std::string(cert_dag, cert_daglen));
+		}
 		_pubkey = std::string(key, keylen);
 	}
 	return _pubkey;

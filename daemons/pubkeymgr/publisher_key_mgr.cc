@@ -139,7 +139,7 @@ void PublisherKeyMgr::send_response(int fd, PublisherKeyResponseBuf &resp)
 void PublisherKeyMgr::handle_key_request(
 		int fd, const PublisherKeyRequest &req)
 {
-
+	std::cout << "PublisherKeyMgr::handle_key_request called" << std::endl;
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string keystr = publisher->pubkey();
@@ -149,12 +149,14 @@ void PublisherKeyMgr::handle_key_request(
 	PublisherKeyResponse *response = response_buf.mutable_key_response();
 
 	// report status
-	if (keystr.size() == 0 || cert_dag.size() == 0) {
+	if (keystr.size() == 0) {
 		response->set_success(false);
 	} else {
 		response->set_success(true);
 		response->set_publisher_key(keystr);
-		response->set_cert_dag(cert_dag);
+		if(cert_dag.size() > 0) {
+			response->set_cert_dag(cert_dag);
+		}
 	}
 	send_response(fd, response_buf);
 }
@@ -162,6 +164,7 @@ void PublisherKeyMgr::handle_key_request(
 void PublisherKeyMgr::handle_verify_request(
 		int fd, const PublisherVerifyRequest &req)
 {
+	std::cout << "PublisherKeyMgr::handle_verify_request called" << std::endl;
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string signature = req.signature();
@@ -180,6 +183,7 @@ void PublisherKeyMgr::handle_verify_request(
 void PublisherKeyMgr::handle_sign_request(
 		int fd, const PublisherSignRequest &req)
 {
+	std::cout << "PublisherKeyMgr::handle_sign_request called" << std::endl;
 	bool success = false;
 
 	PublisherList *publishers = PublisherList::get_publishers();
@@ -249,7 +253,7 @@ void PublisherKeyMgr::manage()
 					std::cout << "Failed closing socket "
 						<< result << std::endl;
 				}
-				results.erase(it++);
+				it = results.erase(it);
 			} else {
 				++it;
 			}

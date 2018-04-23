@@ -97,7 +97,11 @@ std::string PublisherKey::pubkey()
  */
 std::string PublisherKey::cert_dag_str()
 {
-	return _cert_dag->dag_string();
+	if(_cert_dag != nullptr) {
+		return _cert_dag->dag_string();
+	} else {
+		return "";
+	}
 }
 
 bool PublisherKey::keydir_present()
