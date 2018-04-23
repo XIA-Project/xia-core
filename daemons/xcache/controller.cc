@@ -1296,7 +1296,7 @@ int xcache_controller::create_sender(void)
 
 int xcache_controller::register_meta(std::vector<std::string> &ids)
 {
-	int rv;
+	int rv = -1;
 	std::string empty_str("");
 
 	for(size_t i=0;i<ids.size();i++) {
