@@ -189,6 +189,7 @@ bool PublisherKey::fetch_cert_dag()
 {
 	sockaddr_x addr;
 	socklen_t addrlen;
+	addrlen = sizeof(addr);
 
 	// Quickly return success if _cert_dag is known already
 	if(_cert_dag) {
