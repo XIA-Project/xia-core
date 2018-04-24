@@ -244,7 +244,7 @@ void PublisherKeyMgr::manage()
 		// Now walk through all the futures to see if any are ready
 		std::chrono::milliseconds zero(0);
 
-		for (auto it = results.cbegin(); it!=results.cend();) {
+		for (auto it = results.begin(); it!=results.end();) {
 
 			if ((*it).wait_for(zero) == std::future_status::ready) {
 				auto result = (*it).get();
