@@ -376,7 +376,13 @@ int PublisherKey::sign(std::string &digest, std::string &signature)
 	return 0;
 }
 
-int PublisherKey::isValidSignature(std::string &digest, std::string &signature)
+/**
+ * @brief check the signature for the provided digest
+ *
+ * @returns 0 if the signature matches the data
+ * @returns -1 if the signature doesn't match or another error occurs
+ */
+int PublisherKey::checkSignature(std::string &digest, std::string &signature)
 {
 	std::string pubkeyfile = pubfilepath();
 

@@ -28,7 +28,7 @@ class PublisherKey {
 		std::string pubkey();
 		std::string cert_dag_str();
 		int sign(std::string &digest, std::string &signature);
-		int isValidSignature(std::string &digest, std::string &signature);
+		int checkSignature(std::string &digest, std::string &signature);
 	private:
 		bool pubkey_present(std::string path);
 		bool fetch_pubkey();

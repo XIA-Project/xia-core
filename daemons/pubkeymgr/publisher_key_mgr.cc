@@ -164,7 +164,6 @@ void PublisherKeyMgr::handle_key_request(
 void PublisherKeyMgr::handle_verify_request(
 		int fd, const PublisherVerifyRequest &req)
 {
-	std::cout << "PublisherKeyMgr::handle_verify_request called" << std::endl;
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string signature = req.signature();
@@ -172,10 +171,12 @@ void PublisherKeyMgr::handle_verify_request(
 
 	PublisherKeyResponseBuf response_buf;
 	PublisherVerifyResponse *response = response_buf.mutable_verify_response();
-	if (publisher->isValidSignature(digest, signature)) {
-		response->set_success(true);
-	} else {
+	if (publisher->checkSignature(digest, signature)) {
+		std::cout << "PublisherKeyMgr::handle_verify_request sign invalid"
+			<< std::endl;
 		response->set_success(false);
+	} else {
+		response->set_success(true);
 	}
 	send_response(fd, response_buf);
 }
@@ -183,7 +184,6 @@ void PublisherKeyMgr::handle_verify_request(
 void PublisherKeyMgr::handle_sign_request(
 		int fd, const PublisherSignRequest &req)
 {
-	std::cout << "PublisherKeyMgr::handle_sign_request called" << std::endl;
 	bool success = false;
 
 	PublisherList *publishers = PublisherList::get_publishers();
