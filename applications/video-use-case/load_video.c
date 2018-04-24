@@ -182,7 +182,7 @@ int create_xia_dash_manifest(ServerVideoInfo *videoInfo) {
 
 
 int create_xia_dash_manifest_urls(ServerVideoInfo *videoInfo) {
-    string manifestUrlName ="xia_manifest_urls_" + videoInfo->videoName + ".txt";
+    string manifestUrlName ="resources/xia_manifest_urls_" + videoInfo->videoName + ".txt";
 
     FILE *f = fopen(manifestUrlName.c_str(), "w");
     if (f == NULL) {

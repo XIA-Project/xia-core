@@ -1,0 +1,8 @@
+video files should be loaded here.
+
+ex:
+resources
+  dash1
+    *.mpd
+	segment_directories
+
