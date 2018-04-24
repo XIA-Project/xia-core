@@ -305,7 +305,6 @@ class Scenario:
         if client == None:
             # FIXME: what do we do about lat/long?
             client = self.make_client_record(msg.client, id, 0.0, 0.0)
-            self.scenario['client_locations'][id] = client
 
         # reset score  list
         client['cluster_scores'] = []
@@ -327,6 +326,7 @@ class Scenario:
             client['cluster_scores'].append([cluster_id, score])
 
         logging.debug(client)
+        self.scenario['client_locations'][id] = client
 
 
 # test driver

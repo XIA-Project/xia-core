@@ -187,19 +187,10 @@ def main():
         generator_thread.daemon = True
         generator_thread.start()
 
-        # we'll exit unless we block here
-        while True:
-            time.sleep(10)
-    else:
-        # handle client connections
-        #server_thread = ThreadedServer(BrokerServer, str(args.port))
-        #server_thread.start()
-        #threads.append(server_thread)
-
-        SocketServer.TCPServer.allow_reuse_address = True
-        server = SocketServer.TCPServer((HOST, args.port), BrokerHandler)
-        server.RequestHandlerClass.scenario = scenario
-        server.serve_forever()
+    SocketServer.TCPServer.allow_reuse_address = True
+    server = SocketServer.TCPServer((HOST, args.port), BrokerHandler)
+    server.RequestHandlerClass.scenario = scenario
+    server.serve_forever()
 
 
 

@@ -34,6 +34,7 @@ import cdn_pb2
 
 # find the xia directory so we can load utilities
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+sys.path.append(os.path.join(srcdir, "daemons/broker"))
 sys.path.append(os.path.join(srcdir, "bin"))
 import xiapyutils
 
