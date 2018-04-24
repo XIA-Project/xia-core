@@ -193,9 +193,9 @@ void PublisherKeyMgr::handle_sign_request(
 	std::string signature;
 	if (publisher->sign(digest, signature)) {
 		std::cout << "Failed to sign provided digest" << std::endl;
-		return;
+	} else {
+		success = true;
 	}
-	success = true;
 
 	PublisherKeyResponseBuf response_buf;
 	PublisherSignResponse *response = response_buf.mutable_sign_response();
