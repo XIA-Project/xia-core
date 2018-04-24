@@ -734,7 +734,7 @@ int xs_signDigestWithKey(const char *privfilepath,
 	assert(digest_len >= SHA_DIGEST_LENGTH);
 
 	// Print the SHA1 hash in human readable form
-	xs_hexDigest(digest, sizeof digest, hex_digest, sizeof hex_digest);
+	xs_hexDigest(digest, digest_len, hex_digest, sizeof hex_digest);
 
     // Encrypt the SHA1 hash with private key
     fp = fopen(privfilepath, "r");
@@ -757,8 +757,7 @@ int xs_signDigestWithKey(const char *privfilepath,
 	}
 	state = 2;
 
-    //int rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
-    rc = RSA_sign(NID_sha1, digest, sizeof digest, sig_buf, &sig_len, rsa);
+    rc = RSA_sign(NID_sha1, digest, digest_len, sig_buf, &sig_len, rsa);
 	if(rc != 1) {
 		xs_chatter("xs_sign: RSA_sign failed");
 		goto xs_sign_digest_with_key_done;
