@@ -52,8 +52,6 @@ PublisherKeyMgr::~PublisherKeyMgr()
 // returns fd to be closed
 int PublisherKeyMgr::process(int fd)
 {
-	std::cout << "Processing " << fd << std::endl;
-
 	// Wait for up to 5 seconds for the application to send us data
 	int retval;
 	struct timeval tv;
@@ -118,8 +116,6 @@ void PublisherKeyMgr::send_response(int fd, PublisherKeyResponseBuf &resp)
 	std::string response_str;
 	resp.SerializeToString(&response_str);
 
-	std::cout << "PublisherKeyMgr response size: " << response_str.size()
-		<< " sent to socket " << fd << std::endl;
 	uint32_t response_size = response_str.size();
 	retval = send(fd, &response_size, sizeof(response_size), 0);
 	if (retval != (int) sizeof(response_size)) {
@@ -139,7 +135,6 @@ void PublisherKeyMgr::send_response(int fd, PublisherKeyResponseBuf &resp)
 void PublisherKeyMgr::handle_key_request(
 		int fd, const PublisherKeyRequest &req)
 {
-	std::cout << "PublisherKeyMgr::handle_key_request called" << std::endl;
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string keystr = publisher->pubkey();
