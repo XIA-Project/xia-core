@@ -385,7 +385,9 @@ def start_stats(name):
 def start_daemon(name):
         params = []
 
-        if name in python_apps:
+        params.append(os.path.join(xiapyutils.xia_bindir(), name))
+
+        if name == 'broker':
             # GUROBI variables are not in root's environment
             # FIXME: should we only run click as root instead?
             GUROBI_HOME = '/opt/gurobi/linux64'
@@ -398,15 +400,6 @@ def start_daemon(name):
             else:
                 os.environ['LD_LIBRARY_PATH'] = GUROBI_LIB
 
-            params.append(os.path.join(xiapyutils.xia_bindir(), name))
-
-        else:
-            params.append(os.path.join(xiapyutils.xia_bindir(), name))
-
-            # -h isn't used in the python apps, it's help there so only set for the others
-            params.append('-h')
-            params.append(hostname)
-
         if args.verbose > 1:
             params.append('-v')
         params.append('-l%s' % args.level)
@@ -415,7 +408,8 @@ def start_daemon(name):
             params.append('-d')
             params.append(node.rendezvous_sid())
 
-        if name == 'xmanifestd':
+        elif name == 'xmanifestd':
+            # FIXME: we don't take logging params yet, so stripping for now
             params = [os.path.join(xiapyutils.xia_bindir(), name)]
             # give the nameserver time to start so we can register
             time.sleep(2)
