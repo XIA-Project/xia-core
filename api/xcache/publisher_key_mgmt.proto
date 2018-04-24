@@ -33,13 +33,13 @@ message PublisherSignRequest {
 
 message PublisherSignResponse {
 	required bool success = 1;
-	optional string signature = 2;
+	optional bytes signature = 2;
 }
 
 message PublisherVerifyRequest {
 	required string publisher_name = 1;
-	required string signature = 2;
-	required string digest = 3;
+	required bytes signature = 2;
+	required bytes digest = 3;
 }
 
 message PublisherVerifyResponse {
