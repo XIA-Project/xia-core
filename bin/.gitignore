@@ -11,4 +11,5 @@ xcontrold
 xhostd
 manifest_server
 xiaproxy
-video_publisher
+load_video
+

@@ -72,6 +72,7 @@ applications/video-use-case/src/manifest_server
 applications/video-use-case/src/proxy
 applications/video-use-case/src/video_publisher
 applications/video-use-case/src/xia_manifest_urls_dash2.txt
+resources/*
 arada/pdrtestip/pdrtestipclient
 arada/pdrtestip/pdrtestipserver
 arada/waveserveripudp/waveserveripudp
