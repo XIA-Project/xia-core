@@ -6,15 +6,12 @@ SOURCES=publisher.cc publisher_cert.cc
 OBJECTS=$(SOURCES:.cc=.o)
 LIBS=$(XLIB)/libpublisher.so
 STATICLIB=$(XLIB)/libpublisher.a
-ANNOUNCER=$(BINDIR)/announce_publisher
-
-ANNOUNCER_SOURCES=announce_publisher.cc
 
 CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I../../common
 CFLAGS+=-I$(APIDIR)/xsocket/minini -L$(XLIB)
 LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lxcache -Wl,-rpath,$(XLIB)
 
-all: $(LIBS) $(ANNOUNCER)
+all: $(LIBS)
 
 static: $(STATICLIB)
 
@@ -27,8 +24,5 @@ $(LIBS): $(OBJECTS)
 $(STATICLIB): $(OBJECTS)
 	ar rcs $@ $(OBJECTS)
 
-$(ANNOUNCER): $(ANNOUNCER_SOURCES)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
 clean:
-	-rm -f *.o *.so $(LIBS) $(STATICLIB) $(ANNOUNCER)
+	-rm -f *.o *.so $(LIBS) $(STATICLIB)
