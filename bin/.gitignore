@@ -9,7 +9,7 @@ xcache
 announce_publisher
 xcontrold
 xhostd
-manifest_server
+xmanifestd
 xiaproxy
 load_video
 

@@ -41,7 +41,7 @@ controller_services       = ['xcontrold']
 controller_extra_services = ['xnameservice', 'xrendezvous']
 router_services           = ['xrouted']
 host_services             = ['xhostd']
-cdn_services              = ['broker', 'video_publisher', 'manifest_server']
+cdn_services              = ['broker', 'xmanifestd']
 cdn_client_services       = ['xiaproxy', 'pinger']
 stats_services            = ['xstats', 'statsserver']
 
@@ -105,7 +105,7 @@ def msg(str, *params):
 #
 def get_process(name):
     # detect python apps correctly
-    if name == 'xnetjd':
+    if name in  ['xnetjd', 'broker']:
         name = os.path.join(xiapyutils.xia_bindir(), name)
     elif name in python_apps:
         name = os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name)
@@ -160,10 +160,8 @@ def make_service_list(type, boot=False):
 
     if node.broker():
         svcs += ['broker']
-    if node.publisher():
-        svcs += ['video_publisher']
     if node.manifest():
-        svcs += ['manifest_server']
+        svcs += ['xmanifestd']
     if node.client():
         svcs += cdn_client_services
 
@@ -400,7 +398,8 @@ def start_daemon(name):
             else:
                 os.environ['LD_LIBRARY_PATH'] = GUROBI_LIB
 
-            params.append(os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name))
+            params.append(os.path.join(xiapyutils.xia_bindir(), name))
+
         else:
             params.append(os.path.join(xiapyutils.xia_bindir(), name))
 
@@ -416,7 +415,10 @@ def start_daemon(name):
             params.append('-d')
             params.append(node.rendezvous_sid())
 
-        print params
+        if name == 'xmanifestd':
+            params = [os.path.join(xiapyutils.xia_bindir(), name)]
+            # give the nameserver time to start so we can register
+            time.sleep(2)
 
         subprocess.Popen(params)
 
@@ -442,6 +444,20 @@ def start_process(name):
 #            start_broker_service(name)
         else:
             start_daemon(name)
+
+
+
+def disable_caching():
+    if get_process('click'):
+        params = []
+
+        params.append(os.path.join(xiapyutils.xia_bindir(), 'cachectl'))
+        params.append('off')
+
+        try:
+            p = subprocess.Popen(params)
+        except:
+            print 'unable to disable caching'
 
 
 #
@@ -522,9 +538,6 @@ def start():
     args.force = False
     services = make_service_list(nodetype, True)
 
-    if cache == False:
-        services.remove('xcache')
-
     for service in services:
         start_process(service)
 
@@ -533,6 +546,10 @@ def start():
     if not args.quiet:
         args.quiet = True
         print_status(nodetype)
+
+    if cache == False:
+        disable_caching()
+
 
 
 # let's go! ##################################################################

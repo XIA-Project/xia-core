@@ -127,9 +127,6 @@ class nodeconf:
     def broker(self):
         return self._common_bool('broker', 'False')
 
-    def publisher(self):
-        return self._common_bool('publisher', 'False')
-
     def manifest(self):
         return self._common_bool('manifest', 'False')
 

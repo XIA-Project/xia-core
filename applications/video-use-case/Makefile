@@ -5,7 +5,7 @@ VPATH=$(XIADIR)/daemons/broker
 .PHONY: clean all
 
 LDFLAGS += $(LIBS) -lprotobuf -lpthread -lxml2
-BINARIES = load_video manifest_server xiaproxy
+BINARIES = load_video xmanifestd xiaproxy
 TARGETS = $(addprefix $(BINDIR)/, $(BINARIES))
 CFLAGS += -I/usr/include/libxml2
 CFLAGS += -I/usr/local/include/libxml2
@@ -29,7 +29,7 @@ $(BINDIR)/xiaproxy: xiaproxy.o csapp.o utils.o cdn.pb.o
 $(BINDIR)/load_video: load_video.o manifest.o utils.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(BINDIR)/manifest_server: manifest_server.o utils.o
+$(BINDIR)/xmanifestd: xmanifestd.o utils.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

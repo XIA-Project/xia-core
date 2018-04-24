@@ -11,7 +11,7 @@
 #include <iostream>
 #include <assert.h>
 #include <dirent.h>
-#include "manifest_server.h"
+#include "xmanifestd.h"
 
 using namespace std;
 
@@ -132,7 +132,7 @@ int register_receiver(){
     int sock;
     char sid_string[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 
-    say ("\n%s (%s): started\n", TITLE, VERSION);
+    //say ("\n%s (%s): started\n", TITLE, VERSION);
 
     // create a socket, and listen for incoming connections
     if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0){
@@ -164,7 +164,7 @@ int register_receiver(){
         die(-1, "Unable to bind to the dag: %s\n", g.dag_string().c_str());
     }
 
-    say("listening on dag: %s\n", g.dag_string().c_str());
+    //say("listening on dag: %s\n", g.dag_string().c_str());
 
     Xlisten(sock, 5);
 
@@ -176,14 +176,14 @@ void blocking_listener(int socketid){
     while(1){
         int acceptSock;
 
-        say("Waiting for client to connect...\n");
+        //say("Waiting for client to connect...\n");
 
         if ((acceptSock = Xaccept(socketid, NULL, NULL)) < 0){
             warn("accept failed...\n");
             break;
         }
 
-        say("connected to a new client\n");
+        //say("connected to a new client\n");
 
         pthread_t client;
         pthread_create(&client, NULL, process_request, (void *)&acceptSock);

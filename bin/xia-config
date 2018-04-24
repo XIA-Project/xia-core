@@ -48,8 +48,7 @@ conf_files = [
     'etc/hosts.xia',
     'etc/RHID.cred',
     'key/*',
-    'ca/*',
-    'publishers/*'
+    'ca/*'
         ]
 
 temp_files = [
@@ -234,8 +233,6 @@ def create_nodeconf(args):
         node.set('client', 'True')
     if args.broker:
         node.set('broker', 'True')
-    if args.publisher:
-        node.set('publisher', 'True')
     if args.manifest:
         node.set('manifest', 'True')
 
@@ -270,7 +267,6 @@ def common_config(args):
 
     make_dir_with_permissions('ca', 0775)
     make_dir_with_permissions('key', 0775)
-    make_dir_with_permissions('publishers', 0775)
 
 
 #
@@ -395,8 +391,6 @@ def info(args):
             print 'CDN Client'
         if node.broker():
             print 'CDN Broker'
-        if node.publisher():
-            print 'CDN Publisher'
         if node.broker():
             print 'CDN Manifest Server'
 
@@ -498,7 +492,6 @@ common_parser.add_argument('-p', '--ports', choices=['4','8'], default=4, help='
 common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='DSRC_MAC,ARADA_IP:PORT', help='connect via a waveserver')
 common_parser.add_argument('--broker',action='store_true', help='run the CDN broker on this node')
 common_parser.add_argument('--manifest',action='store_true', help='run the CDN manifest server on this node')
-common_parser.add_argument('--publisher',action='store_true', help='run a CDN publisher on this node')
 common_parser.add_argument('--client',action='store_true', help='run the CDN client services on this node')
 
 cache_parser = common_parser.add_mutually_exclusive_group(required=False)
