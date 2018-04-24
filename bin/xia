@@ -45,8 +45,6 @@ cdn_services              = ['broker', 'xmanifestd']
 cdn_client_services       = ['xiaproxy', 'pinger']
 stats_services            = ['xstats', 'statsserver']
 
-python_apps               = ['xnetjd', 'broker', 'pinger']
-
 # make a list of all possible services that might be running on a node where the xia.conf file was deleted
 all_services = common_services + router_services + host_services + controller_services + controller_extra_services + stats_services
 
@@ -105,10 +103,8 @@ def msg(str, *params):
 #
 def get_process(name):
     # detect python apps correctly
-    if name in  ['xnetjd', 'broker']:
+    if name in  ['xnetjd', 'broker', 'pinger']:
         name = os.path.join(xiapyutils.xia_bindir(), name)
-    elif name in python_apps:
-        name = os.path.join(xiapyutils.xia_srcdir(), 'daemons/broker/%s' % name)
 
     return [p.info for p in psutil.process_iter(attrs=['pid', 'name', 'cmdline']) if (name in p.info['name'] or name in p.info['cmdline'])]
 
@@ -122,8 +118,7 @@ def kill(name):
     xia_processes = get_process(name)
     for proc in xia_processes:
         try:
-            p = psutil.Process(proc['pid'])
-            p.kill()
+            subprocess.call(['sudo', 'kill', str(proc['pid'])])
             state = 'stopped'
 
         except psutil.AccessDenied:
@@ -230,7 +225,10 @@ def cleanup():
     for cf in cleanup_files:
         try:
             for f in glob.glob(cf):
-                os.unlink(f)
+                try:
+                    subprocess.call(['sudo', 'rm', '-f', f])
+                except psutil.AccessDenied:
+                    print 'unable to delete %s, root privileges required' % f
         except:
             pass
 
@@ -249,7 +247,7 @@ def start_click():
     else:
         script = 'router'
 
-    params = []
+    params = ['sudo']
 
     if args.valgrind:
         params.append('valgrind')
@@ -413,6 +411,9 @@ def start_daemon(name):
             params = [os.path.join(xiapyutils.xia_bindir(), name)]
             # give the nameserver time to start so we can register
             time.sleep(2)
+
+        elif name == 'xiaproxy':
+            params.append('8080')
 
         subprocess.Popen(params)
 
