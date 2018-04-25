@@ -124,7 +124,7 @@ class Scenario:
 
             # give every client cluster pair a large default starting value
             for idc in self.scenario['cdn_locations'].keys():
-                location['cluster_scores'].append([idc, 100000])
+                location['cluster_scores'].append([idc, 9999999])
 
             self.scenario['client_locations'][id] = location
             self.scenario['ids'][client] = id
