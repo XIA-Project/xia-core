@@ -97,11 +97,11 @@ std::string PublisherKey::pubkey()
  */
 std::string PublisherKey::cert_dag_str()
 {
-	if(_cert_dag != nullptr) {
-		return _cert_dag->dag_string();
-	} else {
+	if(fetch_cert_dag() == false) {
 		return "";
 	}
+	// A valid cert dag should be in _cert_dag
+	return _cert_dag->dag_string();
 }
 
 bool PublisherKey::keydir_present()

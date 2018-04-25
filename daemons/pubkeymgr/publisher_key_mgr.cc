@@ -102,6 +102,8 @@ int PublisherKeyMgr::process(int fd)
 
 	if (cmd_buf.has_key_request()) {
 		handle_key_request(fd, cmd_buf.key_request());
+	} else if (cmd_buf.has_dag_request()) {
+		handle_dag_request(fd, cmd_buf.dag_request());
 	} else if (cmd_buf.has_sign_request()) {
 		handle_sign_request(fd, cmd_buf.sign_request());
 	} else if (cmd_buf.has_verify_request()) {
@@ -138,7 +140,6 @@ void PublisherKeyMgr::handle_key_request(
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string keystr = publisher->pubkey();
-	std::string cert_dag = publisher->cert_dag_str();
 
 	PublisherKeyResponseBuf response_buf;
 	PublisherKeyResponse *response = response_buf.mutable_key_response();
@@ -149,9 +150,27 @@ void PublisherKeyMgr::handle_key_request(
 	} else {
 		response->set_success(true);
 		response->set_publisher_key(keystr);
-		if(cert_dag.size() > 0) {
-			response->set_cert_dag(cert_dag);
-		}
+	}
+	send_response(fd, response_buf);
+}
+
+void PublisherKeyMgr::handle_dag_request(
+		int fd, const PublisherDagRequest &req)
+{
+	std::cout << "KeyMgr::handle_dag_request for "
+		<< req.publisher_name() << std::endl;
+	PublisherList *publishers = PublisherList::get_publishers();
+	PublisherKey *publisher = publishers->get(req.publisher_name());
+	std::string cert_dag = publisher->cert_dag_str();
+
+	PublisherKeyResponseBuf response_buf;
+	PublisherDagResponse *response = response_buf.mutable_dag_response();
+
+	if (cert_dag.size() == 0) {
+		response->set_success(false);
+	} else {
+		response->set_success(true);
+		response->set_cert_dag(cert_dag);
 	}
 	send_response(fd, response_buf);
 }

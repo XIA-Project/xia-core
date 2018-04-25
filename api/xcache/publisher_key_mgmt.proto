@@ -3,16 +3,18 @@ syntax = "proto2";
 message PublisherKeyCmdBuf {
 	oneof PublisherKeyCmdType {
 		PublisherKeyRequest key_request = 1;
-		PublisherSignRequest sign_request = 2;
-		PublisherVerifyRequest verify_request = 3;
+		PublisherDagRequest dag_request = 2;
+		PublisherSignRequest sign_request = 3;
+		PublisherVerifyRequest verify_request = 4;
 	}
 }
 
 message PublisherKeyResponseBuf {
 	oneof PublisherKeyResponseType {
 		PublisherKeyResponse key_response = 1;
-		PublisherSignResponse sign_response = 2;
-		PublisherVerifyResponse verify_response = 3;
+		PublisherDagResponse dag_response = 2;
+		PublisherSignResponse sign_response = 3;
+		PublisherVerifyResponse verify_response = 4;
 	}
 }
 
@@ -23,9 +25,16 @@ message PublisherKeyRequest {
 message PublisherKeyResponse {
 	required bool success = 1;
 	optional string publisher_key = 2;
-	optional string cert_dag = 3;
 }
 
+message PublisherDagRequest {
+	required string publisher_name = 1;
+}
+
+message PublisherDagResponse {
+	required bool success = 1;
+	optional string cert_dag = 2;
+}
 message PublisherSignRequest {
 	required string publisher_name = 1;
 	required string digest = 2;

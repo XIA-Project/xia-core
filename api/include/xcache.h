@@ -97,7 +97,9 @@ extern int XgetNotifSocket(XcacheHandle *h);
 extern int XprocessNotif(XcacheHandle *h);
 extern int XrequestPushedChunk(std::string &chunkaddr,
 		std::string &fetchservice, std::string &returnaddr);
-extern int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
+extern int XgetPublisherPubkey(const char *publisher,
+		char *key, size_t *keylen);
+extern int XgetPublisherDag(const char *publisher,
 		char *cert_dag, size_t *cert_daglen);
 extern int XcacheSignContent(const char *publisher_name,
 		const char *digest, size_t digest_len,

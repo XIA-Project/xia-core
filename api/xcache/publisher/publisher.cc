@@ -60,21 +60,32 @@ std::string Publisher::pubkey()
 	if (_pubkey.size() == 0) {
 		// Connect to keymanager and get publisher's key and certificate addr
 		char key[MAX_PUBKEY_SIZE];
-		char cert_dag[XIA_MAX_DAG_STR_SIZE];
 		size_t keylen = sizeof(key);
-		size_t cert_daglen = sizeof(cert_dag);
 
-		if (XgetPublisherCreds(_name.c_str(), key, &keylen,
-					cert_dag, &cert_daglen)) {
+		if (XgetPublisherPubkey(_name.c_str(), key, &keylen)) {
 			std::cout << "Publisher::pubkey not found" << std::endl;
 			return "";
-		}
-		if(cert_daglen != 0) {
-			_cert_dag = new Graph(std::string(cert_dag, cert_daglen));
 		}
 		_pubkey = std::string(key, keylen);
 	}
 	return _pubkey;
+}
+
+std::string Publisher::content_dag()
+{
+	if(_cert_dag == nullptr) {
+		// Connect to keymanager and get publisher's content dag
+		// Currently, we just return the dag where we got the cert from
+		char cert_dag[XIA_MAX_DAG_STR_SIZE];
+		size_t cert_daglen = sizeof(cert_dag);
+
+		if(XgetPublisherDag(_name.c_str(), cert_dag, &cert_daglen)) {
+			std::cout << "Publisher::content_dag not found" << std::endl;
+			return "";
+		}
+		_cert_dag = new Graph(std::string(cert_dag, cert_daglen));
+	}
+	return _cert_dag->dag_string();
 }
 
 /*!
@@ -125,9 +136,9 @@ std::string Publisher::ncid_dag(std::string content_name)
 	}
 	Node ncid_node(ncidstr);
 
-	// Ensure that the certificate dag was fetched during ncid calculation
-	if(_cert_dag == nullptr) {
-		std::cout << "Publisher::ncid_dag() invalid cert dag" << std::endl;
+	// Fetch the cert dag if we don't have it already
+	if(content_dag().size() == 0) {
+		std::cout << "Publisher::ncid_dag() cert dag unknown" << std::endl;
 		return "";
 	}
 	// Replace Publisher certificate CID in address with NCID of content

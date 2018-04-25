@@ -31,6 +31,7 @@ class Publisher {
 				const std::string &signature);
 	private:
 		std::string pubkey();
+		std::string content_dag();
 
 		std::string _name;
 		Graph *_cert_dag;

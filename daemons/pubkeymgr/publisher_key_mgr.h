@@ -17,6 +17,7 @@ class PublisherKeyMgr {
 	int process(int sockfd);
 	void send_response(int fd, PublisherKeyResponseBuf &resp);
 	void handle_key_request(int fd, const PublisherKeyRequest &req);
+	void handle_dag_request(int fd, const PublisherDagRequest &req);
 	void handle_sign_request(int fd, const PublisherSignRequest &req);
 	void handle_verify_request(int fd, const PublisherVerifyRequest &req);
 

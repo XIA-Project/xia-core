@@ -1462,14 +1462,11 @@ _process_key_request_done:
  * @param publisher name of the publisher
  * @param key a buffer to hold the public key string
  * @param keylen length of provided buffer
- * @param cert_dag a buffer to hold the certificate dag string
- * @pram cert_daglen length of provided cert_dag buffer
  *
  * @returns 0 on success
  * @returns -1 on failure
  */
-int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
-		char *cert_dag, size_t *cert_daglen)
+int XgetPublisherPubkey(const char *publisher, char *key, size_t *keylen)
 {
 	PublisherKeyCmdBuf command;
 	PublisherKeyResponseBuf response;
@@ -1497,7 +1494,6 @@ int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
 
 	// Zero out the user provided buffers
 	bzero(key, *keylen);
-	bzero(cert_dag, *cert_daglen);
 
 	// Extract response components
 	std::string publisher_key = response.key_response().publisher_key();
@@ -1510,22 +1506,40 @@ int XgetPublisherCreds(const char *publisher, char *key, size_t *keylen,
 	strncpy(key, publisher_key.c_str(), publisher_key.size());
 	*keylen = publisher_key.size();
 
-	if (response.key_response().has_cert_dag()) {
-		std::string cert_dag_str = response.key_response().cert_dag();
+	return 0;
+}
 
-		if (cert_dag_str.size() > *cert_daglen) {
-			fprintf(stderr, "Cert dag buffer too small. Need:%zu\n",
-					cert_dag_str.size());
-			return -1;
-		}
+int XgetPublisherDag(const char *publisher, char *cert_dag, size_t *cert_daglen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
 
-		// Fill in the results from the key manager
-		strncpy(cert_dag, cert_dag_str.c_str(), cert_dag_str.size());
+	PublisherDagRequest *req = command.mutable_dag_request();
+	req->set_publisher_name(publisher);
 
-		*cert_daglen= cert_dag_str.size();
-	} else {
-		*cert_daglen = 0;
+	if(_process_key_request(command, response)) {
+		fprintf(stderr, "Failed to get publisher dag\n");
+		return -1;
 	}
+	if(!response.has_dag_response()) {
+		fprintf(stderr, "Invalid response sent by key manager\n");
+		return -1;
+	}
+	if(response.dag_response().success() == false) {
+		fprintf(stderr, "Key manager failed to fetch publisher dag\n");
+		return -1;
+	}
+	std::string cert_dag_str = response.dag_response().cert_dag();
+
+	if(cert_dag_str.size() > *cert_daglen) {
+		fprintf(stderr, "Cert. DAG buffer too small. Need %zu\n",
+				cert_dag_str.size());
+		return -1;
+	}
+
+	bzero(cert_dag, *cert_daglen);
+	strncpy(cert_dag, cert_dag_str.c_str(), cert_dag_str.size());
+	*cert_daglen = cert_dag_str.size();
 
 	return 0;
 }
