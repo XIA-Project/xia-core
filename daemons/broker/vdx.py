@@ -120,7 +120,11 @@ def GetCDNBids(cdn):
         # with scores below 'cap' (function of best score)
         # sorted by lowest cost
 
-        bo = copy(bid_ordering[cdn][location])
+        # modified this code so that it wokrs in a live scenario, not just a static one
+	cluster_scores = Scenario['client_locations'][location]['cluster_scores']
+	bo = [(c, s) for c,s in cluster_scores if c in Scenario['CDNs'][cdn]]
+	bo = sorted(bo, key = lambda x: x[1])
+
         cap = bo[0][1] * 2.0
         b2 = sorted([(c, s, Scenario['cdn_locations'][c]['bw_cost'] +
                       Scenario['cdn_locations'][c]['colo_cost'])
@@ -246,6 +250,7 @@ def Optimize(bids):
                 except:
                     # we don't have any outstanding requests for this client id
                     # default its avg bitrate to 0
+		    logging.debug('no outstanding requests for %s', location)
                     obj_coeff = 0.0
                     avg_bitrate[id] = 0.0
                 coeffs.append(obj_coeff)
