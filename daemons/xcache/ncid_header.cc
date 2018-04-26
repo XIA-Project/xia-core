@@ -12,12 +12,17 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 	Publisher publisher(publisher_name);
 
 	_id = publisher.ncid(content_name);
+	if(_id.size() == 0) {
+		printf("%s Unable to create NCID for %s\n",
+				publisher_name.c_str(), content_name.c_str());
+		throw "NCID could not be calculated";
+	}
 	_uri = publisher.content_URI(content_name);
 	_publisher_name = publisher_name;
 	std::string signature;
 	if(publisher.sign(_uri, data, signature)) {
-		printf("ERROR: Unable to sign %s\n", _uri.c_str());
-		// TODO throw an exception here
+		printf("Unable to sign %s\n", _uri.c_str());
+		throw "Failed to sign";
 	}
 	_signature = signature;
 }

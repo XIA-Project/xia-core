@@ -33,6 +33,7 @@ message xcache_cmd {
 		XCACHE_CID_NOT_FOUND = 4;
 		XCACHE_CID_IN_USE = 5;
 		XCACHE_CID_MARKED_FOR_DELETE = 6;
+		XCACHE_NCID_CALC_ERR = 7;
 	};
 
 	required req_type cmd = 1;

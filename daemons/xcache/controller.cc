@@ -1014,9 +1014,12 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	xcache_meta *meta;
 	int state = 0;
-	int retval = RET_FAILED;
+	bool success = false;
 	sockaddr_x addr;
 	ContentHeader *chdr;
+
+	// Prepare a response for caller - defaulting to failure
+	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
 	// Retrieve publisher name, content name and data passed by user
 	std::string publisher_name = cmd->publisher_name();
@@ -1025,9 +1028,13 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 
 	// FIXME: Free chdr on errors
 	// Build the NCID Header from the provided request
-	chdr = new NCIDHeader(content, cmd->ttl(), publisher_name, content_name);
-	if(chdr == NULL) {
-		syslog(LOG_ERR, "Error creating NCIDHeader for chunk");
+	try {
+		chdr = new NCIDHeader(content, cmd->ttl(),
+				publisher_name, content_name);
+		assert(chdr != NULL);
+	} catch (const char *e) {
+		syslog(LOG_ERR, "Error creating NCIDHeader: %s", e);
+		resp->set_status(xcache_cmd::XCACHE_NCID_CALC_ERR);
 		goto store_named_done;
 	}
 	state = 1;
@@ -1061,10 +1068,8 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 			syslog(LOG_ERR, "Unable to store %s", chdr->id().c_str());
 			goto store_named_done;
 		}
+		resp->set_status(xcache_cmd::XCACHE_OK);
 	}
-
-	// Prepare a response for caller
-	resp->set_cmd(xcache_cmd::XCACHE_RESPONSE);
 
 	// Return the DAG for the CID that just got stored
 	if (cid2addr(chdr->id(), &addr) == 0) {
@@ -1072,26 +1077,24 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 		Graph g(&addr);
 		syslog(LOG_INFO, "store: %s", g.dag_string().c_str());
 	} else {
-		// FIXME: do some sort of error handling here
+		resp->set_status(xcache_cmd::XCACHE_CID_NOT_FOUND);
 	}
 
 	// Keep track of NCID and corresponding CID
 	_ncid_table->register_ncid(chdr->id(), chdr->store_id());
 
 	// Successfully completed storing the NCID (internally as CID)
-	retval = RET_SENDRESP;
-
 	syslog(LOG_INFO, "Store Finished\n");
 
 store_named_done:
 	// Remove allocated data structures on failure
-	if (retval == RET_FAILED) {
+	if (resp->status() != xcache_cmd::XCACHE_OK) {
 		switch(state) {
 			case 2: delete meta;
 			case 1: delete chdr;
 		};
 	}
-	return retval;
+	return RET_SENDRESP;
 }
 
 int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)

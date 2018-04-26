@@ -1,4 +1,5 @@
 #include "ncid-demo-server.h"
+#include <memory>	// std::unique_ptr
 
 NCIDDemoServer::NCIDDemoServer()
 {
@@ -31,21 +32,18 @@ int NCIDDemoServer::serve()
 	std::string data("Some Random Data");
 
 	// Store it as a named chunk
-	int ret;
 	std::cout << "Putting a chunk by its name into xcache" << std::endl;
-	ret = XputNamedChunk(&_xcache, data.c_str(), data.size(),
-			_content_name.c_str(), _publisher.c_str());
-	if (ret < 0) {
+	if(XputNamedChunk(&_xcache, data.c_str(), data.size(),
+			_content_name.c_str(), _publisher.c_str())) {
 		std::cout << "Failed publishing named chunk" << std::endl;
+		return -1;
 	}
 	std::cout << "Named chunk was placed into cache" << std::endl;
-	return ret;
+	return 0;
 }
 
 int main()
 {
-	NCIDDemoServer *server = new NCIDDemoServer();
-	int retval = server->serve();
-	delete server;
-	return retval;
+	std::unique_ptr<NCIDDemoServer> server(new NCIDDemoServer());
+	return server->serve();
 }

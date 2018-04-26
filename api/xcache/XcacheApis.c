@@ -482,8 +482,7 @@ int XputChunk(XcacheHandle *h, const char *data, size_t length,
 ** @param length the number of bytes in data
 ** @param publisher_name name of publisher signing this chunk
 **
-** @returns XCACHE_OK on success
-** @returns XCACHE_ERR_EXISTS if the chunk already resides in the cache
+** @returns 0 on success or if the chunk is already in cache
 ** @returns -1 if an error occurs in producing or signing the chunk
 **
 */
@@ -512,19 +511,20 @@ int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 		return -1;
 	}
 
-	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
-		printf("%s received an error from xcache\n", __func__);
+	if(cmd.cmd() != xcache_cmd::XCACHE_RESPONSE) {
+		printf("%s received incorrect response\n", __func__);
+		return -1;
+	}
+
+	if(cmd.status() != xcache_cmd::XCACHE_OK) {
 		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
-			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
-			return xcache_cmd::XCACHE_ERR_EXISTS;
+			printf("%s: chunk already cached.\n", __func__);
 		} else {
+			printf("%s: ERROR creating named chunk\n", __func__);
 			return -1;
 		}
 	}
-
-	//fprintf(stderr, "%s: Got a response from server\n", __func__);
-
-	return xcache_cmd::XCACHE_OK;
+	return 0;
 }
 
 /*!
