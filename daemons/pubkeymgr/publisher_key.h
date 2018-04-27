@@ -2,7 +2,6 @@
 #define _PUBLISHER_KEY_H
 #include <assert.h>
 #include <string.h>
-#include <Xsocket.h>
 #include <xcache.h>
 #include <Xsecurity.h>
 #include <dagaddr.hpp>
