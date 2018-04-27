@@ -33,10 +33,6 @@ PublisherKey::PublisherKey(std::string name)
 
 	_name = name;
 	_cert_dag = nullptr;
-	if(XcacheHandleInit(&_h)) {
-		std::cout << "PublisherKey: ERROR connecting to Xcache" << std::endl;
-		assert(-1);
-	}
 }
 
 PublisherKey::~PublisherKey()
@@ -44,7 +40,6 @@ PublisherKey::~PublisherKey()
 	if(_keydir!= NULL) {
 		free((void *)_keydir);
 	}
-	XcacheHandleDestroy(&_h);
 }
 
 /*!
@@ -243,7 +238,12 @@ bool PublisherKey::fetch_pubkey()
 	_cert_dag->fill_sockaddr(&addr);
 
 	// Fetch PublisherKey cert
+	if(XcacheHandleInit(&_h)) {
+		std::cout << "PublisherKey: ERROR connecting to Xcache" << std::endl;
+		assert(false);
+	}
 	certlen = XfetchChunk(&_h, &cert, flags, &addr, sizeof(addr));
+	XcacheHandleDestroy(&_h);
 	if (certlen < 0) {
 		std::cout << "ERROR Pubkey not found for " << name() << std::endl;
 		goto fetch_pubkey_done;
