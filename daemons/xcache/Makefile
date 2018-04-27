@@ -2,9 +2,6 @@ include ../../xia.mk
 
 VPATH=../common
 
-PROTOS		:= $(wildcard *.proto)
-PROTO_SRCS	:= $(PROTOS:.proto=.pb.cc)
-
 SUBDIRS=fs
 XCACHE=$(BINDIR)/xcache
 CLEAN=$(addsuffix .build, $(SUBDIRS))
@@ -14,18 +11,17 @@ CLEAN=$(addsuffix .build, $(SUBDIRS))
 SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 		cache_download.cc \
 		push_proxy.cc \
-		cid_header.cc ncid_header.cc\
-	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc $(PROTO_SRCS)
+	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc
 OBJS=$(SOURCES:.cc=.o)
 
-LIBS+=-lpublisher
+LIBS+=-lpublisher -lxcachehdr
 LDFLAGS+=-L$(XLIB) $(LIBS) -lprotobuf -lcrypto
 CFLAGS+=-I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../../click/include -I$(APIDIR)/xsocket/minini -L$(XLIB)
 
 %.pb.cc: %.proto
 	protoc -I. --cpp_out=. $<
 
-all:$(PROTO_SRCS) $(SUBDIRS) $(XCACHE)
+all:$(SUBDIRS) $(XCACHE)
 
 
 $(SUBDIRS):
@@ -36,7 +32,6 @@ $(XCACHE): $(SOURCES)
 
 clean: $(CLEAN)
 	@-rm -f $(XCACHE)
-	rm -f $(PROTO_SRCS) *.pb.cc *.pb.h
 
 $(CLEAN):
 	-make -C $(basename $@) clean

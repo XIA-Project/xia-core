@@ -10,7 +10,7 @@
 #include "controller.h"
 #include "cache.h"
 #include "cid.h"
-#include "ncid_header.h"
+#include "headers/ncid_header.h"
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
 

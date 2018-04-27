@@ -19,7 +19,7 @@
 #include "Xkeys.h"
 #include "Xsecurity.h"
 #include "dagaddr.hpp"
-#include "ncid_header.h"
+#include "headers/ncid_header.h"
 #include "ncid_table.h"
 #include "xcache_sock.h"
 #include "cid.h"

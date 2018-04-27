@@ -12,7 +12,7 @@
 #include "push_proxy.h"
 #include "cid.h"
 #include "xip.h"
-#include "ncid_header.h"
+#include "headers/ncid_header.h"
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
 
