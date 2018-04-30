@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 
 	xcache_conf.threads = DEFAULT_THREADS;
 
-	strcpy(xcache_conf.hostname, "router0");
+	gethostname(xcache_conf.hostname, sizeof(xcache_conf.hostname));
 
 	struct option options[] = {
 		{"host", required_argument, 0, 0},
@@ -122,7 +122,6 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 	}
-
 	initlogging(xcache_conf.hostname, level, verbose);
 
 	ctrl->set_conf(&xcache_conf);
