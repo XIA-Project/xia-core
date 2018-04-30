@@ -92,6 +92,11 @@ int do_chunk_transfer(int sock, char *ubuf, size_t *ulen, ContentHeader *chdr,
 		std::cout << "ERROR fetching content header size" << std::endl;
 		goto do_chunk_transfer_done;
 	}
+	chdr_len = ntohl(chdr_len);
+	if(chdr_len == 0) {
+		std::cout << "ERROR Empty header for requested content" << std::endl;
+		goto do_chunk_transfer_done;
+	}
 
 	// Read the content header
 	buf = (char *)calloc(1, chdr_len);
