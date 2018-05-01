@@ -127,13 +127,13 @@ int do_chunk_transfer(int sock, char *ubuf, size_t *ulen, ContentHeader *chdr,
 	}
 	state = 2;		// chdr allocated for user
 
-	// Read content into user provided buffer
-	if(*ulen < chdr->content_len()) {
-		std::cout << "ERROR: provided buffer too small: "
-			<< *ulen << " need: " << chdr->content_len() << std::endl;
+	// Allocate memory for the content
+	ubuf = (char *) calloc(1, chdr->content_len());
+	if(ubuf == NULL) {
+		std::cout << "ERROR cannot allocate mem for contents" << std::endl;
 		goto do_chunk_transfer_done;
 	}
-	bzero(ubuf, (size_t) *ulen);
+	state = 3;
 
 	if(reliable_read(sock, ubuf, chdr->content_len(), stop)) {
 		std::cout << "ERROR reading chunk contents" << std::endl;
@@ -146,6 +146,7 @@ int do_chunk_transfer(int sock, char *ubuf, size_t *ulen, ContentHeader *chdr,
 
 do_chunk_transfer_done:
 	switch(state) {
+		case 3: if(retval != 0) free(ubuf);
 		case 2: if(retval != 0) delete chdr;
 		case 1: free(buf);
 	};
@@ -164,10 +165,14 @@ do_chunk_transfer_done:
  * Since this thread will block, the call will need a separate thread
  * to trigger the stop.
  *
+ * Since the caller has no way of knowing the header or chunk size in
+ * advance, this function allocates the memory.
+ * NOTE: Caller must free "buf" and "chdr" if this function returns success
+ *
  * @param sock a socket connected to a process sending a chunk
- * @param buf user provided buffer to hold chunk contents.
- * @param len length of user provided buffer. Returns with actual content len
- * @param chdr a pointer to a ContentHeader object. Caller must free.
+ * @param buf will hold chunk contents. Caller must free on success.
+ * @param len holds the size of chunk contents.
+ * @param chdr a pointer to a ContentHeader object. Caller must delete.
  *
  * @returns 0 on success
  * @returns -1 on failure
