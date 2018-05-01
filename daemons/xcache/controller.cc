@@ -1014,7 +1014,6 @@ int xcache_controller::store_named(xcache_cmd *resp, xcache_cmd *cmd)
 {
 	xcache_meta *meta;
 	int state = 0;
-	bool success = false;
 	sockaddr_x addr;
 	ContentHeader *chdr;
 
