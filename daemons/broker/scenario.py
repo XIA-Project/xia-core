@@ -133,11 +133,12 @@ class Scenario:
     # add a new entry to the requests table
     # assumes that there is a matching client_location entry
     #
-    def add_request(self, id, bitrate):
+    def add_request(self, id, bitrate, last_cdn):
         try:
             request = dict(self.scenario['client_locations'][id])
             request['bitrate'] = bitrate
             request['timestamp'] = int(time.time())
+            request['cdn'] = last_cdn
             self.scenario['requests'].append(request)
             logging.debug('added new request for %d at %d' % (id, bitrate))
         except Exception as err:
@@ -273,7 +274,7 @@ class Scenario:
         return length
 
 
-    def get_optimal_cluster(self, client_id, bitrate):
+    def get_optimal_cluster(self, client_id, bitrate, last_cdn):
         try:
             bid = self.scenario['accepted_bids'][client_id]
 

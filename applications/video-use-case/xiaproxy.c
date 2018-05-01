@@ -74,6 +74,7 @@ void *cdn_locator(void *)
 			exit(EXIT_FAILURE);
 		}
 		req_msg->set_bandwidth(bandwidth);
+		req_msg->set_last_cdn(cdn_host);
 		pthread_mutex_unlock(&cdn_lock);
 
 		string message;
