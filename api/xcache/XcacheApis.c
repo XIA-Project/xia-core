@@ -292,8 +292,8 @@ int XcacheHandleInit(XcacheHandle *h)
 	send_command(h->xcacheSock, &cmd);
 
 	if (get_response_blocking(h->xcacheSock, &cmd) >= 0) {
-		fprintf(stderr, "Msg type = %d\n", cmd.cmd());
-		fprintf(stderr, "Library received context id = %d\n", cmd.context_id());
+		//fprintf(stderr, "Msg type = %d\n", cmd.cmd());
+		//fprintf(stderr, "Library received context id = %d\n", cmd.context_id());
 
 		h->contextID = cmd.context_id();
 	} else {
@@ -803,7 +803,7 @@ int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
 		/* Error in Sending chunk */
 		return -1;
 	}
-	fprintf(stderr, "Command sent to xcache successfully\n");
+//	fprintf(stderr, "Command sent to xcache successfully\n");
 
 	if(flags & XCF_BLOCK) {
 		size_t to_copy;
@@ -855,7 +855,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 {
 	xcache_cmd cmd;
 
-	fprintf(stderr, "Inside %s\n", __func__);
+//	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
 //	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
@@ -872,7 +872,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 		/* Error in Sending chunk */
 		return -1;
 	}
-	fprintf(stderr, "Command sent to xcache successfully\n");
+//	fprintf(stderr, "Command sent to xcache successfully\n");
 
 	if(flags & XCF_BLOCK) {
 		size_t to_copy;

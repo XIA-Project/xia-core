@@ -63,20 +63,17 @@ int Xgethostname(char *name, size_t len)
 	unsigned seq = seqNo(sockfd);
 	xsm.set_sequence(seq);
 
-	printf("Xgethostname: sending request to Click\n");
 	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
 		return -1;
 	}
 
-	printf("Xgethostname: waiting for Click response\n");
 	xia::XSocketMsg xsm1;
 	if ((rc = click_reply(sockfd, seq, &xsm1)) < 0) {
 		LOGF("Error retrieving status from Click: %s", strerror(errno));
 		return -1;
 	}
 
-	printf("Xgethostname: retrieving hostname from Click response\n");
 	// Send list of interfaces up to the application
 	if (xsm1.type() == xia::XGETHOSTNAME) {
 		xia::X_GetHostName_Msg *msg = xsm1.mutable_x_gethostname();
