@@ -295,7 +295,6 @@ class Scenario:
             name = self.scenario['cdn_locations'][cluster_id]['name']
             logging.debug('no valid bids found using %s (%s %s)' % (name, ad, hid))
 
-        print len(self.scenario['requests']), len(self.scenario['accepted_bids'])
         return (name, ad, hid)
 
 
