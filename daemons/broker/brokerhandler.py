@@ -21,7 +21,7 @@ import SocketServer
 import cdn_pb2
 from scenario import Scenario
 
-# FIXME: should bitrate be incorporated in what we return from here, or is it only for future calcuations?
+# FIXME: should bandwidth be incorporated in what we return from here, or is it only for future calcuations?
 
 class BrokerHandler(SocketServer.BaseRequestHandler):
     scenario = None
@@ -57,17 +57,17 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
         id = self.scenario.getID(msg.client)
 
         # add a new request entry
-        self.scenario.add_request(id, msg.request.bitrate)
+        self.scenario.add_request(id, msg.request.bandwidth)
 
         # find the best cluster for this client
-        (dag, ad, hid) = self.scenario.get_optimal_cluster(id, msg.request.bitrate)
+        (cluster, ad, hid) = self.scenario.get_optimal_cluster(id, msg.request.bandwidth)
 
-        logging.debug('Returning dag: %s' % dag)
+        logging.info('Returning cluster: %s %s %s' % (cluster, ad, hid))
 
         reply_msg = cdn_pb2.CDNMsg()
         reply_msg.version = cdn_pb2.CDN_PROTO_VERSION
         reply_msg.type = cdn_pb2.CDN_REPLY_MSG
-        reply_msg.reply.cluster = dag
+        reply_msg.reply.cluster = cluster
         reply_msg.reply.ad = ad
         reply_msg.reply.hid = hid
 

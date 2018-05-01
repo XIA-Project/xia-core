@@ -10,10 +10,10 @@ enum constants {
 }
 
 message Request {
-  optional uint32 bitrate = 1; // video bitrate
-  optional string cluster = 2; // on return contains CDN cluster to use
-  optional string ad      = 3;
-  optional string hid     = 4;
+  optional uint32 bandwidth = 1; // video bitrate
+  optional string ad        = 2;
+  optional string hid       = 3;
+  optional uint32 tput      = 4; // current;y received throughput
 }
 
 message Reply {
@@ -31,7 +31,7 @@ message Cluster {
 }
 
 message Scores {
-  repeated Cluster clusters = 1; // list of scores for conn ections to CDN clusters
+  repeated Cluster clusters = 1; // list of scores for connections to CDN clusters
 }
 
 enum msg_type {

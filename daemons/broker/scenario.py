@@ -279,22 +279,23 @@ class Scenario:
 
             logging.debug(bid)
             cluster_id = bid[1]
-            dag = self.scenario['cdn_locations'][cluster_id]['dag']
+            #dag = self.scenario['cdn_locations'][cluster_id]['dag']
             ad = self.scenario['cdn_locations'][cluster_id]['ad']
             hid = self.scenario['cdn_locations'][cluster_id]['hid']
+            name = self.scenario['cdn_locations'][cluster_id]['name']
 
         except Exception as err:
             # we couldn't find a bid, pick a cluster at random
             # FIXME: change to use best score for client
 
             cluster_id = random.choice(self.scenario['cdn_locations'].keys())
-            dag = self.scenario['cdn_locations'][cluster_id]['dag']
             ad = self.scenario['cdn_locations'][cluster_id]['ad']
             hid = self.scenario['cdn_locations'][cluster_id]['hid']
-            logging.debug('no valid bids found using %s' % dag)
+            name = self.scenario['cdn_locations'][cluster_id]['name']
+            logging.debug('no valid bids found using %s (%s %s)' % (name, ad, hid))
 
         print len(self.scenario['requests']), len(self.scenario['accepted_bids'])
-        return (dag, ad, hid)
+        return (name, ad, hid)
 
 
     def update_scores(self, msg):
