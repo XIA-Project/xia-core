@@ -150,7 +150,6 @@ static void parse_to_list_dag_urls(const char *video_folder, xmlNode * a_node, m
 
                 if (xmlStrcmp(attrName, BAD_CAST REPRESENTATION_BANDWIDTH) == 0){
 					bandwidth = (const char *) attrVal;
-					printf("bandwidth=%s\n", bandwidth.c_str());
                 }
             }
          } else if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST SEGMENT_URL) == 0) {
