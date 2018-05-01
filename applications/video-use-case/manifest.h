@@ -11,7 +11,7 @@ using namespace std;
 
 // Note: the following manifest generation tools only works with the manfiest
 // of following format:
-// 
+//
 // <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 // <MPD id="79726b98-dc87-4eef-9880-85a77b0ea937" profiles="urn:mpeg:dash:profile:isoff-main:2011" type="static" availabilityStartTime="2016-02-27T04:10:06.000Z" publishTime="2016-02-27T04:10:17.000Z" mediaPresentationDuration="P0Y0M0DT0H1M24.000S" minBufferTime="P0Y0M0DT0H0M1.000S" bitmovin:version="1.7.0" xmlns:ns2="http://www.w3.org/1999/xlink" xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:bitmovin="http://www.bitmovin.net/mpd/2015">
 //    <Period>
@@ -29,8 +29,8 @@ using namespace std;
 //    </Period>
 //</MPD>
 //
-// Essentially it takes this file and first convert to equivalent manfiest file without the 
-// segment template to one where segment template is replaced by list of actual chunk URIs. 
+// Essentially it takes this file and first convert to equivalent manfiest file without the
+// segment template to one where segment template is replaced by list of actual chunk URIs.
 // Then it replace each chunk URI with the XIA DAG url.
 
 
@@ -49,8 +49,10 @@ const char SEGMENT_INITIALIZATION[] = "initialization";
 const char SEGMENT_INITIALIZATION_ELEMENT[] = "Initialization";
 const char SEGMENT_INITIALIZATION_URL[] = "sourceURL";
 
+const char REPRESENTATION_BANDWIDTH[] = "bandwidth";
+
 /**
- * Given a DASH manifest file with SegmentTemplates, convert it to manifest where segment template 
+ * Given a DASH manifest file with SegmentTemplates, convert it to manifest where segment template
  * is replaced by list of actual chunk URIs.
  */
 int parse_dash_manifest(const char *video_folder, const char *from_uri, const char* to_uri);

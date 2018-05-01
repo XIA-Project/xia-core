@@ -43,7 +43,7 @@ static vector<string> find_all_segment_url(const char *video_folder, string & pa
     }
 
     return result;
-} 
+}
 
 static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
     xmlNode *cur_node = NULL, *suc_node = NULL, *nxt_suc_node = NULL;
@@ -52,21 +52,21 @@ static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
 
     for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
         if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST REPRESENTATION) == 0) {
-            
+
             for (suc_node = cur_node->children; suc_node; ){
-                
+
                 if (suc_node->type == XML_ELEMENT_NODE && xmlStrcmp(suc_node->name, BAD_CAST SEGMENT_TEMPLATE) == 0) {
-                    
+
                     for (curr_attr = suc_node->properties; curr_attr; curr_attr = curr_attr->next){
                         attrName = (xmlChar*)curr_attr->name;
                         attrVal = curr_attr->children->content;
 
-                        if (xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_DURATION) == 0 || xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_TIMESCALE) == 0 
+                        if (xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_DURATION) == 0 || xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_TIMESCALE) == 0
                                     || xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_MEDIA) == 0 || xmlStrcmp(curr_attr->name, BAD_CAST SEGMENT_INITIALIZATION) == 0){
                             string key((char*)attrName);
                             string val((char*)attrVal);
                             attrToVal[key] = val;
-                        } 
+                        }
                     }
 
                     nxt_suc_node = suc_node->next;
@@ -125,7 +125,7 @@ static string constructDAGstring(const char* video_folder, xmlChar* attrVal, map
     fullPath = temp1 + temp2;
 
     vector<string> currUrls = pathToUrl[fullPath];
-            
+
     string dagUrlStr;
     for (int i = 0; i < currUrls.size(); ++i) {
         dagUrlStr += currUrls[i] + " ";
@@ -139,28 +139,42 @@ static void parse_to_list_dag_urls(const char *video_folder, xmlNode * a_node, m
     xmlNode *cur_node = NULL;
     xmlAttr *curr_attr = NULL;
     xmlChar* attrName = NULL, *attrVal = NULL;
+	static string bandwidth;
 
     for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
 
-        if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST SEGMENT_URL) == 0) {
-        
+        if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST REPRESENTATION) == 0) {
             for (curr_attr = cur_node->properties; curr_attr; curr_attr = curr_attr->next){
                 attrName = (xmlChar*)curr_attr->name;
                 attrVal = curr_attr->children->content;
-                
+
+                if (xmlStrcmp(attrName, BAD_CAST REPRESENTATION_BANDWIDTH) == 0){
+					bandwidth = (const char *) attrVal;
+					printf("bandwidth=%s\n", bandwidth.c_str());
+                }
+            }
+         } else if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST SEGMENT_URL) == 0) {
+
+            for (curr_attr = cur_node->properties; curr_attr; curr_attr = curr_attr->next){
+                attrName = (xmlChar*)curr_attr->name;
+                attrVal = curr_attr->children->content;
+
                 if (xmlStrcmp(attrName, BAD_CAST SEGMENT_MEDIA) == 0){
                     string dagUrlStr = constructDAGstring(video_folder, attrVal, pathToUrl);
+
+					dagUrlStr += "?bandwidth=" + bandwidth;
                     xmlSetProp(cur_node, BAD_CAST SEGMENT_MEDIA, BAD_CAST dagUrlStr.c_str());
                 }
             }
         } else if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST SEGMENT_INITIALIZATION_ELEMENT) == 0){
-            
+
             for (curr_attr = cur_node->properties; curr_attr; curr_attr = curr_attr->next){
                 attrName = (xmlChar*)curr_attr->name;
                 attrVal = curr_attr->children->content;
-                
+
                 if (xmlStrcmp(attrName, BAD_CAST SEGMENT_INITIALIZATION_URL) == 0){
                     string dagUrlStr = constructDAGstring(video_folder, attrVal, pathToUrl);
+					dagUrlStr += "?bandwidth=" + bandwidth;
                     xmlSetProp(cur_node, BAD_CAST SEGMENT_INITIALIZATION_URL, BAD_CAST dagUrlStr.c_str());
                 }
             }
@@ -201,7 +215,7 @@ int parse_dash_manifest(const char *video_folder, const char *from_uri, const ch
 
     xmlDoc *doc = NULL;
     xmlNode *root_element = NULL;
-    
+
     xmlInitParser();
 
     doc = xmlReadFile(from_uri, NULL, 0);
