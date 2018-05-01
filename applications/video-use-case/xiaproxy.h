@@ -76,6 +76,7 @@ typedef struct _ProxyRequestCtx{
     char remote_host[MAXLINE];	// ip for remote host
     char remote_port[MAXLINE];	// remote port
     char remote_path[MAXLINE];	// remote resource path
+	char params[MAXLINE];		// everything after '?'
 
 } ProxyRequestCtx;
 
@@ -180,7 +181,7 @@ int forward_http_response_body_to_client(ProxyRequestCtx *ctx, char* data, int l
  * @param  resource  HTTP resource section
  * @param  version   HTTP version number
  */
-int parse_request_line(char *buf, char *method, char *protocol, char *host_port, char *resource, char *version);
+int parse_request_line(char *buf, char *method, char *protocol, char *host_port, char *resource, char *params, char *version);
 
 /**
  * XID in dag url from browser is not capitalized. So capitalize here.

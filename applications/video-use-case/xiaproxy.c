@@ -28,16 +28,15 @@ static int locator_interval = 5;
 static int alive = 1;
 pthread_mutex_t cdn_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct addrinfo *broker_addr;
-static int bitrate = 1500;
-static std::string cdn_ad;
-static std::string cdn_hid;
-static std::string cdn_host;
 static char hostname[64];
 static char *ident = NULL;
 
-// the lookup cache for CDN nameserver query
-//  CDN name -> server location (AD:HID)
-static map<string, vector<string> > dagLookupCache;
+// these variables all need to be protected by a mutex when accessed!
+static int bandwidth = 1500;
+static std::string cdn_ad;
+static std::string cdn_hid;
+static std::string cdn_host;
+
 // the map of CDN name to CDN properties
 //  name -> CDN properties
 static map<string, CDNInfo> cdns;
@@ -52,7 +51,7 @@ void *cdn_locator(void *)
 	char buf[2048];
 
 	while(alive) {
-		syslog(LOG_INFO, "fetching best cdn");
+		syslog(LOG_DEBUG, "fetching best cdn");
 
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 			syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
@@ -69,7 +68,13 @@ void *cdn_locator(void *)
 		msg.set_client(hostname);
 
 		CDN::Request *req_msg = msg.mutable_request();
-		req_msg->set_bitrate(bitrate);
+
+		if (pthread_mutex_lock(&cdn_lock)) {
+			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		req_msg->set_bandwidth(bandwidth);
+		pthread_mutex_unlock(&cdn_lock);
 
 		string message;
 		msg.SerializeToString(&message);
@@ -82,8 +87,6 @@ void *cdn_locator(void *)
 		rc = recv(sock, &foo, 4, 0);
 		len = ntohl(foo);
 		rc = recv(sock, buf, sizeof(buf), 0);
-
-		syslog(LOG_DEBUG, "got %d bytes", rc);
 
 		close(sock);
 
@@ -105,7 +108,7 @@ void *cdn_locator(void *)
 		cdn_host = reply_msg->cluster();
 		pthread_mutex_unlock(&cdn_lock);
 
-		syslog(LOG_NOTICE, "New CDN: %s", cdn_host.c_str());
+		syslog(LOG_NOTICE, "New CDN: %s (RE %s %s)", cdn_host.c_str(), cdn_ad.c_str(), cdn_hid.c_str());
 		sleep(locator_interval);
 	}
 
@@ -230,18 +233,14 @@ void parse_host_port(char *host_port, char *remote_host, char *remote_port) {
 
 void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
 
-	printf("process urls: count = %lu\n", dagUrls.size());
-
 	// get the current cdn provided by the broker
 	if (pthread_mutex_lock(&cdn_lock)) {
 		syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
-	printf("getting best cdn's ad & hid\n");
 	Node ad = Node(cdn_ad);
 	Node hid = Node(cdn_hid);
-
 	pthread_mutex_unlock(&cdn_lock);
 
 	//process the dags
@@ -254,8 +253,6 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
 			dagUrl = "http://" + capitalize_XID(dagUrl);
 		}
 
-		printf("orig = %s\n", dagUrl.c_str());
-
 		Graph incoming(dagUrl);
 
 		// if it's just a cid, make dag using current best cdn
@@ -266,12 +263,10 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses){
 			Node cid = incoming.intent_CID();
 
 			sprintf(d, "DAG 2 0 - %s 2 1 - %s 2 - %s", cdn_ad.c_str(), cdn_hid.c_str(), cid.to_string().c_str());
-			printf("%s\n", d);
+			syslog(LOG_NOTICE, "fetching %s", d);
 
 			Graph modified(d);
 			modified.fill_sockaddr(&chunkAddresses[i]);
-
-			modified.print_graph();
 
 		} else {
 			// it's a full dag, so just use it
@@ -413,35 +408,8 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 	string cname;
 	vector<string> dagUrls;
 
-	//printf("host:%s\npath:%s\n", ctx->remote_host, ctx->remote_path);
-
 	if (strcasestr(ctx->remote_host, XIA_DAG_URL) != NULL){
 		dagUrls = split_string_on_delimiter(ctx->remote_host, " ");
-	} else if (strcasestr(ctx->remote_path, "/CID") != NULL){
-		// if the current url has name with CDN
-		if(strcasestr(ctx->remote_host, XIA_CDN_SERVICE) != NULL){
-			// jump over the /
-			dagUrls = cdn_name_to_dag_urls(ctx->remote_host, ctx->remote_path+1);
-		}
-		// if the current url says this is multi-cdn use case,
-		// pick a CDN name and get the server DAG in the CDN.
-		else if (strcasestr(ctx->remote_host, XIA_VID_SERVICE) != NULL){
-			string pname = ctx->remote_path + 1;
-			size_t start = pname.find("CID:");
-			size_t end = pname.find("?");
-
-			size_t len = end - start;
-			if(len <= 4){
-				return -1;
-			}
-
-			string cid = pname.substr(start, len);
-			string cdn_options = pname.substr(end + 1);
-			cname = multicdn_name_to_CDN_name(ctx->remote_host, (char*)cdn_options.c_str());
-			dagUrls = cdn_name_to_dag_urls((char*)cname.c_str(), (char*)cid.c_str());
-		} else {
-			return -1;
-		}
 	} else {
 		return -1;
 	}
@@ -450,27 +418,18 @@ int handle_stream_requests(ProxyRequestCtx *ctx){
 	sockaddr_x chunkAddresses[numChunks];
 	process_urls_to_DAG(dagUrls, chunkAddresses);
 
-	printf("forward header\n");
+	//printf("forward header\n");
 	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0){
 		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
 	}
 
-	printf("forward chunks\n");
+	//printf("forward chunks\n");
 	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks, true, cname.c_str(), ctx->remote_host) < 0){
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
 
-//	syslog(LOG_NOTICE, "proxy pick CDN: %s host within CDN: %s",  cname.c_str(), dagUrls[0].c_str());
-//
-//	for(auto it = cdns.begin(); it != cdns.end(); it++){
-//		syslog(LOG_NOTICE, "CDN name: %s", it->first.c_str());
-//		syslog(LOG_NOTICE, "CDN num requests: %d", it->second.num_reqs);
-//		syslog(LOG_NOTICE, "CDN average throughput: %f",  it->second.avg_throughput);
-//	}
-
-	printf("all done\n");
 	return 1;
 }
 
@@ -480,11 +439,13 @@ int xia_proxy_handle_request(int browser_sock) {
 	char method[MAXLINE], protocol[MAXLINE];
 	char host_port[MAXLINE];
 	char remote_host[MAXLINE], remote_port[MAXLINE], resource[MAXLINE];
+	char params[MAXLINE];
 	char version[MAXLINE];
 
 	rio_t rio_client;
 	strcpy(remote_host, "");
 	strcpy(remote_port, "80");
+	params[0] = '\0';
 
 	// read the first line of HTTP request
 	Rio_readinitb(&rio_client, browser_sock);
@@ -507,7 +468,7 @@ int xia_proxy_handle_request(int browser_sock) {
 	}
 
 	if (parse_request_line(buf, method, protocol, host_port,
-				resource, version) == -1) {
+				resource, params, version) == -1) {
 		return -1;
 	}
 	parse_host_port(host_port, remote_host, remote_port);
@@ -518,14 +479,13 @@ int xia_proxy_handle_request(int browser_sock) {
 		return -1;
 	}
 
-	printf("%s\nhost:%s port:%s\n", host_port, remote_host, remote_port);
-
 	if (strstr(method, "GET") != NULL || strstr(method, "OPTIONS")) {
 		ProxyRequestCtx ctx;
 		ctx.browser_sock = browser_sock;
 		strcpy(ctx.remote_host, remote_host);
 		strcpy(ctx.remote_port, remote_port);
 		strcpy(ctx.remote_path, resource);
+		strcpy(ctx.params, params);
 
 		if (strcasestr(ctx.remote_host, XIA_DAG_URL) != NULL || strcasestr(ctx.remote_path, "/CID") != NULL){
 			if(handle_stream_requests(&ctx) < 0){
@@ -571,7 +531,7 @@ int xia_proxy_handle_request(int browser_sock) {
 
 int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, int numChunks, bool cdn, ...){
 	int len = -1, totalBytes = 0;
-	double elapsedTime;
+	double elapsed, elapsed2;
 	char *data = NULL;
 	struct timeval t1, t2;
 
@@ -584,15 +544,15 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		}
 		gettimeofday(&t2, NULL);
 
-		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
-		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+		elapsed =  (t2.tv_sec - t1.tv_sec);
+		elapsed += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 
 		if(cdn){
 			va_list ap;
 			va_start(ap, cdn);
 			string cname = va_arg(ap, char*);
 			string origin = va_arg(ap, char*);
-			double curr_throughput = len/elapsedTime;
+			double curr_throughput = len/elapsed;
 			double prev_avg = cdns[cname].avg_throughput;
 
 			// we need to repick a CDN if the current observed throughput
@@ -617,8 +577,6 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 			}
 		}
 
-		syslog(LOG_INFO, "size of data: %d", len);
-		syslog(LOG_INFO, "elapsed time for xfetch: %f", elapsedTime);
 
 		totalBytes += len;
 
@@ -628,9 +586,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 			syslog(LOG_ERR, "error when sending response body to the browser");
 		}
 		gettimeofday(&t2, NULL);
-		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
-		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		syslog(LOG_INFO, "elapsed time for forwarding: %f", elapsedTime);
+		elapsed2 = (t2.tv_sec - t1.tv_sec);
+		elapsed2 += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
+
+		syslog(LOG_INFO, "got %d bytes in %1.3f seconds", len, elapsed);
+		syslog(LOG_INFO, "forwarded in %f seconds", elapsed2);
 	}
 
 	if (data) {
@@ -709,8 +669,9 @@ int forward_http_response_body_to_client(ProxyRequestCtx *ctx, char* data, int l
 }
 
 int parse_request_line(char *buf, char *method, char *protocol,
-		char *host_port, char *resource, char *version) {
+		char *host_port, char *resource, char *params, char *version) {
 	char url[MAXLINE];
+	char tail[MAXLINE];
 	// check if it is valid buffer
 	if (strstr(buf, "/") == NULL || strlen(buf) < 1) {
 		return -1;
@@ -720,11 +681,19 @@ int parse_request_line(char *buf, char *method, char *protocol,
 	sscanf(buf, "%s %s %s", method, url, version);
 	if (strstr(url, "://") != NULL) {
 		// has protocol
-		sscanf(url, "%[^:]://%[^/]%s", protocol, host_port, resource);
+		sscanf(url, "%[^:]://%[^/]%s", protocol, host_port, tail);
 	} else {
 		// no protocols
-		sscanf(url, "%[^/]%s", host_port, resource);
+		sscanf(url, "%[^/]%s", host_port, tail);
 	}
+
+	char *p;
+	if ((p = strstr(tail, "?")) != NULL) {
+		*p++ = 0;
+		strcpy(params, p);
+	}
+	strcpy(resource, tail);
+
 	return 0;
 }
 
@@ -855,123 +824,6 @@ string capitalize_XID(string dagUrl){
 	return dagUrl;
 }
 
-Graph cid2addr(std::string CID, std::string AD, std::string HID) {
-	Node n_src;
-	Node n_cid(XID_TYPE_CID, strchr(CID.c_str(), ':') + 1);
-	Node n_ad(XID_TYPE_AD, strchr(AD.c_str(), ':') + 1);
-	Node n_hid(XID_TYPE_HID, strchr(HID.c_str(), ':') + 1);
-
-	Graph primaryIntent = n_src * n_cid;
-	Graph gFallback = n_src * n_ad * n_hid * n_cid;
-	Graph gAddr = primaryIntent + gFallback;
-
-	return gAddr;
-}
-
-vector<string> cdn_name_to_dag_urls(char* sname, char* cidString){
-	sockaddr_x dag;
-	socklen_t daglen = sizeof(dag);
-	string sname_str = sname;
-	string cid_str = cidString;
-	vector<string> result;
-
-	printf("cdn name to dag urls\n");
-
-	if (!sname || *sname == 0) {
-		return result;
-	}
-
-	// if the CDN name lookup is in cache locally, don't do the resolution
-	if(dagLookupCache.find(sname_str) == dagLookupCache.end()){
-		printf("not in the cache\n");
-		// get the DNS DAG associated with the CDN service name
-		if (XgetDAGbyAnycastName(sname, &dag, &daglen) < 0){
-			warn("unable to locate CDN DNS service name: %s\n", sname);
-			return result;
-		}
-
-		// construct the dag for CID using HID and AD
-		Graph g;
-		g.from_sockaddr(&dag);
-
-		// find out the AD and HID for the DAG and construct the full DAG
-		// for CID
-		string AD, HID;
-		for(int i = 0; i < g.num_nodes(); i++){
-			Node currNode = g.get_node(i);
-
-			if(currNode.type_string() == Node::XID_TYPE_AD_STRING){
-				AD = currNode.to_string();
-			} else if (currNode.type_string() == Node::XID_TYPE_HID_STRING){
-				HID = currNode.to_string();
-			}
-		}
-
-		printf("A   %s %s\n", AD.c_str(), HID.c_str());
-
-		Graph g2 = cid2addr(cid_str, AD, HID);
-		result.push_back(g2.http_url_string());
-
-		dagLookupCache[sname_str].push_back(AD);
-		dagLookupCache[sname_str].push_back(HID);
-
-		return result;
-	} else {
-		string AD = dagLookupCache[sname_str][0];
-		string HID = dagLookupCache[sname_str][1];
-
-		Graph g2 = cid2addr(cid_str, AD, HID);
-		result.push_back(g2.http_url_string());
-
-		printf("B   %s %s\n", AD.c_str(), HID.c_str());
-		return result;
-	}
-}
-
-string multicdn_select_cdn_strategy(string origin, const vector<string> & options){
-	// if we haven't seen a CDN, put it in our accounting
-	for(unsigned i = 0; i < options.size(); i++){
-		if(cdns.find(options[i]) == cdns.end()){
-			CDNInfo c = {0, 0.0};
-			cdns[options[i]] = c;
-		}
-	}
-
-	// select a CDN if the video request it has seen is less than a threshold
-	string c_max_s;
-	double c_max = -DBL_MAX;
-	for(unsigned i = 0; i < options.size(); i++){
-		if(cdns[options[i]].num_reqs < BOOTSTRAP_NUM_REQS){
-			originCDNCache[origin] = options[i];
-			return options[i];
-		} else {
-			if(cdns[options[i]].avg_throughput > c_max){
-				c_max_s = options[i];
-				c_max = cdns[options[i]].avg_throughput;
-			}
-		}
-	}
-
-	// if we need to repick a CDN, select the one with the largest
-	// throughput
-	if(originCDNCache.find(origin) == originCDNCache.end()){
-		originCDNCache[origin] = c_max_s;
-	}
-
-	return originCDNCache[origin];
-}
-
-string multicdn_name_to_CDN_name(char* origin, char* options){
-	vector<string> voptions = split_string_on_delimiter(options, "&");
-
-	printf("multi to CDN\n");
-
-	for(unsigned i = 0; i < voptions.size(); i++){
-		voptions[i] = voptions[i].substr(voptions[i].find("=") + 1);
-	}
-
-	return multicdn_select_cdn_strategy(origin, voptions);
-}
 
 vector<string> split_string_on_delimiter(char* str, char* delimiter){
 	vector<string> result;
