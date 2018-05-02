@@ -11,7 +11,6 @@
 #include <assert.h>
 #include <iostream>
 #include <Xsecurity.h>
-#include <Xsocket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

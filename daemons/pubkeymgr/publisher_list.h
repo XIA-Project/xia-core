@@ -3,12 +3,12 @@
 
 #include <map>
 #include <pthread.h>
-#include "publisher/publisher.h"
+#include "publisher_key.h"
 
 class PublisherList {
 public:
 	static PublisherList *get_publishers();
-	Publisher *get(std::string publisher_name);
+	PublisherKey *get(std::string publisher_name);
 
 protected:
 	PublisherList();
@@ -19,8 +19,8 @@ private:
 	int write_lock(void) { return pthread_rwlock_wrlock(&_rwlock); };
 	int unlock(void)     { return pthread_rwlock_unlock(&_rwlock); };
 
-	std::map<std::string, Publisher*> _name_to_publisher;
-	std::map<std::string, Publisher*>::iterator _name_to_publisher_it;
+	std::map<std::string, PublisherKey*> _name_to_publisher;
+	std::map<std::string, PublisherKey*>::iterator _name_to_publisher_it;
 	// TODO: Add _publisher_to_name mappings so they can help with deletion
 	pthread_rwlock_t _rwlock;
 	static PublisherList* _instance;

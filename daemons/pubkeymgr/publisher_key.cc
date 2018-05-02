@@ -1,23 +1,22 @@
+// XIA Headers
+#include "publisher_key.h"
+#include "publisher_cert.h"
+#include "xcache_cmd.pb.h"
+
+// System headers
+#include <stdlib.h>
+#include <stdio.h>
 #include <iostream>      // cout, endl
 #include <assert.h>
 #include <string.h>
-#include <Xsocket.h>
-#include <Xsecurity.h>
-#include "publisher.h"
-#include "publisher_cert.h"
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "../controller.h"
-#include "xcache_cmd.pb.h"
 #include <sys/types.h>    // stat
 #include <sys/stat.h>     // stat
 #include <unistd.h>       // stat
 
 /*!
- * @brief An Object representing a Publisher named on instantiation
+ * @brief An Object representing a PublisherKey named on instantiation
  */
-Publisher::Publisher(std::string name)
+PublisherKey::PublisherKey(std::string name)
 {
 	char *keydir = (char *)malloc(MAX_KEYDIR_PATH_LEN);
 	assert(keydir != NULL);
@@ -33,39 +32,28 @@ Publisher::Publisher(std::string name)
 	_keydir = strcat(keydir, publisher_dir.c_str());
 
 	_name = name;
-	_cert_dag = NULL;
+	_cert_dag = nullptr;
 }
 
-Publisher::~Publisher()
+PublisherKey::~PublisherKey()
 {
 	if(_keydir!= NULL) {
 		free((void *)_keydir);
-	}
-	if(_cert_dag) {
-		delete _cert_dag;
 	}
 }
 
 /*!
  * @brief The publisher's name
  */
-std::string Publisher::name()
+std::string PublisherKey::name()
 {
 	return _name;
 }
 
 /*!
- * @brief Build Content URI for the requested content
+ * @brief PublisherKey's public key
  */
-std::string Publisher::content_URI(std::string content_name)
-{
-	return name() + "/" + content_name;
-}
-
-/*!
- * @brief Publisher's public key
- */
-std::string Publisher::pubkey()
+std::string PublisherKey::pubkey()
 {
 	char pubkeybuf[MAX_PUBKEY_SIZE];
 	uint16_t pubkeylen = MAX_PUBKEY_SIZE;
@@ -80,9 +68,9 @@ std::string Publisher::pubkey()
 			return "";
 		}
 	}
-	// Find the pubkey file in the Publisher's credential directory
+	// Find the pubkey file in the PublisherKey's credential directory
 	if(xs_readPubkeyFile(pubkeypath.c_str(), pubkeybuf, &pubkeylen)) {
-		printf("Publisher::pubkey() cannot read key from %s\n",
+		printf("PublisherKey::pubkey() cannot read key from %s\n",
 				pubkeypath.c_str());
 		return "";
 	}
@@ -90,7 +78,28 @@ std::string Publisher::pubkey()
 	return pubkeystr;
 }
 
-bool Publisher::keydir_present()
+/*!
+ * @brief Publisher's certificate address (DAG)
+ *
+ * The address where we downloaded the publisher's certificate from
+ * 
+ * We currently use this address as the base for all chunks published
+ * by the said publisher. This is just a shortcut until we have another
+ * way for the publisher to say where the chunks published by it would
+ * be placed.
+ *
+ * Returns certificate dag as a string
+ */
+std::string PublisherKey::cert_dag_str()
+{
+	if(fetch_cert_dag() == false) {
+		return "";
+	}
+	// A valid cert dag should be in _cert_dag
+	return _cert_dag->dag_string();
+}
+
+bool PublisherKey::keydir_present()
 {
 	struct stat statbuf;
 
@@ -109,7 +118,7 @@ bool Publisher::keydir_present()
  *
  * @returns true on success or existing, false on failure
  */
-bool Publisher::ensure_keydir_exists()
+bool PublisherKey::ensure_keydir_exists()
 {
 	if(!keydir_present()) {
 		if(mkdir(_keydir, S_IRWXU | S_IRWXG | S_IRWXO)) {
@@ -130,7 +139,7 @@ bool Publisher::ensure_keydir_exists()
  * For now, we just check to see if the path contains a file
  * TODO: make sure that a valid public key is available in file
  */
-bool Publisher::pubkey_present(std::string path)
+bool PublisherKey::pubkey_present(std::string path)
 {
 	struct stat statbuf;
 
@@ -151,7 +160,7 @@ bool Publisher::pubkey_present(std::string path)
  * certificate DAG with the nameservice. In future, there could be a
  * separate service or distributed source for finding certificate DAGs.
  */
-std::string Publisher::cert_name()
+std::string PublisherKey::cert_name()
 {
 	assert(_name.size() > 0);
 	return _name + ".publisher.cert.xia";
@@ -160,21 +169,22 @@ std::string Publisher::cert_name()
 /*!
  * @brief Query the nameservice for the Certificate DAG address
  *
- * We use the DAG of the Publisher's certificate to build the DAG for
- * NCIDs published by the Publisher. This is a hacky but gives us a
- * DAG for somewhere we know the Publisher is able to publish stuff.
- * In the real world, the Publisher would probably make DAGs available
+ * We use the DAG of the PublisherKey's certificate to build the DAG for
+ * NCIDs published by the PublisherKey. This is a hacky but gives us a
+ * DAG for somewhere we know the PublisherKey is able to publish stuff.
+ * In the real world, the PublisherKey would probably make DAGs available
  * for clients to use to get NCID content.
  *
  * This function populates _cert_dag.
  *
- * @returns true if the DAG for the Publisher's certificate was found
+ * @returns true if the DAG for the PublisherKey's certificate was found
  * @returns false if the DAG was not found
  */
-bool Publisher::fetch_cert_dag()
+bool PublisherKey::fetch_cert_dag()
 {
 	sockaddr_x addr;
 	socklen_t addrlen;
+	addrlen = sizeof(addr);
 
 	// Quickly return success if _cert_dag is known already
 	if(_cert_dag) {
@@ -185,74 +195,74 @@ bool Publisher::fetch_cert_dag()
 	std::string cert_url = cert_name();
 
 	if(XgetDAGbyName(cert_url.c_str(), &addr, &addrlen)) {
-		std::cout << "Publisher::fetch_cert_dag: "
+		std::cout << "PublisherKey::fetch_cert_dag: "
 			<< "could not be found" << std::endl;
 		_cert_dag = NULL;
 		return false;
 	}
 
-	_cert_dag = new Graph(&addr);
+	_cert_dag = std::unique_ptr<Graph>(new Graph(&addr));
 	return true;
 }
 
 /*!
  * @brief Fetch the public key to the provided path
  *
- * Query the nameserver to see if a certificate for this Publisher is
+ * Query the nameserver to see if a certificate for this PublisherKey is
  * available for download. If one is available, we download the certificate
  * and extract the public key from it. Then we verify it against the
  * CA cert that we already have. If all checks out, store public key
  * for publisher and return success.
  */
-bool Publisher::fetch_pubkey()
+bool PublisherKey::fetch_pubkey()
 {
 	sockaddr_x addr;
 	int state = 0;
 	bool retval = false;
 	xcache_cmd resp;
 	xcache_cmd cmd;
-	size_t certlen;
+	int certlen;
 	void *cert;
 	std::string certpath;
 	PublisherCert *pubcert;
-	int flags = XCF_CACHE | XCF_BLOCK;
-
-	// Get a reference to the controller
-	xcache_controller *ctrl = xcache_controller::get_instance();
+	int flags = XCF_BLOCK;
 
 	// Store certificate DAG for building NCID DAGs in future
 	if(fetch_cert_dag() == false) {
-		std::cout << "Publisher::fetch_pubkey: " <<
-			"ERROR fetching Publisher cert addr" << std::endl;
+		std::cout << "PublisherKey::fetch_pubkey: " <<
+			"ERROR fetching PublisherKey cert addr" << std::endl;
 		return false;
 	}
 
 	// xcache operates on sockaddr_x, so fill one in
 	_cert_dag->fill_sockaddr(&addr);
 
-	// Fetch Publisher cert via XfetchChunk equivalent logic
-	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
-	cmd.set_dag(&addr, sizeof(sockaddr_x));
-	cmd.set_flags(flags);
+	// Fetch PublisherKey cert
+	if(XcacheHandleInit(&_h)) {
+		std::cout << "PublisherKey: ERROR connecting to Xcache" << std::endl;
+		assert(false);
+	}
+	certlen = XfetchChunk(&_h, &cert, flags, &addr, sizeof(addr));
+	XcacheHandleDestroy(&_h);
+	if (certlen < 0) {
+		std::cout << "ERROR Pubkey not found for " << name() << std::endl;
+		goto fetch_pubkey_done;
+	}
 
-	ctrl->xcache_fetch_content(&resp, &cmd, flags);
-	certlen = resp.data().length();
-	cert = malloc(resp.data().length());
 	if(cert == NULL) {
 		std::cout << "ERROR getting memory for cert" << std::endl;
 		goto fetch_pubkey_done;
 	}
 	state = 1;
 
-	memcpy(cert, resp.data().c_str(), certlen);
-
-	// Write Publisher cert to disk
-	if(store_publisher_cert(cert, certlen, certpath) == false) {
+	// Write PublisherKey cert to disk
+	// FIXME: Write to a staging area until verification
+	if(store_publisher_cert(cert, (size_t)certlen, certpath) == false) {
 		std::cout << "Unable to store cert on disk" << std::endl;
 		goto fetch_pubkey_done;
 	}
 
-	// Verify Publisher cert against CA cert
+	// Verify PublisherKey cert against CA cert
 	pubcert = new PublisherCert(certpath);
 	state = 2;
 
@@ -261,14 +271,14 @@ bool Publisher::fetch_pubkey()
 		goto fetch_pubkey_done;
 	}
 
-	// Extract Public key from Publisher cert
+	// Extract Public key from PublisherKey cert
 	if(!pubcert->extract_pubkey()) {
 		std::cout << "ERROR extracting pubkey" << certpath << std::endl;
 		goto fetch_pubkey_done;
 	}
 	retval = true;
 
-	// Store valid Publisher cert and valid Pubkey in _keydir
+	// Store valid PublisherKey cert and valid Pubkey in _keydir
 	// TODO Currently storing before verification. Verify before store.
 fetch_pubkey_done:
 	switch(state) {
@@ -289,7 +299,7 @@ fetch_pubkey_done:
  * @returns true on success, false on failure
  * @returns path to certificate file if successful in storing
  */
-bool Publisher::store_publisher_cert(void *cert, size_t len,
+bool PublisherKey::store_publisher_cert(void *cert, size_t len,
 	std::string &certfilepath)
 {
 	FILE *certfile;
@@ -297,7 +307,7 @@ bool Publisher::store_publisher_cert(void *cert, size_t len,
 	bool retval = false;
 	std::string certpath(_keydir);
 
-	// Create directory to store Publisher credentials
+	// Create directory to store PublisherKey credentials
 	if(!ensure_keydir_exists()) {
 		std::cout << "ERROR creds directory unavailable" << std::endl;
 		goto store_publisher_cert_done;
@@ -328,79 +338,20 @@ store_publisher_cert_done:
 }
 
 /*!
- * @brief calculate NCID for the given content name
- *
- * @returns NCID for given content name
+ * @brief Directory containing all PublisherKey security credentials
  */
-std::string Publisher::ncid(std::string content_name)
-{
-	std::string URI = content_URI(content_name);
-	std::string pubkeystr = pubkey();
-	if(pubkeystr.size() == 0) {
-		std::cout << "Publisher::ncid: ERROR return empty string" << std::endl;
-		return "";
-	}
-	std::string ncid_data = URI + pubkeystr;
-	char ncidhex[XIA_SHA_DIGEST_STR_LEN];
-	int ncidlen = XIA_SHA_DIGEST_STR_LEN;
-	xs_getSHA1HexDigest((const unsigned char *)ncid_data.c_str(),
-			ncid_data.size(), ncidhex, ncidlen);
-	assert(strlen(ncidhex) == XIA_SHA_DIGEST_STR_LEN - 1);
-	std::string ncidstr(ncidhex);
-	return "NCID:" + ncidstr;
-
-}
-
-/*!
- * @brief get a DAG for requested content name
- *
- * Convert a content name to the corresponding DAG. This involves
- * a lot of complex set of steps:
- * 1. Download the Publisher's certificate, if necessary.
- * 2. Verifying the certificate against the CA root certiifcate
- * 3. Extracting the public ke from the Publisher Certificate
- * 4. Calculating the NCID from pubkey and content_name
- * 5. Creating DAG by substituting intent CID in Publisher cert with NCID
- *
- * @returns DAG for retrieving the NCID on success
- * @returns empty string on failure
- */
-std::string Publisher::ncid_dag(std::string content_name)
-{
-	std::string ncidstr = ncid(content_name);
-	if(ncidstr.size() == 0) {
-		return "";
-	}
-	Node ncid_node(ncidstr);
-
-	// Fetch address for Publisher certificate, if not known already
-	if(fetch_cert_dag() == false) {
-		std::cout << "Publisher cert address not found" << std::endl;
-		return "";
-	}
-
-	// Replace Publisher certificate CID in address with NCID of content
-	// ASSUMPTION: Certificate is in the same xcache as content being requested
-	Graph dag(*_cert_dag);
-	dag.replace_final_intent(ncid_node);
-	return dag.dag_string();
-}
-
-/*!
- * @brief Directory containing all Publisher security credentials
- */
-std::string Publisher::keydir()
+std::string PublisherKey::keydir()
 {
 	return _keydir;
 }
 
-std::string Publisher::privfilepath()
+std::string PublisherKey::privfilepath()
 {
 	std::string privkeypath = keydir() + "/" + name() + ".priv";
 	return privkeypath;
 }
 
-std::string Publisher::pubfilepath()
+std::string PublisherKey::pubfilepath()
 {
 	// Replace the last 4 chars in privfilepath: "priv" with "pub"
 	std::string pubkeypath = privfilepath();
@@ -408,57 +359,38 @@ std::string Publisher::pubfilepath()
 	return pubkeypath;
 }
 
-/*!
- * @brief Sign the given content to associate it with given content_URI
- *
- * @returns signature for the content, if successful
- * @returns 0 on success -1 on failure
- */
-int  Publisher::sign(std::string content_URI,
-		const std::string &content,
-		std::string &signature)
+int PublisherKey::sign(std::string &digest, std::string &signature)
 {
-	int retval = -1;
-	unsigned char sig_buf[MAX_SIGNATURE_SIZE];
-	uint16_t siglen = MAX_SIGNATURE_SIZE;
-
-	// Sign (Content URI + Content)
-	std::string data = content_URI + content;
-	// Private file path
 	std::string privkeyfile = privfilepath();
 
-	if(xs_signWithKey(privkeyfile.c_str(),
-				(unsigned char *)data.c_str(), (int) data.size(),
-				sig_buf, &siglen)) {
-		printf("Publisher::sign() failed signing provided content\n");
+	unsigned char sigbuf[MAX_SIGNATURE_SIZE];
+	uint16_t sigbuflen = sizeof(sigbuf);
+
+	if (xs_signDigestWithKey(privkeyfile.c_str(),
+				(uint8_t *)digest.c_str(), digest.size(),
+				sigbuf, &sigbuflen)) {
+		std::cout << "PublisherKey: failed signing" << std::endl;
 		return -1;
 	}
-	std::string sigstr((char *)sig_buf, siglen);
-	signature = sigstr;
-	retval = 0;
-	return retval;
+	signature.assign((const char *)sigbuf, (size_t)sigbuflen);
+	return 0;
 }
 
-/*!
- * @brief Verify the signature
+/**
+ * @brief check the signature for the provided digest
  *
- * @returns true on success, false on failure.
+ * @returns 0 if the signature matches the data
+ * @returns -1 if the signature doesn't match or another error occurs
  */
-bool Publisher::isValidSignature(std::string content_URI,
-		const std::string &content,
-		const std::string &signature)
+int PublisherKey::checkSignature(std::string &digest, std::string &signature)
 {
-	// The publisher signed (Content URI + Content)
-	std::string data = content_URI + content;
-	// Public file path
 	std::string pubkeyfile = pubfilepath();
-	// Verify signature is valid
-	if(xs_isValidSignature(pubkeyfile.c_str(),
-				(const unsigned char *)data.c_str(), data.size(),
-				(unsigned char *)signature.c_str(), signature.size())
-			!= 1) {
+
+	if(xs_isValidDigestSignature(pubkeyfile.c_str(),
+				(const unsigned char *)digest.c_str(), digest.size(),
+				(unsigned char *)signature.c_str(), signature.size()) != 1) {
 		std::cout << "ERROR invalid signature" << std::endl;
-		return false;
+		return -1;
 	}
-	return true;
+	return 0;
 }

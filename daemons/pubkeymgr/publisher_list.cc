@@ -17,34 +17,34 @@ PublisherList::PublisherList()
  * TODO: In future we should throw exception if the publisher creds
  * are not found during object creation.
  *
- * Return a reference to a Publisher instance. If one doesn't exist
+ * Return a reference to a PublisherKey instance. If one doesn't exist
  * it is created.
  *
  * If the private key for the publisher is present, this instance can
  * sign and publish named content. The clients will be able to trust
  * this content by verifying publisher cert against CA root certificate.
  *
- * On a client, this Publisher instance will be able to fetch the
+ * On a client, this PublisherKey instance will be able to fetch the
  * publisher's certificate and verify the named content against it.
  *
- * If a Publisher instance already exists, it is returned as is.
+ * If a PublisherKey instance already exists, it is returned as is.
  *
  * @param publisher_name the string used to represent the publisher
  *
- * @returns a reference to the requested Publisher object
+ * @returns a reference to the requested PublisherKey object
  */
-Publisher *
+PublisherKey *
 PublisherList::get(std::string publisher_name)
 {
-	Publisher *publisher;
+	PublisherKey *publisher;
 
 	write_lock();
 
 	// Get a reference to the publisher or create a new one
 	_name_to_publisher_it = _name_to_publisher.find(publisher_name);
 	if (_name_to_publisher_it == _name_to_publisher.end()) {
-		// Create a new Publisher instance
-		publisher = new Publisher(publisher_name);
+		// Create a new PublisherKey instance
+		publisher = new PublisherKey(publisher_name);
 		_name_to_publisher[publisher_name] = publisher;
 	} else {
 		publisher = _name_to_publisher_it->second;

@@ -1,4 +1,5 @@
 #include "publisher_cert.h"
+#include "Xsocket.h"	// XrootDir
 
 PublisherCert::PublisherCert(std::string certpath)
 {

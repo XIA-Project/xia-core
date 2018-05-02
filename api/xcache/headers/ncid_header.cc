@@ -9,16 +9,20 @@ NCIDHeader::NCIDHeader(const std::string &data, time_t ttl,
 		std::string publisher_name, std::string content_name)
 	: CIDHeader(data, ttl)
 {
-	PublisherList *publishers = PublisherList::get_publishers();
-	Publisher *publisher = publishers->get(publisher_name);
+	Publisher publisher(publisher_name);
 
-	_id = publisher->ncid(content_name);
-	_uri = publisher->content_URI(content_name);
+	_id = publisher.ncid(content_name);
+	if(_id.size() == 0) {
+		printf("%s Unable to create NCID for %s\n",
+				publisher_name.c_str(), content_name.c_str());
+		throw "NCID could not be calculated";
+	}
+	_uri = publisher.content_URI(content_name);
 	_publisher_name = publisher_name;
 	std::string signature;
-	if(publisher->sign(_uri, data, signature)) {
-		printf("ERROR: Unable to sign %s\n", _uri.c_str());
-		// TODO throw an exception here
+	if(publisher.sign(_uri, data, signature)) {
+		printf("Unable to sign %s\n", _uri.c_str());
+		throw "Failed to sign";
 	}
 	_signature = signature;
 }
@@ -76,9 +80,8 @@ NCIDHeader::valid_data(const std::string &data)
 	// Which basically runs the constructor to verify deserialized values
 
 	// Retrieve Publisher name from _uri
-	PublisherList *publishers = PublisherList::get_publishers();
-	Publisher *publisher = publishers->get(_publisher_name);
+	Publisher publisher(_publisher_name);
 
 	// Call Publisher::isValidSignature()
-	return publisher->isValidSignature(_uri, data, _signature);
+	return publisher.isValidSignature(_uri, data, _signature);
 }
