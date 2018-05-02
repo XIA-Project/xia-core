@@ -544,19 +544,46 @@ int xia_proxy_handle_request(int browser_sock) {
 	}
 }
 
+bool was_cached(sockaddr_x *requested, sockaddr_x *actual)
+{
+	Graph g_req(requested);
+	Graph g_act(actual);
+	bool rc = false;
+
+	if ((g_req.intent_HID() == g_act.intent_HID()) &&
+		(g_req.intent_AD()  == g_act.intent_AD())) {
+
+		syslog(LOG_INFO, "%s was not cached", g_req.intent_CID().to_string().c_str());
+
+	} else {
+		rc = true;
+		syslog(LOG_INFO, "%s was cached", g_req.intent_CID().to_string().c_str());
+	}
+
+	return rc;
+}
+
 int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, int numChunks, bool cdn, ...){
 	int len = -1, totalBytes = 0;
 	double elapsed, elapsed2;
 	char *data = NULL;
 	struct timeval t1, t2;
+	sockaddr_x src_addr;
+	socklen_t  src_len = sizeof(sockaddr_x);
 
 	for (int i = 0; i < numChunks; i++) {
 
+
 		gettimeofday(&t1, NULL);
-		if((len = XfetchChunk(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]))) < 0) {
+		if((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) < 0) {
 			syslog(LOG_ERR, "XcacheGetChunk Failed");
 			exit(-1);
 		}
+
+		if (was_cached(&chunkAddresses[i], &src_addr)){
+			// FIXME: do something interesting for state
+		}
+
 		gettimeofday(&t2, NULL);
 
 		elapsed =  (t2.tv_sec - t1.tv_sec);

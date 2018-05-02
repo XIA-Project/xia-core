@@ -77,8 +77,9 @@ extern void XbufFree(XcacheBuf *xbuf);
 
 extern int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags,
 		const char *name);
+extern int XfetchChunkAndSource(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t addrlen, sockaddr_x *src_addr, socklen_t *src_len);  //DONE
 extern int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t addrlen);  //DONE
-extern int _XfetchRemoteChunkBlocking(void **buf, sockaddr_x *addr, socklen_t len);
+extern int _XfetchRemoteChunkBlocking(void **buf, sockaddr_x *addr, socklen_t leni, sockaddr_x *src_addr, socklen_t *src_len);
 extern int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr);
 extern int XisChunkLocal(XcacheHandle *h, const char *chunk);
 

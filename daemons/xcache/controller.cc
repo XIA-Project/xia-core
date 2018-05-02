@@ -139,6 +139,9 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 	ContentHeader *chdr = NULL;
 	xcache_meta *meta = NULL;
 
+	sockaddr_x src_addr;
+	socklen_t src_len;
+
 	Graph g(addr);
 
 	syslog(LOG_INFO, "Fetching content from remote DAG = %s\n", g.dag_string().c_str());
@@ -228,6 +231,16 @@ int xcache_controller::fetch_content_remote(sockaddr_x *addr, socklen_t addrlen,
 
 	remaining = chdr->content_len();
 	meta->set_created();
+
+	// find out where we really connected to in case the chunk was cached
+	src_len = sizeof(sockaddr_x);
+	if (resp != NULL && Xgetpeername(sock, (sockaddr*)&src_addr, &src_len) >= 0) {
+
+		resp->set_source_dag(&src_addr, src_len);
+
+	} else {
+		// FIXME: what do we want to do in this case??
+	}
 
 	syslog(LOG_INFO, "Downloading chunk of size %zu", remaining);
 
@@ -453,6 +466,9 @@ void *xcache_controller::__fetch_content(void *__args)
 				args->resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 			}
 		}
+	} else {
+		// use local machine as src dag
+		// FIXME: implement this!
 	}
 
 	args->ret = ret;

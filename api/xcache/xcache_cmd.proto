@@ -53,6 +53,7 @@ message xcache_cmd {
 	optional bytes publisher_name = 16;
 	optional bytes content_name = 17;
 	optional int32 proxy_id = 18;
+	optional bytes source_dag = 19;
 };
 
 message xcache_notif {

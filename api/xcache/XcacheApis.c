@@ -890,6 +890,13 @@ int XisChunkLocal(XcacheHandle *h, const char *chunk)
 */
 int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t len)
 {
+	return XfetchChunkAndSource(h, buf, flags, addr, len, NULL, NULL);
+}
+
+
+
+int XfetchChunkAndSource(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, socklen_t len, sockaddr_x *src_addr, socklen_t *src_len)
+{
 	xcache_cmd cmd;
 
 //	fprintf(stderr, "Inside %s\n", __func__);
@@ -930,6 +937,20 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 		*buf = malloc(to_copy);
 		memcpy(*buf, cmd.data().c_str(), to_copy);
 
+		if (src_addr != NULL) {
+			// we need to return the source dag reflecting where the chunk actually came from
+			if (*src_len >= sizeof(sockaddr_x)) {
+				// FIXME: deal with making sizes verify
+				uint32_t l = cmd.source_dag().length();
+				memcpy(src_addr, cmd.source_dag().c_str(), l);
+				*src_len = l;
+
+			} else {
+				// not enough room, null it out
+				bzero(src_addr, *src_len);
+			}
+		}
+
 		return to_copy;
 	}
 
@@ -953,7 +974,7 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
  * @returns size of data stored in *chunk
  * @returns -1 on failure
  */
-int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
+int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len, sockaddr_x *src_addr, socklen_t *src_len)
 {
 	// NOTE: Code copied from xcache_controller::fetch_content_remote()
 	// Must stay in sync with that code base
@@ -971,6 +992,14 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 	if (Xconnect(sock, (struct sockaddr *)addr, len) < 0) {
 		fprintf(stderr, "ERROR connecting to CID: %s\n", strerror(errno));
 		return -1;
+	}
+
+
+	if (src_addr != NULL && src_len != NULL) {
+		// find out where we really connected to in case the chunk was cached
+		if (Xgetpeername(sock, (sockaddr*)src_addr, src_len) < 0) {
+			return -1;
+		}
 	}
 
 	std::string data;
