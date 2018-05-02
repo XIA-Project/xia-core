@@ -7,6 +7,8 @@ xnetcat
 xrendezvous
 xcache
 announce_publisher
+fs
+pubkeymgr
 xcontrold
 xhostd
 xmanifestd

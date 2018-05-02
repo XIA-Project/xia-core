@@ -1,34 +1,44 @@
 include ../../xia.mk
 
-.PHONY: all clean
+SUBDIRS=headers publisher
+CLEANDIRS=$(addsuffix .build, $(SUBDIRS))
 
 PROTOC=protoc
 CFLAGS+=-c -fpic
 LDFLAGS+=-lprotobuf $(XLIB)/libXsocket.so
 
-SOURCES=XcacheApis.c xcache_sock.c
-PROTO=xcache_cmd.proto
+PROTOS		:= $(wildcard *.proto)
+PROTO_SRCS	:= $(PROTOS:.proto=.pb.cc)
+PROTO_OBJS	:= $(PROTO_SRCS:.cc=.o)
 
-OBJS=xcache_cmd.pb.o $(SOURCES:.c=.o)
+.PHONY: all clean $(SUBDIRS) $(CLEANDIRS)
+
+SOURCES=XcacheApis.c xcache_sock.c
+OBJS=$(SOURCES:.c=.o)
+
 LIB=$(XLIB)/libxcache.so
 
-all: $(LIB) xcache_cmd.pb.cc
+all: $(LIB) $(SUBDIRS)
 
-%.pb.cc %.pb.h: %.proto
+%.pb.cc: %.proto
 	$(PROTOC) --cpp_out=. $<
 
-%.o: %.c xcache_cmd.pb.h $(INC)/xcache.h
+%.pb.o: %.pb.cc
 	$(CC) $(CFLAGS) $< -o $@
 
-%.pb.o:  %.pb.cc
+%.o: %.c $(INC)/xcache.h
 	$(CC) $(CFLAGS) $< -o $@
 
+$(LIB): $(PROTO_OBJS) $(OBJS)
+	$(LD) -fPIC --shared -o $@ $^ $(LDFLAGS)
 
-$(LIB): $(OBJS)
-	$(LD) --shared -o $@ $(OBJS) $(LDFLAGS)
+$(SUBDIRS):
+	make -C $@
 
+$(CLEANDIRS):
+	-make -C $(basename $@) clean
 
-clean:
+clean: $(CLEANDIRS)
 	rm -f $(OBJS)
 	rm -f *.pb.*
 	rm -f $(LIB)

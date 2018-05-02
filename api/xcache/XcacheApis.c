@@ -29,17 +29,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xcache_cmd.pb.h"
+#include "irq.pb.h"
 #include "xcache_sock.h"
 #include "cid.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include "dagaddr.hpp"
+#include "publisher_key_mgmt.pb.h"
 /*! \endcond */
 
 #define IO_BUF_SIZE (1024 * 1024)
 
-static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, sockaddr_x *, socklen_t) = {
+static void (*notif_handlers[XCE_MAX])(XcacheHandle *, int, void *, size_t) = {
 	NULL,
 	NULL,
 };
@@ -122,9 +124,7 @@ static int read_bytes_to_buffer(int fd, std::string &buffer, int remaining)
 		remaining -= ret;
 	}
 
-	// FIXME: there must be a better way of doing this!
-	std::string temp(buf, total);
-	buffer = temp;
+	buffer.assign(buf, total);
 	free(buf);
 
 	return 1;
@@ -482,8 +482,7 @@ int XputChunk(XcacheHandle *h, const char *data, size_t length,
 ** @param length the number of bytes in data
 ** @param publisher_name name of publisher signing this chunk
 **
-** @returns XCACHE_OK on success
-** @returns XCACHE_ERR_EXISTS if the chunk already resides in the cache
+** @returns 0 on success or if the chunk is already in cache
 ** @returns -1 if an error occurs in producing or signing the chunk
 **
 */
@@ -512,19 +511,20 @@ int XputNamedChunk(XcacheHandle *h, const char *data, size_t length,
 		return -1;
 	}
 
-	if(cmd.cmd() == xcache_cmd::XCACHE_ERROR) {
-		printf("%s received an error from xcache\n", __func__);
+	if(cmd.cmd() != xcache_cmd::XCACHE_RESPONSE) {
+		printf("%s received incorrect response\n", __func__);
+		return -1;
+	}
+
+	if(cmd.status() != xcache_cmd::XCACHE_OK) {
 		if(cmd.status() == xcache_cmd::XCACHE_ERR_EXISTS) {
-			fprintf(stderr, "%s: Error this chunk already exists\n", __func__);
-			return xcache_cmd::XCACHE_ERR_EXISTS;
+			printf("%s: chunk already cached.\n", __func__);
 		} else {
+			printf("%s: ERROR creating named chunk\n", __func__);
 			return -1;
 		}
 	}
-
-	//fprintf(stderr, "%s: Got a response from server\n", __func__);
-
-	return xcache_cmd::XCACHE_OK;
+	return 0;
 }
 
 /*!
@@ -828,6 +828,43 @@ int XfetchNamedChunk(XcacheHandle *h, void **buf, int flags, const char *name)
 }
 
 /*!
+ * @brief check if a chunk is cached in the local cache
+ *
+ * Requests the local Xcache to check if the requested chunk is in the
+ * local cache.
+ *
+ * @returns 1 if the chunk in local
+ * @returns 0 if the chunk was not found in local cache
+ * @returns -1 if there was an error
+ */
+int XisChunkLocal(XcacheHandle *h, const char *chunk)
+{
+	// Send a request to Xcache to see if the chunk is local
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_ISLOCAL);
+	cmd.set_cid(chunk);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error sending isLocal command to Xcache\n");
+		return -1;
+	}
+
+	// Synchronously wait for Xcache response
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Invalid isLocal response from Xcache\n");
+		return -1;
+	}
+
+	// Return 1 only if xcache explicitly told us that the chunk is local
+	if(cmd.cmd() == xcache_cmd::XCACHE_ISLOCAL
+			&& cmd.status() == xcache_cmd::XCACHE_OK) {
+		return 1;
+	}
+
+	// The chunk was not local
+	return 0;
+}
+
+/*!
 ** @brief fetch a chunk from the network
 **
 ** Fetches the specified chunk from the network. The chunk is retrieved from the origin server specified
@@ -858,9 +895,11 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 //	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
-//	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
-//		return _XfetchRemoteChunkBlocking(buf, addr, len);
-//	}
+	/*
+	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
+		return _XfetchRemoteChunkBlocking(buf, addr, len);
+	}
+	*/
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
@@ -1007,21 +1046,21 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len)
 ** @note this API is not currently working correctly,
 **
 ** @param h the cache handle used when XfetchChunk was called
-** @param event the type of event to return notificatioins for. It is not clear what the difference
-**  between these events is.
-** \n XCE_CHUNKARRIVED
-** \n XCE_CHUNKAVAILABLE
-** @param addr the DAG of the chunk to receive notifications for
-** @param addrlen the length of addr (should be sizeof(sockaddr_x))
+** @param event the type of event to return notificatioins for.
+** @param data the data to be passed to the callback function
+** @param datalen the length of data
 **
 ** @returns 0 on success
 ** @returns an error code on failure (see the man page for pthread_create() for more details)
 **
 */
-int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, sockaddr_x *addr, socklen_t addrlen))
+int XregisterNotif(int event, void (*func)(XcacheHandle *, int event, void *data, size_t datalen))
 {
-	notif_handlers[event] = func;
-	return 0;
+	if(event < XCE_MAX) {
+		notif_handlers[event] = func;
+		return 0;
+	}
+	return -1;
 }
 
 static void *__notifThread(void *arg)
@@ -1049,8 +1088,26 @@ static void *__notifThread(void *arg)
 			std::cout << "Error while receiving.\n";
 			continue;
 		}
+		// TODO: The application should just take xcache_notif protobuf
+		// For now, we call different handlers with different data
+		// based on the type of notification
 		notif.ParseFromString(buffer);
-		notif_handlers[notif.cmd()](h, notif.cmd(), (sockaddr_x *)notif.dag().c_str(), notif.dag().length());
+
+		// Notify application of a chunk that is now cached
+		if(notif.has_arrived()) {
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)notif.arrived().dag().c_str(),
+					notif.arrived().dag().length());
+		}
+
+		// Notify application with entire chunk contents as accepted
+		// and verified by PushProxy in Xcache
+		if(notif.has_contents()) {
+			std::string buf;
+			notif.contents().SerializeToString(&buf);
+			notif_handlers[notif.cmd()](h, notif.cmd(),
+					(void *)buf.c_str(), buf.length());
+		}
 
 	} while(1);
 }
@@ -1075,6 +1132,196 @@ int XlaunchNotifThread(XcacheHandle *h)
 	return pthread_create(&thread, NULL, __notifThread, (void *)h);
 }
 
+/*!
+ * @brief stop a proxy that was receiving pushed chunks
+ *
+ * @param h the xcache handle
+ * @param proxy_id the proxy handle returned by XnewProxy()
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+
+int XendProxy(XcacheHandle *h, int proxy_id)
+{
+	xcache_cmd cmd;
+	cmd.set_cmd(xcache_cmd::XCACHE_ENDPROXY);
+	cmd.set_context_id(h->contextID);
+	cmd.set_proxy_id(proxy_id);
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error stopping a push proxy\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to end proxy request\n");
+		return -1;
+	}
+	if(cmd.cmd() != xcache_cmd::XCACHE_ENDPROXY
+			|| cmd.status() != xcache_cmd::XCACHE_OK) {
+		fprintf(stderr, "Failed stopping proxy\n");
+		return -1;
+	}
+	return 0;
+}
+
+/*!
+** @brief a proxy for receiving pushed chunks
+**
+** Start a proxy process that can receive chunks pushed from remote
+** Xcache instances. The user may start any number of proxies for
+** various publishers or groups of publishers. Eventually we may allow
+** different caching policies for each proxy.
+**
+** @param h the xcache handle
+** @param proxyaddr address of newly created proxy returned to user
+**
+** @returns proxy_id on success and proxyaddr has proxy address
+** @returns -1 on failure
+*/
+int XnewProxy(XcacheHandle *h, std::string &proxyaddr)
+{
+	// Request Xcache to start a new Proxy for pushed content
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_NEWPROXY);
+	cmd.set_context_id(h->contextID);
+
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error starting new proxy\n");
+		return -1;
+	}
+
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to new proxy creation\n");
+		return -1;
+	}
+
+	if(cmd.cmd() != xcache_cmd::XCACHE_NEWPROXY
+			|| cmd.status() != xcache_cmd::XCACHE_OK) {
+		fprintf(stderr, "Failed starting proxy\n");
+		return -1;
+	}
+
+	printf("XnewProxy: started at: %s\n", cmd.dag().c_str());
+
+	// The command was successful, get the dag for proxy
+	proxyaddr.assign(cmd.dag());
+
+	return cmd.proxy_id();
+}
+
+
+int XrequestPushedChunk(std::string &chunkaddr,
+		std::string &fetchservice, std::string &returnaddr)
+{
+	int sockfd;
+	int state = 0;
+	sockaddr_x fs_addr;
+	Graph *g;
+	InterestRequest irq;
+	std::string irqstr;
+	uint32_t irqstrlen, nirqstrlen;
+	int remaining, offset;
+	char *buf;
+	int sent;
+	int retval = -1;
+
+	// Build the client request to be sent to fetchservice
+	irq.set_chunk_addr(chunkaddr);
+	irq.set_return_addr(returnaddr);
+	irq.SerializeToString(&irqstr);
+
+	// Connect to the fetchservice
+	sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
+	if(sockfd < 0) {
+		fprintf(stderr, "Error creating sock to talk to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	g = new Graph(fetchservice);
+	g->fill_sockaddr(&fs_addr);
+	if(Xconnect(sockfd, (sockaddr *)&fs_addr, sizeof(sockaddr_x))) {
+		fprintf(stderr, "Error connecting to FS\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 1;	// close sockfd
+
+	// Send length of the interest request to fetchservice
+	irqstrlen = irqstr.size();
+	nirqstrlen = htonl(irqstrlen);	// Network byte order
+	if(Xsend(sockfd, &nirqstrlen, sizeof(nirqstrlen),0)
+			!= sizeof(nirqstrlen)) {
+		fprintf(stderr, "Error sending interest request size\n");
+		goto request_pushed_chunk_done;
+	}
+
+	// Now send the serialized irqstr to the fetchservice
+	buf = (char *) malloc(irqstrlen);
+	if(buf == NULL) {
+		fprintf(stderr, "Error allocating memory for interest request\n");
+		goto request_pushed_chunk_done;
+	}
+	state = 2;	// free buf
+	bzero(buf, irqstrlen);
+	memcpy(buf, irqstr.c_str(), irqstrlen);
+
+	remaining = irqstrlen;
+	offset = 0;
+	while(remaining) {
+		sent = Xsend(sockfd, &buf[offset], remaining, 0);
+		if(sent < 0) {
+			fprintf(stderr, "Error sending interest request\n");
+			goto request_pushed_chunk_done;
+		}
+		remaining -= sent;
+		offset += sent;
+	}
+	if(remaining != 0) {
+		fprintf(stderr, "Error sending entire request\n");
+		goto request_pushed_chunk_done;
+	}
+	retval = 0;
+
+request_pushed_chunk_done:
+	switch(state) {
+		case 2: free(buf);
+		case 1: Xclose(sockfd);
+	};
+	return retval;
+}
+
+/*!
+** @brief push a chunk to the requested address
+**
+** Send a chunk to a remote service. The user provides the address of
+** the chunk to be sent and the recipient service address.
+** Typically, the recipient service should know how to handle the
+** incoming chunk header and contents.
+**
+** @param h The cache handle
+** @param chunk DAG of the chunk to be sent. Must be local
+** @param addr Recipient address
+**
+** @returns 0 on success
+** @returns -1 on failure
+*/
+int XpushChunk(XcacheHandle *h, sockaddr_x *chunk, sockaddr_x *addr)
+{
+	xcache_cmd cmd;
+
+	cmd.set_cmd(xcache_cmd::XCACHE_PUSHCHUNK);
+	cmd.set_data(chunk, sizeof(sockaddr_x));
+	cmd.set_dag(addr, sizeof(sockaddr_x));
+	if(send_command(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "Error pushing chunk to remote address\n");
+		return -1;
+	}
+	if(get_response_blocking(h->xcacheSock, &cmd) < 0) {
+		fprintf(stderr, "No valid response to chunk push\n");
+		return -1;
+	}
+	// TODO: read the response code and return error, when necessary
+	return 0;
+}
 /*!
 ** @brief fetch a partial chunk
 **
@@ -1118,4 +1365,263 @@ int XreadChunk(XcacheHandle *h, sockaddr_x *addr, socklen_t addrlen, void *buf, 
 	fprintf(stderr, "Copying %lu bytes of %lu to buffer\n", to_copy, buflen);
 
 	return to_copy;
+}
+
+// Send a command to Key Manager and receive a response
+// FIXME: Use same socket for future calls instead of creating/destroying
+static int _process_key_request(PublisherKeyCmdBuf &cmd,
+		PublisherKeyResponseBuf &resp)
+{
+	uint32_t cmdstr_len;
+	uint32_t response_size;
+	char *response;
+	ssize_t rc;
+	int sockfd;
+	struct sockaddr_un mgr_addr;
+
+	int retval = -1;	// Error, unless proved otherwise
+	int state = 0;
+
+	// Using predefined unix domain socket name - see xcache.h
+	std::string publisher_mgr_sock_name(PUBLISHER_MGR_SOCK_NAME);
+
+	// Serialize command into a buffer to go on wire
+	std::string cmdstr;
+	cmd.SerializeToString(&cmdstr);
+	cmdstr_len = cmdstr.size();
+
+	// Connect to the PublisherKeyManager
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		fprintf(stderr, "Unable to create socket for publisher creds\n");
+		goto _process_key_request_done;
+	}
+
+	mgr_addr.sun_family = AF_UNIX;
+	strcpy(mgr_addr.sun_path, publisher_mgr_sock_name.c_str());
+	if (connect (sockfd, (struct sockaddr *)&mgr_addr, sizeof(mgr_addr))) {
+		fprintf(stderr, "Unable to connect to publisher key manager\n");
+		goto _process_key_request_done;
+	}
+	state = 1;
+
+	// Send command size
+	rc = send(sockfd, &cmdstr_len, sizeof(cmdstr_len), 0);
+	if (rc != sizeof(cmdstr_len)) {
+		fprintf(stderr, "Unable to send command len to key manager\n");
+		goto _process_key_request_done;
+	}
+
+	// Send command
+	rc = send(sockfd, cmdstr.c_str(), cmdstr_len, 0);
+	if (rc < (int) cmdstr_len) {
+		fprintf(stderr, "Unable to send command to key manager\n");
+		goto _process_key_request_done;
+	}
+
+	// Get response length
+	rc = recv(sockfd, &response_size, sizeof(response_size), 0);
+	if (rc != sizeof(response_size)) {
+		fprintf(stderr, "Failed getting response size\n");
+		goto _process_key_request_done;
+	}
+
+	// Receive response into a buffer
+	response = (char *)calloc(1, response_size);
+	if (response == NULL) {
+		fprintf(stderr, "Failed allocating buf for key manager response\n");
+		goto _process_key_request_done;
+	}
+	state = 2;
+
+	rc = recv(sockfd, response, response_size, 0);
+	if (rc != (int) response_size) {
+		fprintf(stderr, "Failed getting entire response\n");
+		goto _process_key_request_done;
+	}
+
+	if (resp.ParseFromString(std::string(response, response_size))
+			!= true) {
+		fprintf(stderr, "Unable to parse key manager response\n");
+		goto _process_key_request_done;
+	}
+	retval = 0;
+
+_process_key_request_done:
+	switch(state) {
+		case 2: free(response);
+		case 1: close(sockfd);
+	};
+
+	return retval;
+}
+
+/*!
+ * @brief Fetch a publisher's verified public key and certificate address
+ *
+ * @param publisher name of the publisher
+ * @param key a buffer to hold the public key string
+ * @param keylen length of provided buffer
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XgetPublisherPubkey(const char *publisher, char *key, size_t *keylen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	// Prepare command for key manager
+	PublisherKeyRequest *req = command.mutable_key_request();
+	req->set_publisher_name(publisher);
+
+	// Run the command on key manager and get a response
+	if(_process_key_request(command, response)) {
+		fprintf(stderr, "Failed to get publisher creds\n");
+		return -1;
+	}
+
+	// Verify response
+	if (!response.has_key_response()) {
+		fprintf(stderr, "Invalid response sent by key manager\n");
+		return -1;
+	}
+
+	if (response.key_response().success() == false) {
+		fprintf(stderr, "Key manager failed to fetch publisher creds\n");
+		return -1;
+	}
+
+	// Zero out the user provided buffers
+	bzero(key, *keylen);
+
+	// Extract response components
+	std::string publisher_key = response.key_response().publisher_key();
+
+	if (publisher_key.size() > *keylen) {
+		fprintf(stderr, "Publisher key buffer too small. Need:%zu\n",
+				publisher_key.size());
+		return -1;
+	}
+	strncpy(key, publisher_key.c_str(), publisher_key.size());
+	*keylen = publisher_key.size();
+
+	return 0;
+}
+
+int XgetPublisherDag(const char *publisher, char *cert_dag, size_t *cert_daglen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	PublisherDagRequest *req = command.mutable_dag_request();
+	req->set_publisher_name(publisher);
+
+	if(_process_key_request(command, response)) {
+		fprintf(stderr, "Failed to get publisher dag\n");
+		return -1;
+	}
+	if(!response.has_dag_response()) {
+		fprintf(stderr, "Invalid response sent by key manager\n");
+		return -1;
+	}
+	if(response.dag_response().success() == false) {
+		fprintf(stderr, "Key manager failed to fetch publisher dag\n");
+		return -1;
+	}
+	std::string cert_dag_str = response.dag_response().cert_dag();
+
+	if(cert_dag_str.size() > *cert_daglen) {
+		fprintf(stderr, "Cert. DAG buffer too small. Need %zu\n",
+				cert_dag_str.size());
+		return -1;
+	}
+
+	bzero(cert_dag, *cert_daglen);
+	strncpy(cert_dag, cert_dag_str.c_str(), cert_dag_str.size());
+	*cert_daglen = cert_dag_str.size();
+
+	return 0;
+}
+
+/*!
+ * @brief Have the Key Manager sign provided digest with publisher key
+ *
+ * @param publisher_name the publisher's human readable name
+ * @param digest (sha1) of content to be signed
+ * @param digest_len length of the digest
+ * @param signature signature is returned in user provided buffer
+ * @param signature_len length of signature buffer. Correct length returned.
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XcacheSignContent(const char *publisher_name, const char *digest,
+		size_t digest_len, char *signature, uint16_t *siglen)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	PublisherSignRequest *req = command.mutable_sign_request();
+	req->set_publisher_name(publisher_name);
+	req->set_digest(std::string(digest, digest_len));
+
+	_process_key_request(command, response);
+
+	if (!response.has_sign_response()) {
+		fprintf(stderr, "Expected sign response, got something else.\n");
+		return -1;
+	}
+
+	if (!response.sign_response().success()) {
+		fprintf(stderr, "Key manager failed to sign\n");
+		return -1;
+	}
+
+	std::string sigstr = response.sign_response().signature();
+	if (*siglen < sigstr.size()) {
+		fprintf(stderr, "signature buffer too small. %zu\n", sigstr.size());
+		return -1;
+	}
+
+	bzero(signature, *siglen);
+	memcpy(signature, sigstr.c_str(), sigstr.size());
+	*siglen = sigstr.size();
+
+	return 0;
+}
+
+/*!
+ * @brief Ask Key Manager to verify provided digest is signed by publisher
+ *
+ * @param publisher_name the publisher that signed this digest
+ * @param signature purported to be from the publisher
+ * @param digest of content signed by publisher
+ * @param digest_len the length of digest
+ *
+ * @returns 0 on success
+ * @returns -1 on failure
+ */
+int XcacheVerifyContent(const char *publisher_name, const char *digest,
+		size_t digest_len, const char *signature, size_t signature_len)
+{
+	PublisherKeyCmdBuf command;
+	PublisherKeyResponseBuf response;
+
+	PublisherVerifyRequest *req = command.mutable_verify_request();
+	req->set_publisher_name(publisher_name);
+	req->set_signature(std::string(signature, signature_len));
+	req->set_digest(std::string(digest, digest_len));
+
+	_process_key_request(command, response);
+
+	if (!response.has_verify_response()) {
+		fprintf(stderr, "Invalid response from Key Manager\n");
+		return -1;
+	}
+	if (!response.verify_response().success()) {
+		fprintf(stderr, "Verification of content failed.\n");
+		return -1;
+	}
+	return 0;
 }

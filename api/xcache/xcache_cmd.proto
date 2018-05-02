@@ -20,6 +20,10 @@ message xcache_cmd {
 		XCACHE_CACHE = 17;
 		XCACHE_STORE_NAMED = 18;
 		XCACHE_FETCHNAMEDCHUNK = 19;
+		XCACHE_PUSHCHUNK = 20;
+		XCACHE_NEWPROXY = 21;
+		XCACHE_ISLOCAL = 22;
+		XCACHE_ENDPROXY = 23;
 	};
 
 	enum status_type {
@@ -29,6 +33,7 @@ message xcache_cmd {
 		XCACHE_CID_NOT_FOUND = 4;
 		XCACHE_CID_IN_USE = 5;
 		XCACHE_CID_MARKED_FOR_DELETE = 6;
+		XCACHE_NCID_CALC_ERR = 7;
 	};
 
 	required req_type cmd = 1;
@@ -47,9 +52,22 @@ message xcache_cmd {
 	optional bytes msg = 13;
 	optional bytes publisher_name = 16;
 	optional bytes content_name = 17;
+	optional int32 proxy_id = 18;
 };
 
 message xcache_notif {
 	required int32 cmd = 1;
-	optional bytes dag = 2;
+	oneof notif_type{
+		notif_arrived arrived = 2;
+		notif_contents contents = 3;
+	};
+};
+
+message notif_arrived {
+	required bytes dag = 1;
+};
+
+message notif_contents {
+	required string cid = 1;
+	required bytes data = 2;
 };

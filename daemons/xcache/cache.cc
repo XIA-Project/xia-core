@@ -10,7 +10,7 @@
 #include "controller.h"
 #include "cache.h"
 #include "cid.h"
-#include "ncid_header.h"
+#include "headers/ncid_header.h"
 #include <clicknet/xia.h>
 #include <clicknet/xtcp.h>
 
@@ -113,6 +113,7 @@ int xcache_cache::validate_pkt(char *pkt, size_t len,
 
 	// Check if the packet is too small
 	if ((len < sizeof(struct click_xia)) || (htons(xiah->plen) > len) ) {
+		syslog(LOG_DEBUG, "Cache: packet too small");
 		// packet is too small, this had better not happen!
 		return PACKET_INVALID;
 	}
@@ -138,6 +139,10 @@ int xcache_cache::validate_pkt(char *pkt, size_t len,
 		}
 	} else if (flags == (XTH_SYN|XTH_ACK)) {
 		// packet is OK, keep going
+
+	} else if (flags == XTH_SYN) {
+		syslog(LOG_INFO, "Cache: possible pushed chunk");
+		// packet is possibly from a pushed chunk, keep going
 
 	} else if (!(flags & XTH_FIN)) {
 		// if it's not a FIN*, we don't want it
@@ -200,8 +205,11 @@ cache_download* xcache_cache::start_new_download(struct xtcp *tcp,
 		std::string cid, std::string sid)
 {
 	syslog(LOG_INFO, "Cache: starting new download for %s", cid.c_str());
-	// if it's not a syn-ack we don't know how much content has already gone by
+	// A pulled chunk will have SYN and ACK flags set
+	// A pushed chunk will only have SYN, ACK will follow later
+	// TODO: Do we need to wait for ack for pushed chunks?
 	if (!(ntohs(tcp->th_flags) & XTH_SYN)) {
+		// if not syn/synack we don't know how much content has already gone by
 		syslog(LOG_INFO, "skipping %s: partial stream received", cid.c_str());
 		return NULL;
 	}

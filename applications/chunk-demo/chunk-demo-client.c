@@ -95,6 +95,7 @@ int make_and_getchunk(int sock)
 	sockaddr_x addr;
 	void *buf;
 	int ret;
+	int flags = 0;
 
 	// send the file request
 	sprintf(cmd, "make");
@@ -111,18 +112,27 @@ int make_and_getchunk(int sock)
 	Graph g(url);
 	g.fill_sockaddr(&addr);
 
-	if ((ret = XfetchChunk(&h, &buf, 0, &addr, sizeof(addr))) < 0) {
+	if ((ret = XfetchChunk(&h, &buf, flags, &addr, sizeof(addr))) < 0) {
 		die(-1, "XfetchChunk Failed\n");
 	}
-	free(buf);
+	if(flags & XCF_BLOCK) {
+		free(buf);	// Should free only if flags had XCF_BLOCK
+	}
 	return 0;
 }
 
-void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
+void xcache_chunk_arrived(XcacheHandle *h, int event,
+		void *data, size_t datalen)
 {
 	int rc;
 	char *buf;
 	int i;
+	if(event != XCE_CHUNKARRIVED) {
+		printf("Xcache notified us of something other than CHUNKARRIVED\n");
+		return;
+	}
+	sockaddr_x *addr = (sockaddr_x *)data;
+	socklen_t addrlen = (socklen_t) datalen;
 
 	printf("Received Chunk Arrived Event\n");
 

@@ -1,1 +1,1 @@
-../daemons/xcache/publisher/publisher.py
+../api/xcache/publisher/publisher.py

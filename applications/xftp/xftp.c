@@ -313,10 +313,17 @@ int getFile(int sock, const char *fin, const char *fout)
 }
 
 // FIXME: does this ever get called???
-void xcache_chunk_arrived(XcacheHandle *h, int /*event*/, sockaddr_x *addr, socklen_t addrlen)
+void xcache_chunk_arrived(XcacheHandle *h, int event,
+		void *data, size_t datalen)
 {
 	//int rc;
 	//void *buf;
+	if(event != XCE_CHUNKARRIVED) {
+		printf("Received unexpected notification\n");
+		return;
+	}
+	sockaddr_x *addr = (sockaddr_x *)data;
+	socklen_t addrlen = (socklen_t)datalen;
 
 	printf("Received Chunk Arrived Event\n");
 	Graph g(addr);
