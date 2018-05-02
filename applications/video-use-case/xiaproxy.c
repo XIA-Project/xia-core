@@ -32,7 +32,7 @@ static char hostname[64];
 static char *ident = NULL;
 
 // these variables all need to be protected by a mutex when accessed!
-static int bandwidth = 1500;
+static int bandwidth = 0;
 static std::string cdn_ad;
 static std::string cdn_hid;
 static std::string cdn_host;
@@ -489,6 +489,20 @@ int xia_proxy_handle_request(int browser_sock) {
 		strcpy(ctx.params, params);
 
 		if (strcasestr(ctx.remote_host, XIA_DAG_URL) != NULL || strcasestr(ctx.remote_path, "/CID") != NULL){
+
+			// FIXME: this is really not very good practice
+			if (strstr(ctx.params, "bandwidth=")) {
+				char *p = ctx.params + strlen("bandwidth=");
+				uint32_t bw = atol(p);
+				printf("bandwidth = %u\n", bw);
+				// lock
+				if (pthread_mutex_lock(&cdn_lock)) {
+					syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+					exit(EXIT_FAILURE);
+				}
+				bandwidth = bw;
+				pthread_mutex_unlock(&cdn_lock);
+			}
 			if(handle_stream_requests(&ctx) < 0){
 				syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 				return -1;
