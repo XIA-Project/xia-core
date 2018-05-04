@@ -32,7 +32,7 @@ NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
 RESOLVCONF=$XIADIR/etc/resolv.conf
 
-ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver"
+ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver pubkeymgr"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -445,6 +445,29 @@ rendezvous()
 }
 
 #
+# start/stop/check the Publisher Key Manager
+#
+publisher_keymgr()
+{
+	local action=$1
+	cd $XIADIR/bin
+	case $action in
+		"start")
+			./pubkeymgr &
+			;;
+		"stop")
+			kill_service "pubkeymgr"
+			;;
+		"check")
+			check_service "pubkeymgr"
+			;;
+		*)
+			echo "unrecognized action: $action"
+			;;
+	esac
+}
+
+#
 # create a directory in $XIADIR if it doesn't exist
 #
 create_dir_if_missing()
@@ -693,15 +716,18 @@ case $1 in
 			exit -1
 		fi
 		[ $NO_CLICK != 1 ] && start_click
+		publisher_keymgr "start"
 		process_nodes "start"
 		visualizer "start"
 		check_service "click"
 		process_nodes "check"
+		publisher_keymgr "check"
 		visualizer "check"
 		;;
 	stop)
 		process_nodes "stop"
 		[ $NO_CLICK != 1 ] && kill_service "click"
+		publisher_keymgr "stop"
 		visualizer "stop"
 		check_all_services
 		rm -f /tmp/xcache*
@@ -711,13 +737,16 @@ case $1 in
 		echo "Stopping XIA"
 		process_nodes "stop"
 		kill_service "click"
+		publisher_keymgr "stop"
 		visualizer "stop"
 		echo "Starting XIA"
 		start_click
 		process_nodes "start"
 		visualizer "start"
+		publisher_keymgr "start"
 		check_service "click"
 		process_nodes "check"
+		publisher_keymgr "check"
 		visualizer "check"
 		;;
 	clean)
@@ -726,6 +755,7 @@ case $1 in
 	check)
 		check_service "click"
 		process_nodes "check"
+		publisher_keymgr "check"
 		visualizer "check"
 		;;
 	kill)
