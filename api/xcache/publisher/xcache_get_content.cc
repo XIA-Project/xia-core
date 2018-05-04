@@ -107,7 +107,6 @@ int do_chunk_transfer(int sock, std::string &ubuf,
 	}
 	state = 1;	// buf allocated
 
-	std::cout << "Fetching content header of size " << chdr_len << std::endl;
 	if(reliable_read(sock, buf, chdr_len, stop)) {
 		std::cout << "ERROR fetching content header" << std::endl;
 		goto do_chunk_transfer_done;

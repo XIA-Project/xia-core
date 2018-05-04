@@ -157,8 +157,6 @@ void PublisherKeyMgr::handle_key_request(
 void PublisherKeyMgr::handle_dag_request(
 		int fd, const PublisherDagRequest &req)
 {
-	std::cout << "KeyMgr::handle_dag_request for "
-		<< req.publisher_name() << std::endl;
 	PublisherList *publishers = PublisherList::get_publishers();
 	PublisherKey *publisher = publishers->get(req.publisher_name());
 	std::string cert_dag = publisher->cert_dag_str();
