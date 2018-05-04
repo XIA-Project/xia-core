@@ -143,8 +143,6 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
         sockaddr_x sx;
 		RfdList rfd_list;
         socklen_t addrlen = sizeof(sockaddr_x);
-        char buf[BUFSIZE];
-		memset(buf, 0, BUFSIZE);
 
 		// Wait for a new connection
 		rfd_list.push_back(_sockfd);
@@ -158,140 +156,21 @@ void PushProxy::operator() (xcache_controller *ctrl, int context_ID)
             continue;
         }
 
-		// Will monitor sock for read data
-		rfd_list.clear();
-		rfd_list.push_back(sock);
-
-		std::cout << "Connected to a publisher" << std::endl;
-		std::cout << "Addrlen: " << addrlen << std::endl;
-		// A producer at addr 'sx' is pushing a chunk to us
-        Graph g(&sx);
-        std::cout << "Socket " << sock << " connected to " <<
-            g.dag_string() << std::endl;
-
-		// Get the content header length
-		uint32_t chdr_len = 0;
-		int count = 0;
-
-		if(wait_for_read(rfd_list)) break;
-		count = Xrecv(sock, &chdr_len, sizeof(chdr_len), 0);
-		if (count != sizeof(chdr_len)) {
-			std::cout << "PushProxy: Failed getting header len." << std::endl;
-			std::cout << "Dropping connection." << std::endl;
-			Xclose(sock);
-			continue;
-		}
-		chdr_len = ntohl(chdr_len);
-		std::cout << "Pushproxy: header length: " << chdr_len << std::endl;
-
-		// Get the content header
-		int remaining = chdr_len;
-		size_t offset = 0;
-		while(remaining) {
-			if(wait_for_read(rfd_list)) break;
-			count = Xrecv(sock, buf+offset, remaining, 0);
-			offset += count;
-			remaining -= count;
-			if (count == 0) {
-				break;
-			}
-		}
-		if (remaining != 0) {
-			std::cout << "PushProxy: error getting header." << std::endl;
-			std::cout << "PushProxy: got " << chdr_len - remaining << std::endl;
-			std::cout << "PushProxy: expected " << chdr_len << std::endl;
-			std::cout << "PushProxy: dropping connection" << std::endl;
-			Xclose(sock);
-			continue;
-		}
-		if (offset != chdr_len) {
-			std::cout << "PushProxy: entire header not found" << std::endl;
-			std::cout << "PushProxy: dropping connection" << std::endl;
+		// We are now connected to fetching service.
+		// Receive the chunk header and contents
+		std::string data;
+		std::unique_ptr<ContentHeader> chdr;
+		std::atomic<bool> stop;
+		if(xcache_get_content(sock, data, chdr, stop)) {
+			std::cout << "Failed receiving content" << std::endl;
 			Xclose(sock);
 			continue;
 		}
 
-		// Parse the header protobuf to determine type of header
-		std::string headerstr(buf, chdr_len);
-		ContentHeaderBuf chdr_buf;
-		if(chdr_buf.ParseFromString(headerstr) == false) {
-			assert(0);
-		}
-
-		// Now create the header object for the received header
-		ContentHeader *chdr = NULL;
-		if(chdr_buf.has_cid_header()) {
-			chdr = new CIDHeader(headerstr);
-		} else if(chdr_buf.has_ncid_header()) {
-			chdr = new NCIDHeader(headerstr);
-		} else {
-			assert(0);
-		}
-
-		memset(buf, 0, BUFSIZE);
-		std::string contentID(chdr->id());
-
-		// Verify content header against sender's address
-		// NOT NEEDED because sender can be anyone, as long as they
-		// provide a valid chunk
-		/*
-		if(src_intent_xid.to_string().compare(contentID) != 0) {
-			std::cout << "PushProxy: headerSID != src DAG SID" << std::endl;
-			std::cout << "PushProxy: " << src_intent_xid.to_string()
-				<< " != " << contentID << std::endl;
-			std::cout << "PushProxy: dropping connection" << std::endl;
-			Xclose(sock);
-			continue;
-		}
-		*/
-
-		// FIXME: add code to verify if this chunk should be accepted
-
-		// Now download content
-		size_t data_len = chdr->content_len();
-		std::cout << "PushProxy: getting data bytes: " << data_len << std::endl;
-		remaining = data_len;
-		offset = 0;
-		char *databuf = (char *)calloc(1, data_len);
-		if (databuf == NULL) {
-			std::cout << "PushProxy: failed allocating " << data_len
-				<< " bytes for pushed chunk data" << std::endl;
-			std::cout << "PushProxy: dropping connection" << std::endl;
-			Xclose(sock);
-			continue;
-		}
-		while(remaining) {
-			if(wait_for_read(rfd_list)) break;
-			count = Xrecv(sock, databuf+offset, remaining, 0);
-			std::cout << "Got bytes: " << count << std::endl;
-			offset += count;
-			remaining -= count;
-			if (count == 0) {
-				break;
-			}
-		}
-		if (remaining != 0) {
-			std::cout << "PushProxy: error getting content" << std::endl;
-			std::cout << "PushProxy:: dropping connection" << std::endl;
-			Xclose(sock);
-			free(databuf);
-			continue;
-		}
-		if (offset != data_len) {
-			std::cout << "PushProxy: entire data not found" << std::endl;
-			std::cout << "PushProxy: dropping connection" << std::endl;
-			Xclose(sock);
-			free(databuf);
-			continue;
-		}
-        Xclose(sock);
-        std::cout << "Got " << data_len << " data bytes" << std::endl;
 		// Now verify the chunk data and header
-		std::string data(databuf, data_len);
 		if(!chdr->valid_data(data)) {
 			std::cout << "PushProxy: Invalid chunk header/data" << std::endl;
 			std::cout << "PushProxy: not saving chunk" << std::endl;
-			free(databuf);
 			continue;
 		}
 		std::cout << "PushProxy: Valid chunk received" << std::endl;

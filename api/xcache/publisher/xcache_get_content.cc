@@ -77,7 +77,8 @@ int reliable_read(int sock, char *buf, int len, std::atomic<bool>& stop)
 	return 0;
 }
 
-int do_chunk_transfer(int sock, char *ubuf, size_t *ulen, ContentHeader *chdr,
+int do_chunk_transfer(int sock, std::string &ubuf,
+		std::unique_ptr<ContentHeader> &chdr,
 		std::atomic<bool>& stop)
 {
 	int state = 0;
@@ -119,35 +120,32 @@ int do_chunk_transfer(int sock, char *ubuf, size_t *ulen, ContentHeader *chdr,
 		goto do_chunk_transfer_done;
 	}
 	if(chdr_buf.has_cid_header()) {
-		chdr = new CIDHeader(headerstr);
+		chdr.reset(new CIDHeader(headerstr));
 	} else if(chdr_buf.has_ncid_header()) {
-		chdr = new NCIDHeader(headerstr);
+		chdr.reset(new NCIDHeader(headerstr));
 	} else {
 		assert(0);
 	}
-	state = 2;		// chdr allocated for user
 
 	// Allocate memory for the content
-	ubuf = (char *) calloc(1, chdr->content_len());
-	if(ubuf == NULL) {
-		std::cout << "ERROR cannot allocate mem for contents" << std::endl;
+	free(buf);
+	buf = (char *)calloc(1, chdr->content_len());
+	if(buf == NULL) {
+		std::cout << "ERROR allocating memory to hold content" << std::endl;
 		goto do_chunk_transfer_done;
 	}
-	state = 3;
 
-	if(reliable_read(sock, ubuf, chdr->content_len(), stop)) {
+	if(reliable_read(sock, buf, chdr->content_len(), stop)) {
 		std::cout << "ERROR reading chunk contents" << std::endl;
 		goto do_chunk_transfer_done;
 	}
-	*ulen = chdr->content_len();
+	ubuf.assign(buf, chdr->content_len());
 
 	// Return content header and content
 	retval = 0;
 
 do_chunk_transfer_done:
 	switch(state) {
-		case 3: if(retval != 0) free(ubuf);
-		case 2: if(retval != 0) delete chdr;
 		case 1: free(buf);
 	};
 
@@ -177,7 +175,9 @@ do_chunk_transfer_done:
  * @returns 0 on success
  * @returns -1 on failure
  */
-int xcache_get_content(int sock, char *buf, size_t *len, ContentHeader *chdr,
+int xcache_get_content(int sock,
+		std::string &buf,
+		std::unique_ptr<ContentHeader> &chdr,
 		std::atomic<bool>& stop)
 {
 	/*
@@ -188,5 +188,5 @@ int xcache_get_content(int sock, char *buf, size_t *len, ContentHeader *chdr,
 	// Wait for the async job to finish
 	return rc.get();
 	*/
-	return do_chunk_transfer(sock, buf, len, chdr, stop);
+	return do_chunk_transfer(sock, buf, chdr, stop);
 }

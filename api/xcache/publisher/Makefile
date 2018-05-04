@@ -1,6 +1,6 @@
 include ../../../xia.mk
 
-.PHONY: all clean
+.PHONY: all clean announcer
 
 SOURCES=publisher.cc xcache_get_content.cc
 OBJECTS=$(SOURCES:.cc=.o)
@@ -13,20 +13,15 @@ CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I../../common
 CFLAGS+=-I$(APIDIR)/xsocket/minini -L$(XLIB)
 LDFLAGS+=-L$(XLIB) -lXsocket -ldagaddr -lxcache -lxcachehdr -Wl,-rpath,$(XLIB)
 
-all: $(LIBS) $(ANNOUNCER)
-
-
 %.o: %.cc
 	$(CC) $(CFLAGS) -g -c -fpic $<  -o $@
 
-$(LIBS): $(OBJECTS)
-	$(LD) -shared -g -o $@ $(OBJECTS) -lc -ldl $(LDFLAGS)
-
-$(STATICLIB): $(OBJECTS)
-	ar rcs $@ $(OBJECTS)
+all: $(OBJECTS)
 
 $(ANNOUNCER): $(ANNOUNCER_SOURCES)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lpublisher
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+announcer: $(ANNOUNCER)
 
 clean:
-	-rm -f *.o *.so $(LIBS) $(STATICLIB) $(ANNOUNCER)
+	-rm -f *.o *.so $(OBJECTS) $(ANNOUNCER)
