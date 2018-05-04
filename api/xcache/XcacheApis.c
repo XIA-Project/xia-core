@@ -899,11 +899,9 @@ int XfetchChunk(XcacheHandle *h, void **buf, int flags, sockaddr_x *addr, sockle
 	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
-	/*
 	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
 		return _XfetchRemoteChunkBlocking(buf, addr, len);
 	}
-	*/
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
