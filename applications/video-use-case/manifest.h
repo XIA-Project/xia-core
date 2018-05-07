@@ -61,6 +61,6 @@ int parse_dash_manifest(const char *video_folder, const char *from_uri, const ch
  * Given a DASH manifest without segment template (processed by above function), replace each segment entry
  * with DAG url of that video chunk.
  */
-int generate_XIA_manifest(const char *video_folder, const char *from_uri, const char* to_uri, map<string, vector<string> > & pathToUrl);
+int generate_XIA_manifest(const char *video_folder, const char *from_uri, const char* to_uri, map<string, string> & pathToUrl);
 
 #endif
