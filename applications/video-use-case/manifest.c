@@ -84,11 +84,9 @@ static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
             xmlNodePtr newNodeSegList = xmlNewNode(NULL, BAD_CAST SEGMENT_LIST);
             key = SEGMENT_DURATION;
             val = attrToVal[key];
-			printf("%s : %s\n", key.c_str(), val.c_str());
             xmlNewProp (newNodeSegList, BAD_CAST SEGMENT_DURATION, BAD_CAST val.c_str());
             key = SEGMENT_TIMESCALE;
             val = attrToVal[key];
-			printf("%s : %s\n", key.c_str(), val.c_str());
             xmlNewProp (newNodeSegList, BAD_CAST SEGMENT_TIMESCALE, BAD_CAST val.c_str());
             xmlAddChild(cur_node, newNodeSegList);
 
@@ -96,14 +94,12 @@ static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
             xmlNodePtr newNodeBaseInit = xmlNewNode(NULL, BAD_CAST SEGMENT_INITIALIZATION_ELEMENT);
             key = SEGMENT_INITIALIZATION;
             val = attrToVal[key];
-			printf("%s : %s\n", key.c_str(), val.c_str());
             xmlNewProp (newNodeBaseInit, BAD_CAST SEGMENT_INITIALIZATION_URL, BAD_CAST val.c_str());
             xmlAddChild(newNodeSegList, newNodeBaseInit);
 
             // need to find out all the segment chunk path
             key = SEGMENT_MEDIA;
             val = attrToVal[key];
-			printf("%s : %s\n", key.c_str(), val.c_str());
             found = val.find_last_of("/");
             val = val.substr(0, found + 1);
             vector<string> urls = find_all_segment_url(video_folder, val);
@@ -113,7 +109,6 @@ static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
                 xmlNodePtr newNodeSegURL = xmlNewNode(NULL, BAD_CAST SEGMENT_URL);
                 key = SEGMENT_MEDIA;
                 val = urls[i];
-				printf("%s : %s\n", key.c_str(), val.c_str());
                 xmlNewProp (newNodeSegURL, BAD_CAST SEGMENT_MEDIA, BAD_CAST val.c_str());
                 xmlAddChild(newNodeSegList, newNodeSegURL);
             }
