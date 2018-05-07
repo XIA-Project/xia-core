@@ -135,6 +135,8 @@ static int process_file(const char *fpath, const struct stat *, int tflag, struc
     int count;
     sockaddr_x *addrs = NULL;
 
+	printf("chunking: %s\n", fpath);
+
 	if (tflag != FTW_F) {
 		// this shouldn't happen, but check just to be safe
 		return 0;
@@ -186,6 +188,7 @@ int publish_content(ServerVideoInfo* videoInfo)
 		return -1;
 	}
 
+	printf("creating manifest for %s\n", videoInfo->videoName.c_str());
     create_xia_dash_manifest(videoInfo);
     publish_manifest(videoInfo->manifestName.c_str());
     create_xia_dash_manifest_urls(videoInfo);
