@@ -2,17 +2,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <cctype>
-#include <algorithm>
 #include <time.h>
-#include <stdarg.h>
-#include <iostream>
 #include <syslog.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <algorithm>
+
+#include "utils.h"
+#include "csapp.h"
+
 #include "xiaproxy.h"
+#include "Xsocket.h"
+#include "xcache.h"
 #include "cdn.pb.h"
 #include "minIni.h"
+#include "dagaddr.hpp"
 
 #define APPNAME "xiaproxy"
 
@@ -41,14 +45,14 @@ static std::string cdn_host;
 static CDNStatistics cdn_stats;
 
 /* for proxy http header back to the browser */
-static const char *http_chunk_header_status_ok = "HTTP/1.0 200 OK\r\n";
-static const char *connection_str = "Connection: close\r\n";
-static const char *http_chunk_header_same_origin ="Access-Control-Allow-Origin: *\r\n";
-static const char *http_chunk_header_date_fmt = "Date: %a, %d %b %Y %H:%M:%S %Z\r\n";
-static const char *http_header_allow_methods ="Access-Control-Allow-Methods: GET, POST, PUT\r\n";
-static const char *http_chunk_header_server ="Server: XIA Video Proxy\r\n";
-static const char *http_chunk_header_end_marker = "\r\n";
-static const char *http_header_allow_headers ="Access-Control-Allow-Headers: range\r\n";
+static const char *http_chunk_header_status_ok        = "HTTP/1.0 200 OK\r\n";
+static const char *connection_str                     = "Connection: close\r\n";
+static const char *http_chunk_header_end_marker       = "\r\n";
+static const char *http_chunk_header_same_origin      = "Access-Control-Allow-Origin: *\r\n";
+static const char *http_chunk_header_date_fmt         = "Date: %a, %d %b %Y %H:%M:%S %Z\r\n";
+static const char *http_header_allow_methods          = "Access-Control-Allow-Methods: GET, POST, PUT\r\n";
+static const char *http_chunk_header_server           = "Server: XIA Video Proxy\r\n";
+static const char *http_header_allow_headers          = "Access-Control-Allow-Headers: range\r\n";
 
 /* http DASH header for videos */
 static const char *http_chunk_header_mp4_content_type = "Content-Type: application\r\n";

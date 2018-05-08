@@ -1,17 +1,9 @@
 #ifndef __PROXY_H__
 #define __PROXY_H__
 
-#include <time.h>
-#include <float.h>
-#include <stdlib.h>
 #include <vector>
-
-#include "csapp.h"
-#include "utils.h"
-#include "Xsocket.h"
-#include "xcache.h"
-
-#include "dagaddr.hpp"
+#include <map>
+#include <float.h>
 
 #define XIA_DAG_URL "DAG"
 #define XIA_VID_SERVICE "xia"
