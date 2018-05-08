@@ -118,24 +118,15 @@ static void parse_to_list_urls(const char *video_folder, xmlNode * a_node) {
     }
 }
 
-static string constructDAGstring(const char* video_folder, xmlChar* attrVal, map<string, vector<string> > & pathToUrl){
-    string fullPath;
-    string temp1(video_folder);
-    string temp2((char*)attrVal);
-    fullPath = temp1 + temp2;
+static string constructDAGstring(const char* video_folder, xmlChar* attrVal, map<string, string>& pathToUrl)
+{
+    string fullPath(video_folder);
 
-    vector<string> currUrls = pathToUrl[fullPath];
-
-    string dagUrlStr;
-    for (int i = 0; i < currUrls.size(); ++i) {
-        dagUrlStr += currUrls[i] + " ";
-    }
-    dagUrlStr = dagUrlStr.substr(0, dagUrlStr.size()-1);
-
-    return dagUrlStr;
+	fullPath += string((char *)attrVal);
+    return pathToUrl[fullPath];
 }
 
-static void parse_to_list_dag_urls(const char *video_folder, xmlNode * a_node, map<string, vector<string> > & pathToUrl) {
+static void parse_to_list_dag_urls(const char *video_folder, xmlNode * a_node, map<string, string> &pathToUrl) {
     xmlNode *cur_node = NULL;
     xmlAttr *curr_attr = NULL;
     xmlChar* attrName = NULL, *attrVal = NULL;
@@ -184,7 +175,7 @@ static void parse_to_list_dag_urls(const char *video_folder, xmlNode * a_node, m
 }
 
 
-int generate_XIA_manifest(const char *video_folder, const char *from_uri, const char* to_uri, map<string, vector<string> > & pathToUrl){
+int generate_XIA_manifest(const char *video_folder, const char *from_uri, const char* to_uri, map<string, string> & pathToUrl){
     FILE *fp = fopen(to_uri, "w");
 
     xmlDoc *doc = NULL;

@@ -1,3 +1,4 @@
+#include <ftw.h>
 #include <stdio.h>
 #include <vector>
 #include <dirent.h>
@@ -33,102 +34,11 @@ void print_dash_info(ServerVideoInfo* videoInfo) {
         say("video manifest urls: %s\n", videoInfo->manifestUrls[i].c_str());
     }
 
-    for (map<string, vector<string> >::iterator it = videoInfo->dagUrls.begin(); it != videoInfo->dagUrls.end(); ++it) {
+    for (map<string, string>::iterator it = videoInfo->dagUrls.begin(); it != videoInfo->dagUrls.end(); ++it) {
         say("video segment uri: %s\n", it->first.c_str());
-
-        for (unsigned i = 0; i < it->second.size(); ++i) {
-            say("video segment cid url: %s\n", it->second[i].c_str());
-        }
+        say("video segment cid url: %s\n", it->second.c_str());
     }
 }
-
-
-
-void publish_each_segment_with_name(const char* name, vector<string> & dagUrls) {
-    int count;
-    sockaddr_x *addrs = NULL;
-
-    if ((count = XputFile(&videoInfo.xcache, name, CHUNKSIZE, &addrs)) < 0) {
-        warn("cannot put file for %s\n", name);
-        return;
-    }
-
-    // push back the cids
-    for(int i =0; i < count; i++) {
-		// strip every but the CID from the dag, we only want the CID in the manifest
-		// the proxy will will fill out the complete dag with either the current best cdn,
-		// or if it doesn't exist, the AD/HID or the manifest server
-        Graph g;
-        g.from_sockaddr(&addrs[i]);
-		Node cid = g.intent_CID();
-
-		g = Node() * cid;
-        dagUrls.push_back(g.http_url_string());
-    }
-}
-
-
-
-void process_dash_files(const char* dir) {
-    int n;
-    struct dirent **namelist;
-    n = scandir(dir, &namelist, 0, versionsort);
-
-    if (n > 0) {
-        for(int i =0 ; i < n; i++) {
-            char path[MAX_PATH_SIZE];
-            int len = snprintf(path, sizeof(path)-1, "%s/%s", dir, namelist[i]->d_name);
-            path[len] = 0;
-
-            if (strcmp(namelist[i]->d_name, ".") != 0 && strcmp(namelist[i]->d_name, "..") != 0) {
-                vector<string> urlsForSegment;
-                publish_each_segment_with_name(path, urlsForSegment);
-
-                if (urlsForSegment.size() > 0) {
-                    videoInfo.dagUrls[path] = urlsForSegment;
-                }
-            }
-            free(namelist[i]);
-        }
-        free(namelist);
-    }
-}
-
-
-
-int process_dash_content(const char *name) {
-    int n;
-    struct dirent **namelist;
-    DIR *dir;
-
-    // the DASH video must be in a directory
-    if (!(dir = opendir(name))) {
-        warn("Unable to open video directory: %s\n", name);
-        return -1;
-    }
-
-    n = scandir(name, &namelist, 0, versionsort);
-
-    if (n < 0) {
-        warn("Unable to read video directory: %s\n", name);
-        return -1;
-    } else {
-        for(int i =0 ; i < n; i++) {
-            char path[MAX_PATH_SIZE];
-            int len = snprintf(path, sizeof(path)-1, "%s/%s/dash", name, namelist[i]->d_name);
-            path[len] = 0;
-
-            if (strcmp(namelist[i]->d_name, ".") != 0 && strcmp(namelist[i]->d_name, "..") != 0) {
-                process_dash_files(path);
-            }
-            free(namelist[i]);
-        }
-        free(namelist);
-    }
-    closedir(dir);
-    return 0;
-}
-
 
 
 int create_xia_dash_manifest(ServerVideoInfo *videoInfo) {
@@ -220,21 +130,65 @@ int publish_manifest(const char* name) {
 }
 
 
+static int process_file(const char *fpath, const struct stat *, int tflag, struct FTW *)
+{
+    int count;
+    sockaddr_x *addrs = NULL;
 
-int publish_content(ServerVideoInfo* videoInfo) {
+	printf("chunking: %s\n", fpath);
+
+	if (tflag != FTW_F) {
+		// this shouldn't happen, but check just to be safe
+		return 0;
+	}
+	if (strcasestr(fpath, ".mpd") != NULL) {
+		// don't chunk the manifest right now
+		return 0;
+	}
+
+    count = XputFile(&videoInfo.xcache, fpath, CHUNKSIZE, &addrs);
+	if (count > 1) {
+		printf("error: segment %s too large to fit in a chunk\n", fpath);
+		return -1;
+
+	} else if (count <= 0) {
+		printf("unable to chunk segment %s\n", fpath);
+		return -1;
+	}
+
+	// strip everything but the CID from the dag, we only want the CID in the manifest
+	// the proxy will will fill out the complete dag with either the current best cdn,
+	// or if it doesn't exist, the AD/HID or the manifest server
+    Graph g;
+    g.from_sockaddr(&addrs[0]);
+	Node cid = g.intent_CID();
+
+	g = Node() * cid;
+    videoInfo.dagUrls[fpath] = g.http_url_string();
+
+	return 0;
+}
+
+
+
+
+int publish_content(ServerVideoInfo* videoInfo)
+{
     char videoPathName[MAX_PATH_SIZE];
-    memset(videoPathName, '\0', sizeof(videoPathName));
 
-    strcat(videoPathName, RESOURCE_FOLDER);
-    strcat(videoPathName, videoInfo->videoName.c_str());
+	sprintf(videoPathName, "%s%s", RESOURCE_FOLDER, videoInfo->videoName.c_str());
 
     // clear out the old data in previously published videos
     videoInfo->manifestUrls.clear();
     videoInfo->dagUrls.clear();
 
-    if(process_dash_content(videoPathName)) {
-        return -1;
-    }
+	// chunk the seegments and save path info for manifest
+	if (nftw(videoPathName, process_file, 25, 0)) {
+		printf("error!\n");
+		return -1;
+	}
+
+	printf("creating manifest for %s\n", videoInfo->videoName.c_str());
     create_xia_dash_manifest(videoInfo);
     publish_manifest(videoInfo->manifestName.c_str());
     create_xia_dash_manifest_urls(videoInfo);

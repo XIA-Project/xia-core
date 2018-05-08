@@ -97,27 +97,31 @@ int handle_xhttp_request(int proxy_sock, char* message){
     return 1;
 }
 
-void *process_request (void *socketid){
+void *process_request (void *socketid)
+{
     int n, status = -1;
     int sock = *((int*)socketid);
     char message[XIA_MAXBUF];
 
-    while(1){
+    while(1) {
 
         memset(message, '\0', sizeof(message));
 
-        if ((n = Xrecv(sock, message, XIA_MAXBUF, 0))  < 0) {
+        if ((n = Xrecv(sock, message, XIA_MAXBUF, 0))  == 0) {
+            // client disconnected
+            break;
+        } else if (n < 0) {
             warn("socket error while waiting for data, closing connection\n");
             break;
         }
 
-        if(n != 0){
+        if (n != 0) {
             // if the request is a manifest request, handle it
             if (strncmp(message, XHTTP_INITIAL, strlen(XHTTP_INITIAL)) == 0){
                 status = handle_xhttp_request(sock, message);
             }
 
-            if(status == -1){
+            if (status == -1) {
                 warn("problem with handling request. Connection exit\n");
                 break;
             }

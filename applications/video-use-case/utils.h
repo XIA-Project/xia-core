@@ -8,7 +8,7 @@
 
 #define MB(__mb) (KB(__mb) * 1024)
 #define KB(__kb) ((__kb) * 1024)
-#define CHUNKSIZE MB(4)
+#define CHUNKSIZE MB(20)
 
 const char MANIFEST_EXTENSION[] = "mpd";
 const char XHTTP_INITIAL[] = "xhttp";
@@ -22,4 +22,4 @@ void timeval_add(struct timeval* result, struct timeval* t2, struct timeval* t1)
 void timeval_subtract(struct timeval* result, struct timeval* t2, struct timeval* t1);
 double calculate_throughput(struct timeval *tv_diff, int bytes);
 
-#endif 
+#endif

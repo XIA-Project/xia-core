@@ -44,7 +44,7 @@ typedef struct _ServerVideoInfo {
     // cids for manifest file, through right now manifest is not used
     vector<string> manifestUrls;
     // path -> list of dagurls
-    map<string, vector<string> > dagUrls;
+    map<string, string> dagUrls;
 
     XcacheHandle xcache;
 } ServerVideoInfo;
