@@ -23,16 +23,24 @@ class DashVideo:
         '''Raise when unable to fetch the segment'''
 
 
-    def __init__(self, manifest):
+    def __init__(self, name, logging):
+        self.manifest = MANIFEST % name
+        self.logging = logging
         self.transfer_time = []
         self.encodings = {}
-        self.manifest = manifest
         self.next_segment = 0
         self.num_segments = 0
         self.elapsed = 0
         self.duration = 0
         self.segment_length = 0
         self.session =  None
+        self.loaded = False
+
+        if logging:
+            fname = 'dashclient.log'
+            self.logfile = open(fname, 'a')
+            self.log('starting %s' % name)
+
         self.get_manifest()
         self.current_bitrate = sorted(self.encodings.keys())[0]
 
@@ -43,6 +51,20 @@ class DashVideo:
 
     def __iter__(self):
         return self
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.logging:
+            self.log('closing %s' % self.manifest)
+            self.logfile.close()
+
+
+    def log(self, msg):
+        if self.logging:
+            now = datetime.datetime.now().strftime("%b %d %H:%M:%S.%f")
+            self.logfile.write('%s %s\n' % (now, msg))
+
+
 
     def adjust_bitrate(self, elapsed):
         self.transfer_time.append(elapsed)
@@ -60,34 +82,40 @@ class DashVideo:
             if avg > self.segment_length * UPPER_THRESHOLD:
                 # segments are too large for the current bitrade, reduce it if possible
                 if i > 0:
-                    self.current_bitrate = self.bitrates()[i - 1]
+                    self.set_bitrate(self.bitrates()[i - 1])
 
             elif avg < self.segment_length * LOWER_THRESHOLD:
                 # we have the bandwidth to use higher quality video
                 if i < len(self.encodings) - 1:
-                    self.current_bitrate = self.bitrates()[i + 1]
-
-
+                    self.set_bitrate(self.bitrates()[i + 1])
 
 
     def next(self):
-        if self.next_segment >= self.num_segments:
+        if (not self.loaded) or self.next_segment >= self.num_segments:
             raise StopIteration
         else:
             url = self.encodings[self.current_bitrate][self.next_segment]
+            self.log('fetching %s' % url)
             self.next_segment += 1
             print url, ' -> ',
             try:
                 start = datetime.datetime.now()
                 req = self.session.get(url)
-                elapsed = datetime.datetime.now() - start
+                now = datetime.datetime.now()
+                elapsed = now - start
 
                 if req.status_code != 200:
                     raise DashVideo.TransferFailed(req.status_code)
 
+                if self.next_segment == 2:
+                    # if this were a player the video could start playing
+                    self.log('joined %s' % self.manifest)
+
                 msec = elapsed.seconds  * 1000.0 + float(elapsed.microseconds) / 1000.0
                 sec  =  float(elapsed.seconds)  + float(elapsed.microseconds) / 1000000.0
-                print "{} {} {: 3.3f} sec {: 3.3f} mbps".format(req.status_code, self.current_bitrate, sec, len(req.content) * 8.0 / sec / 1000000.0)
+                tput = len(req.content) * 8.0 / sec / 1000000.0
+                print '{} {} {: 3.3f} sec {: 3.3f} mbps'.format(req.status_code, self.current_bitrate, sec, tput)
+                self.log('{} bytes {: 3.3f} sec {: 3.3f} mbps'.format(len(req.content), sec, tput))
 
                 self.adjust_bitrate(msec)
 
@@ -106,6 +134,8 @@ class DashVideo:
             self.current_bitrate = rate
         else:
             raise DashVideo.InvalidBitrate('This video is not available at %s bps' % rate)
+
+        self.log('setting bitrate to %d' % self.current_bitrate)
         return rate
 
 
@@ -118,6 +148,7 @@ class DashVideo:
 
 
     def rewind(self):
+        self.log('rewinding %s' % self.manifest)
         self.next_segment = 0
 
 
@@ -133,6 +164,7 @@ class DashVideo:
 
 
     def get_manifest(self):
+        self.log('fetching manifest: %s' % self.manifest)
         self.session = requests.Session()
         self.session.proxies = {"http": "localhost:8080"}
 
@@ -140,10 +172,11 @@ class DashVideo:
             req = self.session.get(self.manifest)
             m = req.text
         except Exception as e:
-            m = self.manifest
-            print 'trying as a file', str(e)
+            print 'failed getting manifest:', str(e)
+            return
 
         mpd = MPEGDASHParser.parse(m)
+        self.loaded = True
 
         for period in mpd.periods:
             for adapt_set in period.adaptation_sets:
@@ -163,12 +196,6 @@ class DashVideo:
                     self.num_segments = len(urls)
                     self.encodings[representation.bandwidth] = urls
 
-                if args.segments > self.num_segments:
-                    args.segments = self.num_segments
-                if args.randomize:
-                    # we don't want the entire video just some small part of it
-                    args.segments = random.randint(1, args.segments)
-
 
 
 def config():
@@ -182,13 +209,15 @@ def config():
     parser.add_argument('-v', '--version', action='version', version=VER)
     parser.add_argument('-d', '--delay', type=float, default=1, help='inter-video delay (defalut=1000ms)')
 
+    parser.add_argument('-l', '--log', action='store_true', help='log actions to video_name.date.log')
     parser.add_argument('-b', '--bitrate', type=int, default=0, help='bitrate to use in bps (default=adaptive')
     parser.add_argument('-s', '--segments', type=int, default=0, help='maximum # of segments to fetch')
     parser.add_argument('-r', '--randomize', action='store_true',  help='fetch a random # of segments up to specified amount')
 
     loop_parser = parser.add_mutually_exclusive_group(required=False)
     loop_parser.add_argument('-c', '--continuous', action='store_true', help='keep looping through videos forever')
-    loop_parser.add_argument('-l', '--loops', type=int, default=0, help='# of times to loop through the videos')
+    loop_parser.add_argument('-p', '--passes', type=int, default=0, help='# of times to loop through the videos')
+
 
     args = parser.parse_args()
 
@@ -198,15 +227,20 @@ def config():
 def get_video(name):
     print '\nfetching:       ', name
     if args.segments <= 0:
-        args.segments = 1000000
+        count = 1000000
+    else:
+        count = args.segments
 
-    manifest = MANIFEST % name
-
-    video = DashVideo(manifest)
+    video = DashVideo(name, args.log)
     video.set_bitrate(args.bitrate)
     video.info()
 
-    count = args.segments
+    if len(video) < count:
+        count = len(video)
+    if args.randomize:
+        # we don't want the entire video just some small part of it
+        count = random.randint(1, count)
+
     for url in video:
         # the video iterator fetches the next segment from the cdn
         # since we aren't playing the content, it just gets thrown away
@@ -225,10 +259,10 @@ if __name__ == '__main__':
                 get_video(video)
                 time.sleep(args.delay)
 
-            if args.loops > 0:
-                args.loops -= 1
+            if args.passes > 0:
+                args.passes -= 1
 
-            if args.continuous == False and args.loops == 0:
+            if args.continuous == False and args.passes == 0:
                 loop = False
     except KeyboardInterrupt:
         pass
