@@ -53,7 +53,7 @@ class DashVideo:
         return self
 
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __del__(self):
         if self.logging:
             self.log('closing %s' % self.manifest)
             self.logfile.close()
