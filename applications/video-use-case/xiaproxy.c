@@ -44,17 +44,19 @@ static std::string cdn_hid;
 static std::string cdn_host;
 static CDNStatistics cdn_stats;
 
-/* for proxy http header back to the browser */
+// for proxy http header back to the browser
 static const char *http_chunk_header_status_ok        = "HTTP/1.0 200 OK\r\n";
-static const char *connection_str                     = "Connection: close\r\n";
 static const char *http_chunk_header_end_marker       = "\r\n";
 static const char *http_chunk_header_same_origin      = "Access-Control-Allow-Origin: *\r\n";
 static const char *http_chunk_header_date_fmt         = "Date: %a, %d %b %Y %H:%M:%S %Z\r\n";
-static const char *http_header_allow_methods          = "Access-Control-Allow-Methods: GET, POST, PUT\r\n";
 static const char *http_chunk_header_server           = "Server: XIA Video Proxy\r\n";
-static const char *http_header_allow_headers          = "Access-Control-Allow-Headers: range\r\n";
 
-/* http DASH header for videos */
+static const char *http_header_allow_headers          = "Access-Control-Allow-Headers: range\r\n";
+static const char *http_header_allow_methods          = "Access-Control-Allow-Methods: GET, POST, PUT\r\n";
+
+static const char *connection_str                     = "Connection: close\r\n";
+
+// http DASH header for videos
 static const char *http_chunk_header_mp4_content_type = "Content-Type: application\r\n";
 static const char *http_chunk_header_mpd_content_type = "Content-Type: application\r\n";
 
@@ -66,7 +68,7 @@ void *cdn_locator(void *)
 	int rc;
 	char buf[2048];
 
-	while(alive) {
+	while (alive) {
 		syslog(LOG_DEBUG, "fetching best cdn");
 
 		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -136,7 +138,7 @@ void *cdn_locator(void *)
 
 void *cdn_scores(void *)
 {
-	while(alive) {
+	while (alive) {
 		syslog(LOG_DEBUG, "updating tput scores");
 
 		if (0) {
@@ -603,7 +605,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 	for (int i = 0; i < numChunks; i++) {
 
 		gettimeofday(&t1, NULL);
-		if((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) < 0) {
+		if ((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) < 0) {
 			syslog(LOG_ERR, "XcacheGetChunk Failed");
 			exit(-1);
 		}
@@ -649,7 +651,7 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 	// send the request for manifest
 	sprintf(cmd, "xhttp://%s%s", ctx->remote_host, ctx->remote_path);
 	memset(reply, '\0', sizeof(reply));
-	if(send_and_receive_reply(ctx, cmd, reply) < 0) {
+	if (send_and_receive_reply(ctx, cmd, reply) < 0) {
 		return -1;
 	}
 
@@ -772,7 +774,7 @@ int xia_proxy_handle_request(int browser_sock)
 	if (n == -1) {
 		syslog(LOG_WARNING, "problem with reading from the socket");
 		return -1;
-	} else if(n == 0) {
+	} else if (n == 0) {
 		return 1;
 	}
 
@@ -823,14 +825,14 @@ int xia_proxy_handle_request(int browser_sock)
 				ctx.bandwidth = 0;
 			}
 
-			if(handle_stream_requests(&ctx) < 0) {
+			if (handle_stream_requests(&ctx) < 0) {
 				syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 				return -1;
 			}
 		} else if (strcasestr(ctx.remote_host, XIA_VID_SERVICE) != NULL) {
 			// if this is option probe,
 			if (strstr(method, "OPTIONS") != NULL) {
-				if(handle_cross_origin_probe(&ctx) < 0) {
+				if (handle_cross_origin_probe(&ctx) < 0) {
 					syslog(LOG_WARNING, "failed to handle cross origin probe back to browser. Exit");
 					return -1;
 				}
@@ -850,7 +852,7 @@ int xia_proxy_handle_request(int browser_sock)
 				}
 				ctx.xia_sock = xia_sock;
 
-				if(handle_manifest_requests(&ctx) < 0) {
+				if (handle_manifest_requests(&ctx) < 0) {
 					syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 					return -1;
 				}
@@ -923,7 +925,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	/* Enable the socket to reuse the address */
+	// Enable the socket to reuse the address
 	if (setsockopt(list_s, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int)) == -1) {
 		syslog(LOG_ERR, "Let us reuse the address on the socket");
 		exit(EXIT_FAILURE);
@@ -942,7 +944,7 @@ int main(int argc, char **argv)
 	}
 
 	// Listen on socket list_s
-	if( (listen(list_s, 10)) == -1) {
+	if ((listen(list_s, 10)) == -1) {
 		syslog(LOG_ERR, "Error Listening");
 		exit(EXIT_FAILURE);
 	}
