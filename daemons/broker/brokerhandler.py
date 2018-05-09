@@ -60,6 +60,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
         self.scenario.add_request(id, msg.request.bandwidth, msg.request.last_cdn)
 
         # find the best cluster for this client
+        # last_cdn and bitrate not currently used here
         (cluster, ad, hid) = self.scenario.get_optimal_cluster(id, msg.request.bandwidth, msg.request.last_cdn)
 
         logging.info('Returning cluster: %s %s %s' % (cluster, ad, hid))

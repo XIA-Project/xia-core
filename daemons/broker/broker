@@ -110,6 +110,7 @@ def configure():
     parser.add_argument('-v', '--verbose', action='store_true', help='enable console logging')
     parser.add_argument('-l', '--level', type=loglevel,
             help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
+    parser.add_argument('-n', '--nocached', action='store_true', help='ignore cached fetches in computations')
     parser.add_argument('-f', '--file', type=argparse.FileType('r'),
                         help='cdn config file (default: %s)' % CONF)
     parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
@@ -167,6 +168,8 @@ def main():
 
     # initialize scenario and prime vdx engine
     scenario = Scenario(args.file)
+    if args.nocached:
+        scenario.allow_cached_fetches(False)
     vdx.setup(scenario)
 
     # compute optimal CDNs in a background thread

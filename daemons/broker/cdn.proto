@@ -17,8 +17,9 @@ enum msg_type {
 }
 
 message Request {
-  optional uint32 tput      = 1; // currenty client video throughput
+  optional float tput       = 1; // currenty client video throughput
   optional string last_cdn  = 2; // cdn client is currently using
+  optional uint32 bandwidth = 3;
 }
 
 message Reply {
@@ -29,7 +30,7 @@ message Reply {
 
 message Stats {
   optional bool   cached    = 1;
-  optional uint32 tput      = 2;
+  optional float  tput      = 2;
   optional uint32 bandwidth = 3;
   optional float  elapsed   = 4;
   optional uint32 size      = 5;

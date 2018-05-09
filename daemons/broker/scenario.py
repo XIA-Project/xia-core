@@ -23,7 +23,16 @@ MAX_REQUEST_AGE = 60
 
 class Scenario:
     def __init__(self, fname):
+        self.allow_cached = True
         self.populate(fname)
+
+
+    #
+    # if false, exclude any results that were served from a CID cache
+    #
+    def allow_cached_fetches(self, allow):
+        self.allow_cached = allow
+
 
 
     #
@@ -79,10 +88,11 @@ class Scenario:
         client['timestamp'] = int(time.time())
 
         client['cluster_scores'] = []
+        client['cluster_stats'] = []
         client['id'] = ''
 
         client['asn'] = ''
-        client['bitrate'] = ''
+        client['bitrate'] = 0
         client['cdn'] = ''
         client['city'] = ''
         client['client_id'] = ''
@@ -125,6 +135,11 @@ class Scenario:
             # give every client cluster pair a large default starting value
             for idc in self.scenario['cdn_locations'].keys():
                 location['cluster_scores'].append([idc, 9999999])
+                stats = {}
+                stats['cached'] = 0
+                stats['bitrate'] = 0
+                stats['tput'] = 0.0
+                location['cluster_stats'].append([idc, stats])
 
             self.scenario['client_locations'][id] = location
             self.scenario['ids'][client] = id
@@ -136,7 +151,7 @@ class Scenario:
     def add_request(self, id, bitrate, last_cdn):
         try:
             request = dict(self.scenario['client_locations'][id])
-            request['bitrate'] = bitrate
+            #request['bitrate'] = bitrate
             request['timestamp'] = int(time.time())
             request['cdn'] = last_cdn
             self.scenario['requests'].append(request)
@@ -327,7 +342,46 @@ class Scenario:
                     score = (rtt * 1000) + (loss * 100)
                 client['cluster_scores'].append([cluster_id, score])
         elif msg.type == cdn_pb2.STATS_SCORE_MSG:
-            print 'tput!'
+            try:
+                client['cluster_stats'] = []
+
+                for cluster in msg.scores.clusters:
+                    cluster_id = self.getID(cluster.name)
+                    cluster_stats = {}
+                    n = 0
+                    total_bitrate = 0
+                    total_cached = 0
+                    total_tput = 0.0
+
+                    for stats in cluster.stats:
+
+                        # if we are configured to ignore cached results go on to the next entry
+                        if stats.cached and self.allow_cached == False:
+                            continue
+
+                        n += 1
+                        print stats.bandwidth, stats.tput
+                        if stats.cached:
+                            total_cached += 1
+                        total_bitrate += int(stats.bandwidth)
+                        total_tput += float(stats.tput)
+
+                    if n > 0:
+                        rate = total_bitrate / n
+                        cluster_stats['bitrate'] = rate
+                        cluster_stats['cached'] = total_cached
+                        cluster_stats['tput'] = total_tput / n
+
+                        client['bitrate'] = rate
+
+                        client['cluster_stats'].append([cluster_id, cluster_stats])
+    #                else:
+    #                    cluster_stats['bitrate'] = 0
+    #                    cluster_stats['cached'] = 0
+    #                    cluster_stats['tput'] = 0.0
+    #                    client['cluster_stats'].append([cluster_id, cluster_stats])
+            except Exception as e:
+                print str(e)
 
         logging.debug(client)
         self.scenario['client_locations'][id] = client
