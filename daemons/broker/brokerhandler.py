@@ -39,7 +39,7 @@ class BrokerHandler(SocketServer.BaseRequestHandler):
 
             if msg.type == cdn_pb2.CDN_REQUEST_MSG:
                 self.handle_request(msg)
-            elif msg.type == cdn_pb2.PING_SCORES_MSG:
+            elif msg.type == cdn_pb2.PING_SCORES_MSG or msg.type == cdn_pb2.STATS_SCORE_MSG:
                 self.handle_scores(msg)
             else:
                 logging.warn('unknown msg type')

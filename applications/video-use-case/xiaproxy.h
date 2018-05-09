@@ -42,6 +42,12 @@ typedef struct _ProxyRequestCtx{
     char remote_port[MAXLINE];	// remote port
     char remote_path[MAXLINE];	// remote resource path
 	char params[MAXLINE];		// everything after '?'
+
+	// save this stuff at the start of the connection so
+	// that it doesn't change from under us
+	string ad;
+	string hid;
+	string cdn_host;
 	uint32_t bandwidth;
 
 } ProxyRequestCtx;

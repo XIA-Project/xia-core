@@ -9,10 +9,16 @@ enum constants {
   CDN_PROTO_VERSION = 1;
 }
 
+enum msg_type {
+  CDN_REQUEST_MSG  = 1;
+  PING_SCORES_MSG  = 2;
+  CDN_REPLY_MSG    = 3;
+  STATS_SCORE_MSG  = 4;
+}
+
 message Request {
-  optional uint32 bandwidth = 1; // current video bandwidth @ client
-  optional uint32 tput      = 2; // currenty client video throughput
-  optional string last_cdn  = 3; // cdn client is currently using
+  optional uint32 tput      = 1; // currenty client video throughput
+  optional string last_cdn  = 2; // cdn client is currently using
 }
 
 message Reply {
@@ -21,20 +27,30 @@ message Reply {
   optional string hid     = 3;
 }
 
+message Stats {
+  optional bool   cached    = 1;
+  optional uint32 tput      = 2;
+  optional uint32 bandwidth = 3;
+  optional float  elapsed   = 4;
+  optional uint32 size      = 5;
+}
+
 message Cluster {
   required string name = 1;	// hostname of the 'cluster'
+
+  // this record will either contain ping or stats scores
+  // depending on the msg_type
+
+  // ping scores
   optional uint32 rtt  = 2;	// avg ping rtt time in ms. Infinate if blank
   optional uint32 loss = 3;	// packet loss percentage 0-100
+
+  // connection statistics
+  repeated Stats stats = 4;
 }
 
 message Scores {
   repeated Cluster clusters = 1; // list of scores for connections to CDN clusters
-}
-
-enum msg_type {
-  CDN_REQUEST_MSG  = 1;
-  PING_SCORES_MSG  = 2;
-  CDN_REPLY_MSG    = 3;
 }
 
 message CDNMsg {

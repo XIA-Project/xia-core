@@ -307,24 +307,27 @@ class Scenario:
             # FIXME: what do we do about lat/long?
             client = self.make_client_record(msg.client, id, 0.0, 0.0)
 
-        # reset score  list
-        client['cluster_scores'] = []
+        if msg.type == cdn_pb2.PING_SCORES_MSG:
+            # reset score  list
+            client['cluster_scores'] = []
 
-        for cluster in msg.scores.clusters:
-            cluster_id = self.getID(cluster.name)
-            rtt = cluster.rtt
-            loss = cluster.loss
+            for cluster in msg.scores.clusters:
+                cluster_id = self.getID(cluster.name)
+                rtt = cluster.rtt
+                loss = cluster.loss
 
-            logging.debug('cluster %s (%d) has %s %s' % (cluster.name, cluster_id, rtt, loss))
+                logging.debug('cluster %s (%d) has %s %s' % (cluster.name, cluster_id, rtt, loss))
 
-            # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
-            # lower is better
+                # first pass at making score score = (latency * 1000) + (packet loss percentage * 100)
+                # lower is better
 
-            if rtt == None or rtt <= 0 or loss == 100:
-                score = 10000000000
-            else:
-                score = (rtt * 1000) + (loss * 100)
-            client['cluster_scores'].append([cluster_id, score])
+                if rtt == None or rtt <= 0 or loss == 100:
+                    score = 10000000000
+                else:
+                    score = (rtt * 1000) + (loss * 100)
+                client['cluster_scores'].append([cluster_id, score])
+        elif msg.type == cdn_pb2.STATS_SCORE_MSG:
+            print 'tput!'
 
         logging.debug(client)
         self.scenario['client_locations'][id] = client

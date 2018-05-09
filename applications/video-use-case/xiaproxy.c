@@ -85,49 +85,56 @@ void *cdn_locator(void *)
 		msg.set_version(CDN::CDN_PROTO_VERSION);
 		msg.set_client(hostname);
 
-//		CDN::Request *req_msg = msg.mutable_request();
+		// fIXME: move the xfer scores to this?
+		CDN::Request *req_msg = msg.mutable_request();
 
-//		if (pthread_mutex_lock(&cdn_lock)) {
-//			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-//			exit(EXIT_FAILURE);
-//		}
-//		req_msg->set_bandwidth(bandwidth);
-//		req_msg->set_last_cdn(cdn_host);
-//		pthread_mutex_unlock(&cdn_lock);
-
-		string message;
-		msg.SerializeToString(&message);
-		unsigned len = message.length();
-
-		unsigned foo = htonl(len);
-
-		rc = send(sock, &foo, 4, 0);
-		rc = send(sock, message.c_str(), len, 0);
-		rc = recv(sock, &foo, 4, 0);
-		len = ntohl(foo);
-		rc = recv(sock, buf, sizeof(buf), 0);
-
-		close(sock);
-
-		msg.Clear();
-		std::string result(buf, rc);
-		msg.ParseFromString(result);
-
-		CDN::Reply *reply_msg = msg.mutable_reply();
-		reply_msg = msg.mutable_reply();
-
-		// lock mutex
 		if (pthread_mutex_lock(&cdn_lock)) {
 			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
-
-		cdn_ad = reply_msg->ad();
-		cdn_hid = reply_msg->hid();
-		cdn_host = reply_msg->cluster();
+		req_msg->set_last_cdn(cdn_host);
 		pthread_mutex_unlock(&cdn_lock);
 
-		syslog(LOG_NOTICE, "New CDN: %s (RE %s %s)", cdn_host.c_str(), cdn_ad.c_str(), cdn_hid.c_str());
+		string message;
+		msg.SerializeToString(&message);
+		unsigned len = message.length();
+		unsigned msg_len = htonl(len);
+
+		if ((rc = send(sock, &msg_len, 4, 0)) > 0) {
+			if ((rc = send(sock, message.c_str(), len, 0)) > 0) {
+				if ((rc = recv(sock, &msg_len, 4, 0) > 0)) {
+					len = ntohl(msg_len);
+					rc = recv(sock, buf, sizeof(buf), 0);
+				}
+			}
+		}
+
+		close(sock);
+
+		if (rc > 0) {
+			msg.Clear();
+			std::string result(buf, rc);
+			msg.ParseFromString(result);
+
+			CDN::Reply *reply_msg = msg.mutable_reply();
+			reply_msg = msg.mutable_reply();
+
+			// lock mutex
+			if (pthread_mutex_lock(&cdn_lock)) {
+				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+			cdn_ad = reply_msg->ad();
+			cdn_hid = reply_msg->hid();
+			cdn_host = reply_msg->cluster();
+			pthread_mutex_unlock(&cdn_lock);
+
+			syslog(LOG_NOTICE, "New CDN: %s (RE %s %s)", cdn_host.c_str(), cdn_ad.c_str(), cdn_hid.c_str());
+		} else {
+			syslog(LOG_ERR, "CDN update failed: %s", strerror(errno));
+		}
+
 		sleep(locator_interval);
 	}
 
@@ -141,8 +148,8 @@ void *cdn_scores(void *)
 	while (alive) {
 		syslog(LOG_DEBUG, "updating tput scores");
 
-		if (0) {
-			syslog(LOG_DEBUG, "no new tput records, skipping...");
+		if (cdn_stats.size() == 0) {
+			syslog(LOG_NOTICE, "no new tput records, skipping...");
 
 		} else {
 			int sock;
@@ -168,24 +175,38 @@ void *cdn_scores(void *)
 				exit(EXIT_FAILURE);
 			}
 
-			// for score in last scores
-			// create cluster record
-			// set cluster.name
-			//   cluster.cached
-			//   cluster.tput
-			//scores_msg->set_bandwidth(bandwidth);
+			for (CDNStatistics::iterator it = cdn_stats.begin(); it != cdn_stats.end(); it++) {
+				CDNStats stats = it->second.stats;
+
+				CDN::Cluster *c = scores_msg->add_clusters();
+				c->set_name(it->first);
+
+				for (CDNStats::iterator it2 = stats.begin(); it2 != stats.end(); it2++) {
+					CDN::Stats *s = c->add_stats();
+					s->set_cached(it2->cached);
+					s->set_bandwidth(it2->bandwidth);
+					s->set_size(it2->size);
+					s->set_elapsed(it2->elapsed);
+					s->set_tput(it2->tput);
+				}
+				stats.clear();
+			}
+			cdn_stats.clear();
 
 			pthread_mutex_unlock(&cdn_lock);
 
 			string message;
 			msg.SerializeToString(&message);
 			unsigned len = message.length();
+			unsigned msg_len = htonl(len);
 
-			unsigned foo = htonl(len);
+			if((rc = send(sock, &msg_len, 4, 0)) > 0) {
+				rc = send(sock, message.c_str(), len, 0);
+			}
 
-	//		rc = send(sock, &foo, 4, 0);
-	//		rc = send(sock, message.c_str(), len, 0);
-
+			if (rc < 0) {
+				syslog(LOG_ERR, "Failure sending updated scores %s", strerror(errno));
+			}
 			close(sock);
 		}
 
@@ -336,14 +357,11 @@ bool was_cached(sockaddr_x *requested, sockaddr_x *actual)
 	Graph g_act(actual);
 	bool rc = false;
 
-	if ((g_req.intent_HID() == g_act.intent_HID()) &&
-		(g_req.intent_AD()  == g_act.intent_AD())) {
-
-		syslog(LOG_INFO, "%s was not cached", g_req.intent_CID().to_string().c_str());
+	if ((g_req.intent_HID().equal_to(g_act.intent_HID())) &&
+		(g_req.intent_AD().equal_to(g_act.intent_AD()))) {
 
 	} else {
 		rc = true;
-		syslog(LOG_INFO, "%s was cached", g_req.intent_CID().to_string().c_str());
 	}
 
 	return rc;
@@ -442,19 +460,8 @@ void parse_host_port(char *host_port, char *remote_host, char *remote_port)
 
 
 
-void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses)
+void process_urls_to_DAG(ProxyRequestCtx *ctx, vector<string> & dagUrls, sockaddr_x* chunkAddresses)
 {
-
-	// get the current cdn provided by the broker
-	if (pthread_mutex_lock(&cdn_lock)) {
-		syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	Node ad = Node(cdn_ad);
-	Node hid = Node(cdn_hid);
-	pthread_mutex_unlock(&cdn_lock);
-
 	//process the dags
 	for (unsigned i = 0; i < dagUrls.size(); ++i) {
 		string dagUrl = dagUrls[i];
@@ -475,7 +482,7 @@ void process_urls_to_DAG(vector<string> & dagUrls, sockaddr_x* chunkAddresses)
 
 			Node cid = incoming.intent_CID();
 
-			sprintf(d, "DAG 2 0 - %s 2 1 - %s 2 - %s", cdn_ad.c_str(), cdn_hid.c_str(), cid.to_string().c_str());
+			sprintf(d, "DAG 2 0 - %s 2 1 - %s 2 - %s", ctx->ad.c_str(), ctx->hid.c_str(), cid.to_string().c_str());
 			syslog(LOG_NOTICE, "fetching %s", d);
 
 			Graph modified(d);
@@ -613,13 +620,30 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		elapsed =  (t2.tv_sec - t1.tv_sec);
 		elapsed += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 
-		CDNStat s;
-		s.cached    = was_cached(&chunkAddresses[i], &src_addr);
-		s.elapsed   = elapsed;
-		s.size      = len;
-		s.tput      = len / elapsed;
-		s.bandwidth = ctx->bandwidth;
+		if (ctx->bandwidth != 0){
+			CDNStat s;
+			s.cached    = was_cached(&chunkAddresses[i], &src_addr);
+			s.elapsed   = elapsed;
+			s.size      = len;
+			s.tput      = len / elapsed;
+			s.bandwidth = ctx->bandwidth;
 
+			if (pthread_mutex_lock(&cdn_lock)) {
+				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+			CDNStatistics::iterator it = cdn_stats.find(ctx->cdn_host);
+			if (it != cdn_stats.end()) {
+				it->second.total_requests++;
+				it->second.stats.push_back(s);
+			} else {
+				cdn_stats[ctx->cdn_host].total_requests = 1;
+				cdn_stats[ctx->cdn_host].stats.push_back(s);
+			}
+			pthread_mutex_unlock(&cdn_lock);
+
+		}
 		totalBytes += len;
 
 		gettimeofday(&t1, NULL);
@@ -658,7 +682,7 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 	vector<string> dagUrls = split_string_on_delimiter(reply, " ");
 	int numChunks = dagUrls.size();
 	sockaddr_x chunkAddresses[numChunks];
-	process_urls_to_DAG(dagUrls, chunkAddresses);
+	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
 	if (forward_http_header_to_client(ctx, CONTENT_MANIFEST) < 0) {
 		syslog(LOG_WARNING, "unable to forward manifest to client");
@@ -688,7 +712,9 @@ int handle_stream_requests(ProxyRequestCtx *ctx)
 
 	int numChunks = dagUrls.size();
 	sockaddr_x chunkAddresses[numChunks];
-	process_urls_to_DAG(dagUrls, chunkAddresses);
+
+	ctx->cdn_host = cdn_host;
+	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
 	//printf("forward header\n");
 	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0) {
@@ -807,20 +833,23 @@ int xia_proxy_handle_request(int browser_sock)
 		strcpy(ctx.remote_path, resource);
 		strcpy(ctx.params, params);
 
+		// get the current cdn provided by the broker
+		if (pthread_mutex_lock(&cdn_lock)) {
+			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		ctx.ad = cdn_ad;
+		ctx.hid = cdn_hid;
+		ctx.cdn_host = cdn_host;
+		pthread_mutex_unlock(&cdn_lock);
+
 		if (strcasestr(ctx.remote_host, XIA_DAG_URL) != NULL || strcasestr(ctx.remote_path, "/CID") != NULL) {
 
-			// FIXME: this is really not very good practice
 			if (strstr(ctx.params, "bandwidth=")) {
 				char *p = ctx.params + strlen("bandwidth=");
 				uint32_t bw = atol(p);
 				ctx.bandwidth = bw;
-				// lock
-//				if (pthread_mutex_lock(&cdn_lock)) {
-//					syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-//					exit(EXIT_FAILURE);
-//				}
-//				bandwidth = bw;
-//				pthread_mutex_unlock(&cdn_lock);
 			} else {
 				ctx.bandwidth = 0;
 			}
@@ -962,7 +991,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	while (1) {
+	while (alive) {
 		// Accept incoming connection requests from clients
 		new_socket = accept(list_s, (struct sockaddr *)&address,
 				(socklen_t *) &addrlen);
