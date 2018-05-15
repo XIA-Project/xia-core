@@ -740,23 +740,18 @@ struct xcache_context *xcache_controller::lookup_context(int context_id)
 
 int xcache_controller::free_context_for_sock(int sockfd)
 {
-	std::cout << "Controller::free_context_for_sock " << sockfd << std::endl;
 	int retval = -1;
 	// Look up context containing sockfd in context_map
 	auto it = context_map.begin();
 	for(; it!=context_map.end();it++) {
 		if(it->second->xcacheSock == sockfd) {
-			std::cout << "Controller: found context" << std::endl;
 			break;
 		}
 	}
 	// If we found a matching context for sockfd, remove it from map
 	if(it != context_map.end()) {
 		close(it->second->notifSock);
-		std::cout << "Controller: closed notifsock "
-			<< it->second->notifSock << std::endl;
 		context_map.erase(it);
-		std::cout << "Controller: freed context" << std::endl;
 		retval = 0;
 	}
 	return retval;
