@@ -492,13 +492,10 @@ int xcache_controller::xcache_fetch_named_content(xcache_cmd *resp,
 
 int xcache_controller::xcache_end_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	std::cout << "Controller::xcache_end_proxy called" << std::endl;
 	// Set the response to be a failure
 	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 
-	std::cout << "Controller::xcache_end_proxy checking cmd" << std::endl;
 	assert(cmd->cmd() == xcache_cmd::XCACHE_ENDPROXY);
-	std::cout << "Controller::xcache_end_proxy checked cmd" << std::endl;
 
 	//auto context_ID = cmd->context_id();
 	auto proxy_id = cmd->proxy_id();
@@ -530,13 +527,10 @@ int xcache_controller::xcache_end_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 
 int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 {
-	std::cout << "Controller::xcache_new_proxy called" << std::endl;
 	// Set the response to be a failure
 	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 
-	std::cout << "Controller::xcache_new_proxy checking cmd" << std::endl;
 	assert(cmd->cmd() == xcache_cmd::XCACHE_NEWPROXY);
-	std::cout << "Controller::xcache_new_proxy checked cmd" << std::endl;
 
 	auto context_ID = cmd->context_id();
 
@@ -546,7 +540,7 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 			<< "ERROR: Too many proxies already in system" << std::endl;
 		return RET_SENDRESP;
 	}
-	std::cout << "Controller::xcache_new_proxy starting a proxy"<< std::endl;
+
 	// Create a new PushProxy and start it
 	PushProxy *proxy = new PushProxy();
 	if(proxy == NULL) {
@@ -568,8 +562,8 @@ int xcache_controller::xcache_new_proxy(xcache_cmd *resp, xcache_cmd *cmd)
 		push_proxies[proxy_id] = proxy;
 		proxy_threads[proxy_id] = proxy_thread;
 	}
-	// TODO: Fill in successful response here with proxy dag
-	std::cout << "Controller::xcache_new_proxy created proxy" << std::endl;
+
+	// Fill in successful response here with proxy dag
 	resp->set_cmd(xcache_cmd::XCACHE_NEWPROXY);
 	resp->set_status(xcache_cmd::XCACHE_OK);
 	resp->set_dag(proxy->addr());
