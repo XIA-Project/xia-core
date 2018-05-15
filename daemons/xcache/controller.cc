@@ -738,6 +738,30 @@ struct xcache_context *xcache_controller::lookup_context(int context_id)
 	}
 }
 
+int xcache_controller::free_context_for_sock(int sockfd)
+{
+	std::cout << "Controller::free_context_for_sock " << sockfd << std::endl;
+	int retval = -1;
+	// Look up context containing sockfd in context_map
+	auto it = context_map.begin();
+	for(; it!=context_map.end();it++) {
+		if(it->second->xcacheSock == sockfd) {
+			std::cout << "Controller: found context" << std::endl;
+			break;
+		}
+	}
+	// If we found a matching context for sockfd, remove it from map
+	if(it != context_map.end()) {
+		close(it->second->notifSock);
+		std::cout << "Controller: closed notifsock "
+			<< it->second->notifSock << std::endl;
+		context_map.erase(it);
+		std::cout << "Controller: freed context" << std::endl;
+		retval = 0;
+	}
+	return retval;
+}
+
 int xcache_controller::free_context(xcache_cmd *cmd)
 {
 	unsigned id = cmd->context_id();
@@ -1499,15 +1523,40 @@ void xcache_controller::run(void)
 
 		// Wait for read data on all active and library sockets
 		rc = Xselect(max + 1, &fds, NULL, NULL, NULL);
+		if(rc == 0) {
+			syslog(LOG_ERR, "Controller: Xselect returned 0 without timeout");
+			continue;
+		}
+		if(rc < 0) {
+			syslog(LOG_ERR, "Controller: Xselect failed");
+			continue;
+		}
+
+		// Make sure at least one fd is set
+		bool at_least_one_fd_ready = false;
+		bool at_least_one_fd_processed = false;
+		for(int i=0; i<max+1; i++) {
+			if(FD_ISSET(i, &fds)) {
+				at_least_one_fd_ready = true;
+				break;
+			}
+		}
+		if(!at_least_one_fd_ready) {
+			syslog(LOG_ERR, "Controller: Xselect said fds ready but none");
+			syslog(LOG_ERR, "Xselect returned %d", rc);
+			continue;
+		}
 
 		// 2 new connections on libsocket when XcacheHandleInit() called
 		if(FD_ISSET(libsocket, &fds)) {
+			at_least_one_fd_processed = true;
 			int new_connection = accept(libsocket, NULL, 0);
 
 			// Add newly connected socket to list of fds to monitor
 			if (new_connection > 0) {
 				if(FD_ISSET(new_connection, &allfds)) {
-					syslog(LOG_ERR, "Controller: socket already monitored\n");
+					syslog(LOG_ERR, "Controller: sock already monitored %d\n",
+							new_connection);
 				} else {
 					active_conns.push_back(new_connection);
 					FD_SET(new_connection, &allfds);
@@ -1519,6 +1568,7 @@ void xcache_controller::run(void)
 			int accept_sock;
 			sockaddr_x mypath;
 			socklen_t mypath_len = sizeof(mypath);
+			at_least_one_fd_processed = true;
 
 			syslog(LOG_INFO, "Accepting sender connection!");
 			if((accept_sock=XacceptAs(sendersocket, (struct sockaddr *)&mypath,
@@ -1557,6 +1607,7 @@ void xcache_controller::run(void)
 				++iter;
 				continue;
 			}
+			at_least_one_fd_processed = true;
 
 			char buf[XIA_MAXBUF];
 			std::string buffer("");
@@ -1573,6 +1624,7 @@ void xcache_controller::run(void)
 				close(*iter);
 				iter = active_conns.erase(iter);
 				FD_CLR(*iter, &allfds);
+				free_context_for_sock(*iter);
 				continue;
 			}
 
@@ -1594,6 +1646,7 @@ void xcache_controller::run(void)
 				close(*iter);
 				iter = active_conns.erase(iter);
 				FD_CLR(*iter, &allfds);
+				free_context_for_sock(*iter);
 				continue;
 			}
 
@@ -1606,6 +1659,7 @@ void xcache_controller::run(void)
 				close(*iter);
 				iter = active_conns.erase(iter);
 				FD_CLR(*iter, &allfds);
+				free_context_for_sock(*iter);
 				continue;
 			}
 
@@ -1661,6 +1715,18 @@ void xcache_controller::run(void)
 				++iter;
 			}
 		}
+		if(at_least_one_fd_processed == false) {
+			syslog(LOG_ERR, "Xcache::Controller ERROR no fd processed");
+			std::cout << "Controller ERROR Xselect had an fd to process"
+				<< " but we didn't find one among the ones we're looking at"
+				<< std::endl;
+			for(int i=0;i<max+1;i++) {
+				if(FD_ISSET(i, &fds)) {
+					std::cout << "FD set: " << i << std::endl;
+				}
+			}
+		}
+		assert(at_least_one_fd_processed == true);
 	}
 }
 
