@@ -113,6 +113,7 @@ void *recvCmd(void *socketid)
 
 
 	Xclose(sock);
+	XcacheHandleDestroy(&xcache);
 	pthread_exit(NULL);
 }
 
