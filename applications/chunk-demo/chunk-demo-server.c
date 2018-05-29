@@ -144,7 +144,7 @@ int registerReceiver()
 	if (XregisterName(NAME, dag) < 0 )
 		die(-1, "error registering name: %s\n", NAME);
 
-	if (Xbind(sock, (struct sockaddr*)dag, sizeof(dag)) < 0) {
+	if (Xbind(sock, (struct sockaddr*)dag, sizeof(sockaddr_x)) < 0) {
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
