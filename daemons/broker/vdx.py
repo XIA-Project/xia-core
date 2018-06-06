@@ -34,8 +34,10 @@ EXPOSE_COST = 'FULL'
 BG_TRAFFIC_PERCENTAGE = 4.0
 
 # weights for optimization
-w_c = 0.1  # cost
-w_p = 1.0 - w_c  # performance
+w_cost = 0.01           # CDN costs modifier
+w_perf = 1.0 - w_cost  # overall performance modifier
+w_bw   = .1            # bandwidth modifier
+w_ping = -10          # ping latency/drop modifier
 
 closest_clusters_lookup = {}
 bid_ordering = defaultdict(dict)
@@ -52,7 +54,8 @@ def get_regression_score(location, cluster):
 def build_bid_ordering(cl):
     cdn, location = cl
     cluster_scores = Scenario['client_locations'][location]['cluster_scores']
-    bo = [(c, max(0.01, s)) for c, s in cluster_scores
+
+    bo = [(c, max(0.01, s), r) for c, s, r in cluster_scores
           if c in Scenario['CDNs'][cdn]]
     unseen_clusters = list(Scenario['CDNs'][cdn] -
                            set(zip(*cluster_scores)[0]))
@@ -120,30 +123,34 @@ def GetCDNBids(cdn):
         # with scores below 'cap' (function of best score)
         # sorted by lowest cost
 
-        # modified this code so that it wokrs in a live scenario, not just a static one
+
+        # modified this code so that it works in a live scenario, not just a static one
 	cluster_scores = Scenario['client_locations'][location]['cluster_scores']
-	bo = [(c, s) for c,s in cluster_scores if c in Scenario['CDNs'][cdn]]
+
+	bo = [(c, s, r) for c,s,r in cluster_scores if c in Scenario['CDNs'][cdn]]
 	bo = sorted(bo, key = lambda x: x[1])
 
         cap = bo[0][1] * 2.0
-        b2 = sorted([(c, s, Scenario['cdn_locations'][c]['bw_cost'] +
+        b2 = sorted([(c, s, r, Scenario['cdn_locations'][c]['bw_cost'] +
                       Scenario['cdn_locations'][c]['colo_cost'])
-                     for c, s in bo if s <= cap], key=lambda x: x[2])
+                     for c, s, r in bo if s <= cap], key=lambda x: x[2])
+
         if len(b2) > 1:
             bo = b2
         else:  # if there's only one choice at this point...
             # just give me the best two scoring choices, sorted by cost
-            bo = sorted([(c, s, Scenario['cdn_locations'][c]['bw_cost'] +
+            bo = sorted([(c, s, r, Scenario['cdn_locations'][c]['bw_cost'] +
                           Scenario['cdn_locations'][c]['colo_cost'])
-                         for c, s in bo[:2]], key=lambda x: x[2])
-        bo = [(c, s) for (c, s, _) in bo]
+                         for c, s, r in bo[:3]], key=lambda x: x[2])
+        bo = [(c, s, r) for (c, s, r, _) in bo]
 
+        print 'final bo'
+        print bo
         if METHOD == "Optimal":
             bo = bid_ordering[cdn][location]
 
-
         selected = 0
-        for (cluster, score) in bo:
+        for (cluster, score, rate) in bo:
             if score == 0:
                 capacity = 0
             else:
@@ -154,7 +161,7 @@ def GetCDNBids(cdn):
                 capacity *= 0.7  # protect from overages in optimization
             c = Scenario['cdn_locations'][cluster]
             bids[location].append((cdn, cluster, score, capacity,
-                                   c['bw_cost'], c['colo_cost']))
+                                   c['bw_cost'], c['colo_cost'], rate))
             selected += 1
             if selected >= choices:
                 break
@@ -165,7 +172,7 @@ def GetCDNBids(cdn):
     bs = []
     for location in bids:
         for i in xrange(len(bids[location])):
-            _, _, _, _, bw_cst, colo_cst = bids[location][i]
+            _, _, _, _, bw_cst, colo_cst, _ = bids[location][i]
             total = bw_cst + colo_cst
             bs.append((total, bw_cst, colo_cst, location, bids[location][i]))
 
@@ -181,25 +188,31 @@ def GetCDNBids(cdn):
     a = range(len(bs))
     a = (1.0 * sum(a)) / len(a)
     for i, (_, _, _, location, bid) in enumerate(bs):
-        cdn, cluster, score, capacity, bw_cst, colo_cst = bid
+        cdn, cluster, score, capacity, bw_cst, colo_cst, rate = bid
         standard_price = Scenario['CDN_standard_price'][
             cdn] if cdn in Scenario['CDN_standard_price'] else 1
         if EXPOSE_COST == 'FULL':
             bids[location].append((cdn, cluster, score, capacity,
-                                   bw_cst, colo_cst))
+                                   bw_cst, colo_cst, rate))
         if EXPOSE_COST == 'NOTHING':
             bids[location].append((cdn, cluster, score, capacity,
-                                   standard_price, standard_price))
+                                   standard_price, standard_price, rate))
         if EXPOSE_COST == 'OPAQUE':
             bids[location].append((cdn, cluster, score, capacity,
                                    0.5 * i * standard_price / a,
-                                   0.5 * i * standard_price / a))
+                                   0.5 * i * standard_price / a, rate))
         if EXPOSE_COST == 'RELATIVE':
             bids[location].append((cdn, cluster, score, capacity,
                                    bw_cst / avbw * standard_price,
-                                   colo_cst / avcolo * standard_price))
+                                   colo_cst / avcolo * standard_price, rate))
 
     return dict(bids)
+
+
+def MedianRate(location):
+    rates = [r for _,_,r in Scenario['client_locations'][location]['cluster_scores'] if r > 0]
+    m = np.median(rates) if len(rates) > 0 else 0
+    return m
 
 
 # Figures out which bids to accept
@@ -222,6 +235,7 @@ def Optimize(bids):
         avg_bitrate[id].append(r['bitrate'])
     for id in avg_bitrate:
         avg_bitrate[id] = sum(avg_bitrate[id]) / float(len(avg_bitrate[id]))
+
     avg_bitrate = dict(avg_bitrate)
 
     ################################
@@ -234,7 +248,12 @@ def Optimize(bids):
     k = 0
     for id, location in enumerate(client_locations):
         if location in bids:
-            for j, (cdn, cluster, score, capacity, bw_cst, colo_cst) \
+
+            median_rate = MedianRate(location)
+
+            print "BIDS"
+            print bids
+            for j, (cdn, cluster, ping_score, capacity, bw_cst, colo_cst, bw_score) \
                     in enumerate(bids[location]):
                 index[id][j] = k
                 k += 1
@@ -246,8 +265,14 @@ def Optimize(bids):
                     else:
                         price = 0
                 try:
-                    obj_coeff = w_p * (-100.0 * score) - w_c * (price * avg_bitrate[id])
-                except:
+                    print '\nCOMPUTING COEFF!'
+                    #obj_coeff = w_perf * (w_ping * ping_score) - w_cost * (price * avg_bitrate[id])
+                    if bw_score == 0:
+                        bw_score = median_rate
+                    print 'bw', bw_score, 'ping', ping_score, 'price', price, 'avg rate', avg_bitrate[id]
+                    obj_coeff = w_perf * (((w_ping * ping_score) + (w_bw * bw_score))) - (w_cost * (price * avg_bitrate[id]))
+                    print 'coeff=', obj_coeff
+                except Exception:
                     # we don't have any outstanding requests for this client id
                     # default its avg bitrate to 0
 		    logging.debug('no outstanding requests for %s', location)
@@ -273,7 +298,7 @@ def Optimize(bids):
     cdn_clusters = set()
     for i, j in [(i, j) for i in index for j in index[i]]:
         location = client_locations[i]
-        cdn, cluster, _, capacity, _, _ = bids[location][j]
+        cdn, cluster, _, capacity, _, _, rate = bids[location][j]
         cdn_clusters.add((cdn, cluster))
         Capacities[(cdn, cluster)] = capacity
         U_cluster[(cdn, cluster)].append(U[index[i][j]])
@@ -299,14 +324,21 @@ def Optimize(bids):
     ##########
     logging.debug('optimizing')
     m.optimize()
-
+    m.write("cdn.lp")
+    m.write("cdn.mps")
     #############
     # Get Results
     #############
     logging.debug('getting results')
 
-    results = {(i, j): round(U[index[i][j]].x)
-               for i in index for j in index[i]}
+    try:
+        results = {(i, j): round(U[index[i][j]].x)
+                   for i in index for j in index[i]}
+        print 'IT WORKED THIS TIME'
+
+    except:
+        print 'x not found problem'
+        return {}
 
     for i in index:
         s = sum([results[(i, j)] for j in index[i]])

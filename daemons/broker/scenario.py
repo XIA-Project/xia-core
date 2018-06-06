@@ -136,7 +136,7 @@ class Scenario:
 
             # give every client cluster pair a large default starting value
             for idc in self.scenario['cdn_locations'].keys():
-                location['cluster_scores'].append([idc, 9999999])
+                location['cluster_scores'].append([idc, 999999, 0])
                 stats = {}
                 stats['cached'] = 0
                 stats['bitrate'] = 0
@@ -156,6 +156,7 @@ class Scenario:
             #request['bitrate'] = bitrate
             request['timestamp'] = int(time.time())
             request['cdn'] = last_cdn
+            request['bitrate'] = bitrate
             self.scenario['requests'].append(request)
             logging.debug('added new request for %d at %d' % (id, bitrate))
         except Exception as err:
@@ -325,9 +326,6 @@ class Scenario:
             client = self.make_client_record(msg.client, id, 0.0, 0.0)
 
         if msg.type == cdn_pb2.PING_SCORES_MSG:
-            # reset score  list
-            client['cluster_scores'] = []
-
             for cluster in msg.scores.clusters:
                 cluster_id = self.getID(cluster.name)
                 rtt = cluster.rtt
@@ -339,10 +337,17 @@ class Scenario:
                 # lower is better
 
                 if rtt == None or rtt <= 0 or loss == 100:
-                    score = 10000000000
+                    score = 10000000
                 else:
                     score = (rtt * 1000) + (loss * 100)
-                client['cluster_scores'].append([cluster_id, score])
+
+                for i, cs in enumerate(client['cluster_scores']):
+                    try:
+                        if cs[0] == cluster_id:
+                            client['cluster_scores'][i][1] = score
+                    except:
+                        client['cluster_scores'].append([cluster_id, score, 0])
+
         elif msg.type == cdn_pb2.STATS_SCORE_MSG:
             try:
                 client['cluster_stats'] = []
@@ -351,12 +356,12 @@ class Scenario:
                     cluster_id = self.getID(cluster.name)
                     cluster_stats = {}
                     n = 0
+                    rate = 0
                     total_bitrate = 0
                     total_cached = 0
                     total_tput = 0.0
 
                     for stats in cluster.stats:
-
                         # if we are configured to ignore cached results go on to the next entry
                         if stats.cached and self.allow_cached == False:
                             continue
@@ -373,23 +378,26 @@ class Scenario:
 
                     if n > 0:
                         rate = total_bitrate / n
+                        tput = total_tput / n
                         cluster_stats['bitrate'] = rate
                         cluster_stats['cached'] = total_cached
-                        cluster_stats['tput'] = total_tput / n
+                        cluster_stats['tput'] = tput / n
 
                         client['bitrate'] = rate
 
                         client['cluster_stats'].append([cluster_id, cluster_stats])
-    #                else:
-    #                    cluster_stats['bitrate'] = 0
-    #                    cluster_stats['cached'] = 0
-    #                    cluster_stats['tput'] = 0.0
-    #                    client['cluster_stats'].append([cluster_id, cluster_stats])
+
+                    for i, cs in enumerate(client['cluster_scores']):
+                        try:
+                            if cs[0] == cluster_id:
+                                client['cluster_scores'][i][2] = tput
+                        except:
+                            client['cluster_scores'].append([cluster_id, 99999999, rate])
+
             except Exception as e:
                 print str(e)
 
         logging.debug(client)
-        self.scenario['client_locations'][id] = client
 
 
 # test driver
