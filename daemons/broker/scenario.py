@@ -87,6 +87,8 @@ class Scenario:
         client['lon'] = lon
         client['timestamp'] = int(time.time())
 
+        client['max_tput'] = 0.0
+
         client['cluster_scores'] = []
         client['cluster_stats'] = []
         client['id'] = ''
@@ -365,6 +367,9 @@ class Scenario:
                             total_cached += 1
                         total_bitrate += int(stats.bandwidth)
                         total_tput += float(stats.tput)
+
+                        if stats.tput > client['max_tput']:
+                            client['max_tput'] = stats.tput
 
                     if n > 0:
                         rate = total_bitrate / n
