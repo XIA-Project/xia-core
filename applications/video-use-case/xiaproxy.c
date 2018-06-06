@@ -29,6 +29,8 @@ unsigned int numthreads        = 0;     // Current number of clients
 pthread_mutex_t numthreadslock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t cdn_lock       = PTHREAD_MUTEX_INITIALIZER;
 
+uint32_t last_bandwidth = 0;
+
 static int locator_interval = 5;
 static int scorer_interval  = 5;
 static int alive            = 1;
@@ -93,7 +95,7 @@ void *cdn_locator(void *)
 			exit(EXIT_FAILURE);
 		}
 		req_msg->set_last_cdn(cdn_host);
-		req_msg->set_bandwidth(0);
+		req_msg->set_bandwidth(last_bandwidth);
 		pthread_mutex_unlock(&cdn_lock);
 
 		string message;
@@ -633,6 +635,8 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 			}
+
+			last_bandwidth = ctx->bandwidth;
 
 			CDNStatistics::iterator it = cdn_stats.find(ctx->cdn_host);
 			if (it != cdn_stats.end()) {
