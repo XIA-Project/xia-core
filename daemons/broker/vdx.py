@@ -127,7 +127,10 @@ def GetCDNBids(cdn):
         # modified this code so that it works in a live scenario, not just a static one
 	cluster_scores = Scenario['client_locations'][location]['cluster_scores']
 
-	bo = [(c, s, r) for c,s,r in cluster_scores if c in Scenario['CDNs'][cdn]]
+        # ignore links that are down (score == 0)
+	bo = [(c, s, r) for c,s,r in cluster_scores if c in Scenario['CDNs'][cdn] and s != 0]
+        if len(bo) == 0:
+            return {}
 	bo = sorted(bo, key = lambda x: x[1])
 
         cap = bo[0][1] * 2.0
@@ -144,8 +147,6 @@ def GetCDNBids(cdn):
                          for c, s, r in bo[:3]], key=lambda x: x[2])
         bo = [(c, s, r) for (c, s, r, _) in bo]
 
-        print 'final bo'
-        print bo
         if METHOD == "Optimal":
             bo = bid_ordering[cdn][location]
 
@@ -251,8 +252,6 @@ def Optimize(bids):
 
             median_rate = MedianRate(location)
 
-            print "BIDS"
-            print bids
             for j, (cdn, cluster, ping_score, capacity, bw_cst, colo_cst, bw_score) \
                     in enumerate(bids[location]):
                 index[id][j] = k
@@ -265,7 +264,6 @@ def Optimize(bids):
                     else:
                         price = 0
                 try:
-                    print '\nCOMPUTING COEFF!'
                     #obj_coeff = w_perf * (w_ping * ping_score) - w_cost * (price * avg_bitrate[id])
                     if bw_score == 0:
                         bw_score = median_rate
@@ -334,10 +332,7 @@ def Optimize(bids):
     try:
         results = {(i, j): round(U[index[i][j]].x)
                    for i in index for j in index[i]}
-        print 'IT WORKED THIS TIME'
-
     except:
-        print 'x not found problem'
         return {}
 
     for i in index:

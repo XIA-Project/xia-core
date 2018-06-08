@@ -337,7 +337,7 @@ class Scenario:
                 # lower is better
 
                 if rtt == None or rtt <= 0 or loss == 100:
-                    score = 10000000
+                    score = 0
                 else:
                     score = (rtt * 1000) + (loss * 100)
 
