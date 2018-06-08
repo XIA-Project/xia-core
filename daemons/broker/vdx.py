@@ -264,10 +264,11 @@ def Optimize(bids):
                     else:
                         price = 0
                 try:
-                    #obj_coeff = w_perf * (w_ping * ping_score) - w_cost * (price * avg_bitrate[id])
+                    # if client and cdn haven't talked yet use the median rate of this client to all other cdns
                     if bw_score == 0:
                         bw_score = median_rate
                     print 'bw', bw_score, 'ping', ping_score, 'price', price, 'avg rate', avg_bitrate[id]
+
                     obj_coeff = w_perf * (((w_ping * ping_score) + (w_bw * bw_score))) - (w_cost * (price * avg_bitrate[id]))
                     print 'coeff=', obj_coeff
                 except Exception:
@@ -322,8 +323,11 @@ def Optimize(bids):
     ##########
     logging.debug('optimizing')
     m.optimize()
-    m.write("cdn.lp")
-    m.write("cdn.mps")
+
+    # see what's happening in gurobi when optimizing
+    #m.write("cdn.lp")
+    #m.write("cdn.mps")
+
     #############
     # Get Results
     #############
