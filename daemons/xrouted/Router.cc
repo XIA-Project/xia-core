@@ -87,7 +87,8 @@ int Router::handler()
 {
 	int rc;
 	char recv_message[BUFFER_SIZE];
-	struct pollfd pfds[3];
+	int nfds = 3;
+	struct pollfd pfds[nfds];
 	int iface;
 	bool local;
 
@@ -100,11 +101,16 @@ int Router::handler()
 	pfds[2].events = POLLIN;
 
 	// only poll for local sock if we haven't gotten config info from the network
-	int num_pfds = _joined ? 3 : 1;
+	int num_pfds = _joined ? nfds : 1;
 
-	// get the next incoming message
-	if ((rc = readMessage(recv_message, pfds, num_pfds, &iface, &local)) > 0) {
+	// get the next incoming message(s)
+	int i = 0;
+	while  ((rc = readMessage(recv_message, pfds, num_pfds, &iface, &local)) > 0) {
 		processMsg(string(recv_message, rc), iface, local);
+		if (++i >= (2 * nfds)) {
+			// don't stay here forever
+			break;
+		}
 	}
 
 	if (_joined) {

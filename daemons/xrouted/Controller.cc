@@ -124,7 +124,8 @@ int Controller::handler()
 	int rc;
 	char recv_message[BUFFER_SIZE];
 	int iface;
-	struct pollfd pfds[3];
+	int nfds = 3;
+	struct pollfd pfds[nfds];
 	bool local;
 
 	bzero(pfds, sizeof(pfds));
@@ -135,9 +136,14 @@ int Controller::handler()
 	pfds[1].events = POLLIN;
 	pfds[2].events = POLLIN;
 
-	// get the next incoming message
-	if ((rc = readMessage(recv_message, pfds, 3, &iface, &local)) > 0) {
+	// get the next incoming message(s)
+	int i = 0;
+	while  ((rc = readMessage(recv_message, pfds, nfds, &iface, &local)) > 0) {
 		processMsg(string(recv_message, rc), iface, local);
+		if (++i >= (2 * nfds)) {
+			// don't stay here forever
+			break;
+		}
 	}
 
 	// send any messages that need to go out
