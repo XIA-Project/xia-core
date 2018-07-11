@@ -50,6 +50,7 @@ static void initlogging(std::string  hostname, unsigned level, bool verbose)
 int main(int argc, char *argv[])
 {
 	int c;
+	char *p;
 	unsigned level = 3;
 	bool verbose = false;
 
@@ -59,6 +60,10 @@ int main(int argc, char *argv[])
 	xcache_conf.threads = DEFAULT_THREADS;
 
 	gethostname(xcache_conf.hostname, sizeof(xcache_conf.hostname));
+	if ((p = strchr(xcache_conf.hostname, '.')) != NULL) {
+		*p = '\0';
+	}
+
 
 	struct option options[] = {
 		{"host", required_argument, 0, 0},
