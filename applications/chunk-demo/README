@@ -1,0 +1,42 @@
+The chunk-demo directory includes several applications to demonstrate
+various ways of chunk retrieval in XIA.
+
+1. Chunk download without caching
+
+	=== chunk-demo-server and chunk-demo-client ===
+
+	1. Start chunk-demo-server on a host. It registers with nameservice.
+	2. Start chunk-demo-client on another host.
+	3. A connection is made to server and a chunk is downloaded without caching.
+
+2. Request remote Fetching Service to fetch and push chunks to client
+
+	== make-random-chunk, bin/fs and fetch-demo-client ===
+
+	0. make-random-chunk and bin/fs are run on one host. Fetch client on second.
+	1. Invoke make-random-chunk simply create a chunk with random data.
+	2. Launch ./bin/fs - the Fetching Service.
+	3. Run fetch-demo-client with random chunk DAG and fetching service DAG.
+		- Both dags are printed as output from respective commands.
+		- This creates a Push Proxy.
+		- Then submits Interest Request and Push Proxy DAG to Fetching Service.
+		- The Fetching Service retrieves the requested chunk.
+		- The retrieved chunk is then pushed back to client's PushProxy.
+		- The client's PushProxy then delivers chunk contents to the client.
+
+3. Named Content
+
+	=== ./bin/announce_publisher, ncid-demo-server, ncid-demo-client ===
+
+	1. Follow daemons/xcache/README.NCID to create CA and Publisher certs.
+	2. ./bin/announce_publisher <PublisherName> to publish certificate.
+	3. ncid-demo-server creates a random chunk and publishes it by name.
+	4. On another host, run ncid-demo-client.
+		- The client fetches and verifies publisher certificate, if needed.
+		- Then generates named content identifier for content name known to it.
+		- Publisher used name named content ID to publish the chunk.
+		- So client can now send a request to fetch the chunk.
+		- The chunk is simply fetched and its size is shown on screen.
+
+NOTE: push-demo-server and push-demo-client are probably broken at this time.
+5/10/2018.

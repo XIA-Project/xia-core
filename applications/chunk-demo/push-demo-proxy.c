@@ -19,7 +19,8 @@ int main()
 
 	// Request a new push proxy
 	std::string proxyaddr;
-	if (XnewProxy(&_xcache, proxyaddr)) {
+	int proxy_id = XnewProxy(&_xcache, proxyaddr);
+	if (proxy_id == -1) {
 		printf("ERROR starting proxy for pushed chunks\n");
 		return -1;
 	}

@@ -95,7 +95,7 @@ int make_and_getchunk(int sock)
 	sockaddr_x addr;
 	void *buf;
 	int ret;
-	int flags = 0;
+	int flags = XCF_BLOCK;
 
 	// send the file request
 	sprintf(cmd, "make");
@@ -110,48 +110,18 @@ int make_and_getchunk(int sock)
 	printf("Got URL %s\n", url);
 
 	Graph g(url);
+
+	printf("Chunk address: %s\n", g.dag_string().c_str());
 	g.fill_sockaddr(&addr);
 
 	if ((ret = XfetchChunk(&h, &buf, flags, &addr, sizeof(addr))) < 0) {
 		die(-1, "XfetchChunk Failed\n");
 	}
+	printf("Received chunk of size: %d\n", ret);
 	if(flags & XCF_BLOCK) {
 		free(buf);	// Should free only if flags had XCF_BLOCK
 	}
 	return 0;
-}
-
-void xcache_chunk_arrived(XcacheHandle *h, int event,
-		void *data, size_t datalen)
-{
-	int rc;
-	char *buf;
-	int i;
-	if(event != XCE_CHUNKARRIVED) {
-		printf("Xcache notified us of something other than CHUNKARRIVED\n");
-		return;
-	}
-	sockaddr_x *addr = (sockaddr_x *)data;
-	socklen_t addrlen = (socklen_t) datalen;
-
-	printf("Received Chunk Arrived Event\n");
-
-	rc = XfetchChunk(h, (void**)&buf, 0, addr, addrlen);
-
-	printf("XfetchChunk returned %d\nData: \n", rc);
-	for (i = 0; i < CHUNKSIZE; i++) {
-		if (i % 16 == 0) {
-			printf("%.8x ", i);
-		}
-
-		printf("%02x", (unsigned char)buf[i]);
-		if (i % 2 == 1)
-			printf(" ");
-
-		if ((i + 1) % 16 == 0)
-			printf("\n");
-	}
-	free(buf);
 }
 
 int initializeClient(const char *name)
@@ -159,15 +129,12 @@ int initializeClient(const char *name)
 	int sock;
 	sockaddr_x dag;
 	socklen_t daglen;
-	char sdag[1024];
+	//char sdag[1024];
 
 	if (XcacheHandleInit(&h) < 0) {
 		printf("Xcache handle initialization failed.\n");
 		exit(-1);
 	}
-
-	XregisterNotif(XCE_CHUNKARRIVED, xcache_chunk_arrived);
-	XlaunchNotifThread(&h);
 
     // lookup the xia service
 	daglen = sizeof(dag);
@@ -175,6 +142,8 @@ int initializeClient(const char *name)
 		die(-1, "unable to locate: %s\n", name);
 
 
+	Graph g(&dag);
+	printf("Connecting to server: %s\n", g.dag_string().c_str());
 	// create a socket, and listen for incoming connections
 	if ((sock = Xsocket(AF_XIA, SOCK_STREAM, 0)) < 0)
 		die(-1, "Unable to create the listening socket\n");
@@ -183,32 +152,13 @@ int initializeClient(const char *name)
 		Xclose(sock);
 		die(-1, "Unable to bind to the dag: %s\n", dag);
 	}
-
-	// save the AD and HID for later. This seems hacky
-	// we need to find a better way to deal with this
-	Graph g(&dag);
-	strncpy(sdag, g.dag_string().c_str(), sizeof(sdag));
-//   	say("sdag = %s\n",sdag);
-	char *ads = strstr(sdag,"AD:");
-	char *hids = strstr(sdag,"HID:");
-// 	i = sscanf(ads,"%s",s_ad );
-// 	i = sscanf(hids,"%s", s_hid);
-
-	if (sscanf(ads,"%s",s_ad ) < 1 || strncmp(s_ad,"AD:", 3) !=0){
-		die(-1, "Unable to extract AD.");
-	}
-
-	if (sscanf(hids,"%s", s_hid) < 1 || strncmp(s_hid,"HID:", 4) !=0 ){
-		die(-1, "Unable to extract AD.");
-	}
-
-	warn("Service AD: %s, Service HID: %s\n", s_ad, s_hid);
+	printf("Connected to server.\n");
 
 	return sock;
 }
 
 void usage(){
-	say("usage: get|put <source file> <dest name>\n");
+	say("usage: chunk-demo-client [<service name>]\n");
 }
 
 bool file_exists(const char * filename)
@@ -225,35 +175,22 @@ int main(int argc, char **argv)
 
 	const char *name;
 	int sock = -1;
-	char cmd[512];
 
 	say ("\n%s (%s): started\n", TITLE, VERSION);
 
 	if (argc == 1) {
 		say("No service name passed, using default: %s\n", NAME);
 		sock = initializeClient(NAME);
-		usage();
 	} else if (argc == 2) {
 		name = argv[1];
 		say("Connecting to: %s\n", name);
 		sock = initializeClient(name);
-
 	} else {
-		die(-1, "chunk-demo-client [SID]");
+		usage();
+		die(-1, "Invalid arguments.");
 	}
 
 
-	while (1) {
-		say(">>");
-		cmd[0] = '\n';
-
-		if (fgets(cmd, 511, stdin) == NULL) {
-			die(errno, "%s", strerror(errno));
-		}
-
-		if (strncmp(cmd, "make", 4) == 0){
-			make_and_getchunk(sock);
-		}
-	}
-	return 1;
+	make_and_getchunk(sock);
+	return 0;
 }

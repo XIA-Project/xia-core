@@ -385,6 +385,9 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 	if (nx == 0) {
 		// there were no xsockets in the FD_SETS, just do a normal select
 		rc = (_f_select)(nfds, readfds, writefds, errorfds, timeout);
+		if(rc > 0) {
+			count = rc;
+		}
 		goto done;
 	}
 
@@ -454,13 +457,16 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				int flags = pfd_out.flags();
 				unsigned id = pfd_out.id();
 
-				int fd = 0;
+				int fd = -1;
 				for (int j = 0; j < nfds; j++) {
 					if (id == s2i[j].id) {
 						fd = s2i[j].fd;
 						break;
 					}
 				}
+				if(fd == -1) {
+					printf("ERROR: fd not found in s2i\n");
+				} else {
 
 				// printf("socket %d out flags:%08x\n", pfds[i].fd, pfds[i].revents);
 				if (readfds && (flags & POLLIN)) {
@@ -477,6 +483,7 @@ int Xselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *errorfds, struc
 				if (errorfds && (flags & POLLERR)) {
 					FD_SET(fd, errorfds);
 					count++;
+				}
 				}
 			}
 
@@ -496,5 +503,26 @@ done:
 	}
 	free(s2i);
 	errno = eno;
+	if(rc > 0) {
+		int rfdcount = 0;
+		int wfdcount = 0;
+		int efdcount = 0;
+		for(int i=0;i<nfds;i++) {
+			if(readfds && FD_ISSET(i, readfds)) {
+				rfdcount++;
+			}
+			if(writefds && FD_ISSET(i, writefds)) {
+				wfdcount++;
+			}
+			if(errorfds && FD_ISSET(i, errorfds)) {
+				efdcount++;
+			}
+		}
+		if(count != (rfdcount + wfdcount + efdcount)) {
+			printf("ERROR: Xselect returned %d, instead of %d",
+					count, (rfdcount + wfdcount + efdcount));
+		}
+		assert(count == (rfdcount + wfdcount + efdcount));
+	}
 	return (rc <= 0 ? rc : count);
 }

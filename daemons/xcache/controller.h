@@ -226,6 +226,7 @@ public:
 
 	// free the context
 	int free_context(xcache_cmd *cmd);
+	int free_context_for_sock(int sockfd);
 
 	/**
 	 * Remove content.

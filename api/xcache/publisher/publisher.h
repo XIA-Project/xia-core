@@ -1,11 +1,18 @@
 #ifndef _PUBLISHER_H
 #define _PUBLISHER_H
+#include "headers/ncid_header.h"	// xcache_get_content
 #include <assert.h>
 #include <string.h>
 #include <Xsocket.h>
 #include <Xsecurity.h>
 #include <dagaddr.hpp>
+#include <memory>	// std::unique_ptr
+#include <atomic>	// std::atomic
 
+extern int xcache_get_content(int sock,
+		std::string &buf,
+		std::unique_ptr<ContentHeader> &chdr,
+		std::atomic<bool> &stop);
 /*!
  * @brief Represent a Publisher and its local capabilities
  *

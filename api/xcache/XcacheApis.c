@@ -37,6 +37,10 @@
 #include <errno.h>
 #include "dagaddr.hpp"
 #include "publisher_key_mgmt.pb.h"
+#include "headers/content_header.h"
+#include "publisher/publisher.h"
+#include <memory>	// std::unique_ptr
+#include <atomic>	// std::atomic
 /*! \endcond */
 
 #define IO_BUF_SIZE (1024 * 1024)
@@ -902,11 +906,9 @@ int XfetchChunkAndSource(XcacheHandle *h, void **buf, int flags, sockaddr_x *add
 //	fprintf(stderr, "Inside %s\n", __func__);
 
 	// Bypass cache if blocked requesting chunk without caching
-	/*
 	if ( !(flags & XCF_CACHE) && (flags & XCF_BLOCK)) {
-		return _XfetchRemoteChunkBlocking(buf, addr, len);
+		return _XfetchRemoteChunkBlocking(buf, addr, len, src_addr, src_len);
 	}
-	*/
 
 	cmd.set_cmd(xcache_cmd::XCACHE_FETCHCHUNK);
 	cmd.set_context_id(h->contextID);
@@ -1002,66 +1004,23 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len, so
 		}
 	}
 
-	std::string data;
-	char buf[IO_BUF_SIZE];
-	struct cid_header header;
-	int to_recv, recvd;
-	size_t remaining;
-	size_t offset;
-
-	Node expected_cid(g.get_final_intent());
-
-	remaining = sizeof(cid_header);
-	offset = 0;
-
-	while (remaining > 0) {
-		fprintf(stderr, "Remaining(1) = %lu\n", remaining);
-		recvd = Xrecv(sock, (char *)&header + offset, remaining, 0);
-		if (recvd < 0) {
-			fprintf(stderr, "Sender Closed the connection: %s", strerror(errno));
-			Xclose(sock);
-			assert(0);
-			break;
-		} else if (recvd == 0) {
-			fprintf(stderr, "Xrecv returned 0\n");
-			break;
-		}
-		remaining -= recvd;
-		offset += recvd;
+	std::string buf;
+	std::unique_ptr<ContentHeader> chdr;
+	std::atomic<bool> stop(false);
+	if (xcache_get_content(sock, buf, chdr, stop)) {
+		fprintf(stderr, "ERROR getting chunk\n");
+		Xclose(sock);
+		return -1;
 	}
-
-	remaining = ntohl(header.length);
-
-	while (remaining > 0) {
-		to_recv = remaining > IO_BUF_SIZE ? IO_BUF_SIZE : remaining;
-
-		recvd = Xrecv(sock, buf, to_recv, 0);
-		if (recvd < 0) {
-			fprintf(stderr, "Receiver Closed the connection; %s", strerror(errno));
-			Xclose(sock);
-			assert(0);
-			break;
-		} else if (recvd == 0) {
-			fprintf(stderr, "Xrecv returned 0");
-			break;
-		}
-		fprintf(stderr, "recvd = %d, to_recv = %d\n", recvd, to_recv);
-
-		remaining -= recvd;
-		std::string temp(buf, recvd);
-
-		data += temp;
-	}
-
+	Xclose(sock);
 	// TODO: Verify that data matches intent CID in addr
 
 	// Copy data to a buffer to be returned
-	int to_copy = data.length();
+	assert (buf.size() == chdr->content_len());
+	int to_copy = chdr->content_len();
 	*chunk = malloc(to_copy);
 	bzero(*chunk, to_copy);
-	memcpy(*chunk, data.c_str(), to_copy);
-
-	Xclose(sock);
+	memcpy(*chunk, buf.c_str(), buf.size());
 
 	return to_copy;
 }
