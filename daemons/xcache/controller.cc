@@ -1161,8 +1161,9 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	if(Xsend(req->to_sock, (void *)&header_len, sizeof(header_len), 0) !=
 			sizeof(header_len)) {
 		syslog(LOG_ALERT, "Unable to send header length");
-		assert(0);
+		//assert(0);
 		Xclose(req->to_sock);
+		return;
 	}
 
 	// Now send the header
@@ -1174,9 +1175,10 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 	while (remaining > 0) {
 		sent = Xsend(req->to_sock, header.c_str() + offset, remaining, 0);
 		if (sent < 0) {
-			syslog(LOG_ALERT, "Receiver Closed the connection %s", strerror(errno));
-			assert(0);
+			syslog(LOG_ALERT, "1 Receiver Closed the connection %s", strerror(errno));
+			//assert(0);
 			Xclose(req->to_sock);
+			return;
 		}
 		remaining -= sent;
 		offset += sent;
@@ -1198,9 +1200,10 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 			     remaining, 0);
 		syslog(LOG_DEBUG, "Sent = %d\n", sent);
 		if (sent < 0) {
-			syslog(LOG_ALERT, "Receiver Closed the connection: %s", strerror(errno));
-			assert(0);
+			syslog(LOG_ALERT, "2 Receiver Closed the connection: %s", strerror(errno));
+			//assert(0);
 			Xclose(req->to_sock);
+			return;
 		}
 		remaining -= sent;
 		offset += sent;

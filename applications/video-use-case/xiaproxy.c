@@ -617,7 +617,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		gettimeofday(&t1, NULL);
 		if ((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) < 0) {
 			syslog(LOG_ERR, "XcacheGetChunk Failed");
-			exit(-1);
+			if (data) {
+				free(data);
+			}
+			return 0;
+			//exit(-1);
 		}
 		gettimeofday(&t2, NULL);
 		elapsed =  (t2.tv_sec - t1.tv_sec);
@@ -689,12 +693,12 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 	sockaddr_x chunkAddresses[numChunks];
 	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
-	if (forward_http_header_to_client(ctx, CONTENT_MANIFEST) < 0) {
+	if (forward_http_header_to_client(ctx, CONTENT_MANIFEST) <= 0) {
 		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
 	}
 
-	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) < 0) {
+	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) <= 0) {
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
@@ -722,12 +726,12 @@ int handle_stream_requests(ProxyRequestCtx *ctx)
 	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
 	//printf("forward header\n");
-	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0) {
+	if (forward_http_header_to_client(ctx, CONTENT_STREAM) <= 0) {
 		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
 	}
 
-	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) < 0) {
+	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) <= 0) {
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
