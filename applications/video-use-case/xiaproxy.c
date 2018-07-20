@@ -612,6 +612,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 	sockaddr_x src_addr;
 	socklen_t  src_len = sizeof(sockaddr_x);
 
+	// FIXME: there's no reason for this loop, we'll only ever get 1 chunk at a time
 	for (int i = 0; i < numChunks; i++) {
 
 		gettimeofday(&t1, NULL);
@@ -666,11 +667,12 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 
 		syslog(LOG_INFO, "got %d bytes in %1.3f seconds", len, elapsed);
 		syslog(LOG_INFO, "forwarded in %f seconds", elapsed2);
+		if (data) {
+			free(data);
+			data = NULL;
+		}
 	}
 
-	if (data) {
-		free(data);
-	}
 	return totalBytes;
 }
 
@@ -701,8 +703,8 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) < 0) {
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
-	}
 
+	}
 	return 1;
 }
 
@@ -735,7 +737,6 @@ int handle_stream_requests(ProxyRequestCtx *ctx)
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
 	}
-
 	return 1;
 }
 
@@ -890,7 +891,10 @@ int xia_proxy_handle_request(int browser_sock)
 				}
 				ctx.xia_sock = xia_sock;
 
-				if (handle_manifest_requests(&ctx) < 0) {
+				int rc = handle_manifest_requests(&ctx);
+				Xclose(ctx.xia_sock);
+
+				if (rc < 0) {
 					syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
 					return -1;
 				}
@@ -952,10 +956,11 @@ int main(int argc, char **argv)
 	Xgethostname(hostname, sizeof(hostname));
 
 	// set up signal handler for ctrl-c
-	(void) signal(SIGINT, cleanup);
+	// FIXME: comment out sig handlers for now to make finding leaks easier
+	// (void) signal(SIGINT, cleanup);
 
 	// write on closed pipe (socket)
-	(void) signal (SIGPIPE, SIG_IGN);
+	// (void) signal (SIGPIPE, SIG_IGN);
 
 	// create the listening socket
 	if ((list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
@@ -1014,13 +1019,16 @@ int main(int argc, char **argv)
 			perror("proxy: ERROR: locking numthreads variable");
 			return -1;
 		}
-		if (numthreads++ < MAX_CLIENTS) {
+// FIXME: letting this be unbounded for now although it rarely goes about 1
+		numthreads++;
+//		if (numthreads < MAX_CLIENTS) {
 			// Create a new thread
 			pthread_t worker;
 			if (pthread_create(&worker, NULL, job, (void *)&new_socket)) {
 				syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
 			}
-		}
+//		}
+// end FIXME
 		if (pthread_mutex_unlock(&numthreadslock)) {
 			syslog(LOG_WARNING, "proxy: ERROR: unlocking numthreads variable");
 			return -1;
