@@ -573,8 +573,20 @@ int Xgetaddrinfo(const char *name, const char *service, const struct addrinfo *h
 	return 0;
 }
 
+/*!
+** @brief Free all memory allocated by Xgetaddrinfo call
+**
+** @param ai Pointer to addrinfo list allocated by Xgetaddrinfo
+**
+*/
 void Xfreeaddrinfo(struct addrinfo *ai)
 {
-	// no xia specific processing required at the moment
-	freeaddrinfo(ai);
+	struct addrinfo *p;
+
+	while(ai != NULL) {
+		p = ai;
+		ai = ai->ai_next;
+		free(p->ai_addr);
+		free(p);
+	}
 }
