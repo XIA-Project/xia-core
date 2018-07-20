@@ -1197,12 +1197,13 @@ int XrequestPushedChunk(std::string &chunkaddr,
 		goto request_pushed_chunk_done;
 	}
 	g = new Graph(fetchservice);
+	state = 1;
 	g->fill_sockaddr(&fs_addr);
 	if(Xconnect(sockfd, (sockaddr *)&fs_addr, sizeof(sockaddr_x))) {
 		fprintf(stderr, "Error connecting to FS\n");
 		goto request_pushed_chunk_done;
 	}
-	state = 1;	// close sockfd
+	state = 2;	// close sockfd
 
 	// Send length of the interest request to fetchservice
 	irqstrlen = irqstr.size();
@@ -1219,7 +1220,7 @@ int XrequestPushedChunk(std::string &chunkaddr,
 		fprintf(stderr, "Error allocating memory for interest request\n");
 		goto request_pushed_chunk_done;
 	}
-	state = 2;	// free buf
+	state = 3;	// free buf
 	bzero(buf, irqstrlen);
 	memcpy(buf, irqstr.c_str(), irqstrlen);
 
@@ -1242,8 +1243,9 @@ int XrequestPushedChunk(std::string &chunkaddr,
 
 request_pushed_chunk_done:
 	switch(state) {
-		case 2: free(buf);
-		case 1: Xclose(sockfd);
+		case 3: free(buf);
+		case 2: Xclose(sockfd);
+		case 1: delete g;
 	};
 	return retval;
 }
