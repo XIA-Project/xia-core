@@ -103,17 +103,13 @@ void *process_request (void *socketid)
     int sock = *((int*)socketid);
     char message[XIA_MAXBUF];
 
-    while(1) {
+	memset(message, '\0', sizeof(message));
 
-        memset(message, '\0', sizeof(message));
-
-        if ((n = Xrecv(sock, message, XIA_MAXBUF, 0))  == 0) {
-            // client disconnected
-            break;
-        } else if (n < 0) {
-            warn("socket error while waiting for data, closing connection\n");
-            break;
-        }
+	if ((n = Xrecv(sock, message, XIA_MAXBUF, 0))  == 0) {
+		// client disconnected
+    } else if (n < 0) {
+        warn("socket error while waiting for data, closing connection\n");
+    } else {
 
         if (n != 0) {
             // if the request is a manifest request, handle it
@@ -123,7 +119,6 @@ void *process_request (void *socketid)
 
             if (status == -1) {
                 warn("problem with handling request. Connection exit\n");
-                break;
             }
         }
     }
