@@ -236,7 +236,7 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 /*!
 ** @brief free memory allocated by Xgetifaddrs
 **
-** Free's the memory allocated by XgetifAddrs().
+** Frees the memory allocated by XgetifAddrs().
 **
 ** @param ifa pointer to ifaddr structure to be freed.
 **
@@ -244,6 +244,19 @@ int Xgetifaddrs(struct ifaddrs **ifap)
 */
 void Xfreeifaddrs(struct ifaddrs *ifa)
 {
-	// no xia specific processing required at the moment
-	freeifaddrs(ifa);
+	struct ifaddrs *p;
+	while(ifa != NULL) {
+		p = ifa;
+		ifa = ifa->ifa_next;
+		if(p->ifa_name) {
+			free(p->ifa_name);
+		}
+		if(p->ifa_addr) {
+			free(p->ifa_addr);
+		}
+		if(p->ifa_dstaddr) {
+			free(p->ifa_dstaddr);
+		}
+		free(p);
+	}
 }
