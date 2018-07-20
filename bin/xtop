@@ -15,15 +15,25 @@ options:
   name          additional processes to monitor
   -h, --help    display this help
   -v, --version display the version number
+  -d, --debug   show info for gdb and valgrind as well
 EOH
 	exit 0
 fi
+
 
 # because they are python scripts, these daemons needs to be treated differently
 x=$(pgrep -f 'xnetj|broker|pinger' | tr '\n' ',')
 
 # get the rest of the click processes (replace \n in pgrep output with ,)
 x="$x$(pgrep 'click|xrouted|xcontrold|xhostd|xcache|xname|xiaproxy|load_video|xmanifestd|statsserver|xstats' | tr '\n ' ',')"
+
+# show debug processes in case we are running a daemon with them
+if [ "$1" == "-d" ] || [ "$1" == "--debug" ]; then
+	x=$x$(pgrep -f 'valgrind|gdb' | tr '\n' ',')
+
+	# strip the debug switch
+	shift
+fi
 
 # add anything from the command line
 for p in $@; do
