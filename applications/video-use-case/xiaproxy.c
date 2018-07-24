@@ -358,10 +358,11 @@ bool was_cached(sockaddr_x *requested, sockaddr_x *actual)
 {
 	Graph g_req(requested);
 	Graph g_act(actual);
-	bool rc = false;
+	bool rc;
 
 	if ((g_req.intent_HID().equal_to(g_act.intent_HID())) &&
 		(g_req.intent_AD().equal_to(g_act.intent_AD()))) {
+		rc = false;
 
 	} else {
 		rc = true;
@@ -485,6 +486,9 @@ void process_urls_to_DAG(ProxyRequestCtx *ctx, vector<string> & dagUrls, sockadd
 
 			Node cid = incoming.intent_CID();
 
+			// *--------------------------------->CID
+			//  \-------->AD---------------------/
+			//             \---->HID------------/
 			sprintf(d, "DAG 2 0 - %s 2 1 - %s 2 - %s", ctx->ad.c_str(), ctx->hid.c_str(), cid.to_string().c_str());
 			syslog(LOG_NOTICE, "fetching %s", d);
 
@@ -624,13 +628,23 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 			return -1;
 			//exit(-1);
 		}
+
 		gettimeofday(&t2, NULL);
 		elapsed =  (t2.tv_sec - t1.tv_sec);
 		elapsed += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 
-		if (ctx->bandwidth != 0){
+		bool cached = was_cached(&chunkAddresses[i], &src_addr);
+
+		syslog(LOG_NOTICE, "fetched: %s", g.intent_CID_str().c_str());
+		syslog(LOG_NOTICE, "bandwidth: %u", ctx->bandwidth);
+		syslog(LOG_NOTICE, "cached: %s", cached ? "true" : "false");
+		syslog(LOG_NOTICE, "size: %u", len);
+		syslog(LOG_NOTICE, "elapsed: %0.3f", elapsed);
+		syslog(LOG_NOTICE, "throughput: %0.3f mbps", len / elapsed * 8 / 1000000);
+
+		if (ctx->bandwidth != 0) {
 			CDNStat s;
-			s.cached    = was_cached(&chunkAddresses[i], &src_addr);
+			s.cached    = cached;
 			s.elapsed   = elapsed;
 			s.size      = len;
 			s.tput      = len / elapsed;
@@ -665,8 +679,8 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		elapsed2 = (t2.tv_sec - t1.tv_sec);
 		elapsed2 += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 
-		syslog(LOG_INFO, "got %d bytes in %1.3f seconds", len, elapsed);
-		syslog(LOG_INFO, "forwarded in %f seconds", elapsed2);
+		//syslog(LOG_INFO, "got %d bytes in %1.3f seconds", len, elapsed);
+		//syslog(LOG_INFO, "forwarded in %f seconds", elapsed2);
 		if (data) {
 			free(data);
 			data = NULL;
@@ -703,7 +717,6 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 	if (forward_chunks_to_client(ctx, chunkAddresses, numChunks) < 0) {
 		syslog(LOG_WARNING, "unable to forward chunks to client");
 		return -1;
-
 	}
 	return 1;
 }
