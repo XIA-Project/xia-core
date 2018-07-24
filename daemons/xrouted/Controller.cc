@@ -848,7 +848,7 @@ int Controller::updateTables()
 		extractNeighborADs();
 		populateNeighboringADBorderRouterEntries(it1->second.hid, routingTable);
 		populateADEntries(routingTable, ADRoutingTable);
-		printRoutingTable(it1->second.hid, routingTable);
+		//printRoutingTable(it1->second.hid, routingTable);
 
 		sendRoutingTable(&it1->second, routingTable);
 	}
