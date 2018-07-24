@@ -633,6 +633,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		elapsed =  (t2.tv_sec - t1.tv_sec);
 		elapsed += (t2.tv_usec - t1.tv_usec) / 1000000.0;   // us to s
 
+		Graph g(&chunkAddresses[i]);
 		bool cached = was_cached(&chunkAddresses[i], &src_addr);
 
 		syslog(LOG_NOTICE, "fetched: %s", g.intent_CID_str().c_str());
