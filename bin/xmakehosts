@@ -57,6 +57,8 @@ badhosts() {
 		esac
 	done
 
+	echo >>$HOSTSFILE
+	echo "# Invalid addresses for testing XCMP with xping/xtraceroute" >>$HOSTSFILE 
 	echo "badnetwork RE AD:0000000000000000000000000000000000000000 $HID" >>$HOSTSFILE
 	echo "badhost RE $AD HID:0000000000000000000000000000000000000000" >>$HOSTSFILE
 	echo "badservice RE $AD $HID SID:0000000000000000000000000000000000000000" >>$HOSTSFILE
@@ -77,3 +79,4 @@ for h in $*; do
 done
 
 cat $HOSTSFILE
+
