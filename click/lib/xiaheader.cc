@@ -146,6 +146,36 @@ XIAHeaderEncap::encap(Packet* p_in, bool adjust_plen) const
     return p;
 }
 
+WritablePacket *
+XIAHeaderEncap::encap_replace(Packet *p_in) const
+{
+	// New header size
+	size_t header_len = hdr_size();
+
+	// Old header size
+	XIAHeader xiah(p_in->xia_header());
+	size_t old_len = xiah.hdr_size();
+
+	WritablePacket *p;
+
+	// Resize packet to hold new header
+	if(old_len < header_len) {
+		p = p_in->push(header_len - old_len);
+	} else {
+		p_in->pull(old_len - header_len);
+		p = p_in->push(0);
+	}
+	if(!p) {
+		return NULL;
+	}
+
+	// Copy header into the packet and mark it as the network header
+	memcpy(p->data(), _hdr, header_len);
+	p->set_xia_header(reinterpret_cast<struct click_xia *>(p->data()),
+			header_len);
+	return p;
+}
+
 void
 XIAHeaderEncap::update()
 {

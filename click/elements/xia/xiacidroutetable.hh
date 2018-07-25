@@ -1,5 +1,5 @@
-#ifndef CLICK_XIAXIDROUTETABLE_HH
-#define CLICK_XIAXIDROUTETABLE_HH
+#ifndef CLICK_XIACIDROUTETABLE_HH
+#define CLICK_XIACIDROUTETABLE_HH
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <clicknet/xia.h>
@@ -8,9 +8,14 @@
 #include "xcmp.hh"
 CLICK_DECLS
 
+/* NOTE: This code is a copy of xiaxidroutetable.hh and should just be
+ * making a subclass instead of copying the code. Only for testing purpose.
+ * -NITIN
+ */
+
 /*
 =c
-XIAXIDRouteTable(XID1 OUT1, XID2 OUT2, ..., - OUTn)
+XIACIDRouteTable(XID1 OUT1, XID2 OUT2, ..., - OUTn)
 
 =s ip
 simple XID routing table
@@ -20,7 +25,7 @@ Routes XID according to a routing table.
 
 =e
 
-XIAXIDRouteTable(AD0 0, HID2 1, - 2)
+XIACIDRouteTable(AD0 0, HID2 1, - 2)
 It outputs AD0 packets to port 0, HID2 packets to port 1, and other packets to port 2.
 If the packet has already arrived at the destination node, the packet will be destroyed,
 so use the XIACheckDest element before using this element.
@@ -37,20 +42,12 @@ so use the XIACheckDest element before using this element.
 #define UNREACHABLE -6
 #define FALLBACK -7
 
-enum { PRINCIPAL_TYPE_ENABLED, ROUTE_TABLE_HID, FWD_TABLE_DAG, XCACHE_SID };
+class XIACIDRouteTable : public Element { public:
 
-typedef struct {
-	int	port;
-	unsigned flags;
-	XID *nexthop;
-} XIARouteData;
+    XIACIDRouteTable();
+    ~XIACIDRouteTable();
 
-class XIAXIDRouteTable : public Element { public:
-
-    XIAXIDRouteTable();
-    ~XIAXIDRouteTable();
-
-    const char *class_name() const		{ return "XIAXIDRouteTable"; }
+    const char *class_name() const		{ return "XIACIDRouteTable"; }
     const char *port_count() const		{ return "-/-"; }
     const char *processing() const		{ return PUSH; }
 
@@ -80,6 +77,8 @@ private:
 	HashTable<XID, XIARouteData*> _rts;
 	XIARouteData _rtdata;
     uint32_t _drops;
+	XIAPath _local_addr;
+	XID _xcache_sid;
 
 	int _principal_type_enabled;
 };

@@ -864,8 +864,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	// NOTE: CID dags arrive here with the last ptr = the SID node,
 	//  so we can't use the last pointer as it's not pointing to the
 	// CID. I don't think this will break existing logic.
-	//XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	XID _destination_xid = dst_path.xid(dst_path.destination_node());
+	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+	//XID _destination_xid = dst_path.xid(dst_path.destination_node());
+	XID _intent_xid = dst_path.xid(dst_path.destination_node());
 
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
@@ -934,9 +935,10 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 				uint8_t hop_count = -1;
 				// we have received a syn for CID,
-				int dest_type = ntohl(_destination_xid.type());
+				int dest_type = ntohl(_intent_xid.type());
 				if (dest_type == CLICK_XIA_XID_TYPE_CID
 						|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
+					click_chatter("SYN for %s", dst_path.unparse().c_str());
 					hop_count = HLIM_DEFAULT - xiah.hlim();
 
 					// we've received a SYN for a CID DAG which usually contains a fallback
@@ -945,9 +947,9 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 					// Additionally, we may be a router which can service the request, so
 					// don't just flatten the DAG, but make sure it points to our cache daemon.
 					// FIXME: can we do this without having to convert to strings?
-					XIAPath new_addr = _local_addr;
-					new_addr.append_node(_xcache_sid);
-					new_addr.append_node(_destination_xid);
+					//XIAPath new_addr = _local_addr;
+					//new_addr.append_node(_xcache_sid);
+					//new_addr.append_node(_destination_xid);
 					set_full_dag = true;
 					/*
 					String str_local_addr = _local_addr.unparse_re();
@@ -958,7 +960,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 
 					dst_path.parse_re(str_local_addr);
 					*/
-					dst_path = new_addr;
+					//dst_path = new_addr;
 				}
 
 				// INFO("Socket %d Handling new SYN\n", sk->port);
@@ -2291,6 +2293,12 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in PacketRoute
 		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
 		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
+		// rt_CID and rt_NCID being updated
+		String cid_table_str = _hostname + "/xrc/n/proc/rt_CID.dag";
+		String ncid_table_str = _hostname + "/xrc/n/proc/rt_NCID.dag";
+		HandlerCall::call_write(cid_table_str.c_str(), new_dag.unparse().c_str(), this);
+		HandlerCall::call_write(ncid_table_str.c_str(), new_dag.unparse().c_str(), this);
+
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
@@ -2370,9 +2378,13 @@ void XTRANSPORT::XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketM
 	xia::X_SetXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_setxcachesid();
 
 	_xcache_sid.parse(_msg->sid().c_str());
+	// Update CID and NCID forwarding tables with Xcache SID
+	String cid_table_str = _hostname + "/xrc/n/proc/rt_CID.xcache";
+	String ncid_table_str = _hostname + "/xrc/n/proc/rt_NCID.xcache";
+	HandlerCall::call_write(cid_table_str.c_str(), _msg->sid().c_str(), this);
+	HandlerCall::call_write(ncid_table_str.c_str(), _msg->sid().c_str(), this);
 	// FIXME: this isn't returing a status
 }
-
 
 
 void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)

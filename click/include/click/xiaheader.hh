@@ -107,6 +107,10 @@ class XIAHeaderEncap { public:
     // (i.e. manual set_plen(p_in->length()) invocation is unnecessary)
     WritablePacket* encap(Packet* p_in, bool adjust_plen = true) const;
 
+	// replace the original header with a new one
+	// NOTE: the last visited pointer remains unchanged
+	WritablePacket* encap_replace(Packet *p_in) const;
+
     void update();
 
 private:
