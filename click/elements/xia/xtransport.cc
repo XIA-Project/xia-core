@@ -655,7 +655,26 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	CancelRetransmit(sk);
 
 	if (sk->src_path.destination_node() != static_cast<size_t>(-1)) {
-		src_xid = sk->src_path.xid(sk->src_path.destination_node());
+		XIAPath src_path = sk->src_path;
+		src_xid = src_path.xid(src_path.destination_node());
+
+		// If intent XID is a chunk
+		if (src_xid.type() == CLICK_XIA_XID_TYPE_CID
+				|| src_xid.type() == CLICK_XIA_XID_TYPE_NCID) {
+
+			// Get SID for the XIDpair from src_path DAG
+			if(src_path.remove_intent_node() == false) {
+				click_chatter("ERROR:Unable to remove intent node chunk");
+				return false;
+			}
+			src_xid = src_path.xid(src_path.destination_node());
+			assert(src_xid.type() == CLICK_XIA_XID_TYPE_SID);
+			if (src_xid.type() != CLICK_XIA_XID_TYPE_SID) {
+				click_chatter("Unable to teardown %s",
+						src_path.unparse().c_str());
+				return false;
+			}
+		}
 		have_src = true;
 	}
 	if (sk->dst_path.destination_node() != static_cast<size_t>(-1)) {
