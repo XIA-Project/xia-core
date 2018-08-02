@@ -518,7 +518,6 @@ skip_data:
 			syslog(LOG_INFO, "saving metadata for CID:%s",
 					meta->store_id().c_str());
 			ctrl->add_meta(meta);
-			assert(ctrl->acquire_meta(chunk_id) != NULL);
 			// printf("cache:cache length: %lu\n", meta->get_length());
 
 			xcache_req *req = new xcache_req();
