@@ -911,6 +911,7 @@ int xcache_controller::evict(xcache_cmd *resp, xcache_cmd *cmd)
 				xr.delRoute(c);
 				// let the garbage collector do the actual data removal
 				meta->set_state(EVICTING);
+				[[gnu::fallthrough]];
 
 			case EVICTING:
 				// we're in process of evicting...
@@ -1031,8 +1032,12 @@ store_named_done:
 	// Remove allocated data structures on failure
 	if (resp->status() != xcache_cmd::XCACHE_OK) {
 		switch(state) {
-			case 2: delete meta;
-			case 1: delete chdr;
+			case 2:
+				delete meta;
+				[[gnu::fallthrough]];
+			case 1:
+				delete chdr;
+				[[gnu::fallthrough]];
 		};
 	}
 	return RET_SENDRESP;
@@ -1106,8 +1111,12 @@ store_done:
 	// On error, delete allocated data structures
 	if(retval == RET_FAILED) {
 		switch(state) {
-			case 2: delete meta;
-			case 1: delete chdr;
+			case 2:
+				delete meta;
+				[[gnu::fallthrough]];
+			case 1:
+				delete chdr;
+				[[gnu::fallthrough]];
 		};
 	}
 	return retval;

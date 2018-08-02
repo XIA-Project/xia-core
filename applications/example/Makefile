@@ -9,7 +9,7 @@ TARGETS= echoclient echoclient-datagram echoclient-simple echoserver time_of_day
 
 all: $(TARGETS)
 	make -C dag_manipulation
-	make -C xssl
+	#make -C xssl
 	make -C speedtest
 
 %: %.c

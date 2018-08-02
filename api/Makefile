@@ -3,7 +3,7 @@ all:
 	make -C xsocket
 	make -C xcache
 	make -C wrapper
-	make -C xssl
+	#make -C xssl
 
 static:
 	make -C dagaddr static

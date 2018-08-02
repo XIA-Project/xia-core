@@ -115,12 +115,16 @@ add_ifaddr_done:
 	switch(state) {
 		case 4:
 			free(_ifaddr->ifa_dstaddr);
+			[[gnu::fallthrough]];
 		case 3:
 			free(_ifaddr->ifa_addr);
+			[[gnu::fallthrough]];
 		case 2:
 			free(_ifaddr->ifa_name);
+			[[gnu::fallthrough]];
 		case 1:
 			free(_ifaddr);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }

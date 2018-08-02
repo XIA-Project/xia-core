@@ -21,39 +21,39 @@ XIAPath::XIAPath()
 
 XIAPath::XIAPath(const XIAPath& r)
 {
-	g = r.g;
+    g = r.g;
 }
 
 XIAPath&
 XIAPath::operator=(const XIAPath& r)
 {
-	g = r.g;
+    g = r.g;
     return *this;
 }
 
 bool
 XIAPath::parse(const String& s, const Element* context)
 {
-	(void) context;
-	g = Graph(s.c_str());
-	if(g.num_nodes() <= 1) {
-		return false;
-	}
+    (void) context;
+    g = Graph(s.c_str());
+    if(g.num_nodes() <= 1) {
+        return false;
+    }
     return true;
 }
 
 bool
 XIAPath::parse_dag(const String& s, const Element* context)
 {
-	(void) context;
-	return parse(s, context);
+    (void) context;
+    return parse(s, context);
 }
 
 bool
 XIAPath::parse_re(const String& s, const Element* context)
 {
-	(void) context;
-	return parse(s, context);
+    (void) context;
+    return parse(s, context);
 }
 
 template <typename InputIterator>
@@ -63,14 +63,14 @@ XIAPath::parse_node(InputIterator node_begin, InputIterator node_end)
     if (node_begin == node_end)
         return;
 
-	int count = 0;
+    int count = 0;
     InputIterator current_node = node_begin;
 
     while (current_node != node_end) {
-		++count;
-		++current_node;
-	}
-	g.from_wire_format(count, node_begin);
+        ++count;
+        ++current_node;
+    }
+    g.from_wire_format(count, node_begin);
 }
 
 template void XIAPath::parse_node(const struct click_xia_xid_node*, const struct click_xia_xid_node*);
@@ -80,7 +80,7 @@ template <typename InputIterator>
 void
 XIAPath::parse_node(InputIterator node_begin, size_t n)
 {
-	g.from_wire_format(n, node_begin);
+    g.from_wire_format(n, node_begin);
 }
 
 template void XIAPath::parse_node(const struct click_xia_xid_node*, size_t);
@@ -89,21 +89,21 @@ template void XIAPath::parse_node(struct click_xia_xid_node*, size_t);
 String
 XIAPath::unparse(const Element* context)
 {
-	(void) context;
-	return g.dag_string().c_str();
+    (void) context;
+    return g.dag_string().c_str();
 }
 
 String
 XIAPath::unparse_dag(const Element* context)
 {
-	(void) context;
-	return g.dag_string().c_str();
+    (void) context;
+    return g.dag_string().c_str();
 }
 
 size_t
 XIAPath::unparse_node_size() const
 {
-	return g.unparse_node_size();
+    return g.unparse_node_size();
 }
 
 size_t
@@ -116,26 +116,26 @@ XIAPath::unparse_node(struct click_xia_xid_node* node, size_t n) const
     if (total_n == 0)
         return 0;
 
-	return g.fill_wire_buffer(node);
+    return g.fill_wire_buffer(node);
 }
 
 
 bool
 XIAPath::is_valid() const
 {
-	if (g.num_nodes() >= 1) {
-		return true;
-	}
-	return false;
+    if (g.num_nodes() >= 1) {
+        return true;
+    }
+    return false;
 }
 
 void
 XIAPath::find_nodes_of_type(uint32_t type, Vector<XID> &v)
 {
-	std::vector<const Node *>fid_nodes = g.get_nodes_of_type(type);
-	for (size_t i=0; i < fid_nodes.size(); i++) {
-		v.push_back(XID(fid_nodes[i]->to_string().c_str()));
-	}
+    std::vector<const Node *>fid_nodes = g.get_nodes_of_type(type);
+    for (size_t i=0; i < fid_nodes.size(); i++) {
+        v.push_back(XID(fid_nodes[i]->to_string().c_str()));
+    }
 }
 
 XIAPath::handle_t
@@ -147,13 +147,13 @@ XIAPath::destination_node() const
 std::string
 XIAPath::intent_ad_str() const
 {
-	return g.intent_AD_str();
+    return g.intent_AD_str();
 }
 
 std::string
 XIAPath::intent_hid_str() const
 {
-	return g.intent_HID_str();
+    return g.intent_HID_str();
 }
 
 /**
@@ -173,65 +173,65 @@ XIAPath::xid(handle_t node) const
 bool
 XIAPath::replace_intent_hid(XID new_hid)
 {
-	return g.replace_intent_HID(new_hid.unparse().c_str());
+    return g.replace_intent_HID(new_hid.unparse().c_str());
 }
 
 std::string
 XIAPath::intent_sid_str() const
 {
-	return g.intent_SID_str();
+    return g.intent_SID_str();
 }
 
 bool
 XIAPath::append_node(const XID& xid)
 {
-	g.append_node_str(xid.unparse().c_str());
-	return true;
+    g.append_node_str(xid.unparse().c_str());
+    return true;
 }
 
 bool
 XIAPath::remove_intent_sid_node()
 {
-	return g.remove_intent_sid_node();
+    return g.remove_intent_sid_node();
 }
 
 bool
 XIAPath::remove_intent_node()
 {
-	return g.remove_intent_node();
+    return g.remove_intent_node();
 }
 
 
 bool
 XIAPath::flatten()
 {
-	return g.flatten();
+    return g.flatten();
 }
 
 int
 XIAPath::compare_except_intent_ad(XIAPath& other)
 {
-	return g.compare_except_intent_AD(other.get_graph());
+    return g.compare_except_intent_AD(other.get_graph());
 }
 
 const Graph&
 XIAPath::get_graph() const
 {
-	return g;
+    return g;
 }
 
 bool
 XIAPath::first_hop_is_sid() const
 {
-	return g.first_hop_is_sid();
+    return g.first_hop_is_sid();
 }
 
 bool XIAPath::operator== (XIAPath& other) {
-	return (g == other.g);
+    return (g == other.g);
 }
 
 bool XIAPath::operator!= (XIAPath& other) {
-	return !(g == other.g);
+    return !(g == other.g);
 }
 
 #ifndef NDEBUG_XIA

@@ -141,11 +141,14 @@ fs_done:
 	switch(state) {
 		case 3:
 			Xclose(sock);
+			[[gnu::fallthrough]];
 		case 2:
 			Xfreeaddrinfo(ai);
+			[[gnu::fallthrough]];
 		case 1:
 			// TODO: Can check if XexistsSID before attempting remove
 			XremoveSID(sid_string);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }

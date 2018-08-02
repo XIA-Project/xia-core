@@ -161,35 +161,36 @@ def getAradaInterfaces(ignore_interfaces):
 		pass
 	return addrs
 
+def interfaceNames(ignore_interfaces):
+    iface_list = []
+    interfaces = subprocess.check_output('ifconfig -s'.split())
+    interfaces = interfaces.strip()
+    interfaces = interfaces.split('\n')
+    for iface_out in interfaces[1:]:
+        iface = iface_out.split()[0]
+        if iface not in ignore_interfaces:
+            iface_list.append(iface)
+    return iface_list
+
 #
 # get list of interfaces on Linux
 #
 def getLinuxInterfaces(ignore_interfaces):
-    # Get the MAC and IP addresses
-    filters = ''
-    if ignore_interfaces != None:
-        filter_array = ignore_interfaces.split(",")
-        for filter in filter_array:
-            filters += 'grep -v %s | ' % filter.strip()
-
-    cmdline = subprocess.Popen(
-            "/sbin/ifconfig | %s grep -v fake | grep -A 1 HWaddr | sed 's/ \+/ /g' | sed s/addr://" % (filters),
-            shell=True, stdout=subprocess.PIPE)
-    result = cmdline.stdout.read().strip()
-
-    # TODO: eliminate this by making the shell command above smarter
+    # Output: list of found addresses
     addrs = []
-    temp_array = result.split("\n")
-    iface, mac, ip = (None, None, None)
-    for i in range(len(temp_array)):
-        if temp_array[i].strip() == '':
-            continue
-        if i % 3 == 0:
-            iface = temp_array[i].split(' ')[0]
-            mac = temp_array[i].split(' ')[4]
-        elif i % 3 == 1:
-            ip = temp_array[i].split(' ')[2]
-            addrs.append([iface, mac, ip])
+
+    # Get the names of all interfaces minus the ones to be ignored
+    ignore_list = []
+    if ignore_interfaces is not None:
+        ignore_list = ignore_interfaces.split(",")
+    ifaces = interfaceNames(ignore_list)
+    for iface in ifaces:
+        # Get each interface's mac address
+        cmd = 'ifconfig {}'.format(iface)
+        ifconfig_out = subprocess.check_output(cmd.split())
+        mac = mac_str_from_ifconfig_out(ifconfig_out)
+        if mac is not None:
+            addrs.append([iface, mac, '0.0.0.0'])
 
     return addrs
 
