@@ -2,20 +2,19 @@
 
 sudo apt-mark hold grub
 sudo apt-get update -qq -y
-sudo apt-get install -qq -y git libpq-dev libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto build-essential openssl swig
+sudo apt-get install -qq -y git net-tools libpq-dev libxml2 libxml2-dev libssl-dev python-pip python-tk python-dev python-requests python-crypto python-scipy build-essential openssl swig
 
-sudo pip install pynacl
-sudo pip install psutil
-sudo pip install configparser
-sudo pip install ipaddress
+sudo -H pip install pynacl
+sudo -H pip install psutil
+sudo -H pip install configparser
+sudo -H pip install ipaddress
 
 # needed for video broker
-sudo pip install rpyc
-sudo pip install msgpack
-sudo pip install pycountry
-sudo pip install dotmap
-sudo pip install scipy
-sudo pip install simpleplotlib
+sudo -H pip install rpyc
+sudo -H pip install msgpack
+sudo -H pip install pycountry
+sudo -H pip install dotmap
+sudo -H pip install simpleplotlib
 
 rel=$(lsb_release -d)
 
