@@ -85,6 +85,7 @@ static int sha1_hash_of_pubkey(unsigned char *hash, int hashlen, char *pemkey, i
 
 	assert(hash != NULL);
 	assert(hashlen == SHA_DIGEST_LENGTH);
+	(void)hashlen;
 
 	pubkeystr = (char *)calloc(keylen - keystartoffset - keyendoffset, 1);
 	if(pubkeystr == NULL) {
@@ -168,10 +169,18 @@ static int write_key_files(const char *keydir, char *pubkeyhashstr, RSA *r)
 
 cleanup_write_key_files:
 	switch(state) {
-		case 4: BIO_free_all(privfilebio);
-		case 3: BIO_free_all(pubfilebio);
-		case 2: free(pubfilepath);
-		case 1: free(privfilepath);
+		case 4:
+			BIO_free_all(privfilebio);
+			[[gnu::fallthrough]];
+		case 3:
+			BIO_free_all(pubfilebio);
+			[[gnu::fallthrough]];
+		case 2:
+			free(pubfilepath);
+			[[gnu::fallthrough]];
+		case 1:
+			free(privfilepath);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }
@@ -317,6 +326,7 @@ destroy_keypair_done:
 	switch(state) {
 		case 2:
 			free(pubfilepath);
+			[[gnu::fallthrough]];
 		case 1:
 			free(privfilepath);
 	};
@@ -455,10 +465,18 @@ int generate_keypair(char *pubkeyhashstr, int hashstrlen)
 
 cleanup_generate_keypair:
 	switch(state) {
-		case 4: free(pubkeystr);
-		case 3: BIO_free_all(pubkeybuf);
-		case 2: RSA_free(r);
-		case 1: BN_free(bne);
+		case 4:
+			free(pubkeystr);
+			[[gnu::fallthrough]];
+		case 3:
+			BIO_free_all(pubkeybuf);
+			[[gnu::fallthrough]];
+		case 2:
+			RSA_free(r);
+			[[gnu::fallthrough]];
+		case 1:
+			BN_free(bne);
+			[[gnu::fallthrough]];
 	};
 
 	return retval;
@@ -478,8 +496,10 @@ cleanup_generate_keypair:
  */
 int XmakeNewSID(char *randomSID, int randomSIDlen)
 {
-	char pubkeyhashstr[XIA_SHA_DIGEST_STR_LEN];
 	assert(randomSIDlen >= (int) (strlen("SID:") + XIA_SHA_DIGEST_STR_LEN));
+	(void) randomSIDlen;
+
+	char pubkeyhashstr[XIA_SHA_DIGEST_STR_LEN];
 	if(generate_keypair(pubkeyhashstr, XIA_SHA_DIGEST_STR_LEN)) {
 		return -1;
 	}
@@ -631,8 +651,12 @@ int exists_keypair(const char *pubkeyhashstr)
 	}
 exists_keypair_done:
 	switch(state) {
-		case 2: free(pubfilepath);
-		case 1: free(privfilepath);
+		case 2:
+			free(pubfilepath);
+			[[gnu::fallthrough]];
+		case 1:
+			free(privfilepath);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }

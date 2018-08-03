@@ -1,4 +1,5 @@
 /* Protocol between libxsocket and Xcache */
+syntax = "proto2";
 
 message xcache_cmd {
 	enum req_type {

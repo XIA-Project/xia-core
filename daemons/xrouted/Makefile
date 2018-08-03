@@ -20,7 +20,7 @@ xroute.pb.cc xroute.pb.h: xroute.proto
 	protoc --cpp_out=. $<
 
 $(XROUTED): $(COMMON_OBJS) $(ROUTER_OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $@ $(CFLAGS) -Wno-unused-parameter $^ $(LDFLAGS)
 
 $(XCONTROLD): $(COMMON_OBJS) $(CONTROL_OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)

@@ -282,8 +282,12 @@ bool PublisherKey::fetch_pubkey()
 	// TODO Currently storing before verification. Verify before store.
 fetch_pubkey_done:
 	switch(state) {
-		case 2: delete pubcert;
-		case 1: free(cert);
+		case 2:
+			delete pubcert;
+			[[gnu::fallthrough]];
+		case 1:
+			free(cert);
+			[[gnu::fallthrough]];
 	};
 
 	return retval;

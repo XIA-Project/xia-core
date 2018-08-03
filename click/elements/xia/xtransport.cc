@@ -1275,6 +1275,7 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 		break;
 	case xia::XDEFIFACE:
 		Xdefaultiface(_sport, id, &xia_socket_msg);
+		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;

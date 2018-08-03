@@ -36,7 +36,7 @@ DELAY  = 2
 levels = ['LOG_EMERG', 'LOG_ALERT', 'LOG_CRIT', 'LOG_ERR', 'LOG_WARNING', 'LOG_NOTICE', 'LOG_INFO', 'LOG_DEBUG']
 
 # services for the various node types
-common_services           = ['click', 'xnetjd', 'xcache']
+common_services           = ['click', 'xnetjd', 'pubkeymgr', 'xcache']
 controller_services       = ['xcontrold']
 controller_extra_services = ['xnameservice', 'xrendezvous']
 router_services           = ['xrouted']

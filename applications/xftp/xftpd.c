@@ -74,7 +74,10 @@ void getConfig(int argc, char** argv)
 	int c;
 
 	strcpy(name, NAME);
-	(void*)getcwd(rootdir, sizeof(rootdir));
+	if(getcwd(rootdir, sizeof(rootdir)) == NULL) {
+		printf("ERROR getting current working directory\n");
+		exit(-1);
+	}
 
 	opterr = 0;
 

@@ -25,7 +25,7 @@ fi
 x=$(pgrep -f 'xnetj|broker|pinger' | tr '\n' ',')
 
 # get the rest of the click processes (replace \n in pgrep output with ,)
-x="$x$(pgrep 'click|xrouted|xcontrold|xhostd|xcache|xname|xiaproxy|load_video|xmanifestd|statsserver|xstats' | tr '\n ' ',')"
+x="$x$(pgrep 'click|xrouted|xcontrold|xhostd|xcache|xname|xiaproxy|load_video|xmanifestd|pubkeymgr|statsserver|xstats' | tr '\n ' ',')"
 
 # show debug processes in case we are running a daemon with them
 if [ "$1" == "-d" ] || [ "$1" == "--debug" ]; then

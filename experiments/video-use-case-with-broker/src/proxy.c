@@ -230,7 +230,7 @@ int handle_cross_origin_probe(ProxyRequestCtx *ctx) {
 }
 
 int handle_manifest_requests(ProxyRequestCtx *ctx) {
-    char cmd[XIA_MAXBUF];
+    char cmd[sizeof("xhttp://") + sizeof(ProxyRequestCtx)];
     char reply[XIA_MAXBUF];
 
     // send the request for manifest
