@@ -13,7 +13,7 @@ xroute.pb.cc: xroute.proto
 	protoc --cpp_out=. $<
 
 $(XROUTED): $(SOURCES)
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
+	$(CC) -o $@ $(CFLAGS) -Wno-unused-parameter $^ $(LDFLAGS)
 
 clean:
 	@-rm -f $(XROUTED)

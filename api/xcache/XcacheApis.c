@@ -1243,8 +1243,12 @@ int XrequestPushedChunk(std::string &chunkaddr,
 
 request_pushed_chunk_done:
 	switch(state) {
-		case 3: free(buf);
-		case 2: Xclose(sockfd);
+		case 3:
+			free(buf);
+			[[gnu::fallthrough]];
+		case 2:
+			Xclose(sockfd);
+			[[gnu::fallthrough]];
 		case 1: delete g;
 	};
 	return retval;
@@ -1410,7 +1414,9 @@ static int _process_key_request(PublisherKeyCmdBuf &cmd,
 
 _process_key_request_done:
 	switch(state) {
-		case 2: free(response);
+		case 2:
+			free(response);
+			[[gnu::fallthrough]];
 		case 1: close(sockfd);
 	};
 

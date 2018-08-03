@@ -27,7 +27,7 @@ all: $(SUBDIRS) $(LIB) announce_publisher
 	$(PROTOC) --cpp_out=. $<
 
 %.pb.o: %.pb.cc
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) -Wno-unused-parameter $< -o $@
 
 %.o: %.c $(INC)/xcache.h
 	$(CC) $(CFLAGS) $< -o $@
