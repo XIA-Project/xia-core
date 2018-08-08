@@ -462,6 +462,7 @@ Node::has_valid_xid() const
 		case XID_TYPE_HID:
 		case XID_TYPE_SID:
 			valid = true;
+			break;
 		default:
 			std::string s = xids[this->type()];
 			if (!s.empty()) {

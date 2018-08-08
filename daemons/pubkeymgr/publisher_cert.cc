@@ -148,8 +148,10 @@ check_done:
 	switch(state) {
 		case 2:
 			X509_STORE_CTX_free(context);
+			[[gnu::fallthrough]];
 		case 1:
 			X509_free(x);
+			[[gnu::fallthrough]];
 	}
 
 	return ret;
@@ -221,11 +223,21 @@ bool PublisherCert::extract_pubkey()
 
 extract_pubkey_done:
 	switch(state) {
-		case 5: EVP_PKEY_free(pubkey);
-		case 4: X509_free(cert);
-		case 3: BIO_free_all(outbio);
-		case 2: BIO_free_all(certbio);
-		case 1: fclose(pubkeyfile);
+		case 5:
+			EVP_PKEY_free(pubkey);
+			[[gnu::fallthrough]];
+		case 4:
+			X509_free(cert);
+			[[gnu::fallthrough]];
+		case 3:
+			BIO_free_all(outbio);
+			[[gnu::fallthrough]];
+		case 2:
+			BIO_free_all(certbio);
+			[[gnu::fallthrough]];
+		case 1:
+			fclose(pubkeyfile);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }

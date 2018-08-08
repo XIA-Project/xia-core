@@ -28,7 +28,7 @@ xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
 
 xia.pb.o:
-	$(CC) $(CFLAGS) xia.pb.cc  -o $@
+	$(CC) $(CFLAGS) -Wno-unused-parameter xia.pb.cc  -o $@
 
 %.o: %.c xia.pb.cc $(XINC)/Xsocket.h $(XINC)/xia.h
 	$(CC) $(CFLAGS) $<  -o $@ -lpthread

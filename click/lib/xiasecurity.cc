@@ -421,6 +421,7 @@ static const char *get_keydir()
 void xs_getSHA1Hash(const unsigned char *data, int data_len, uint8_t* digest, int digest_len)
 {
 	assert(digest_len == SHA_DIGEST_LENGTH);
+	(void) digest_len;
 	SHA1(data, data_len, digest);
 }
 
@@ -772,8 +773,12 @@ int xs_signDigestWithKey(const char *privfilepath,
 
 xs_sign_digest_with_key_done:
 	switch(state) {
-		case 2: free(sig_buf);
-		case 1: fclose(fp);
+		case 2:
+			free(sig_buf);
+			[[gnu::fallthrough]];
+		case 1:
+			fclose(fp);
+			[[gnu::fallthrough]];
 	}
 	return retval;
 }
@@ -854,9 +859,15 @@ int xs_readPubkeyFile(const char *pubfilepath,
 
 xs_readPubkeyFile_cleanup:
 	switch(state) {
-		case 3: BIO_free_all(bio_pub);
-		case 2: RSA_free(rsa);
-		case 1: fclose(fp);
+		case 3:
+			BIO_free_all(bio_pub);
+			[[gnu::fallthrough]];
+		case 2:
+			RSA_free(rsa);
+			[[gnu::fallthrough]];
+		case 1:
+			fclose(fp);
+			[[gnu::fallthrough]];
 	};
 	return retval;
 }

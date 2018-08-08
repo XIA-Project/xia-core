@@ -17,7 +17,7 @@ CFLAGS+=-I$(APIDIR)/include -I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../
 	protoc -I. --cpp_out=. $<
 
 %.o: %.cc
-	$(CC) $(CFLAGS) -g -c -fpic $< -o $@
+	$(CC) $(CFLAGS) -Wno-unused-parameter -g -c -fpic $< -o $@
 
 $(LIB): $(OBJS)
 	$(LD) --shared -g -o $@ $^ -lc -ldl $(LDFLAGS)

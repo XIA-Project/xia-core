@@ -63,7 +63,7 @@ LDFLAGS=-L\$(MIPSLIBDIR) -lpthread -Wl,-rpath,\$(APIDIR)/lib
 PYLDFLAGS=-L\$(MIPSLIBDIR)/python2.7/config -lpython2.7 -lpthread -ldl -lpthread -lutil -lm -Xlinker -export-dynamic
 PYINCLUDES=-I\$(MIPSPYINCDIR)
 
-LIBS=\$(XLIB)/libxcache.so \$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so -lprotobuf -lssl -lcrypto
+LIBS=\$(XLIB)/libxcache.so \$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so -lprotobuf -lssl -lcrypto
 
 EOF
 
@@ -86,7 +86,7 @@ LD=g++
 CFLAGS=$CFLAGS -I\$(XINC)
 CXXFLAGS=$CFLAGS
 LDFLAGS=-lpthread -Wl,-rpath,\$(APIDIR)/lib
-LIBS=\$(XLIB)/libxcache.so \$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so \$(XLIB)/libXssl.so
+LIBS=\$(XLIB)/libxcache.so \$(XLIB)/libXsocket.so \$(XLIB)/libdagaddr.so
 PYLDFLAGS=`python-config --ldflags`
 PYINCLUDES=`python-config --includes`
 

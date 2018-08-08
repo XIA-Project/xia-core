@@ -88,7 +88,7 @@ void populate()
 	DIR *cd = opendir(CACHEDIR);
 	struct dirent* chunk;
 	struct stat info;
-	char path[256];
+	char path[512];
 	char cid[64];
 	char *buf;
 	sockaddr_x addr;
