@@ -1607,6 +1607,9 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		xid_pair.set_src(source_xid);
 		xid_pair.set_dst(destination_xid);
 
+		// Assign src & dst XID pair as 'key' for this socket
+		sk->set_key(xid_pair);
+
 		// Map the src & dst XID pair to source port()
 		XIDpairToSock.set(xid_pair, tcp_conn);
 
