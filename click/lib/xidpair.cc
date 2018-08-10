@@ -50,6 +50,16 @@ XIDpair::set_dst(const XID& dst)
     dst_xid = dst;
 }
 
+XID&
+XIDpair::src()
+{
+	return src_xid;
+}
 
+XID&
+XIDpair::dst()
+{
+	return dst_xid;
+}
 
 CLICK_ENDDECLS

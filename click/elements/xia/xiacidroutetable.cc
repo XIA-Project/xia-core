@@ -479,7 +479,7 @@ XIACIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 	  XIAHeader hdr(p->xia_header());
 	  XIAPath our_path = hdr.dst_path();
 	  XID intent_xid = our_path.xid(our_path.destination_node());
-	  uint32_t type = intent_xid.type();
+	  uint32_t type = ntohl(intent_xid.type());
 	  if(!(type == CLICK_XIA_XID_TYPE_CID
 				  || type == CLICK_XIA_XID_TYPE_NCID)) {
 		  // We got a packet whose intent was not CID. Not allowed.
@@ -492,8 +492,8 @@ XIACIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 	  our_new_addr.append_node(intent_xid);
 	  XIAHeaderEncap hdr_encap(hdr);
 	  hdr_encap.set_dst_path(our_new_addr);
-	  // Xcache SID is the second node from end based on order of addition
-	  hdr_encap.set_last(our_new_addr.unparse_node_size()-2);
+	  // Xcache SID is the third node from end based on order of addition
+	  hdr_encap.set_last(our_new_addr.unparse_node_size()-3);
 	  hdr_encap.encap_replace(p);
 	  // Now, send the packet up the stack
 	  output(1).push(p);

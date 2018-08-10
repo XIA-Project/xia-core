@@ -655,30 +655,11 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	CancelRetransmit(sk);
 
 	if (sk->src_path.destination_node() != static_cast<size_t>(-1)) {
-		XIAPath src_path = sk->src_path;
-		src_xid = src_path.xid(src_path.destination_node());
-
-		// If intent XID is a chunk
-		if (src_xid.type() == CLICK_XIA_XID_TYPE_CID
-				|| src_xid.type() == CLICK_XIA_XID_TYPE_NCID) {
-
-			// Get SID for the XIDpair from src_path DAG
-			if(src_path.remove_intent_node() == false) {
-				click_chatter("ERROR:Unable to remove intent node chunk");
-				return false;
-			}
-			src_xid = src_path.xid(src_path.destination_node());
-			assert(src_xid.type() == CLICK_XIA_XID_TYPE_SID);
-			if (src_xid.type() != CLICK_XIA_XID_TYPE_SID) {
-				click_chatter("Unable to teardown %s",
-						src_path.unparse().c_str());
-				return false;
-			}
-		}
+		src_xid = sk->get_key().src();
 		have_src = true;
 	}
 	if (sk->dst_path.destination_node() != static_cast<size_t>(-1)) {
-		dst_xid = sk->dst_path.xid(sk->dst_path.destination_node());
+		dst_xid = sk->get_key().dst();
 		have_dst = true;
 	}
 
@@ -686,12 +667,8 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 
 	if (sk->sock_type == SOCK_STREAM) {
 		if (have_src && have_dst) {
-			XIDpair xid_pair;
-			xid_pair.set_src(src_xid);
-			xid_pair.set_dst(dst_xid);
-
-			XIDpairToConnectPending.erase(xid_pair);
-			XIDpairToSock.erase(xid_pair);
+			XIDpairToConnectPending.erase(sk->get_key());
+			XIDpairToSock.erase(sk->get_key());
 		}
 	}
 
@@ -881,12 +858,8 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 	}
 
 	// NOTE: CID dags arrive here with the last ptr = the SID node,
-	//  so we can't use the last pointer as it's not pointing to the
-	// CID. I don't think this will break existing logic.
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
-	//XID _destination_xid = dst_path.xid(dst_path.destination_node());
 	XID _intent_xid = dst_path.xid(dst_path.destination_node());
-
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
 	XIDpair xid_pair;
@@ -937,78 +910,49 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				return;
 			}
 
-			// First, check if this request is already in the pending queue
-			HashTable<XIDpair , class sock*>::iterator it;
-			it = XIDpairToConnectPending.find(xid_pair);
+			// if this is new request, put it in the queue
+			// Check if this new request was modified by rendezvous service
+			bool rv_modified_dag = false;
 
-			if (it == XIDpairToConnectPending.end()) {
-				// if this is new request, put it in the queue
-				// Check if this new request was modified by rendezvous service
-				bool rv_modified_dag = false;
-
-				XIAPath bound_dag = sk->get_src_path();
-				XIAPath pkt_dag = dst_path; // Our address that client sent
-				if (usingRendezvousDAG(bound_dag, pkt_dag)) {
-					rv_modified_dag = true;
-				}
-
-				uint8_t hop_count = -1;
-				// we have received a syn for CID,
-				int dest_type = ntohl(_intent_xid.type());
-				if (dest_type == CLICK_XIA_XID_TYPE_CID
-						|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
-					click_chatter("SYN for %s", dst_path.unparse().c_str());
-					hop_count = HLIM_DEFAULT - xiah.hlim();
-
-					// we've received a SYN for a CID DAG which usually contains a fallback
-					// we need to strip out the direct path to the content and only use the
-					// AD->HID->SID->CID path.
-					// Additionally, we may be a router which can service the request, so
-					// don't just flatten the DAG, but make sure it points to our cache daemon.
-					// FIXME: can we do this without having to convert to strings?
-					//XIAPath new_addr = _local_addr;
-					//new_addr.append_node(_xcache_sid);
-					//new_addr.append_node(_destination_xid);
-					set_full_dag = true;
-					/*
-					String str_local_addr = _local_addr.unparse_re();
-					str_local_addr += " ";
-					str_local_addr += _xcache_sid.unparse();
-					str_local_addr += " ";
-					str_local_addr += _destination_xid.unparse();
-
-					dst_path.parse_re(str_local_addr);
-					*/
-					//dst_path = new_addr;
-				}
-
-				// INFO("Socket %d Handling new SYN\n", sk->port);
-				// Prepare new sock for this connection
-				uint32_t new_id = NewID();
-				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
-
-				new_sk->initialize(ErrorHandler::default_handler());
-
-				new_sk->dst_path = src_path;
-				new_sk->src_path = dst_path;
-				new_sk->listening_sock = sk;
-				new_sk->rv_modified_dag = rv_modified_dag;
-				int iface;
-				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
-					new_sk->outgoing_iface = iface;
-				}
-				if (set_full_dag) {
-					new_sk->full_src_dag = true;
-				}
-				new_sk->set_key(xid_pair);
-				new_sk->set_hop_count(hop_count);
-				XIDpairToConnectPending.set(xid_pair, new_sk);
-				new_sk->push(p_in);
+			XIAPath bound_dag = sk->get_src_path();
+			XIAPath pkt_dag = dst_path; // Our address that client sent
+			if (usingRendezvousDAG(bound_dag, pkt_dag)) {
+				rv_modified_dag = true;
 			}
+
+			uint8_t hop_count = -1;
+			// we have received a syn for CID,
+			int dest_type = ntohl(_intent_xid.type());
+			if (dest_type == CLICK_XIA_XID_TYPE_CID
+					|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
+				hop_count = HLIM_DEFAULT - xiah.hlim();
+				set_full_dag = true;
+			}
+
+			// INFO("Socket %d Handling new SYN\n", sk->port);
+			// Prepare new sock for this connection
+			uint32_t new_id = NewID();
+			XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
+
+			new_sk->initialize(ErrorHandler::default_handler());
+
+			new_sk->dst_path = src_path;
+			new_sk->src_path = dst_path;
+			new_sk->listening_sock = sk;
+			new_sk->rv_modified_dag = rv_modified_dag;
+			int iface;
+			if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
+				new_sk->outgoing_iface = iface;
+			}
+			if (set_full_dag) {
+				new_sk->full_src_dag = true;
+			}
+			new_sk->set_key(xid_pair);
+			new_sk->set_hop_count(hop_count);
+			XIDpairToConnectPending.set(xid_pair, new_sk);
+			new_sk->push(p_in);
 		}
 	}
-
-
 }
 
 

@@ -843,8 +843,8 @@ int xcache_controller::__store(xcache_meta *meta, const std::string &data)
  * Build a DAG for the provided CID or NCID. It is assumed that the chunk
  * is cached on the local xcache.
  *
- *     * -------------------------> cid
- *      `--> AD -> HID -> SID--'
+ *     * ------------------> cid
+ *      `--> AD -> HID ---'
  *
  * @param cid is the CID or NCID that is cached locally
  *
@@ -855,34 +855,29 @@ int xcache_controller::cid2addr(std::string cid, sockaddr_x *sax)
 {
 	int rc = 0;
 
-	struct addrinfo *ai;
-
-	// make a direct AD-HID-SID dag for the xcache daemon
-	if (Xgetaddrinfo(NULL, xcache_sid.c_str(), NULL, &ai) >= 0) {
-		if (ai->ai_addr) {
-			// now append the CID to it
-			Node cnode(cid);
-			Graph spath((sockaddr_x*)ai->ai_addr);
-			spath *= cnode;
-
-			// now make a direct ->CID path
-			Graph cpath = Node() * cnode;
-
-			// make final dag
-			// * => CID is primary
-			// * => AD => HID => SID => CID is fallback
-			Graph dag = cpath + spath;
-
-			sockaddr_x xaddr;
-			dag.fill_sockaddr(&xaddr);
-			memcpy(sax, &xaddr, sizeof(sockaddr_x));
-		} else {
-			rc = -1;
-		}
-
-		Xfreeaddrinfo(ai);
-	} else {
+	struct ifaddrs *ifaddr;
+	// TODO: What if we have more than one local addr? using default for now.
+	if (Xgetifaddrs(&ifaddr)) {
 		rc = -1;
+	} else {
+		// A node for our CID
+		Node cid_node(cid);
+
+		// Build CID DAG:  *-> AD -> HID -> CID
+		sockaddr_x *iface_dag = (sockaddr_x *)ifaddr->ifa_addr;
+		Graph cid_dag(iface_dag);
+		cid_dag *= cid_node;
+
+		// Another DAG with just CID: *-> CID
+		Graph cid_direct_dag = Node() * cid_node;
+
+		// Final DAG with cid_direct_dag as primary and cid_dag as fallback
+		Graph dag = cid_direct_dag + cid_dag;
+
+		sockaddr_x xaddr;
+		dag.fill_sockaddr(&xaddr);
+		memcpy(sax, &xaddr, sizeof(sockaddr_x));
+		Xfreeifaddrs(ifaddr);
 	}
 
 	return rc;
