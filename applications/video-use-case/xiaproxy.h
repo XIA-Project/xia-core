@@ -38,9 +38,9 @@ typedef struct _ProxyRequestCtx{
     int xia_sock;				// xia socket to server inside XIA
     int browser_sock;			// socket back to browser
 
-    char remote_host[MAXLINE];	// ip for remote host
-    char remote_port[MAXLINE];	// remote port
-    char remote_path[MAXLINE];	// remote resource path
+    char remote_host[4096];	// ip for remote host
+    char remote_port[4096];	// remote port
+    char remote_path[4096];	// remote resource path
 	char params[MAXLINE];		// everything after '?'
 
 	// save this stuff at the start of the connection so

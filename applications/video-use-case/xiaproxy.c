@@ -25,8 +25,6 @@ static int reuseaddr = 1;               // need to reuse the address for binding
 static int list_s;                      // listening socket of this proxy
 static XcacheHandle xcache;             // xcache instance
 
-unsigned int numthreads        = 0;     // Current number of clients
-pthread_mutex_t numthreadslock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t cdn_lock       = PTHREAD_MUTEX_INITIALIZER;
 
 uint32_t last_bandwidth = 0;
@@ -643,6 +641,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		syslog(LOG_NOTICE, "elapsed: %0.3f", elapsed);
 		syslog(LOG_NOTICE, "throughput: %0.3f mbps", len / elapsed * 8 / 1000000);
 
+		FILE *f = fopen("proxy.log", "a");
+		fprintf(f, "%s: cached %s %u bytes, %0.3f s, %0.3f mbps\n", g.intent_CID_str().c_str(),
+				cached ? "1" : "0", len, elapsed, len / elapsed * 8 / 1000000);
+		fclose(f);
+
 		if (ctx->bandwidth != 0) {
 			CDNStat s;
 			s.cached    = cached;
@@ -695,11 +698,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 
 int handle_manifest_requests(ProxyRequestCtx *ctx)
 {
-	char cmd[XIA_MAXBUF];
-	char reply[XIA_MAXBUF];
+	char cmd[MAXLINE];
+	char reply[MAXLINE];
 
 	// send the request for manifest
-	sprintf(cmd, "xhttp://%s%s", ctx->remote_host, ctx->remote_path);
+	snprintf(cmd, MAXLINE, "xhttp://%s%s", ctx->remote_host, ctx->remote_path);
 	memset(reply, '\0', sizeof(reply));
 	if (send_and_receive_reply(ctx, cmd, reply) < 0) {
 		return -1;
@@ -741,7 +744,6 @@ int handle_stream_requests(ProxyRequestCtx *ctx)
 	ctx->cdn_host = cdn_host;
 	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
-	//printf("forward header\n");
 	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0) {
 		syslog(LOG_WARNING, "unable to forward manifest to client");
 		return -1;
@@ -891,7 +893,6 @@ int xia_proxy_handle_request(int browser_sock)
 				}
 			} else {
 				// manifest request must request .mpd files as extension
-				printf("manifest request\n");
 				if (strcasestr(ctx.remote_path, ".mpd") == NULL) {
 					syslog(LOG_WARNING, "request remote path not mpd manifest type");
 					return -1;
@@ -933,7 +934,7 @@ int xia_proxy_handle_request(int browser_sock)
 void *job(void *sockptr)
 {
 	int rc;
-	int browser_sock = *((int *)sockptr);
+	int browser_sock = (int)(long int)sockptr;
 
 	rc = xia_proxy_handle_request(browser_sock);
 	if (rc == -1) {
@@ -942,18 +943,18 @@ void *job(void *sockptr)
 
 	close_fd(browser_sock);
 
-	if (pthread_mutex_lock(&numthreadslock)) {
-		perror("proxy: ERROR: locking numthreads variable");
-		return NULL;
-	}
-	if (numthreads > 0) {
-		numthreads--;
-	}
-	if (pthread_mutex_unlock(&numthreadslock)) {
-		perror("proxy: ERROR: unlocking numthreads variable");
-		return NULL;
-	}
 	return NULL;
+}
+
+
+
+void start_new_job(long int sock)
+{
+	pthread_t worker;
+
+	if (pthread_create(&worker, NULL, job, (void *)sock)) {
+		syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
+	}
 }
 
 
@@ -1013,12 +1014,6 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	// Initialize a mutex to guard numthreads global
-	if (pthread_mutex_init(&numthreadslock, NULL)) {
-		perror("proxy: ERROR initializing lock for numthreads");
-		return -1;
-	}
-
 	while (alive) {
 		// Accept incoming connection requests from clients
 		new_socket = accept(list_s, (struct sockaddr *)&address,
@@ -1028,24 +1023,10 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		// Check if we can create another thread
-		if (pthread_mutex_lock(&numthreadslock)) {
-			perror("proxy: ERROR: locking numthreads variable");
-			return -1;
-		}
-// FIXME: letting this be unbounded for now although it rarely goes about 1
-		numthreads++;
-//		if (numthreads < MAX_CLIENTS) {
-			// Create a new thread
-			pthread_t worker;
-			if (pthread_create(&worker, NULL, job, (void *)&new_socket)) {
-				syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
-			}
-//		}
-// end FIXME
-		if (pthread_mutex_unlock(&numthreadslock)) {
-			syslog(LOG_WARNING, "proxy: ERROR: unlocking numthreads variable");
-			return -1;
+		pthread_t worker;
+
+		if (pthread_create(&worker, NULL, job, (void *)(long int)new_socket)) {
+			syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
 		}
 	}
 
