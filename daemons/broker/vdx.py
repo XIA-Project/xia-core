@@ -36,7 +36,7 @@ BG_TRAFFIC_PERCENTAGE = 4.0
 # weights for optimization
 w_cost = 0.01           # CDN costs modifier
 w_perf = 1.0 - w_cost  # overall performance modifier
-w_bw   = .1            # bandwidth modifier
+w_bw   = .01            # bandwidth modifier
 w_ping = -10          # ping latency/drop modifier
 
 closest_clusters_lookup = {}
@@ -266,7 +266,7 @@ def Optimize(bids):
                 try:
                     # if client and cdn haven't talked yet use the median rate of this client to all other cdns
                     if bw_score == 0:
-                        bw_score = median_rate
+                        bw_score = median_rate * 1.1
                     print 'bw', bw_score, 'ping', ping_score, 'price', price, 'avg rate', avg_bitrate[id]
 
                     obj_coeff = w_perf * (((w_ping * ping_score) + (w_bw * bw_score))) - (w_cost * (price * avg_bitrate[id]))
@@ -297,9 +297,17 @@ def Optimize(bids):
     cdn_clusters = set()
     for i, j in [(i, j) for i in index for j in index[i]]:
         location = client_locations[i]
-        cdn, cluster, _, capacity, _, _, rate = bids[location][j]
+        cdn, cluster, ping, capacity, _, _, rate = bids[location][j]
         cdn_clusters.add((cdn, cluster))
-        Capacities[(cdn, cluster)] = capacity
+
+        print 'ping =', ping
+
+        # try to solve problem where a node goes down
+        # just make capacity 0 to make the node unappealing
+        if ping == 0 or ping == 1000000:
+            Capacities[(cdn, cluster)] = 0
+        else:
+            Capacities[(cdn, cluster)] = capacity
         U_cluster[(cdn, cluster)].append(U[index[i][j]])
         Bitrates_cluster[(cdn, cluster)].append(avg_bitrate[i])
 
@@ -360,7 +368,7 @@ def Optimize(bids):
             accepted_bids[r['mgID']] = bid
         else:
             logging.debug("client didn't get a bid")
-            logging.debug(i, j)
+#            logging.debug(i, j)
 #            sys.exit(-1)
 
     for i, j in [(i, j) for i in index for j in index[i]]:

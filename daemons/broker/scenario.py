@@ -337,9 +337,9 @@ class Scenario:
                 # lower is better
 
                 if rtt == None or rtt <= 0 or loss == 100:
-                    score = 0
+                    score = 1000000
                 else:
-                    score = (rtt * 1000) + (loss * 100)
+                    score = (rtt * 1000) + (loss * 10000)
 
                 for i, cs in enumerate(client['cluster_scores']):
                     try:
