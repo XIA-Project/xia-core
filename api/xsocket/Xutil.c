@@ -345,6 +345,12 @@ int click_get(int sock, unsigned seq, char *buf, unsigned buflen, xia::XSocketMs
 //			LOGF("seq %d received %d bytes\n", seq, rc);
 
 			if (rc < 0) {
+				// try to guard against the weird errors we see on GENI
+				if (errno == ENOBUFS || errno == EIO) {
+					printf("got annoying error, looping: %s\n", strerror(errno));
+					sleep(1);
+					continue;
+				}
 				if (isBlocking(sock) || (errno != EWOULDBLOCK && errno != EAGAIN)) {
 					LOGF("error(%d) getting reply data from click", errno);
 				}

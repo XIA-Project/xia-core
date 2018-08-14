@@ -92,12 +92,17 @@ static int send_command(int xcache_sock, xcache_cmd *cmd)
 	remaining = cmd_on_wire.length();
 
 	msg_length = htonl(remaining);
-	send(xcache_sock, &msg_length, 4, 0);
+	ret = send(xcache_sock, &msg_length, 4, 0);
 
+	if (ret != 4) {
+		printf("unable to retrieve message length\n");
+		return -1;
+	}
 	sent = 0;
 	do {
 		ret = send(xcache_sock, cmd_on_wire.c_str() + sent, remaining, 0);
 		if (ret <= 0) {
+			printf("unable to retrieve message\n");
 			break;
 		}
 		remaining -= ret;
