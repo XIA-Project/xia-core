@@ -181,10 +181,10 @@ elementclass XIALineCard {
 	xarpr :: XARPResponder($mac);
 
 //	print_in :: XIAPrint(">>> (In Iface $num) ");
-	print_out :: XIAPrint("<<< (Out Iface $num)");
+//	print_out :: XIAPrint("<<< (Out Iface $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, -);
-	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, -);
+//	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, -);
+//	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, -);
 
 	// AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(INTERFACE $num, ACTIVE $isrouter);
@@ -193,9 +193,12 @@ elementclass XIALineCard {
 	// packets to network could be XIA packets or XARP queries (or XCMP messages?)
 	// we only want to print/count the XIA packets
 	toNet :: Tee(3) -> Queue(200) -> [0]output;   // send all packets
-	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
+
+//	toNet[1] -> statsFilter :: Classifier(12/C0DE, -) -> Strip(14) -> CheckXIAHeader -> print_out -> count_final_out -> count_next_out -> Discard;  // only print/count XIP packets
+//	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
+	toNet[1] -> Discard;
+
 	toNet[2] -> xrespFilter :: Classifier(12/C0DE, -) -> Strip(14) -> CheckXIAHeader -> MarkXIAHeader -> [1]xresp[2] -> Discard;
-	statsFilter[1] -> Discard;   // don't print/count XARP or XCMP packets
 	xrespFilter[1] -> Discard;
 
 	// On receiving a packet from the host
