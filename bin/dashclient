@@ -8,6 +8,7 @@ import argparse
 import datetime
 import xiapyutils
 from mpegdash.parser import MPEGDASHParser
+from multiprocessing import Process
 
 VER = '1.0'
 MANIFEST='http://www.origin.xia/%s.mpd'
@@ -213,6 +214,7 @@ def config():
     parser.add_argument('-b', '--bitrate', type=int, default=0, help='bitrate to use in bps (default=adaptive')
     parser.add_argument('-s', '--segments', type=int, default=0, help='maximum # of segments to fetch')
     parser.add_argument('-r', '--randomize', action='store_true',  help='fetch a random # of segments up to specified amount')
+    parser.add_argument('-t', '--threads', type = int, default=1, help='spawn n simulatane3ous client threads')
 
     loop_parser = parser.add_mutually_exclusive_group(required=False)
     loop_parser.add_argument('-c', '--continuous', action='store_true', help='keep looping through videos forever')
@@ -248,16 +250,18 @@ def get_video(name):
         if count <= 0:
             break
 
+def run_client(num):
 
-if __name__ == '__main__':
+    if num > 0:
+        # pause briefly so that we don't (0-5 seconds)
+        time.sleep(random.random() * 5.0)
 
-    config()
     try:
         loop = True
         while loop:
-            for video in args.videos:
-                get_video(video)
-                time.sleep(args.delay)
+            video = random.choice(args.videos)
+            get_video(video)
+            time.sleep(args.delay)
 
             if args.passes > 0:
                 args.passes -= 1
@@ -267,4 +271,19 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
 
+
+if __name__ == '__main__':
+
+    clients = []
+
+    random.seed()
+    config()
+
+    for i in range(0, args.threads):
+        c = Process(target=run_client, args=(i,))
+        clients.append(c)
+        c.start()
+
+    for c in clients:
+        c.join()
 
