@@ -24,8 +24,9 @@ class DashVideo:
         '''Raise when unable to fetch the segment'''
 
 
-    def __init__(self, name, logging):
+    def __init__(self, name, id, logging):
         self.manifest = MANIFEST % name
+        self.id = id
         self.logging = logging
         self.transfer_time = []
         self.encodings = {}
@@ -38,7 +39,7 @@ class DashVideo:
         self.loaded = False
 
         if logging:
-            fname = 'dashclient.log'
+            fname = 'dashclient-%d.log' % id
             self.logfile = open(fname, 'a')
             self.log('starting %s' % name)
 
@@ -98,7 +99,7 @@ class DashVideo:
             url = self.encodings[self.current_bitrate][self.next_segment]
             self.log('fetching %s' % url)
             self.next_segment += 1
-            print url, ' -> ',
+            print self.id, url, ' -> ',
             try:
                 start = datetime.datetime.now()
                 req = self.session.get(url)
@@ -220,20 +221,19 @@ def config():
     loop_parser.add_argument('-c', '--continuous', action='store_true', help='keep looping through videos forever')
     loop_parser.add_argument('-p', '--passes', type=int, default=0, help='# of times to loop through the videos')
 
-
     args = parser.parse_args()
 
 
 
 
-def get_video(name):
-    print '\nfetching:       ', name
+def get_video(name, id):
+    print '\n%d fetching:       %s' % (id,  name)
     if args.segments <= 0:
         count = 1000000
     else:
         count = args.segments
 
-    video = DashVideo(name, args.log)
+    video = DashVideo(name, id, args.log)
     video.set_bitrate(args.bitrate)
     video.info()
 
@@ -250,9 +250,13 @@ def get_video(name):
         if count <= 0:
             break
 
-def run_client(num):
+    print '%d closing:        %s' % (id, name)
 
-    if num > 0:
+
+
+def run_client(id):
+
+    if id > 0:
         # pause briefly so that we don't (0-5 seconds)
         time.sleep(random.random() * 5.0)
 
@@ -260,7 +264,7 @@ def run_client(num):
         loop = True
         while loop:
             video = random.choice(args.videos)
-            get_video(video)
+            get_video(video, id)
             time.sleep(args.delay)
 
             if args.passes > 0:
@@ -272,6 +276,7 @@ def run_client(num):
         pass
 
 
+
 if __name__ == '__main__':
 
     clients = []
@@ -281,9 +286,5 @@ if __name__ == '__main__':
 
     for i in range(0, args.threads):
         c = Process(target=run_client, args=(i,))
-        clients.append(c)
         c.start()
-
-    for c in clients:
-        c.join()
 
