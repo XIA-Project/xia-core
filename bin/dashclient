@@ -96,7 +96,7 @@ class DashVideo:
         if (not self.loaded) or self.next_segment >= self.num_segments:
             raise StopIteration
         else:
-            url = self.encodings[self.current_bitrate][self.next_segment]
+            url = '%s&client=%s' % (self.encodings[self.current_bitrate][self.next_segment], self.id)
             self.log('fetching %s' % url)
             self.next_segment += 1
             print self.id, url, ' -> ',

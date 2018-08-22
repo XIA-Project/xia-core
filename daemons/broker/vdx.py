@@ -84,8 +84,22 @@ def get_closest_clusters(cluster):
 
 def setup(scenario):
     global Scenario, bid_ordering
+    global w_ping, w_bw
 
     Scenario = scenario.scenario
+
+    # set the criteria for how we calculate bids (default = use both)
+    print '\n\n\n', scenario.mode()
+    if scenario.mode() == 'ping':
+        # ping/latency only
+        w_bw = 0
+    elif scenario.mode() == 'rate':
+        # bandwidth only
+        w_ping = 0
+
+    print 'values', w_ping, w_bw
+
+    print scenario.mode()
 
     for cdn in xrange(len(Scenario['CDNs'])):
         Scenario['CDNs'][cdn] = set(Scenario['CDNs'][cdn])
@@ -264,6 +278,8 @@ def Optimize(bids):
                     else:
                         price = 0
                 try:
+
+                    print w_ping, w_bw
                     # if client and cdn haven't talked yet use the median rate of this client to all other cdns
                     if bw_score == 0:
                         bw_score = median_rate * 1.1

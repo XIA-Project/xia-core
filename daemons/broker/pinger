@@ -95,6 +95,7 @@ def update_stats():
 
             if rtt == None:
                 rtt = 0
+                loss = 100
             logging.info('        rtt:%s loss:%s%%' % (rtt, loss))
 
             score = [cluster, rtt, loss]
@@ -105,12 +106,13 @@ def update_stats():
 #
 # build the scores protobuf
 #
-def scores_msg(scores):
+def scores_msg(scores, client):
     msg = cdn_pb2.CDNMsg()
     msg.version = cdn_pb2.CDN_PROTO_VERSION
     msg.type = cdn_pb2.PING_SCORES_MSG
 
-    msg.client = hostname
+    msg.client = '%s-%d' % (hostname, client)
+    print msg.client
 
     for (name, rtt, loss) in scores:
         c = msg.scores.clusters.add()
@@ -125,20 +127,21 @@ def scores_msg(scores):
 # send the scores to the broker
 #
 def send_scores(scores):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((args.broker, args.port))
+    for c in range(0,  args.clients):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((args.broker, args.port))
 
-    msg = scores_msg(scores)
-    msgstr = msg.SerializeToString()
-    length = len(msgstr)
+        msg = scores_msg(scores, c)
+        msgstr = msg.SerializeToString()
+        length = len(msgstr)
 
-    sock.send(struct.pack("!L", length))
+        sock.send(struct.pack("!L", length))
 
-    sent = 0
-    while sent < length:
-        sent += sock.send(msgstr[sent:])
+        sent = 0
+        while sent < length:
+            sent += sock.send(msgstr[sent:])
 
-    sock.close()
+        sock.close()
 
 
 
@@ -264,6 +267,7 @@ def configure():
     parser.add_argument('-V', '--version', action='version', version=VER)
     parser.add_argument('-v', '--verbose', action='store_true', help='enable console logging')
     parser.add_argument('-l', '--level', type=loglevel, help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
+    parser.add_argument('-n', '--clients', type=int, default=0, help='number of clients to simulate')
     parser.add_argument('-F', '--frequency', type=freq_val, help='check every COUNT seconds (default: %(default)s)')
     parser.add_argument('-c', '--count',   type=count_val, help='# of pings to send (default:%(default)d)')
     parser.add_argument('-d', '--delay',   type=delay_val, help='delay between pings in seconds (default: %(default)s)')

@@ -49,7 +49,21 @@ typedef struct _ProxyRequestCtx{
 	string hid;
 	string cdn_host;
 	uint32_t bandwidth;
+	uint32_t id;
 
 } ProxyRequestCtx;
+
+typedef struct {
+	std::string     hostname;
+	std::string     cdn_ad;
+	std::string     cdn_hid;
+	std::string     cdn_host;
+	CDNStatistics   cdn_stats;
+	pthread_mutex_t cdn_lock;
+	uint32_t        last_bandwidth;
+} ClientInfo;
+
+typedef vector<ClientInfo> ClientState;
+
 
 #endif

@@ -25,13 +25,11 @@ static int reuseaddr = 1;               // need to reuse the address for binding
 static int list_s;                      // listening socket of this proxy
 static XcacheHandle xcache;             // xcache instance
 
-pthread_mutex_t cdn_lock       = PTHREAD_MUTEX_INITIALIZER;
-
-uint32_t last_bandwidth = 0;
-
 static int locator_interval = 5;
 static int scorer_interval  = 5;
 static int alive            = 1;
+
+static int num_clients      = 1;
 
 static char hostname[64];
 static char *ident = NULL;
@@ -39,10 +37,14 @@ static char *ident = NULL;
 static struct addrinfo *broker_addr;
 
 // these variables all need to be protected by a mutex when accessed!
-static std::string cdn_ad;
-static std::string cdn_hid;
-static std::string cdn_host;
-static CDNStatistics cdn_stats;
+//static std::string cdn_ad;
+//static std::string cdn_hid;
+//static std::string cdn_host;
+//static CDNStatistics cdn_stats;
+//uint32_t last_bandwidth = 0;
+//pthread_mutex_t cdn_lock       = PTHREAD_MUTEX_INITIALIZER;
+ClientState client_state;
+
 
 // for proxy http header back to the browser
 static const char *http_chunk_header_status_ok        = "HTTP/1.0 200 OK\r\n";
@@ -53,6 +55,9 @@ static const char *http_chunk_header_server           = "Server: XIA Video Proxy
 
 static const char *http_header_allow_headers          = "Access-Control-Allow-Headers: range\r\n";
 static const char *http_header_allow_methods          = "Access-Control-Allow-Methods: GET, POST, PUT\r\n";
+
+static const char *bandwidth_str                      = "bandwidth";
+static const char *client_str                         = "client";
 
 static const char *connection_str                     = "Connection: close\r\n";
 
@@ -69,71 +74,75 @@ void *cdn_locator(void *)
 	char buf[2048];
 
 	while (alive) {
-		syslog(LOG_DEBUG, "fetching best cdn");
+		for (int i = 0; i < num_clients; i++) {
 
-		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-			syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
-			exit(EXIT_FAILURE);
+			std::string hname = client_state[i].hostname;
+			syslog(LOG_DEBUG, "fetching best cdn for %s", hname.c_str());
 
-		}
+			if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+				syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
+				exit(EXIT_FAILURE);
 
-		connect(sock, broker_addr->ai_addr, sizeof(struct sockaddr));
-
-		CDN::CDNMsg msg;
-		msg.Clear();
-		msg.set_type(CDN::CDN_REQUEST_MSG);
-		msg.set_version(CDN::CDN_PROTO_VERSION);
-		msg.set_client(hostname);
-
-		// fIXME: move the xfer scores to this?
-		CDN::Request *req_msg = msg.mutable_request();
-
-		if (pthread_mutex_lock(&cdn_lock)) {
-			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		req_msg->set_last_cdn(cdn_host);
-		req_msg->set_bandwidth(last_bandwidth);
-		pthread_mutex_unlock(&cdn_lock);
-
-		string message;
-		msg.SerializeToString(&message);
-		unsigned len = message.length();
-		unsigned msg_len = htonl(len);
-
-		if ((rc = send(sock, &msg_len, 4, 0)) > 0) {
-			if ((rc = send(sock, message.c_str(), len, 0)) > 0) {
-				if ((rc = recv(sock, &msg_len, 4, 0) > 0)) {
-					len = ntohl(msg_len);
-					rc = recv(sock, buf, sizeof(buf), 0);
-				}
 			}
-		}
 
-		close(sock);
+			connect(sock, broker_addr->ai_addr, sizeof(struct sockaddr));
 
-		if (rc > 0) {
+			CDN::CDNMsg msg;
 			msg.Clear();
-			std::string result(buf, rc);
-			msg.ParseFromString(result);
+			msg.set_type(CDN::CDN_REQUEST_MSG);
+			msg.set_version(CDN::CDN_PROTO_VERSION);
+			msg.set_client(hname);
 
-			CDN::Reply *reply_msg = msg.mutable_reply();
-			reply_msg = msg.mutable_reply();
+			// fIXME: move the xfer scores to this?
+			CDN::Request *req_msg = msg.mutable_request();
 
-			// lock mutex
-			if (pthread_mutex_lock(&cdn_lock)) {
+			if (pthread_mutex_lock(&client_state[i].cdn_lock)) {
 				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 			}
+			req_msg->set_last_cdn(client_state[i].cdn_host);
+			req_msg->set_bandwidth(client_state[i].last_bandwidth);
+			pthread_mutex_unlock(&client_state[i].cdn_lock);
 
-			cdn_ad = reply_msg->ad();
-			cdn_hid = reply_msg->hid();
-			cdn_host = reply_msg->cluster();
-			pthread_mutex_unlock(&cdn_lock);
+			string message;
+			msg.SerializeToString(&message);
+			unsigned len = message.length();
+			unsigned msg_len = htonl(len);
 
-			syslog(LOG_NOTICE, "New CDN: %s (RE %s %s)", cdn_host.c_str(), cdn_ad.c_str(), cdn_hid.c_str());
-		} else {
-			syslog(LOG_ERR, "CDN update failed: %s", strerror(errno));
+			if ((rc = send(sock, &msg_len, 4, 0)) > 0) {
+				if ((rc = send(sock, message.c_str(), len, 0)) > 0) {
+					if ((rc = recv(sock, &msg_len, 4, 0) > 0)) {
+						len = ntohl(msg_len);
+						rc = recv(sock, buf, sizeof(buf), 0);
+					}
+				}
+			}
+
+			close(sock);
+
+			if (rc > 0) {
+				msg.Clear();
+				std::string result(buf, rc);
+				msg.ParseFromString(result);
+
+				CDN::Reply *reply_msg = msg.mutable_reply();
+				reply_msg = msg.mutable_reply();
+
+				// lock mutex
+				if (pthread_mutex_lock(&client_state[i].cdn_lock)) {
+					syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+					exit(EXIT_FAILURE);
+				}
+
+				client_state[i].cdn_ad = reply_msg->ad();
+				client_state[i].cdn_hid = reply_msg->hid();
+				client_state[i].cdn_host = reply_msg->cluster();
+				pthread_mutex_unlock(&client_state[i].cdn_lock);
+
+				syslog(LOG_NOTICE, "New CDN: %s (RE %s %s)", client_state[i].cdn_host.c_str(), client_state[i].cdn_ad.c_str(), client_state[i].cdn_hid.c_str());
+			} else {
+				syslog(LOG_ERR, "CDN update failed: %s", strerror(errno));
+			}
 		}
 
 		sleep(locator_interval);
@@ -147,68 +156,70 @@ void *cdn_locator(void *)
 void *cdn_scores(void *)
 {
 	while (alive) {
-		syslog(LOG_DEBUG, "updating tput scores");
+		for (int i = 0; i < num_clients; i++) {
+			syslog(LOG_DEBUG, "updating tput scores for %s", client_state[i].hostname.c_str());
 
-		if (cdn_stats.size() == 0) {
-			syslog(LOG_NOTICE, "no new tput records, skipping...");
+			if (client_state[i].cdn_stats.size() == 0) {
+				syslog(LOG_NOTICE, "no new tput records, skipping...");
 
-		} else {
-			int sock;
-			int rc;
+			} else {
+				int sock;
+				int rc;
 
-			if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-				syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-
-			connect(sock, broker_addr->ai_addr, sizeof(struct sockaddr));
-
-			CDN::CDNMsg msg;
-			msg.Clear();
-			msg.set_type(CDN::STATS_SCORE_MSG);
-			msg.set_version(CDN::CDN_PROTO_VERSION);
-			msg.set_client(hostname);
-
-			CDN::Scores *scores_msg = msg.mutable_scores();
-
-			if (pthread_mutex_lock(&cdn_lock)) {
-				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-
-			for (CDNStatistics::iterator it = cdn_stats.begin(); it != cdn_stats.end(); it++) {
-				CDNStats stats = it->second.stats;
-
-				CDN::Cluster *c = scores_msg->add_clusters();
-				c->set_name(it->first);
-
-				for (CDNStats::iterator it2 = stats.begin(); it2 != stats.end(); it2++) {
-					CDN::Stats *s = c->add_stats();
-					s->set_cached(it2->cached);
-					s->set_bandwidth(it2->bandwidth);
-					s->set_size(it2->size);
-					s->set_elapsed(it2->elapsed);
-					s->set_tput(it2->tput);
+				if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+					syslog(LOG_ERR, "can't create broker sock: %s", strerror(errno));
+					exit(EXIT_FAILURE);
 				}
-				stats.clear();
+
+				connect(sock, broker_addr->ai_addr, sizeof(struct sockaddr));
+
+				CDN::CDNMsg msg;
+				msg.Clear();
+				msg.set_type(CDN::STATS_SCORE_MSG);
+				msg.set_version(CDN::CDN_PROTO_VERSION);
+				msg.set_client(client_state[i].hostname);
+
+				CDN::Scores *scores_msg = msg.mutable_scores();
+
+				if (pthread_mutex_lock(&client_state[i].cdn_lock)) {
+					syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+					exit(EXIT_FAILURE);
+				}
+
+				for (CDNStatistics::iterator it = client_state[i].cdn_stats.begin(); it != client_state[i].cdn_stats.end(); it++) {
+					CDNStats stats = it->second.stats;
+
+					CDN::Cluster *c = scores_msg->add_clusters();
+					c->set_name(it->first);
+
+					for (CDNStats::iterator it2 = stats.begin(); it2 != stats.end(); it2++) {
+						CDN::Stats *s = c->add_stats();
+						s->set_cached(it2->cached);
+						s->set_bandwidth(it2->bandwidth);
+						s->set_size(it2->size);
+						s->set_elapsed(it2->elapsed);
+						s->set_tput(it2->tput);
+					}
+					stats.clear();
+				}
+				client_state[i].cdn_stats.clear();
+
+				pthread_mutex_unlock(&client_state[i].cdn_lock);
+
+				string message;
+				msg.SerializeToString(&message);
+				unsigned len = message.length();
+				unsigned msg_len = htonl(len);
+
+				if((rc = send(sock, &msg_len, 4, 0)) > 0) {
+					rc = send(sock, message.c_str(), len, 0);
+				}
+
+				if (rc < 0) {
+					syslog(LOG_ERR, "Failure sending updated scores %s", strerror(errno));
+				}
+				close(sock);
 			}
-			cdn_stats.clear();
-
-			pthread_mutex_unlock(&cdn_lock);
-
-			string message;
-			msg.SerializeToString(&message);
-			unsigned len = message.length();
-			unsigned msg_len = htonl(len);
-
-			if((rc = send(sock, &msg_len, 4, 0)) > 0) {
-				rc = send(sock, message.c_str(), len, 0);
-			}
-
-			if (rc < 0) {
-				syslog(LOG_ERR, "Failure sending updated scores %s", strerror(errno));
-			}
-			close(sock);
 		}
 
 		sleep(scorer_interval);
@@ -256,6 +267,7 @@ void help(const char *name)
 {
 	printf("\nusage: %s [-l level] [-v] port\n", name);
 	printf("where:\n");
+	printf(" -n clients  : # of clients running on the host\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
 	printf(" -v          : log to the console as well as syslog\n");
 	printf(" port        : port to accept proxy requests on\n");
@@ -273,8 +285,11 @@ void config(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "l:v")) != -1) {
+	while ((c = getopt(argc, argv, "n:l:v")) != -1) {
 		switch (c) {
+			case 'n':
+				num_clients = MAX(1, atoi(optarg));
+				break;
 			case 'l':
 				level = MIN(atoi(optarg), LOG_DEBUG);
 				break;
@@ -613,6 +628,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 	struct timeval t1, t2;
 	sockaddr_x src_addr;
 	socklen_t  src_len = sizeof(sockaddr_x);
+	int id = ctx->id;
 
 	// FIXME: there's no reason for this loop, we'll only ever get 1 chunk at a time
 	for (int i = 0; i < numChunks; i++) {
@@ -654,22 +670,22 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 			s.tput      = len / elapsed;
 			s.bandwidth = ctx->bandwidth;
 
-			if (pthread_mutex_lock(&cdn_lock)) {
+			if (pthread_mutex_lock(&client_state[id].cdn_lock)) {
 				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
 				exit(EXIT_FAILURE);
 			}
 
-			last_bandwidth = ctx->bandwidth;
+			client_state[id].last_bandwidth = ctx->bandwidth;
 
-			CDNStatistics::iterator it = cdn_stats.find(ctx->cdn_host);
-			if (it != cdn_stats.end()) {
+			CDNStatistics::iterator it = client_state[id].cdn_stats.find(ctx->cdn_host);
+			if (it != client_state[id].cdn_stats.end()) {
 				it->second.total_requests++;
 				it->second.stats.push_back(s);
 			} else {
-				cdn_stats[ctx->cdn_host].total_requests = 1;
-				cdn_stats[ctx->cdn_host].stats.push_back(s);
+				client_state[id].cdn_stats[ctx->cdn_host].total_requests = 1;
+				client_state[id].cdn_stats[ctx->cdn_host].stats.push_back(s);
 			}
-			pthread_mutex_unlock(&cdn_lock);
+			pthread_mutex_unlock(&client_state[id].cdn_lock);
 
 		}
 		totalBytes += len;
@@ -729,6 +745,7 @@ int handle_manifest_requests(ProxyRequestCtx *ctx)
 
 int handle_stream_requests(ProxyRequestCtx *ctx)
 {
+	int id = ctx->id;
 	string cname;
 	vector<string> dagUrls;
 
@@ -741,7 +758,7 @@ int handle_stream_requests(ProxyRequestCtx *ctx)
 	int numChunks = dagUrls.size();
 	sockaddr_x chunkAddresses[numChunks];
 
-	ctx->cdn_host = cdn_host;
+	ctx->cdn_host = client_state[id].cdn_host;
 	process_urls_to_DAG(ctx, dagUrls, chunkAddresses);
 
 	if (forward_http_header_to_client(ctx, CONTENT_STREAM) < 0) {
@@ -854,31 +871,45 @@ int xia_proxy_handle_request(int browser_sock)
 	if (strstr(method, "GET") != NULL || strstr(method, "OPTIONS")) {
 		ProxyRequestCtx ctx;
 		ctx.browser_sock = browser_sock;
+		ctx.id = 0;
 		strcpy(ctx.remote_host, remote_host);
 		strcpy(ctx.remote_port, remote_port);
 		strcpy(ctx.remote_path, resource);
 		strcpy(ctx.params, params);
 
-		// get the current cdn provided by the broker
-		if (pthread_mutex_lock(&cdn_lock)) {
-			syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-
-		ctx.ad = cdn_ad;
-		ctx.hid = cdn_hid;
-		ctx.cdn_host = cdn_host;
-		pthread_mutex_unlock(&cdn_lock);
-
 		if (strcasestr(ctx.remote_host, XIA_DAG_URL) != NULL || strcasestr(ctx.remote_path, "/CID") != NULL) {
+			ctx.bandwidth = 0;
+			ctx.id = 0;
 
-			if (strstr(ctx.params, "bandwidth=")) {
-				char *p = ctx.params + strlen("bandwidth=");
-				uint32_t bw = atol(p);
-				ctx.bandwidth = bw;
-			} else {
-				ctx.bandwidth = 0;
+			char s[1024];
+			char *opt, *val;
+			char *st, *st1;
+			
+			// get the client id and current video bandwidth
+			strncpy(s, ctx.params, sizeof(s));
+			for (st = s, opt = strtok_r(st, "=", &st1); opt; opt = strtok_r(NULL, "=", &st1)) {
+				if ((val = strtok_r(NULL, "&", &st1)) != NULL) {
+					if (strncmp(opt, bandwidth_str, strlen(bandwidth_str)) == 0) {
+						ctx.bandwidth = atol(val);
+					} else if (strncmp(opt, client_str, strlen(client_str)) == 0) {
+						ctx.id = atol(val);
+					} else {
+						syslog(LOG_INFO, "invalid http options: %s", ctx.params);
+						break;
+					}
+				}
 			}
+
+			// get the current cdn provided by the broker
+			if (pthread_mutex_lock(&client_state[ctx.id].cdn_lock)) {
+				syslog(LOG_ERR, "cdn_mutex lock error: %s", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+			ctx.ad = client_state[ctx.id].cdn_ad;
+			ctx.hid = client_state[ctx.id].cdn_hid;
+			ctx.cdn_host = client_state[ctx.id].cdn_host;
+			pthread_mutex_unlock(&client_state[ctx.id].cdn_lock);
 
 			if (handle_stream_requests(&ctx) < 0) {
 				syslog(LOG_WARNING, "failed to return back chunks to browser. Exit");
@@ -969,6 +1000,14 @@ int main(int argc, char **argv)
 	config(argc, argv);
 
 	Xgethostname(hostname, sizeof(hostname));
+
+	client_state.resize(20);
+	for (int i = 0; i < num_clients; i++) {
+		char buf[128];
+		snprintf(buf, sizeof(buf), "%s-%d", hostname, i);
+		client_state[i].hostname = buf;
+		client_state[i].cdn_lock = PTHREAD_MUTEX_INITIALIZER;
+	}
 
 	// set up signal handler for ctrl-c
 	// FIXME: comment out sig handlers for now to make finding leaks easier

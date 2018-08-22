@@ -111,10 +111,11 @@ def configure():
     parser.add_argument('-l', '--level', type=loglevel,
             help='set syslog level [0-7] (0=LOG_EMERG, 1=LOG_ALERT, 2=LOG_CRIT, 3=LOG_ERR, 4=LOG_WARNING, 5=LOG_NOTICE, 6=LOG_INFO, 7=LOG_DEBUG)')
     parser.add_argument('-n', '--nocached', action='store_true', help='ignore cached fetches in computations')
+    parser.add_argument('-m', '--mode', default='both', choices=['ping', 'rate', 'both'], help='bid calculation based on latency, bandwidth, or both')
     parser.add_argument('-f', '--file', type=argparse.FileType('r'),
                         help='cdn config file (default: %s)' % CONF)
     parser.add_argument('-p', '--port', help='broker port (default=%(default)s)')
-    parser.add_argument('-b', '--bids', type=int, help='calculate new bids every BIDS seconds')
+    parser.add_argument('-b', '--bids', type=int, default=BID_RATE, help='calculate new bids every BIDS seconds (default=%(default)s)')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='generate random connections locally')
     parser.add_argument('-r', '--requests', type=int,
@@ -131,6 +132,8 @@ def configure():
         logging.info('generating new connections every %d seconds', args.requests)
     else:
         logging.info('Starting broker service on port %s', args.port)
+
+    print 'config done'
 
 
 #
@@ -164,13 +167,19 @@ def init_logging():
 def main():
     global scenario
 
+    print 'configuring'
     configure()
 
+    print 'setting up'
     # initialize scenario and prime vdx engine
     scenario = Scenario(args.file)
+    scenario.set_mode(args.mode)
     if args.nocached:
         scenario.allow_cached_fetches(False)
+
+    print 'setting up more'
     vdx.setup(scenario)
+    print 'done'
 
     # compute optimal CDNs in a background thread
     compute_thread = threading.Thread(target=compute_bids)

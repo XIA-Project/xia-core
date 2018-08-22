@@ -24,7 +24,23 @@ MAX_REQUEST_AGE = 60
 class Scenario:
     def __init__(self, fname):
         self.allow_cached = True
+        self.bid_mode = 'both'
         self.populate(fname)
+
+
+    #
+    # set factors used to do bid calculations in the vdx engine
+    #
+    def set_mode(self, mode):
+        self.bid_mode = mode
+
+
+    #
+    # get the bid mode
+    #
+    def mode(self):
+        return self.bid_mode
+
 
 
     #
