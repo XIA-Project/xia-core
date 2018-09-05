@@ -133,8 +133,6 @@ def configure():
     else:
         logging.info('Starting broker service on port %s', args.port)
 
-    print 'config done'
-
 
 #
 # initialize logging stuff
@@ -167,19 +165,15 @@ def init_logging():
 def main():
     global scenario
 
-    print 'configuring'
     configure()
 
-    print 'setting up'
     # initialize scenario and prime vdx engine
     scenario = Scenario(args.file)
     scenario.set_mode(args.mode)
     if args.nocached:
         scenario.allow_cached_fetches(False)
 
-    print 'setting up more'
     vdx.setup(scenario)
-    print 'done'
 
     # compute optimal CDNs in a background thread
     compute_thread = threading.Thread(target=compute_bids)
