@@ -158,7 +158,12 @@ class NetjoinXIAConf(object):
         return self.node.controller_dag()
 
     def write_controller_dag(self, controller_dag):
-        self.node.set('controller_dag', controller_dag)
+        # FIXME: this is not the way we should fix this longterm.
+        # the controller dag should live in memory somewhere that is
+        # accessibly to all threads rather than them having to get it
+        # from disk
+        self.node._set('controller', 'controller_dag', controller_dag)
+        self.node.write()
 
 if __name__ == "__main__":
     conf = NetjoinXIAConf()
