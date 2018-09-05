@@ -78,7 +78,7 @@ class Scenario:
             self.config = ConfigParser(allow_no_value = True)
             self.config.readfp(fname)
         except Exception as err:
-            logging.crit(str(err))
+            logging.warning(str(err))
             sys.exit(-1)
 
         self.load_bitrates()
