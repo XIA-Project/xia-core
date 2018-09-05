@@ -387,6 +387,13 @@ def info(args):
             print 'Rendezvous SID:     %s' % node.rendezvous_sid()
             print 'Rendezvous ctl SID: %s' % node.rendezvous_ctl_sid()
 
+        if type == 'router' or type == 'controller':
+            if node.cache() == True:
+                caching = 'enabled'
+            else:
+                caching = 'disabled'
+            print 'Caching:            %s' % caching
+
         if node.client():
             print 'CDN Client'
         if node.broker():
