@@ -12,6 +12,7 @@ BEGIN {
 	t  = 0.0;	# total time (s)
 	tp = 0.0;	# cumulative tput scores
 	r  = 0;		# # of video chunks
+	s  = 0;		# total # of sefgmetns in the video
 
 	# stats for all videos
 	tb  = 0;
@@ -25,8 +26,22 @@ BEGIN {
 	name = $5;	# save the name of the current video
 }
 
+/num segments/ {
+	s = $6;
+}
+
 /closing/ {
-	print FILENAME ":", name ":",  r, "segments", b, "bytes", t, "seconds", tp / r, "mbps";
+	if (r == 0 || s == 0) {
+		printf("%s: FAILED\n", FILENAME);
+	} else {
+		if (r != s) {
+			status = "INCOMPLETE";
+		} else {
+			status = "SUCCESS";
+		}
+		printf("%s: %-10s %d/%d segments %d bytes %1.3f seconds %1.3f mbps\n",
+			FILENAME, status, r, s, b, t, tp / r);
+	}
 
 	# update the global stats
 	tb  += b;
@@ -39,6 +54,7 @@ BEGIN {
 	t = 0.0;
 	tp = 0.0;
 	r = 0;
+	s = 0;
 }
 
 /bytes/ {

@@ -44,6 +44,7 @@ class DashVideo:
             self.log('starting %s' % name)
 
         self.get_manifest()
+        self.log('num segments: %d' % self.num_segments)
         self.current_bitrate = sorted(self.encodings.keys())[0]
 
 
