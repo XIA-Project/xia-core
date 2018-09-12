@@ -36,7 +36,7 @@ shift
 
 # copy to all of the specified hosts
 for h in $*; do
-	scp $FILENAME $h:$FILENAME
+	scp -o StrictHostKeyChecking=no $FILENAME $h:$FILENAME
 done
 
 

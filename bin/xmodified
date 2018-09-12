@@ -35,10 +35,10 @@ fi
 for f in $(git status | grep modified | tr -s " " | cut -d " " -f2); do
 	echo $f
 	d=$(pwd)/$(dirname $f)
-	parallel-scp -H "$*" $f $d
+	parallel-scp -O StrictHostKeyChecking=no -H "$*" $f $d
 done
 for f in $(git status | grep "new file" | tr -s " " | cut -d" " -f3); do
 	echo $f
 	d=$(pwd)/$(dirname $f)
-	parallel-scp -H "$*" $f $d
+	parallel-scp -O StrictHostKeyChecking=no -H "$*" $f $d
 done
