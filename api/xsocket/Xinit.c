@@ -67,6 +67,8 @@ fork_t _f_fork;
 __thread int _select_fd = -1;
 
 
+unsigned max_api_payload = XIA_MAXBUF;
+
 size_t mtu_internal = 0;
 size_t mtu_wire = 1500;
 
@@ -88,6 +90,29 @@ size_t api_mtu()
 
 	return mtu_internal;
 }
+
+
+static void set_api_payload_size()
+{
+	char *maxbuf = secure_getenv("XIA_MAXBUF");
+	max_api_payload = XIA_MAXBUF;
+
+	if (maxbuf) {
+		char *err;
+		unsigned m = strtoul(maxbuf, &err, 10);
+
+		printf("e=%s m=%u err=%s\n", maxbuf, m, err);
+
+		if (m > 0) {
+			if (m < 4096) {
+				max_api_payload = 4096;
+			} else if (m < XIA_MAXBUF) {
+				max_api_payload = m;
+			}
+		}
+	}
+}
+
 
 void cleanup()
 {
@@ -166,6 +191,8 @@ void __attribute__ ((constructor)) api_init()
 		printf("can't find fork!\n");
 
 	api_mtu();
+	set_api_payload_size();
+
 
 #if 0
 	memset (&sa_new, 0, sizeof (struct sigaction));

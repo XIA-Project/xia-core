@@ -187,6 +187,8 @@ extern int checkXid(const char *xid, const char *type);
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
 
+extern unsigned XmaxPayload();
+
 extern const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
 extern int xia_pton(int af, const char *src, sockaddr_x *dst);
 extern size_t sockaddr_size(const sockaddr_x *s);

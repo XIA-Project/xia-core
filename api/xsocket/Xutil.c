@@ -22,6 +22,7 @@
 #include "Xutil.h"
 #include <errno.h>
 #include <strings.h>
+#include <stdlib.h>
 
 // for printfing param values
 #include <fcntl.h>
@@ -239,6 +240,12 @@ const char *XnetworkDAGIntentAD(const char *network_dag)
         return last_ad;
     }
     return NULL;
+}
+
+
+unsigned XmaxPayload()
+{
+	return max_api_payload;
 }
 
 int validateSocket(int sock, int stype, int err)

@@ -715,8 +715,6 @@ int XputBuffer(XcacheHandle *h, const char *data, size_t length, size_t chunkSiz
 
 	if(chunkSize == 0)
 		chunkSize =  DEFAULT_CHUNK_SIZE;
-	else if(chunkSize > XIA_MAXBUF)
-		chunkSize = XIA_MAXBUF;
 
 	numChunks = length / chunkSize;
 	if(length % chunkSize)

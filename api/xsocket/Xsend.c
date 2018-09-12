@@ -60,7 +60,7 @@ int Xsend(int sockfd, const void *buf, size_t len, int flags)
 	if (len == 0)
 		return 0;
 
-	len = MIN(len, XIA_MAXBUF);
+	len = MIN(len, XmaxPayload());
 
 	if (!buf) {
 		LOG("buffer pointer is null!\n");
@@ -182,10 +182,10 @@ int _xsendto(int sockfd, const void *buf, size_t len, int flags,
 
 	// FIXME: should this return an error, like sendto does?
 	// if buf is too big, send only what we can
-	if (len > XIA_MAXBUF) {
-		LOGF("truncating... requested size (%lu) is larger than XIA_MAXBUF (%d)\n",
-				len, XIA_MAXBUF);
-		len = XIA_MAXBUF;
+	if (len > XmaxPayload()) {
+		LOGF("truncating... requested size (%lu) is larger than the max payload size (%d)\n",
+				len, XmaxPayload());
+		len = XmaxPayload();
 	}
 
 	xia::XSocketMsg xsm;
