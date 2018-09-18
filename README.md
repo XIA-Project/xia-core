@@ -1,6 +1,6 @@
 XIA-core
 =======
-[![Build Status](https://travis-ci.org/XIA-Project/xia-core.svg?branch=xia-v2)](https://travis-ci.org/XIA-Project/xia-core)
+[![Build Status](https://travis-ci.org/XIA-Project/xia-core.svg?branch=v2-cdn-18)](https://travis-ci.org/XIA-Project/xia-core)
 
 We are proud to announce version 1.0 of XIA (eXpressive Internet Architecture).
 XIA (eXpressive Internet Architecture) is a joint research project between
