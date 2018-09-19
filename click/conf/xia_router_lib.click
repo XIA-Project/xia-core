@@ -75,7 +75,7 @@ elementclass XIAPacketRoute {
 	// print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
-	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, -);
+	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, -);
 	//print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// pdesty :: XIAPrint(">>>  DEST YES");
 	// pdestn :: XIAPrint(">>>  DEST NO");
@@ -121,19 +121,20 @@ elementclass XIAPacketRoute {
 
 	rt_AD, rt_HID, rt_SID, rt_IP :: XIAXIDRouteTable();
 	rt_CID, rt_NCID :: XIACIDRouteTable();
+	rt_ICID :: XIAICIDRouteTable();
 	rt_FID :: FIDRouteEngine($num_ports);
-	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, rt_NCID, [2]output;
+	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, rt_NCID, rt_ICID, [2]output;
 
 	// TO ADD A NEW USER DEFINED XID (step 3)
 	// add rt_XID_NAME before the arrow in the following 7 lines
 	// if the XID is used for routing like an AD or HID, add it to lines 1,2,4,5,7
 	// if the XID should be treated like a SID and will return data to the API, add it to lines 1,3,4,6,7
 
-	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_FID[0], rt_NCID[0]-> GPRP;
+	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_FID[0], rt_NCID[0], rt_ICID[0] -> GPRP;
 	rt_AD[1], rt_HID[1], 					   rt_IP[1], rt_FID[1]-> XIANextHop -> check_dest;
-						 rt_SID[1], rt_CID[1]					  , rt_NCID[1]-> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
-	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_FID[2], rt_NCID[2]-> consider_next_path;
-	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3], rt_FID[3], rt_NCID[3]-> Discard;
+						 rt_SID[1], rt_CID[1]					  , rt_NCID[1], rt_ICID[1] -> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_FID[2], rt_NCID[2], rt_ICID[2] -> consider_next_path;
+	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3], rt_FID[3], rt_NCID[3], rt_ICID[3] -> Discard;
 						 rt_SID[3]								  -> [3]output;
 	//NITIN disable XCMP REDIRECT messages
 	//NITIN rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] rt_FID[4]-> x; // xcmp redirect message
@@ -184,8 +185,8 @@ elementclass XIALineCard {
 //	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, -);
-	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, -);
+	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, dst ICID-);
+	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, -);
 
 	// AIP challenge-response HID verification module
 	xchal :: XIAChallengeSource(INTERFACE $num, ACTIVE $isrouter);
@@ -204,7 +205,8 @@ elementclass XIALineCard {
 
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
-	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> c;
+	// XIA_FROMNET_ANNO is 1 on packets that arrived from network
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> XIAPaint(ANNO $XIA_FROMNET_ANNO, 1) -> c;
 
 	// Received a network joining packet
 	c[3] -> xnetj :: XNetJ($mac) -> toNet;
@@ -246,8 +248,8 @@ elementclass IPLineCard {
 	print_out :: XIAPrint("<<< $ip (Out Port $num)");
 
 	// TODO: Make a counter for IP
-	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, -);
-	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, -);
+	//count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, dst ICID, -);
+	//count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, -);
 
 	toNet :: Null -> print_out -> Queue(200) -> [0]output; //count_final_out -> count_next_out -> [0]output;
 
@@ -320,6 +322,7 @@ elementclass XIARoutingCore {
 	Script(write n/proc/rt_IP.add - $FALLBACK);		// no default route for IP; consider other path
 	Script(write n/proc/rt_FID.add - $DESTINED_FOR_BROADCAST);	// by default all FIDs are broadcast unless local
 	Script(write n/proc/rt_NCID.add - $FALLBACK);		// no default route for NCID; consider other path
+	Script(write n/proc/rt_ICID.add - $FALLBACK);		// no default route for ICID; consider other path
 
 	// TO ADD A NEW USER DEFINED XID (step 4)
 	// create a default fallback route for the new XID

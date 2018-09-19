@@ -38,6 +38,8 @@ enum XSocketCallType {
   XMANAGEFID = 40;
   XUPDATEDEFIFACE = 41;
   XDEFIFACE = 42;
+
+  XCIDINTEREST = 43;
 }
 
 message XSocketMsg {
@@ -87,6 +89,8 @@ message XSocketMsg {
 
   optional X_UpdateDefIface_Msg x_updatedefiface = 44;
   optional X_DefIface_Msg x_defiface = 45;
+
+  optional X_CIDInterest_Msg x_cidinterest = 46;
 }
 
 message X_Socket_Msg {
@@ -258,6 +262,12 @@ message X_UpdateDefIface_Msg {
 
 message X_DefIface_Msg {
 	optional int32 interface = 1;
+}
+
+message X_CIDInterest_Msg {
+  required uint32 id = 1; // id of actual socket to close
+  optional bytes src_addr = 2;
+  optional bytes cid_addr = 3;
 }
 
 /**************************************************/

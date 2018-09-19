@@ -36,6 +36,7 @@ public:
 	static const std::string XID_TYPE_HID_STRING;
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_NCID_STRING;
+	static const std::string XID_TYPE_ICID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_FID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
@@ -138,10 +139,12 @@ public:
 	const Node& intent_HID() const;
 	const Node& intent_SID() const;
 	const Node& intent_CID() const;
+	const Node& intent_ICID() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
 	std::string intent_CID_str() const;
+	std::string intent_ICID_str() const;
 	bool is_valid() const;
 	bool is_final_intent(const Node& n);
 	bool is_final_intent(const std::string xid_string);
@@ -158,6 +161,7 @@ public:
 	Node get_final_intent() const;
 	bool replace_intent_HID(std::string new_hid_str);
 	bool replace_intent_AD(std::string new_ad_str);
+	bool replace_CID_with_ICID_intent();
 	size_t unparse_node_size() const;
 	bool flatten();
 	bool first_hop_is_sid() const;
@@ -178,6 +182,7 @@ private:
 	std::size_t intent_HID_index() const;
 	std::size_t intent_SID_index() const;
 	std::size_t intent_CID_index() const;
+	std::size_t intent_ICID_index() const;
 
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);

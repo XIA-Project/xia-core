@@ -17,6 +17,7 @@ class Element;
 class XIAPath { public:
     XIAPath();
     XIAPath(const XIAPath& r);
+	XIAPath(const Graph& r);
 
     XIAPath& operator=(const XIAPath& r);
 

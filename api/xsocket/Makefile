@@ -13,6 +13,7 @@ SOURCES= Xaccept.c Xbind.c Xclose.c Xconnect.c Xfcntl.c Xgetaddrinfo.c \
 	XupdateDAG.c XupdateNameServerDAG.c Xutil.c Xlisten.c state.c \
 	Xmsg.c Xfork.c Xnotify.c \
 	minini/minIni.c XsetXcacheSID.c Xkeys.c Xsecurity.c \
+	XinterestedInCID.c \
 	Xgetifaddrs.c Xgethostname.c
 
 OBJS=$(SOURCES:.c=.o) xia.pb.o

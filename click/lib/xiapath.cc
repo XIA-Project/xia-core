@@ -24,6 +24,11 @@ XIAPath::XIAPath(const XIAPath& r)
     g = r.g;
 }
 
+XIAPath::XIAPath(const Graph& r)
+{
+	g = r;
+}
+
 XIAPath&
 XIAPath::operator=(const XIAPath& r)
 {

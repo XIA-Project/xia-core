@@ -9,3 +9,4 @@ define($FALLBACK -7)
 
 define($SRC_PORT_ANNO 52
 	)
+define($XIA_FROMNET_ANNO 90)

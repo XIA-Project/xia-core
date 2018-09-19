@@ -116,6 +116,7 @@ const std::string Node::XID_TYPE_AD_STRING = "AD";
 const std::string Node::XID_TYPE_HID_STRING = "HID";
 const std::string Node::XID_TYPE_CID_STRING = "CID";
 const std::string Node::XID_TYPE_NCID_STRING = "NCID";
+const std::string Node::XID_TYPE_ICID_STRING = "ICID";
 const std::string Node::XID_TYPE_SID_STRING = "SID";
 const std::string Node::XID_TYPE_IP_STRING = "IP";
 const std::string Node::XID_TYPE_FID_STRING = "FID";
@@ -164,6 +165,7 @@ Node::Node(uint32_t type, const void* id, int dummy)
 *			\n Node::XID_TYPE_HID (Host)
 *			\n Node::XID_TYPE_CID (Content)
 *			\n Node::XID_TYPE_NCID (NamedContent)
+*			\n Node::XID_TYPE_ICID (Interest in a CID)
 *			\n Node::XID_TYPE_SID (Service)
 *			\n Node::XID_TYPE_FID (Flood)
 *			\n Node::XID_TYPE_IP (IPv4 / 4ID)
@@ -196,6 +198,7 @@ Node::Node(int type, const std::string id_str)
 *			\n Node::XID_TYPE_HID_STRING
 *			\n Node::XID_TYPE_CID_STRING
 *			\n Node::XID_TYPE_NCID_STRING
+*			\n Node::XID_TYPE_ICID_STRING
 *			\n Node::XID_TYPE_SID_STRING
 *			\n Node::XID_TYPE_FID_STRING
 *			\n Node::XID_TYPE_IP_STRING
@@ -288,6 +291,8 @@ Node::construct_from_strings(const std::string type_str, const std::string id_st
 		ptr_->type = XID_TYPE_CID;
 	else if (typestr == XID_TYPE_NCID_STRING)
 		ptr_->type = XID_TYPE_NCID;
+	else if (typestr == XID_TYPE_ICID_STRING)
+		ptr_->type = XID_TYPE_ICID;
 	else if (typestr == XID_TYPE_SID_STRING)
 		ptr_->type = XID_TYPE_SID;
 	else if (typestr == XID_TYPE_IP_STRING)
@@ -388,6 +393,8 @@ Node::type_string() const
 			return XID_TYPE_CID_STRING;
 		case XID_TYPE_NCID:
 			return XID_TYPE_NCID_STRING;
+		case XID_TYPE_ICID:
+			return XID_TYPE_ICID_STRING;
 		case XID_TYPE_SID:
 			return XID_TYPE_SID_STRING;
 		case XID_TYPE_FID:
@@ -458,6 +465,7 @@ Node::has_valid_xid() const
 		case XID_TYPE_IP:
 		case XID_TYPE_CID:
 		case XID_TYPE_NCID:
+		case XID_TYPE_ICID:
 		case XID_TYPE_FID:
 		case XID_TYPE_HID:
 		case XID_TYPE_SID:
@@ -977,6 +985,12 @@ Graph::intent_XID_index(uint32_t xid_type) const
 }
 
 std::size_t
+Graph::intent_ICID_index() const
+{
+	return intent_XID_index(XID_TYPE_ICID);
+}
+
+std::size_t
 Graph::intent_CID_index() const
 {
 	return intent_XID_index(XID_TYPE_CID);
@@ -1024,6 +1038,20 @@ Graph::replace_intent_AD(std::string new_ad_str)
 	return replace_intent_XID(XID_TYPE_AD, new_ad_str);
 }
 
+bool
+Graph::replace_CID_with_ICID_intent()
+{
+	// Find the intent index
+	std::size_t intent_cid_index = intent_CID_index();
+	if (intent_cid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph: ERROR: intent not CID, cannot convert to ICID\n");
+		return false;
+	}
+	// Simply switch its type to ICID
+	Node icid(XID_TYPE_ICID, nodes_[intent_cid_index].id_string());
+	nodes_[intent_cid_index] = icid;
+	return true;
+}
 /**
   * @brief Compare two graphs while ignoring intent AD
   *
@@ -1183,6 +1211,35 @@ Graph::intent_CID() const
 	return nodes_[cid_index];
 }
 
+/*
+ * @brief Return the ICID for the Graph's intent node
+ *
+ * Get the ICID string on first path to intent node
+ * Note: This function is essentially identical to intent_AD_str()
+ *
+ * @return The ICID if found, empty string otherwise
+ */
+std::string
+Graph::intent_ICID_str() const
+{
+	std::string icid;
+	std::size_t icid_index = intent_ICID_index();
+	if (icid_index == INVALID_GRAPH_INDEX) {
+		return "";
+	}
+	return nodes_[icid_index].to_string();
+}
+
+const Node&
+Graph::intent_ICID() const
+{
+	std::size_t icid_index = intent_ICID_index();
+	if (icid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_CID: CID index not found\n");
+		throw std::range_error("CID not found");
+	}
+	return nodes_[icid_index];
+}
 
 /**
 * @brief Return the graph in string form
@@ -1452,6 +1509,7 @@ Graph::next_hop(const Node& n)
 	while (intentIndex == nIndex ||
 			(nodes_[intentIndex].type() != XID_TYPE_CID
 			 && nodes_[intentIndex].type() != XID_TYPE_NCID
+			 && nodes_[intentIndex].type() != XID_TYPE_ICID
 			 && nodes_[intentIndex].type() != XID_TYPE_SID))
 	{
 		if (is_sink(intentIndex)) {

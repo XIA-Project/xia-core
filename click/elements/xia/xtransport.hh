@@ -247,8 +247,10 @@ private:
 	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
+	void ProcessInterestPacket(WritablePacket *p_in);
 	void ProcessDatagramPacket(WritablePacket *p_in);
 	void ProcessStreamPacket(WritablePacket *p_in);
 	int HandleStreamRawPacket(WritablePacket *p_in);
