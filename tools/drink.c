@@ -107,7 +107,7 @@ void getConfig(int argc, char** argv)
 
 	fhc.delay = htonl(fhc.delay);
 	fhc.numPkts = htonl(fhc.numPkts);
-	fhc.pktSize = MIN(htonl(fhc.pktSize), XmaxPayload());
+	fhc.pktSize = htonl(MIN(fhc.pktSize, XmaxPayload()));
 }
 
 void say(const char *fmt, ...)
