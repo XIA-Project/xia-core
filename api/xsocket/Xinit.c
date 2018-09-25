@@ -101,8 +101,6 @@ static void set_api_payload_size()
 		char *err;
 		unsigned m = strtoul(maxbuf, &err, 10);
 
-		printf("e=%s m=%u err=%s\n", maxbuf, m, err);
-
 		if (m > 0) {
 			if (m < 4096) {
 				max_api_payload = 4096;
