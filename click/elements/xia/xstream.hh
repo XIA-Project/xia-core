@@ -145,42 +145,46 @@ private:
 							 after this segment )  */
 };
 
+// FIXME: this should really be a socket option
+#define TCP_FIFO_SIZE (256 * 1024)
+
 // Queue of packets from socket layer to transport
 class TCPFifo
 {
 public:
-#define FIFO_SIZE 256
-	TCPFifo(XStream *con);
-	TCPFifo(){};
+	TCPFifo(unsigned size);
 	~TCPFifo();
-	int 	push(WritablePacket *);
-	int 	pkt_length() { return (_head - _tail) % FIFO_SIZE; }
-	bool 	is_empty() { return ( 0 == pkt_length()) ; }
-	int 	pkts_to_send(int offset, int win);
-	void 	drop_until (tcp_seq_t offset);
 
-	tcp_seq_t byte_length() { return _bytes; }
-	WritablePacket *pull();
-	WritablePacket *get (tcp_seq_t offset);
+	unsigned available();	// return amount of free space
+	void clear();			// empty the buffer
 
-protected:
-	WritablePacket **_q;
-	int 	_head;
-	int 	_tail;
-	int 	_peek_cache_position;
-	int 	_peek_cache_offset;
-	tcp_seq_t _bytes;
+	bool is_empty()         { return (_used == 0); };
+	tcp_seq_t byte_length() { return _used; }
+
+	int push(WritablePacket *);
+
+	// FIXME: this is packet rather than byte based, should fix in the future
+	int pkts_to_send(int offset, int win);
+
+	WritablePacket *get(tcp_seq_t offset, unsigned len);
+	void drop_until (tcp_seq_t offset);
 
 private:
-	XStream *_con;   /* The XStream to which I belong */
-	int verbosity();
+	unsigned _size;
+	unsigned _used;
+	unsigned _free;
+
+	unsigned char *_buf;
+	unsigned char *_h;
+	unsigned char *_t;
+	unsigned char *_last;
 };
 
 class XStream  : public sock {
 
 public:
 	XStream(XTRANSPORT *transport, unsigned short port, uint32_t id);
-	XStream() : _outputTask(NULL, 0) {}; 
+	XStream() : _q_usr_input(TCP_FIFO_SIZE), _outputTask(NULL, 0) {};
 	~XStream() {};
 
 	const char *class_name() const  { return "XStream"; }
@@ -316,9 +320,19 @@ XStream::verbosity()  { return get_transport()->verbosity(); }
 inline int
 TCPQueue::verbosity() { return _con->sock::get_transport()->verbosity(); }
 
-inline int
-TCPFifo::verbosity()  { return _con->get_transport()->verbosity(); }
+inline unsigned TCPFifo::available()
+{
+	printf("%u bytes left free\n", _free);
+	return _free;
+}
 
+
+inline void TCPFifo::clear()
+{
+	_h = _t = _buf;
+	_used = 0;
+	_free = _size;
+}
 
 
 CLICK_ENDDECLS

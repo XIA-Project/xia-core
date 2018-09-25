@@ -1359,7 +1359,7 @@ send:
 
 	/*278*/
 	if (len){
-		p = _q_usr_input.get(off);
+		p = _q_usr_input.get(off, len);
 
 		if (_staged){ // because drop_until frees up queue space
 			unstage_data();
@@ -2252,7 +2252,7 @@ int XStream::read_from_recv_buf(XSocketMsg *xia_socket_msg) {
 	int extra = 0;
 	char *buf;
 
-	// FIXME: be smarter about how much data we can return
+	// FIXME: add code to throttle max xfer size
 	bytes_requested = min(bytes_requested, 60 * 1024);
 
 	if (_tail_length != 0){
@@ -2338,7 +2338,7 @@ XStream::tcp_newtcpcb()
 
 XStream::XStream(XTRANSPORT *transport, const unsigned short port, uint32_t id)
 	: sock(transport, port, id, SOCK_STREAM), _q_recv(this),
-		_q_usr_input(this), _outputTask(transport, id) {
+		_q_usr_input(TCP_FIFO_SIZE), _outputTask(transport, id) {
 
 	tp = tcp_newtcpcb();
 	tp->t_state = TCPS_CLOSED;
@@ -2780,35 +2780,77 @@ TCPQueue::pretty_print(StringAccum &sa, int signed_width)
 }
 
 
-TCPFifo::TCPFifo(XStream *con)
+TCPFifo::TCPFifo(unsigned size)
 {
-	_con = con;
-	_q = (WritablePacket**) CLICK_LALLOC(sizeof(WritablePacket *) * FIFO_SIZE);
-	_head = _tail = _bytes = 0;
+	_size = size;
+	_buf = (unsigned char *)calloc(size, sizeof(unsigned char));
+	if (!_buf) {
+		_size =  0;
+	}
+
+	_last = _buf + size;
+	clear();
 }
 
 
 TCPFifo::~TCPFifo()
 {
-	for (int i=_tail; i!= _head; i = (i + 1) % FIFO_SIZE){
-		_q[i]->kill();
+	if (_buf) {
+		free(_buf);
+		_buf = NULL;
 	}
-	CLICK_LFREE(_q, sizeof(WritablePacket *) * FIFO_SIZE);
+	clear();
 }
 
 
 int
 TCPFifo::push(WritablePacket *p)
 {
-	// no room in the output queue
-	if ((_head + 1) % FIFO_SIZE == _tail){
+	unsigned count = p->length();
+	unsigned char *data = p->data();
+
+	//printf("pushing %u: h:%u t:%u f:%u u:%u\n", count, _h - _buf, _t - _buf, _free, _used);
+
+	assert(_buf);
+
+	// FIXME: we're in a weird packet vs byte thing here.
+	// for now, don't accept if we can't take everything
+	if (_free == 0 || count > _free) {
 		return EWOULDBLOCK;
 	}
 
-	_q[_head] = p;
-	_bytes += p->length();
-	_head = (_head + 1) % FIFO_SIZE;
-	//printf("tcpfifo contains %d bytes\n", _bytes);
+	if (_h + count < _last) {
+		// we can simply append
+		memcpy(_h, data, count);
+		_h += count;
+		//printf("didn't wrap\n");
+	} else {
+		// the head is going to wrap
+		unsigned num = _last - _h;
+
+		// fill to end of buffer
+		memcpy(_h, data, num);
+		data += num;
+
+		if (num > 0) {
+			unsigned left = count - num;
+			memcpy(_buf, data, left);
+			_h = _buf + left;
+
+			//printf("we had to wrap\n");
+		} else {
+			_h = _buf;
+		}
+	}
+
+	_used += count;
+	_free -= count;
+
+	assert(_t < _last && _h < _last);
+	assert(_free <= _size && _used <= _size);
+
+	//printf("appended %u bytes, now %u bytes total\n", count, _used);
+	p->kill();
 	return 0;
 }
 
@@ -2817,70 +2859,62 @@ TCPFifo::push(WritablePacket *p)
 int
 TCPFifo::pkts_to_send(int offset, int win)
 {
-	if (is_empty()) { return 0; }
-	if (offset >= win) { return 0; }
-	if (pkt_length() == 1) { return 1; }
-
-	int wp = _tail;
-	int wo = 0;
-
-	// FIXME: try casting offset as unsigned - POSSIBLY INTRODUCES WRAPAROUND ERROR
-	while (wo + _q[wp]->length() <= (unsigned)offset){
-		wo += _q[wp]->length();
-		wp = (wp + 1) % FIFO_SIZE;
-		if (wp == _head) { return 0; }
-	}
-
-	if (((wp + 1) % FIFO_SIZE) == _head){
+	assert(_buf);
+	if (is_empty() || (offset >= win)) {
+		return 0;
+	} else {
 		return 1;
 	}
 
-	// FIXME: try casting win as unsigned - POSSIBLY INTRODUCES WRAPAROUND ERROR
-	if (wo + _q[wp]->length() >= (unsigned)win){
-		return 1;
-	}
-
-	return 2;
+	// FIXME: in the old code, this would indicate that 2 or more
+	// packets were in the fido. now that we are byte based this
+	// doesn't make a lot of sense. Can we get away with it only
+	// saying 0 or 1? Or does this need to be based on offset and
+	// window or max payload size?
+	// return 2;
 }
 
 
 /* get a piece of payload starting at <offset> bytes from the tail */
 WritablePacket *
-TCPFifo::get(tcp_seq_t offset)
+TCPFifo::get(tcp_seq_t offset, unsigned len)
 {
-	WritablePacket * retval;
-	int wp = _tail;
-	tcp_seq_t wo = 0;
+	assert(_buf);
+	assert(len <= _used);
+	assert(offset <= _used);
+	assert(offset + len <= _used);
 
-	if (is_empty()) { return NULL; }
+	if (len > _used) {
+		len = _used;
+	}
+	//printf("getting %u: h:%u t:%u f:%u u:%u\n", len, _h - _buf, _t - _buf, _free, _used);
 
-	while (wo + _q[wp]->length() <= offset){
-		wo += _q[wp]->length();
-		wp = (wp + 1) % FIFO_SIZE;
-		if (wp == _head) { return NULL; }
+	WritablePacket *p = WritablePacket::make(512, NULL, len, 0);
+
+	unsigned char *bytes = p->data();
+	unsigned char *start = _t + offset;
+
+	if (start > _last) {
+		unsigned long s = start - _last;
+		start = _buf + s;
+		//printf("start is past end of buffer, wrapping to the front of the buffer: %lu\n", s);
 	}
 
-	/* FIXME: this is an expensive packet copy. Maybe there
-	is a better solution.  The problem is: We must keep a copy for later
-	retransmissions and one copy to send out now */
+	if (start + len < _last) {
+		//printf("copying all in one chunk\n");
+		memcpy(bytes, start, len);
 
-	retval = _q[wp]->clone()->uniqueify();
+	} else {
+		// we need to do it in 2 parts
+		unsigned num = _last - start;
+		memcpy(bytes, start, num);
+		bytes += num;
 
-	if (wo < offset){
-		retval->pull(offset - wo);
+		unsigned remaining = len - num;
+		//printf("buffer wraps: %d from end, %d from front\n", num, remaining);
+		memcpy(bytes, _buf, remaining);
 	}
-	return retval;
-}
 
-
-WritablePacket *
-TCPFifo::pull()
-{
-	WritablePacket *p;
-	if (_head == _tail) { return NULL; }
-	p = _q[_tail];
-	_tail = (_tail + 1) % FIFO_SIZE;
-	_bytes -= p->length();
 	return p;
 }
 
@@ -2890,22 +2924,34 @@ TCPFifo::pull()
 void
 TCPFifo::drop_until(tcp_seq_t offset)
 {
-	tcp_seq_t wo = 0;
+	assert(_buf);
+	assert(offset <= _used);
 
-	if (is_empty()){
-		return;
-	}
+	if (offset >= _used) {
+		//printf("dropped everything!\n");
+		// the queue is now empty
+		_used = 0;
+		_free = _size;
+		_h = _t = _buf;
 
-	while ((!is_empty()) && wo + _q[_tail]->length() <= offset){
-		wo += _q[_tail]->length();
-		_bytes -= _q[_tail]->length();
-		_q[_tail]->kill();
-		_tail = (_tail + 1) % FIFO_SIZE;
+	} else {
+		// advance the tail pointer
+		_t += offset;
+
+		//printf("advancing tail by %u\n", offset);
+
+		// check to see if the tail should wrap
+		if (_t >= _last) {
+			//printf("t > last %u %p %p\n", _t - _last, _t, _last);
+			unsigned s = _t - _last;
+			_t = _buf + s;
+			//printf("buf = %p t=%p diff=%u\n", _buf, _t, _t - _buf);
+		}
+
+		_free += offset;
+		_used -= offset;
 	}
-	if ((!is_empty()) && wo < offset){
-		_q[_tail]->pull(offset - wo);
-		_bytes -= (offset - wo);
-	}
+	//printf("released %u: h:%u t:%u f:%u u:%u\n", offset, _h - _buf, _t - _buf, _free, _used);
 }
 
 
