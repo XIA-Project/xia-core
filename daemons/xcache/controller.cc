@@ -1597,7 +1597,7 @@ void xcache_controller::run(void)
 
 				syslog(LOG_INFO, "XacceptAs Succeeded\n");
 				Graph g(&mypath);
-				g.print_graph();
+				//g.print_graph();
 
 				// Create a request to add to worker queue
 
