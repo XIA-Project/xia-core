@@ -165,7 +165,7 @@ int register_receiver(){
 
     //say("listening on dag: %s\n", g.dag_string().c_str());
 
-    Xlisten(sock, 5);
+    Xlisten(sock, 20);
 
     Xfreeaddrinfo(ai);
     return sock;
