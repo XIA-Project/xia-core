@@ -21,6 +21,7 @@ import time
 import glob
 import psutil
 import argparse
+import resource
 import ipaddress
 import subprocess
 
@@ -551,6 +552,11 @@ def start():
 node = nodeconf.nodeconf()
 node.read()
 hostname = xiapyutils.getxiaclickhostname()
+
+# raise the maximum # of open file handles allowed by this script and its subprocesses
+# many Xsockets in TIME_WAIT can bring the number of handles in use over the default of 1024
+# this is probably only an issue for the cache daemon but make it global to be safe
+resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
 
 parser = argparse.ArgumentParser(description='Control an XIA node')
 parser.add_argument('-v', '--version', action='version', version=VER)
