@@ -23,6 +23,9 @@ class DashVideo:
     class TransferFailed(Exception):
         '''Raise when unable to fetch the segment'''
 
+    class ManifestMissing(Exception):
+        '''Raise when unable to fetch the manifest'''
+
 
     def __init__(self, name, id, logging):
         self.manifest = MANIFEST % name
@@ -103,7 +106,7 @@ class DashVideo:
             print self.id, url, ' -> ',
             try:
                 start = datetime.datetime.now()
-                req = self.session.get(url)
+                req = self.session.get(url, timeout=10)
                 now = datetime.datetime.now()
                 elapsed = now - start
 
@@ -172,10 +175,10 @@ class DashVideo:
         self.session.proxies = {"http": "localhost:8080"}
 
         try:
-            req = self.session.get(self.manifest)
+            req = self.session.get(self.manifest, timeout=10)
             m = req.text
         except Exception as e:
-            print 'failed getting manifest:', str(e)
+            print '%s failed getting manifest: %s' % (self.id, str(e))
             return
 
         mpd = MPEGDASHParser.parse(m)
@@ -234,22 +237,29 @@ def get_video(name, id):
     else:
         count = args.segments
 
-    video = DashVideo(name, id, args.log)
-    video.set_bitrate(args.bitrate)
-    video.info()
+    try:
+        video = DashVideo(name, id, args.log)
+        if not video.loaded:
+            raise DashVideo.ManifestMissing('unable to fetch', name)
+            return
 
-    if len(video) < count:
-        count = len(video)
-    if args.randomize:
-        # we don't want the entire video just some small part of it
-        count = random.randint(1, count)
+        video.set_bitrate(args.bitrate)
+        video.info()
 
-    for url in video:
-        # the video iterator fetches the next segment from the cdn
-        # since we aren't playing the content, it just gets thrown away
-        count -= 1
-        if count <= 0:
-            break
+        if len(video) < count:
+            count = len(video)
+        if args.randomize:
+            # we don't want the entire video just some small part of it
+            count = random.randint(1, count)
+
+        for url in video:
+            # the video iterator fetches the next segment from the cdn
+            # since we aren't playing the content, it just gets thrown away
+            count -= 1
+            if count <= 0:
+                break
+    except Exception as e:
+        print '%d ERROR getting %s %s' % (id, name, str(e))
 
     print '%d closing:        %s' % (id, name)
 
