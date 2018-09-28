@@ -12,7 +12,7 @@ BEGIN {
 	t  = 0.0;	# total time (s)
 	tp = 0.0;	# cumulative tput scores
 	r  = 0;		# # of video chunks
-	s  = 0;		# total # of sefgmetns in the video
+	s  = 0;		# total # of segments in the video
 
 	# stats for all videos
 	tb  = 0;
