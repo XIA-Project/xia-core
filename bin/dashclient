@@ -106,7 +106,7 @@ class DashVideo:
             print self.id, url, ' -> ',
             try:
                 start = datetime.datetime.now()
-                req = self.session.get(url, timeout=10)
+                req = self.session.get(url, timeout=30)
                 now = datetime.datetime.now()
                 elapsed = now - start
 
@@ -175,7 +175,7 @@ class DashVideo:
         self.session.proxies = {"http": "localhost:8080"}
 
         try:
-            req = self.session.get(self.manifest, timeout=10)
+            req = self.session.get(self.manifest, timeout=30)
             m = req.text
         except Exception as e:
             print '%s failed getting manifest: %s' % (self.id, str(e))
