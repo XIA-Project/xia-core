@@ -12,6 +12,7 @@ sudo -H pip install ipaddress
 # needed for video broker
 sudo -H pip install rpyc
 sudo -H pip install msgpack
+sudo -H pip install mpegdash
 sudo -H pip install pycountry
 sudo -H pip install dotmap
 sudo -H pip install simpleplotlib
