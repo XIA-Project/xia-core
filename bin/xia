@@ -474,7 +474,10 @@ def print_status(nodetype):
     print
     get_logging()
 
-    apimax = args.apimax
+    try:
+        apimax = args.apimax
+    except:
+        apimax = 0
     if apimax == 0:
         apimax = 'default'
     print 'api max size :', apimax

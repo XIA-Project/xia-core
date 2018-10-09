@@ -147,7 +147,7 @@ class nodeconf:
 
     def apimax(self):
         #FIXME: ugh fix magic number!
-        a = self._get('xia', 'apimax', 0)
+        a = int(self._get('xia', 'apimax', 0))
         if a < 0 or a > 62000:
             a = 0
         return a
