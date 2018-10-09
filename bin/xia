@@ -474,6 +474,11 @@ def print_status(nodetype):
     print
     get_logging()
 
+    apimax = args.apimax
+    if apimax == 0:
+        apimax = 'default'
+    print 'api max size :', apimax
+
 
 # main functionality #########################################################
 #
@@ -512,6 +517,10 @@ def stop():
 #
 def start():
     nodetype = get_nodetype()
+
+    # if set, limit the maximum size of the API<-> click packet size
+    if args.apimax != 0:
+        os.environ['XIA_MAXBUF'] = str(args.apimax)
 
     # if set, override caching behavior defined in xia.conf
     cache = node.cache()
@@ -579,6 +588,7 @@ cache_parser.add_argument('--nocache', action='store_true', help='override xia.c
 start_parser.add_argument('--valgrind', action='store_true', help='run click inside of valgrind')
 start_parser.add_argument('-s', '--sclient', type=ip_addr, metavar='IP-ADDR', help='run the stats client and send output to IP-ADDR')
 start_parser.add_argument('-S', '--sserver', action='store_true', help='run the XIA stats server on this node')
+start_parser.add_argument('-a', '--apimax', type=int, default=node.apimax(), help='set the maximum size of the internal api packets')
 start_parser.set_defaults(func=start, verbose=0, level=3)
 
 stop_parser = sub.add_parser('stop', help='stop an XIA node')

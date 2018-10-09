@@ -18,7 +18,7 @@ import os
 import xiapyutils
 from configparser import ConfigParser
 
-xkeys = ['hostname', 'nodetype', 'numports', 'hid', 'cache', 'broker', 'publisher', 'manifest', 'client']
+xkeys = ['hostname', 'nodetype', 'numports', 'hid', 'cache', 'broker', 'publisher', 'manifest', 'client', 'apimax']
 ckeys = ['ad', 'controller_sid', 'nameserver_sid', 'rendezvous_sid', 'rendezvous_ctl_sid', 'controller_dag']
 wkeys = [ 'mac', 'addr', 'port']
 
@@ -144,6 +144,13 @@ class nodeconf:
 
     def numports(self):
         return self._get('xia', 'numports', 4)
+
+    def apimax(self):
+        #FIXME: ugh fix magic number!
+        a = self._get('xia', 'apimax', 0)
+        if a < 0 or a > 62000:
+            a = 0
+        return a
 
     def interfaces(self):
         list = []

@@ -412,6 +412,12 @@ def info(args):
         if w:
             print 'Waveserver MAC:     %s' % w[0]
             print 'Waveserver Addr:    %s:%s' % (w[1], w[2])
+
+        a = node.apimax()
+        if a == 0:
+            a = 'default'
+        print 'Max API pkt size:   %s' % a
+
     else:
         print 'No configuration found'
 
@@ -500,6 +506,7 @@ common_parser.add_argument('-w', '--waveserver', type=waveserver, metavar='DSRC_
 common_parser.add_argument('--broker',action='store_true', help='run the CDN broker on this node')
 common_parser.add_argument('--manifest',action='store_true', help='run the CDN manifest server on this node')
 common_parser.add_argument('--client',action='store_true', help='run the CDN client services on this node')
+common_parser.add_argument('-a', '--apimax', type=int, default=0, help='set the maximum size of the internal api packets')
 
 cache_parser = common_parser.add_mutually_exclusive_group(required=False)
 cache_parser.add_argument('--cache', action='store_true', default=True, help='enable xcache caching (default)')
