@@ -211,6 +211,7 @@ public:
 	/**
 	 * Stores content locally.
 	 */
+	int store(std::string &cid, const std::string &data, time_t);
 	int store(xcache_cmd *, xcache_cmd *, time_t);
 	int __store(xcache_meta *meta, const std::string &data);
 	int __store_policy(xcache_meta *);
@@ -227,6 +228,9 @@ public:
 	// free the context
 	int free_context(xcache_cmd *cmd);
 	int free_context_for_sock(int sockfd);
+
+	/** Check if a given CID is local **/
+	bool is_CID_local(std::string cid);
 
 	/**
 	 * Remove content.

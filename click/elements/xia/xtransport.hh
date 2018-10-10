@@ -145,6 +145,7 @@ private:
 	int _num_ports;
 	XIAPath _nameserver_addr;
 	uint32_t _next_id;
+	int icidsock{-1};
 
 	Packet* UDPIPPrep(Packet *, int);
     bool migratable_sock(sock *, int);

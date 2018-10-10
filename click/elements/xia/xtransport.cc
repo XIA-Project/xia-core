@@ -20,6 +20,8 @@
 
 #include "taskident.hh"
 
+#include <sys/socket.h>  // unix domain socket for ICIDs
+#include <sys/un.h>      // unix domain socket for ICIDs
 /*
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
@@ -34,6 +36,7 @@
 #define FID_BAD_SEQ   1
 #define FID_SEQ_START 2
 #define uint32_max    0xffffffff
+#define ICID_SOCK_NAME "/tmp/xcache-icid.sock"
 
 CLICK_DECLS
 
@@ -239,6 +242,9 @@ XTRANSPORT::~XTRANSPORT()
 
 	xcmp_listeners.clear();
 	notify_listeners.clear();
+	if(icidsock != -1) {
+		close(icidsock);
+	}
 }
 
 
@@ -837,6 +843,22 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessInterestPacket(WritablePacket *p_in)
 {
+	// Lazily create a UNIX domain socket to send ICID packets to Xcache
+	if(icidsock == -1) {
+		icidsock = socket(AF_UNIX, SOCK_DGRAM, 0);
+		if(icidsock == -1) {
+			WARN("Unable to create unix socket for ICIDs\n");
+			return;
+		}
+		sockaddr_un sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.sun_family = AF_UNIX;
+		strcpy(sa.sun_path, ICID_SOCK_NAME);
+		if(connect(icidsock, (struct sockaddr *)&sa, sizeof(sa))) {
+			icidsock = -1;
+			return;
+		}
+	}
 	XIAHeader xiah(p_in->xia_header());
 	XIAPath dst_path = xiah.dst_path();
 	XID dst_xid(xiah.hdr()->node[xiah.last()].xid);
@@ -845,6 +867,10 @@ void XTRANSPORT::ProcessInterestPacket(WritablePacket *p_in)
 		return;
 	}
 	// TODO: Now send this packet straight to Xcache Interest socket
+	if(send(icidsock, p_in->data(), p_in->length(), 0) != p_in->length()) {
+		WARN("ProcessInterestPacket: error sending icid of size %zu\n",
+				p_in->length());
+	}
 }
 
 /*************************************************************

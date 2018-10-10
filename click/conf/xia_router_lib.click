@@ -185,7 +185,7 @@ elementclass XIALineCard {
 //	print_in :: XIAPrint(">>> (In Iface $num) ");
 	print_out :: XIAPrint("<<< (Out Iface $num)");
 
-	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, dst ICID-);
+	count_final_out :: XIAXIDTypeCounter(dst AD, dst HID, dst SID, dst CID, dst IP, dst FID, dst NCID, dst ICID, -);
 	count_next_out :: XIAXIDTypeCounter(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, -);
 
 	// AIP challenge-response HID verification module
@@ -206,7 +206,7 @@ elementclass XIALineCard {
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
 	// XIA_FROMNET_ANNO is 1 on packets that arrived from network
-	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> XIAPaint(ANNO $XIA_FROMNET_ANNO, 1) -> c;
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> XIAPaint(ANNO $XIA_FROMNET_ANNO, COLOR 1) -> c;
 
 	// Received a network joining packet
 	c[3] -> xnetj :: XNetJ($mac) -> toNet;

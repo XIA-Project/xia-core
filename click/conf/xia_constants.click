@@ -7,6 +7,6 @@ define($REDIRECT -5)
 define($UNREACHABLE -6)
 define($FALLBACK -7)
 
+define($XIA_FROMNET_ANNO 90)
 define($SRC_PORT_ANNO 52
 	)
-define($XIA_FROMNET_ANNO 90)

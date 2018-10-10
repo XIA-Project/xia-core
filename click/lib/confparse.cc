@@ -1643,6 +1643,8 @@ cp_xid_type(const String& str, uint32_t* result)
         *result = htonl(CLICK_XIA_XID_TYPE_CID);
     else if (str.compare(String("NCID")) == 0)
         *result = htonl(CLICK_XIA_XID_TYPE_NCID);
+    else if (str.compare(String("ICID")) == 0)
+        *result = htonl(CLICK_XIA_XID_TYPE_ICID);
     else if (str.compare(String("HID")) == 0)
         *result = htonl(CLICK_XIA_XID_TYPE_HID);
     else if (str.compare(String("SID")) == 0)
