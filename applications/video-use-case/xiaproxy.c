@@ -30,6 +30,7 @@ static int scorer_interval  = 5;
 static int alive            = 1;
 
 static int num_clients      = 1;
+static int timeout          = -1;
 
 static char hostname[64];
 static char *ident = NULL;
@@ -258,6 +259,8 @@ int run_broker_threads()
 		syslog(LOG_ERR, "can't create broker thread: %s", strerror(errno));
 		rc = 1;
 	}
+
+	freeaddrinfo(broker_addr);
 	return rc;
 }
 
@@ -265,9 +268,10 @@ int run_broker_threads()
 
 void help(const char *name)
 {
-	printf("\nusage: %s [-l level] [-v] port\n", name);
+	printf("\nusage: %s [-n clients] [-t timeout] [-l level] [-v] port\n", name);
 	printf("where:\n");
 	printf(" -n clients  : # of clients running on the host\n");
+	printf(" -t timeout  : maximum time receive timeout in seconds\n");
 	printf(" -l level    : syslog logging level 0 = LOG_EMERG ... 7 = LOG_DEBUG (default=3:LOG_ERR)\n");
 	printf(" -v          : log to the console as well as syslog\n");
 	printf(" port        : port to accept proxy requests on\n");
@@ -285,7 +289,7 @@ void config(int argc, char** argv)
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "n:l:v")) != -1) {
+	while ((c = getopt(argc, argv, "n:t:l:v")) != -1) {
 		switch (c) {
 			case 'n':
 				num_clients = MAX(1, atoi(optarg));
@@ -295,6 +299,12 @@ void config(int argc, char** argv)
 				break;
 			case 'v':
 				verbose = LOG_PERROR;
+				break;
+			case 't':
+				timeout = atoi(optarg);
+				if (timeout <= 0) {
+				    timeout = -1;
+				}
 				break;
 			case '?':
 			default:
@@ -436,6 +446,17 @@ int send_command(ProxyRequestCtx *ctx, const char *cmd)
 int get_server_reply(ProxyRequestCtx *ctx, char *reply, int sz)
 {
 	int n = -1;
+
+	struct pollfd pfds[1];
+	pfds[0].fd = ctx->xia_sock;
+	pfds[0].events = POLLIN;
+
+	if (Xpoll(pfds, 1, timeout * 1000) <= 0) {
+		Xclose(ctx->xia_sock);
+		syslog(LOG_WARNING, "%d connection timed out", ctx->xia_sock);
+		return -1;
+	}
+
 	if ((n = Xrecv(ctx->xia_sock, reply, sz, 0))  < 0) {
 		Xclose(ctx->xia_sock);
 		syslog(LOG_WARNING, "Unable to communicate with the server");
@@ -634,7 +655,7 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 	for (int i = 0; i < numChunks; i++) {
 
 		gettimeofday(&t1, NULL);
-		if ((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) < 0) {
+		if ((len = XfetchChunkAndSource(&xcache, (void**)&data, XCF_BLOCK, &chunkAddresses[i], sizeof(chunkAddresses[i]), &src_addr, &src_len)) <= 0) {
 			syslog(LOG_ERR, "XcacheGetChunk Failed");
 			if (data) {
 				free(data);
@@ -973,8 +994,7 @@ void *job(void *sockptr)
 	}
 
 	close_fd(browser_sock);
-
-	return NULL;
+	pthread_exit(NULL);
 }
 
 
@@ -986,6 +1006,7 @@ void start_new_job(long int sock)
 	if (pthread_create(&worker, NULL, job, (void *)sock)) {
 		syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
 	}
+	pthread_detach(worker);
 }
 
 
@@ -1048,6 +1069,7 @@ int main(int argc, char **argv)
 
 	// initilize xcache
 	XcacheHandleInit(&xcache);
+	XcacheHandleSetTimeout(&xcache, timeout);
 
 	if (run_broker_threads() != 0) {
 		return -1;
