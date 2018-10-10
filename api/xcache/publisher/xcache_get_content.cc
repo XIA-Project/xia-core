@@ -18,25 +18,41 @@
 int interruptible_read(int sock, void *buf, size_t len,
 		std::atomic<bool>& stop)
 {
-	fd_set rfds;
+	fd_set rfds, efds;
 	struct timeval timeout;
 	int rc;
 
+	int i = 0;
+
 	FD_ZERO(&rfds);
 	FD_SET(sock, &rfds);
+	FD_ZERO(&efds);
+	FD_SET(sock, &efds);
 
 	timeout.tv_sec = XCACHE_READ_TIMEOUT_SEC;
 	timeout.tv_usec = XCACHE_READ_TIMEOUT_USEC;
 
+	// FIXME: the 15 second logic below is a quick hack to break out if a single
+	// Xrecv would takes longer than 15 seconds. This is strictky for the video
+	// use case when under heavy load and should get into the main code branch.
+
 	while(!stop) {
-		rc = Xselect(sock+1, &rfds, NULL, NULL, &timeout);
+		rc = Xselect(sock+1, &rfds, NULL, &efds, &timeout);
 		if(rc == 0) {
 			// timed out, try waiting again after checking for stop
+			if (++i >= 15) {
+			    std::cout << "ERROR connection timed out " << rc << std::endl;
+			    return -1;
+			}
 			continue;
 		} else if(rc < 0 || rc > 1) {
 			std::cout << "ERROR Select on read returned " << rc << std::endl;
 			return -1;
+		} else if (FD_ISSET(sock, &efds)) {
+			std::cout << "ERROR except fd is set" << rc << std::endl;
+			return -1;
 		}
+
 		// We get here only if rc is 1
 		assert(rc == 1);
 		// Break out and perform the requested read
@@ -64,11 +80,11 @@ int reliable_read(int sock, char *buf, int len, std::atomic<bool>& stop)
 
 	while(remaining) {
 		count = interruptible_read(sock, buf+offset, remaining, stop);
-		offset += count;
-		remaining -= count;
-		if(count == 0) {
+		if(count <= 0) {
 			break;
 		}
+		offset += count;
+		remaining -= count;
 	}
 	if(remaining != 0) {
 		std::cout << "ERROR: Unable to read bytes: " << len << std::endl;

@@ -260,6 +260,7 @@ int XcacheHandleDestroy(XcacheHandle *h)
 	h->notifSock = -1;
 	h->contextID = 0;
 	h->ttl = 0;
+	h->timeout = 0;
 
 	return 0;
 }
@@ -284,6 +285,7 @@ int XcacheHandleInit(XcacheHandle *h)
 	}
 
 	h->ttl = 0;
+	h->timeout = 0;
 	h->xcacheSock = get_connected_socket();
 
 	if (h->xcacheSock < 0) {
@@ -341,6 +343,30 @@ int XcacheHandleSetTtl(XcacheHandle *h, time_t ttl)
 
 	if (h && ttl >= 0) {
 		h->ttl = ttl;
+		rc = 0;
+	}
+	return rc;
+}
+
+/*!
+** @brief set receive timeout
+**
+** Sets the maximum time in seconds with no data before a chunk fetch fails.
+** The default value (0) is to live forever.
+**
+** @param h XcacheHandle to modify
+** @param timeout receive timeout length
+**
+** @returns 0 on success
+** @returns -1 on error
+**
+*/
+int XcacheHandleSetTimeout(XcacheHandle *h, time_t timeout)
+{
+	int rc = -1;
+
+	if (h && timeout >= 0) {
+		h->timeout = timeout;
 		rc = 0;
 	}
 	return rc;
