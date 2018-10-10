@@ -47,8 +47,11 @@ class DashVideo:
             self.log('starting %s' % name)
 
         self.get_manifest()
-        self.log('num segments: %d' % self.num_segments)
-        self.current_bitrate = sorted(self.encodings.keys())[0]
+        if self.loaded:
+            self.log('num segments: %d' % self.num_segments)
+            self.current_bitrate = sorted(self.encodings.keys())[0]
+        else:
+            self.log('manifest failed')
 
 
     def __len__(self):
@@ -106,12 +109,15 @@ class DashVideo:
             print self.id, url, ' -> ',
             try:
                 start = datetime.datetime.now()
-                req = self.session.get(url, timeout=30)
+                req = self.session.get(url, timeout=args.timeout)
                 now = datetime.datetime.now()
                 elapsed = now - start
 
                 if req.status_code != 200:
-                    raise DashVideo.TransferFailed(req.status_code)
+                    raise DashVideo.TransferFailed('bad status', req.status_code)
+
+                if len(req.content) == 0:
+                    raise DashVideo.TransferFailed('empty segment')
 
                 if self.next_segment == 2:
                     # if this were a player the video could start playing
@@ -120,7 +126,7 @@ class DashVideo:
                 msec = elapsed.seconds  * 1000.0 + float(elapsed.microseconds) / 1000.0
                 sec  =  float(elapsed.seconds)  + float(elapsed.microseconds) / 1000000.0
                 tput = len(req.content) * 8.0 / sec / 1000000.0
-                print '{} {} {: 3.3f} sec {: 3.3f} mbps'.format(req.status_code, self.current_bitrate, sec, tput)
+                print '{} {} {: 3.3f} sec {: 3.3f} mbps'.format(req.status_code, len(req.content), sec, tput)
                 self.log('{} bytes {: 3.3f} sec {: 3.3f} mbps'.format(len(req.content), sec, tput))
 
                 self.adjust_bitrate(msec)
@@ -175,10 +181,12 @@ class DashVideo:
         self.session.proxies = {"http": "localhost:8080"}
 
         try:
-            req = self.session.get(self.manifest, timeout=30)
+            req = self.session.get(self.manifest, timeout=args.timeout)
+            if req.status_code != 200 or len(req.content) == 0:
+                raise DashVideo.TransferFailed('unable to retrieve manifest')
             m = req.text
         except Exception as e:
-            print '%s failed getting manifest: %s' % (self.id, str(e))
+            #print '%s failed getting manifest: %s' % (self.id, str(e))
             return
 
         mpd = MPEGDASHParser.parse(m)
@@ -219,13 +227,18 @@ def config():
     parser.add_argument('-b', '--bitrate', type=int, default=0, help='bitrate to use in bps (default=adaptive')
     parser.add_argument('-s', '--segments', type=int, default=0, help='maximum # of segments to fetch')
     parser.add_argument('-r', '--randomize', action='store_true',  help='fetch a random # of segments up to specified amount')
-    parser.add_argument('-t', '--threads', type = int, default=1, help='spawn n simulatane3ous client threads')
+    parser.add_argument('-n', '--nthreads', type=int, default=1, help='spawn n simulatane3ous client threads')
+    parser.add_argument('-t', '--timeout', type=int, default=0, help='maximum segment fetch time')
 
     loop_parser = parser.add_mutually_exclusive_group(required=False)
     loop_parser.add_argument('-c', '--continuous', action='store_true', help='keep looping through videos forever')
     loop_parser.add_argument('-p', '--passes', type=int, default=0, help='# of times to loop through the videos')
 
     args = parser.parse_args()
+
+    # if invalid or net set, use the default timeout value
+    if args.timeout <= 0:
+        args.timeout = None
 
 
 
@@ -295,7 +308,7 @@ if __name__ == '__main__':
     random.seed()
     config()
 
-    for i in range(0, args.threads):
+    for i in range(0, args.nthreads):
         c = Process(target=run_client, args=(i,))
         c.start()
 
