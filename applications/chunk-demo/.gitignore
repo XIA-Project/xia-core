@@ -7,3 +7,4 @@ push-demo-client
 push-demo-proxy
 fetch-demo-client
 make-random-chunk
+icid-demo-client

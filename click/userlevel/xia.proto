@@ -265,9 +265,7 @@ message X_DefIface_Msg {
 }
 
 message X_CIDInterest_Msg {
-  required uint32 id = 1; // id of actual socket to close
-  optional bytes src_addr = 2;
-  optional bytes cid_addr = 3;
+    required bytes cid_addr = 1;
 }
 
 /**************************************************/

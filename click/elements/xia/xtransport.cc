@@ -1540,16 +1540,15 @@ void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMs
 {
 	xia::X_CIDInterest_Msg *xcm = xia_socket_msg->mutable_x_cidinterest();
 
-	sock *sk = idToSock.get(xcm->id());
+	sock *sk = idToSock.get(id);
 	if(!sk) {
-		ERROR("Invalid socket %d\n", id);
+		ERROR("Invalid socket for id:%u\n", id);
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
 		return;
 	}
 
-	// Make sure we have a valid addresses in the request
-	if(xcm->src_addr().size() != sizeof(sockaddr_x)
-		|| xcm->cid_addr().size() != sizeof(sockaddr_x)) {
+	// Make sure we have a valid address for the CID
+	if(xcm->cid_addr().size() != sizeof(sockaddr_x)) {
 		ERROR("Invalid address provided\n");
 		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
 		return;
@@ -1560,9 +1559,7 @@ void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMs
 	memcpy(&cid_addr, xcm->cid_addr().c_str(), xcm->cid_addr().size());
 	Graph cid_dag(&cid_addr);
 
-	sockaddr_x src_addr;
-	memcpy(&src_addr, xcm->src_addr().c_str(), xcm->src_addr().size());
-	Graph src_dag(&src_addr);
+	Graph src_dag(sk->get_src_path().get_graph());
 
 	// Verify that we are using a valid routable address
 	if(src_dag.num_nodes() < 2) {

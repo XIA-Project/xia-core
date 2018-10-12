@@ -38,11 +38,7 @@ int XinterestedInCID(int sockfd, sockaddr_x *addr)
 
 	interest = xsm.mutable_x_cidinterest();
 
-	// Book-keeping entries
-	unsigned id = getID(sockfd);
-	interest->set_id(id);
-
-	// Make sure we have been a good socket that can receive chunk contents
+	// Make sure we have a good socket that can receive chunk contents
 	if(addr->sx_family != AF_XIA) {
 		errno = EAFNOSUPPORT;
 		return -1;
@@ -55,54 +51,23 @@ int XinterestedInCID(int sockfd, sockaddr_x *addr)
 		return -1;
 	}
 
-	// Assign a DAG for sockfd, if one doesn't exist already
+	// Caller must be listening on the given socket
 	if(!isSIDAssigned(sockfd)) {
-		LOG("XinterestedInCID: creating new SID\n");
-		if(XmakeNewSID(src_SID, sizeof(src_SID))) {
-			LOG("Unable to create a new SID");
-			return -1;
-		}
-		LOGF("XinterestedInCID: new SID:%s:", src_SID);
-
-		// Build a default DAG with this SID as our source address
-		if(Xgetaddrinfo(NULL, src_SID, NULL, &ai)) {
-			LOGF("Unable to make default DAG for %s", src_SID);
-			return -1;
-		}
-		sockaddr_x *sa = (sockaddr_x *)ai->ai_addr;
-		Graph src_dag(sa);
-		LOGF("XinterestedInCID: our addr:%s:\n", src_dag.dag_string().c_str());
-
-		// Include the source DAG in the message to Click
-		interest->set_src_addr(sa, sizeof(sockaddr_x));
-
-		Xfreeaddrinfo(ai);
-		setSIDAssigned(sockfd);
-		setTempSID(sockfd, src_SID);
+		LOG("XinterestedInCID: Error: provided socket not bound\n");
+		return -1;
 	}
 
 	// API specific values
 	interest->set_cid_addr(addr, sizeof(sockaddr_x));
 
-	sock = MakeApiSocket(SOCK_DGRAM);
-	// TODO check if MakeApiSocket succeeded here and increment state
-	state = 1; // sock allocated
-
-	if ((rc = click_send(sock, &xsm)) < 0) {
+	if ((rc = click_send(sockfd, &xsm)) < 0) {
 		LOGF("Error talking to Click: %s", strerror(errno));
-		goto XinterestedInCID_done;
-	} else if((rc = click_reply(sock, seq, &xsm)) < 0) {
+		return -1;
+	} else if((rc = click_reply(sockfd, seq, &xsm)) < 0) {
 		LOGF("Error getting status from Click: %s", strerror(errno));
-		goto XinterestedInCID_done;
+		return -1;
 	}
 
 XinterestedInCID_done:
-	switch(state) {
-		case 1:
-			freeSocketState(sock);
-			(_f_close)(sock);
-			/* fall through */
-	}
-
-	return rc;
+	return 0;
 }
