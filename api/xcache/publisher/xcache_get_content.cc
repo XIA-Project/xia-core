@@ -9,8 +9,8 @@
 // C Headers
 #include <stdlib.h>
 
-#define XCACHE_READ_TIMEOUT_SEC 1
-#define XCACHE_READ_TIMEOUT_USEC 0
+#define XCACHE_POLL_TIMEOUT_SEC 1000 /* timeout in milliseconds */
+#define XCACHE_READ_TIMEOUT_MAX 20
 #define XCACHE_MAX_IO_BUF_SIZE 65535
 
 // Return number of bytes read
@@ -18,38 +18,33 @@
 int interruptible_read(int sock, void *buf, size_t len,
 		std::atomic<bool>& stop)
 {
-	fd_set rfds, efds;
-	struct timeval timeout;
+	struct pollfd pfd;
 	int rc;
-
 	int i = 0;
 
-	FD_ZERO(&rfds);
-	FD_SET(sock, &rfds);
-	FD_ZERO(&efds);
-	FD_SET(sock, &efds);
+	pfd.fd = sock;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
 
-	timeout.tv_sec = XCACHE_READ_TIMEOUT_SEC;
-	timeout.tv_usec = XCACHE_READ_TIMEOUT_USEC;
-
-	// FIXME: the 15 second logic below is a quick hack to break out if a single
-	// Xrecv would takes longer than 15 seconds. This is strictky for the video
+	// FIXME: the 20 second logic below is a quick hack to break out if a single
+	// Xrecv would takes longer than 20 seconds. This is strictky for the video
 	// use case when under heavy load and should get into the main code branch.
 
 	while(!stop) {
-		rc = Xselect(sock+1, &rfds, NULL, &efds, &timeout);
+		rc = Xpoll(&pfd, 1, XCACHE_POLL_TIMEOUT_SEC);
+
 		if(rc == 0) {
 			// timed out, try waiting again after checking for stop
-			if (++i >= 15) {
+			if (++i >= XCACHE_READ_TIMEOUT_MAX) {
 			    std::cout << "ERROR connection timed out " << rc << std::endl;
 			    return -1;
 			}
 			continue;
-		} else if(rc < 0 || rc > 1) {
-			std::cout << "ERROR Select on read returned " << rc << std::endl;
+		} else if(rc < 0) {
+			std::cout << "ERROR Select on read returned " << rc << " " << errno << std::endl;
 			return -1;
-		} else if (FD_ISSET(sock, &efds)) {
-			std::cout << "ERROR except fd is set" << rc << std::endl;
+		} else if (!(pfd.revents && POLLIN)) {
+			printf("ERROR from poll: revents = %08x\n", pfd.revents);
 			return -1;
 		}
 

@@ -1042,7 +1042,12 @@ int _XfetchRemoteChunkBlocking(void **chunk, sockaddr_x *addr, socklen_t len, so
 		return -1;
 	}
 	Xclose(sock);
-	// TODO: Verify that data matches intent CID in addr
+
+
+	if (chdr->valid_data(buf) == false) {
+		fprintf(stderr, "ERROR chunk failed validation\n");
+		return -1;
+	}
 
 	// Copy data to a buffer to be returned
 	assert (buf.size() == chdr->content_len());
