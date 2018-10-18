@@ -282,7 +282,7 @@ def run_client(id):
 
     if id > 0:
         # pause briefly so that we don't (0-5 seconds)
-        time.sleep(random.random() * 5.0)
+        time.sleep(random.random() * 10.0)
 
     try:
         loop = True
