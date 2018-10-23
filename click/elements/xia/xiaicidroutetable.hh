@@ -53,7 +53,7 @@ class XIAICIDRouteTable : public Element { public:
     int configure(Vector<String> &, ErrorHandler *);
     void add_handlers();
 
-    void push(Packet *);
+    void push(int in_ether_port, Packet *);
 
 	int set_enabled(int e);
 	int get_enabled();

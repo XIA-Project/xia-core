@@ -440,12 +440,12 @@ XIAICIDRouteTable::generate_routes_handler(const String &conf, Element *e, void 
 
 
 void
-XIAICIDRouteTable::push(Packet *p)
+XIAICIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 {
 	uint16_t fromnet = XIA_FROMNET_ANNO(p);
 	if (! (fromnet == 0 || fromnet == 1)) {
 		click_chatter("XIAICIDRouteTable: Invalid fromnet!");
-		output(2).push(p);
+		output(3).push(p);
 		return;
 	}
 
@@ -458,8 +458,8 @@ XIAICIDRouteTable::push(Packet *p)
 		// Packet from network, send to API
 		output(1).push(p);
 	} else {
-		// Packet from API, send to network
-		output(0).push(p);
+		// Packet from API, ignore *-------> ICID link, try fallback.
+		output(2).push(p);
 	}
 }
 
