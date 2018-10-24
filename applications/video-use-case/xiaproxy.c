@@ -905,7 +905,7 @@ int xia_proxy_handle_request(int browser_sock)
 			char s[1024];
 			char *opt, *val;
 			char *st, *st1;
-			
+
 			// get the client id and current video bandwidth
 			strncpy(s, ctx.params, sizeof(s));
 			for (st = s, opt = strtok_r(st, "=", &st1); opt; opt = strtok_r(NULL, "=", &st1)) {
@@ -999,18 +999,6 @@ void *job(void *sockptr)
 
 
 
-void start_new_job(long int sock)
-{
-	pthread_t worker;
-
-	if (pthread_create(&worker, NULL, job, (void *)sock)) {
-		syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
-	}
-	pthread_detach(worker);
-}
-
-
-
 int main(int argc, char **argv)
 {
 	struct sockaddr_in address;
@@ -1088,6 +1076,9 @@ int main(int argc, char **argv)
 
 		if (pthread_create(&worker, NULL, job, (void *)(long int)new_socket)) {
 			syslog(LOG_WARNING, "proxy: ERROR: creating handler. Dropping request");
+			close(new_socket);
+		} else {
+			pthread_detach(worker);
 		}
 	}
 
