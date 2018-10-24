@@ -1535,7 +1535,7 @@ void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMs
 		return;
 	}
 
-	// Retrieve src and CID addresses from the message
+	// Retrieve CID address from the message
 	sockaddr_x cid_addr;
 	memcpy(&cid_addr, xcm->cid_addr().c_str(), xcm->cid_addr().size());
 	Graph cid_dag(&cid_addr);
@@ -1568,7 +1568,7 @@ void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMs
 
 	// Header with just addresses.
 	XIAHeaderEncap xiah;
-	xiah.set_nxt(CLICK_XIA_NXT_DATA);
+	//xiah.set_nxt(CLICK_XIA_NXT_DATA);
 	xiah.set_hlim(sk->hlim);
 	xiah.set_dst_path(cid_path);
 	xiah.set_src_path(src_path);
@@ -1578,6 +1578,9 @@ void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMs
 
 	// And, off it goes...
 	output(NETWORK_PORT).push(p);
+
+	// Tell API that all went well
+	ReturnResult(_sport, xia_socket_msg);
 }
 
 void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
