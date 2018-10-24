@@ -25,6 +25,7 @@
 #include "ncid_table.h"
 #include "xcache_sock.h"
 #include "cid.h"
+#include "icid/icid_monitor.h"
 
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
@@ -1470,9 +1471,13 @@ void xcache_controller::run(void)
 	struct cache_args args;
 	xcache_req *req;
 	pthread_t gc_thread;
+	ICIDMonitor icid_monitor;
 
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
+
+	// ICID monitor to listen and respond to CID interest requests
+	std::thread icid_mon(&ICIDMonitor::monitor, &icid_monitor);
 
 	// Application interface
 	libsocket = xcache_create_lib_socket();

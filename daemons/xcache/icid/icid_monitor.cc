@@ -42,6 +42,7 @@
 
 ICIDMonitor::ICIDMonitor()
 {
+	printf("ICIDMonitor: initializing\n");
 	// Get references to controller, thread pool and interest table
 	ctrl = xcache_controller::get_instance();
 	pool = ICIDThreadPool::get_pool();
@@ -87,10 +88,12 @@ ICIDMonitor::ICIDMonitor()
 	sa.sun_family = AF_UNIX;
 	strcpy(sa.sun_path, ICID_SOCK_NAME);
 
+	printf("ICIDMonitor: binding to unix socket for ICID packets\n");
 	if(bind(icid_sock, (struct sockaddr *)&sa, sizeof(sa))) {
 		std::cout << "Error binding to Interest CID socket" << std::endl;
 		throw "Unable to bind to Interest CID socket";
 	}
+	printf("ICIDMonitor: initialized\n");
 }
 
 ICIDMonitor::~ICIDMonitor()
@@ -113,6 +116,7 @@ void ICIDMonitor::handle_ICID_packet()
 	int ret;
 	bool fetch_needed = false;
 
+	printf("ICIDMonitor: waiting for incoming ICID packet\n");
 	ret = recvfrom(icid_sock, buffer, ICID_MAXBUF, 0, NULL, NULL);
 	if(ret <= 0) {
 		std::cout << "Error reading interest:"
@@ -122,6 +126,7 @@ void ICIDMonitor::handle_ICID_packet()
 
 	// Read in the XIA Header here
 	// TODO: Add additional checks to ensure buffer contains XIA pkt
+	printf("ICIDMonitor: reading XIA header from ICID packet\n");
 	struct click_xia *xiah = (struct click_xia *)buffer;
 	Graph dst_dag;
 	dst_dag.from_wire_format(xiah->dnode, &xiah->node[0]);
@@ -131,6 +136,7 @@ void ICIDMonitor::handle_ICID_packet()
 
 	// Now find the ICID intent
 	// TODO: Handle exception thrown if intent is not an ICID
+	printf("ICIDMonitor: looking for ICID intent in packet\n");
 	Node icid = dst_dag.intent_ICID();
 
 	// Convert into CID to check for
@@ -138,21 +144,26 @@ void ICIDMonitor::handle_ICID_packet()
 	std::string cid_str = cid.to_string();
 
 	// Check if the CID is local. If yes, queue job to push it to caller
+	printf("ICIDMonitor: checking to see if CID is local\n");
 	if(ctrl->is_CID_local(cid_str) == true) {
 		// Schedule a job to have the chunk pushed to caller
+		printf("ICIDMonitor: queuing a push of found CID\n");
 		ICIDWorkRequestPtr work(
 				std::make_unique<ICIDPushRequest>(cid.to_string(),
 					src_dag.dag_string()));
 		pool->queue_work(std::move(work));
 		return;
 	}
+	printf("ICIDMonitor: CID was not local\n");
 	// If not,
 	// We need to fetch only if the chunk is not already in IRQ table
-	if(irqtable->has_entry(cid_str)) {
+	if(irqtable->has_entry(cid_str) == false) {
+		printf("ICIDMonitor: CID has not been requested before\n");
 		fetch_needed = true;
 	}
 
 	// add CID and requestor address to irq_table
+	printf("ICIDMonitor: updating interest request table\n");
 	if(irqtable->add_fetch_request(cid_str, src_dag.dag_string()) == false) {
 		std::cout << "Error adding fetch request to table" << std::endl;
 		return;
@@ -162,13 +173,16 @@ void ICIDMonitor::handle_ICID_packet()
 	// it to be satisfied.
 	// TODO: This prevents repeated requests from client. Is that OK?
 	if(!fetch_needed) {
+		printf("ICIDMonitor: skipping sending ICID for duplicate\n");
 		return;
 	}
 
+	printf("ICIDMonitor: sending new ICID request\n");
 	// Send a new ICID request with our socket's address
 	sockaddr_x icid_addr;
 	dst_dag.fill_sockaddr(&icid_addr);
 	XinterestedInCID(recv_sock, &icid_addr);
+	printf("ICIDMonitor: done handling ICID request\n");
 }
 
 void ICIDMonitor::handle_push_connection()
@@ -177,12 +191,14 @@ void ICIDMonitor::handle_push_connection()
 	sockaddr_x sa;
 	socklen_t sa_len = sizeof(sa);
 
+	printf("ICIDMonitor: receiving a chunk\n");
 	// Accept an incoming connection for a pushed chunk
 	if((sock = Xaccept(recv_sock, (sockaddr *)&sa, &sa_len)) < 0) {
 		std::cout << "Error accepting connection from push req" << std::endl;
 		return;
 	}
 
+	printf("ICIDMonitor: queuing up job to receive the chunk\n");
 	// Now create and queue up a job to handle the incoming chunk
 	ICIDWorkRequestPtr work(std::make_unique<ICIDReceiveRequest>(sock));
 	pool->queue_work(std::move(work));
@@ -200,13 +216,17 @@ void ICIDMonitor::monitor()
 	int max_rfd = recv_sock > icid_sock ? recv_sock: icid_sock;
 
 	while(true) {
+		//handle_ICID_packet();
+		//continue;
 
 		// Prepare set of descriptors to monitor
 		FD_ZERO(&rfds);
 		rfds = all_rfds; // all_rfds is a single list for ICIDMonitor
 
+		printf("ICIDMonitor: Waiting for ICID or a chunk\n");
 		// Wait for at least one descriptor to be readable
 		if(Xselect(max_rfd+1, &rfds, NULL, NULL, NULL) <= 0) {
+			printf("ICIDMonitor: no ICID or chunk\n");
 			continue;
 		}
 

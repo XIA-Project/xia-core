@@ -30,6 +30,7 @@ elementclass CacheFilter {
 	// Socket to receive control requests from Xcache. e.g. blacklist
 	CacheFilterSock::Socket(UNIX_DGRAM, "/tmp/cachefilter-click.sock",
 		SNAPLEN 65536);
+
 	srcCidClassifier::XIAXIDTypeClassifier(src CID, src NCID, -);
 
 	cidFilter::XIACidFilter(true);	// if false, don't cache
@@ -309,6 +310,10 @@ elementclass XIARoutingCore {
 
 	n :: RouteEngine($num_ports);
 
+	// Socket to send ICID packets to Xcache
+	XcacheICIDSock::Socket(UNIX_DGRAM, "/tmp/xcache-icid.sock", CLIENT true,
+		SNAPLEN 65536);
+
 	xtransport::XTRANSPORT($hostname, IP:$external_ip, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
 
 
@@ -338,6 +343,9 @@ elementclass XIARoutingCore {
 
 	n[0] -> output;
 	input -> [0]n;
+
+	// Send ICID packets to Xcache
+	xtransport[2] -> XcacheICIDSock;
 
 	n[1] -> c[1] -> [1]xtransport[1] -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [0]n;
 	c[0] -> x[0] -> [0]n; // new (response) XCMP packets destined for some other machine

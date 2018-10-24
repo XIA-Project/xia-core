@@ -810,6 +810,7 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 			ProcessDatagramPacket(p_in);
 			break;
 		case CLICK_XIA_NXT_DATA:
+			printf("Xtransport: Got an interest packet\n");
 			ProcessInterestPacket(p_in);
 			break;
 		default:
@@ -843,34 +844,14 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessInterestPacket(WritablePacket *p_in)
 {
-	// Lazily create a UNIX domain socket to send ICID packets to Xcache
-	if(icidsock == -1) {
-		icidsock = socket(AF_UNIX, SOCK_DGRAM, 0);
-		if(icidsock == -1) {
-			WARN("Unable to create unix socket for ICIDs\n");
-			return;
-		}
-		sockaddr_un sa;
-		memset(&sa, 0, sizeof(sa));
-		sa.sun_family = AF_UNIX;
-		strcpy(sa.sun_path, ICID_SOCK_NAME);
-		if(connect(icidsock, (struct sockaddr *)&sa, sizeof(sa))) {
-			icidsock = -1;
-			return;
-		}
-	}
-	XIAHeader xiah(p_in->xia_header());
+	WritablePacket *p = p_in->uniqueify();
+	XIAHeader xiah(p->xia_header());
 	XIAPath dst_path = xiah.dst_path();
-	XID dst_xid(xiah.hdr()->node[xiah.last()].xid);
-	if (dst_xid.type() != CLICK_XIA_XID_TYPE_ICID) {
-		WARN("ProcessInterestPacket: not an ICID intent!\n");
-		return;
-	}
-	// TODO: Now send this packet straight to Xcache Interest socket
-	if(send(icidsock, p_in->data(), p_in->length(), 0) != p_in->length()) {
-		WARN("ProcessInterestPacket: error sending icid of size %zu\n",
-				p_in->length());
-	}
+	printf("ProcessInterestPacket: request for: %s\n",
+			dst_path.unparse().c_str());
+	printf("ProcessInterestPacket: sending interest packet to Xcache\n");
+	checked_output_push(2, p);
+	printf("ProcessInterestPacket: done\n");
 }
 
 /*************************************************************

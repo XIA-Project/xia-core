@@ -3,14 +3,13 @@
 
 #include "icid_thread_pool.h"
 #include "icid_irq_table.h"
-#include "controller.h"
+#include "../controller.h"
 #include "Xsocket.h"
 
 class ICIDMonitor {
 	public:
 		void monitor();
 
-	protected:
 		ICIDMonitor();
 		~ICIDMonitor();
 
