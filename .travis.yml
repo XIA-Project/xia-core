@@ -1,3 +1,8 @@
+language: cpp
+sudo: required
+os: linux
+dist: trusty
+
 matrix:
     include:
         - os: linux
@@ -12,11 +17,6 @@ matrix:
 
 before_install:
     - eval "${MATRIX_EVAL}"
-
-language: cpp
-sudo: required
-dist: trusty
-os: linux
 
 before_script: make deps
 
