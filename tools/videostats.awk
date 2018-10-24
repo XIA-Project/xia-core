@@ -14,11 +14,18 @@ BEGIN {
 	r  = 0;		# # of video chunks
 	s  = 0;		# total # of segments in the video
 
+	vinc = 0;	# video quality incresase
+	vdec = 0;	# video rate decrease
+	vlast = 0; 	# last video segments bitrate
+
 	# stats for all videos
 	tb  = 0;
 	tt  = 0.0;
 	ttp = 0.0;
 	tr  = 0;
+
+	tvinc = 0;	# global video rate increases
+	tvdec = 0;	# global video rate decreases
 }
 
 /starting/ {
@@ -30,6 +37,18 @@ BEGIN {
 	s = $6;
 }
 
+/setting bitrate/ {
+
+	rate = $7;
+	if (rate > vlast) {
+		vinc++;
+	} else if (rate < vlast) {
+		vdec++;
+	}
+	vlast = $7;
+}
+
+
 /closing/ {
 	if (r == 0 || s == 0) {
 		printf("%s: FAILED\n", FILENAME);
@@ -39,8 +58,8 @@ BEGIN {
 		} else {
 			status = "SUCCESS";
 		}
-		printf("%s: %-10s %d/%d segments %d bytes %1.3f seconds %1.3f mbps\n",
-			FILENAME, status, r, s, b, t, tp / r);
+		printf("%s: %-10s %d/%d segments %d bytes %1.3f seconds %1.3f mbps %d/%d rate changes\n",
+			FILENAME, status, r, s, b, t, tp / r, vinc, vdec);
 	}
 
 	# update the global stats
@@ -48,6 +67,8 @@ BEGIN {
 	tt  += t;
 	ttp += tp;
 	tr  += r;
+	tvinc += vinc;
+	tvdec += vdec;
 
 	# reset video specific stats
 	b = 0;
@@ -55,6 +76,9 @@ BEGIN {
 	tp = 0.0;
 	r = 0;
 	s = 0;
+	vinc = 0;
+	vdec = 0;
+	vlast = 0;
 }
 
 /bytes/ {
@@ -72,4 +96,5 @@ END {
 	print tb / 1000000, "MB";
 	print tt, "seconds";
 	print ttp/ tr, "mbps";
+	printf("%d/%d rate changes\n", tvinc, tvdec);
 }
