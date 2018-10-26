@@ -1044,6 +1044,11 @@ Graph::replace_CID_with_ICID_intent()
 	// Find the intent index
 	std::size_t intent_cid_index = intent_CID_index();
 	if (intent_cid_index == INVALID_GRAPH_INDEX) {
+		std::size_t intent_icid_index = intent_ICID_index();
+		if(intent_icid_index != INVALID_GRAPH_INDEX) {
+			printf("Graph: Intent is ICID, no need to replace");
+			return true;
+		}
 		printf("Graph: ERROR: intent not CID, cannot convert to ICID\n");
 		return false;
 	}
