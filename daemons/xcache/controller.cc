@@ -1523,8 +1523,8 @@ void xcache_controller::run(void)
 		max = MAX(libsocket, sendersocket);
 
 		// FIXME: do something better
-		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
-			max = MAX(max, *iter);
+		for(auto sockfd : active_conns) {
+			max = MAX(max, sockfd);
 		}
 
 		// Wait for read data on all active and library sockets
@@ -1563,6 +1563,10 @@ void xcache_controller::run(void)
 				if(FD_ISSET(new_connection, &allfds)) {
 					syslog(LOG_ERR, "Controller: sock already monitored %d\n",
 							new_connection);
+					if(std::find (active_conns.begin(), active_conns.end(),
+								new_connection) == active_conns.end()) {
+						active_conns.push_back(new_connection);
+					}
 				} else {
 					active_conns.push_back(new_connection);
 					FD_SET(new_connection, &allfds);
