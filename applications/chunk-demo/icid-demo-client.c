@@ -61,12 +61,14 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	std::cout << "Sending interest request" << std::endl;
 	// Call XinterestedInCID for given address
 	if(XinterestedInCID(sockfd, &cidaddr)) {
 		std::cout << "Error submitting interest" << std::endl;
 		return -1;
 	}
 
+	std::cout << "Waiting for a connection delivering CID" << std::endl;
 	// Now accept connections on the socket - for now just one
 	sockaddr_x remote;
 	socklen_t remote_len = sizeof(remote);
@@ -75,17 +77,24 @@ int main(int argc, char **argv)
 		std::cout << "Error accepting connection" << std::endl;
 		return -1;
 	}
+	std::cout << "Got connected on socket " << accepted_sock << std::endl;
 
 	// Fetch the content
 	// Receive chunk header and data
 	std::string buf;
 	std::unique_ptr<ContentHeader> chdr;
 	std::atomic<bool> stop(false);
+	std::cout << "Receiving content" << std::endl;
 	if(xcache_get_content(accepted_sock, buf, chdr, stop)) {
 		std::cout << "Error receiving a chunk" << std::endl;
 		return -1;
 	}
-	std::cout << "Passed: content retrieved" << std::endl;
+	std::cout << "Content retrieved" << std::endl;
+	if(chdr->valid_data(buf) == false) {
+		std::cout << "Error data verification failed" << std::endl;
+		return -1;
+	}
+	std::cout << "Passed: content valid" << std::endl;
 
 	Xclose(accepted_sock);
 	Xclose(sockfd);
