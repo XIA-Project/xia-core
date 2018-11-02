@@ -21,10 +21,7 @@
  */
 int XinterestedInCID(int sockfd, sockaddr_x *addr)
 {
-	int sock;
 	int rc = -1;
-	int state = 0;
-	struct addrinfo *ai;
 	char src_SID[strlen("SID:") + XIA_SHA_DIGEST_STR_LEN];
 	bzero(src_SID, sizeof(src_SID));
 
@@ -68,6 +65,5 @@ int XinterestedInCID(int sockfd, sockaddr_x *addr)
 		return -1;
 	}
 
-XinterestedInCID_done:
 	return 0;
 }
