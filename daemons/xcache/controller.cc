@@ -1047,8 +1047,6 @@ store_named_done:
 	return RET_SENDRESP;
 }
 
-using ContentHeaderPtr = std::unique_ptr<ContentHeader>;
-
 /**
  * Store given content into local storage
  *
@@ -1061,7 +1059,7 @@ int xcache_controller::store(std::string &cid,
 {
 	xcache_meta *meta;
 
-	ContentHeaderPtr chdr = std::make_unique<CIDHeader>(data, ttl);
+	auto chdr = std::make_unique<CIDHeader>(data, ttl);
 	if(chdr == NULL) {
 		syslog(LOG_ERR, "Failed allocating CIDHeader for a chunk");
 		return -1;
