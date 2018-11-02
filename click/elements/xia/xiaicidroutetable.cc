@@ -476,7 +476,7 @@ XIAICIDRouteTable::lookup_route(Packet *p)
    if (idx == CLICK_XIA_XID_EDGE_UNUSED)
    {
 	// unused edge -- use default route
-  	return _rtdata.port;
+	return _rtdata.port;
     }
 
     const struct click_xia_xid_node& node = hdr->node[idx];
