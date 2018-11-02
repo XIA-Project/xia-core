@@ -80,7 +80,6 @@ int main(int argc, char **argv)
 	std::cout << "Got connected on socket " << accepted_sock << std::endl;
 
 	// Fetch the content
-	// Receive chunk header and data
 	std::string buf;
 	std::unique_ptr<ContentHeader> chdr;
 	std::atomic<bool> stop(false);
@@ -90,6 +89,8 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	std::cout << "Content retrieved" << std::endl;
+
+	// Verify the content
 	if(chdr->valid_data(buf) == false) {
 		std::cout << "Error data verification failed" << std::endl;
 		return -1;
