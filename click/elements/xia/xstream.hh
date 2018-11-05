@@ -210,7 +210,8 @@ public:
 
 	// holding area for one data packet if the send buffer is full
 	bool stage_data(WritablePacket *p, unsigned seq);
-	WritablePacket *unstage_data();
+	int unstage_data();
+	bool is_staged() { return _staged != NULL; }
 
 	// short state() const { return tp->t_state; }
 	bool has_pullable_data() { return !_q_recv.is_empty() && SEQ_LT(_q_recv.first(), tp->rcv_nxt); }

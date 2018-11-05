@@ -2705,6 +2705,8 @@ void XTRANSPORT::Xsend(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_
 		if (sk -> get_type() == SOCK_STREAM) {	// why do we need this test, we should always be a stream socket here
 			XStream *st = dynamic_cast<XStream *>(sk);
 
+			assert(st->is_staged() == false);
+
 			int tcp_rc = st->usrsend(payload);
 			//INFO("usrsend reurned %d\n", tcp_rc);
 			if (tcp_rc != 0) {

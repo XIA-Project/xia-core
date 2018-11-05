@@ -1359,11 +1359,11 @@ send:
 
 	/*278*/
 	if (len){
-		p = _q_usr_input.get(off, len);
-
 		if (_staged){ // because drop_until frees up queue space
 			unstage_data();
 		}
+
+		p = _q_usr_input.get(off, len);
 
 		if (!p){
 			//debug_output(VERB_ERRORS, "[%s] offset [%u] not in fifo!", SPKRNAME, off);
@@ -1881,6 +1881,10 @@ XStream::usrsend(WritablePacket *p)
 	// 	usrclosed();
 	// }
 
+	if (_staged) {
+		unstage_data();
+	}
+
 	if (p){
 		//printf("usrsend: Push into _q_usr_input\n");
 		//int remaining = (int)p -> length();
@@ -2388,6 +2392,7 @@ bool XStream::run_task(Task*){
 
 bool XStream::stage_data(WritablePacket *p, unsigned seq)
 {
+	// seq is API packet seq # not tcp seq #
 	if (_staged == NULL){
 		_staged = p;
 		_staged_seq = seq;
@@ -2397,12 +2402,16 @@ bool XStream::stage_data(WritablePacket *p, unsigned seq)
 	}
 }
 
-WritablePacket *XStream::unstage_data()
+int XStream::unstage_data()
 {
+	unsigned len;
 	// if there's data, try to put it into the queue
-	if (_staged && (_q_usr_input.push(_staged) == 0)){
+	if (_staged) {
+		len = _staged->length();
 
-		WritablePacket *p = _staged;
+		if (_q_usr_input.push(_staged) !=  0){
+			return -1;
+		}
 
 		// tell the API we let it go into the buffer
 		xia::XSocketMsg xsm;
@@ -2410,15 +2419,15 @@ WritablePacket *XStream::unstage_data()
 		xsm.set_sequence(_staged_seq);
 		xsm.set_id(get_id());
 
-		get_transport()->ReturnResult(port, &xsm, p->length());
+		get_transport()->ReturnResult(port, &xsm, len);
 
 		_staged = NULL;
 		_staged_seq = 0;
 
-		return p;
+		return len;
 
 	} else{
-		return NULL;
+		return -1;
 	}
 }
 
@@ -2795,6 +2804,7 @@ TCPFifo::TCPFifo(unsigned size)
 
 TCPFifo::~TCPFifo()
 {
+	assert(_used == 0);
 	if (_buf) {
 		free(_buf);
 		_buf = NULL;
@@ -2849,7 +2859,7 @@ TCPFifo::push(WritablePacket *p)
 	assert(_t < _last && _h < _last);
 	assert(_free <= _size && _used <= _size);
 
-	//printf("appended %u bytes, now %u bytes total\n", count, _used);
+	//printf("appended %u bytes, now %u bytes total head=%u\n", count, _used, _h -_buf);
 	p->kill();
 	return 0;
 }
@@ -2887,7 +2897,7 @@ TCPFifo::get(tcp_seq_t offset, unsigned len)
 	if (len > _used) {
 		len = _used;
 	}
-	//printf("getting %u: h:%u t:%u f:%u u:%u\n", len, _h - _buf, _t - _buf, _free, _used);
+	//printf("getting %u bytes from %u: h:%u t:%u f:%u u:%u\n", len, offset, _h - _buf, _t - _buf, _free, _used);
 
 	WritablePacket *p = WritablePacket::make(512, NULL, len, 0);
 
@@ -2927,6 +2937,7 @@ TCPFifo::drop_until(tcp_seq_t offset)
 	assert(_buf);
 	assert(offset <= _used);
 
+	//printf("dropping %u: h:%u t:%u f:%u u:%u\n", offset, _h - _buf, _t - _buf, _free, _used);
 	if (offset >= _used) {
 		//printf("dropped everything!\n");
 		// the queue is now empty
