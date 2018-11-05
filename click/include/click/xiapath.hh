@@ -97,6 +97,9 @@ class XIAPath { public:
 	// forcing us to take the fallback path
 	bool flatten();
 
+	// If there are two SIDs in DAG, flatten to use fallback as first intent
+	bool flatten_double_sid();
+
 	// Compare two XIAPath objects but ignore intent AD
 	int compare_except_intent_ad(XIAPath& other);
 

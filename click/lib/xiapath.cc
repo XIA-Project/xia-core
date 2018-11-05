@@ -208,6 +208,12 @@ XIAPath::flatten()
     return g.flatten();
 }
 
+bool
+XIAPath::flatten_double_sid()
+{
+	return g.flatten_double_sid();
+}
+
 int
 XIAPath::compare_except_intent_ad(XIAPath& other)
 {

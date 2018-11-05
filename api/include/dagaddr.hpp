@@ -160,6 +160,7 @@ public:
 	bool replace_intent_AD(std::string new_ad_str);
 	size_t unparse_node_size() const;
 	bool flatten();
+	bool flatten_double_sid();
 	bool first_hop_is_sid() const;
 	bool remove_intent_sid_node();
 	bool remove_intent_node();
@@ -171,6 +172,10 @@ public:
 	std::size_t final_intent_index() const;
 
 	int compare_except_intent_AD(Graph other) const;
+
+	int add_sid_fallback(std::string sid);
+	Graph last_ordered_path_dag() const;
+	int merge_multi_host_fallback(Graph &fallback);
 private:
 	bool replace_intent_XID(uint32_t xid_type, std::string new_xid_str);
 	std::size_t intent_XID_index(uint32_t xid_type) const;
@@ -181,6 +186,8 @@ private:
 
 	std::size_t add_node(const Node& p, bool allow_duplicate_nodes = false);
 	void add_edge(std::size_t from_id, std::size_t to_id);
+	bool remove_vector_edge(std::vector<std::size_t> &vec, std::size_t id);
+	bool remove_edge(std::size_t from_id, std::size_t to_id);
 
 	void replace_node_at(int i, const Node& new_node);
 
@@ -203,7 +210,8 @@ private:
 	void construct_from_re_string(std::string re_string);
 	int check_re_string(std::string re_string);
 
-	bool depth_first_walk(int node, std::vector<Node> &paths) const;
+	bool depth_first_walk(int node, std::vector<Node> &stack,
+			std::vector<Node> &paths) const;
 	bool ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const;
 
 	void dump_stack_trace() const;

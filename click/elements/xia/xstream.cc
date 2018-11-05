@@ -532,6 +532,7 @@ XStream::tcp_input(WritablePacket *p)
 	/* drop after socket close */
 	if (tp->t_state > TCPS_CLOSE_WAIT && ti.ti_len){
 		tcp_set_state(TCPS_CLOSED);
+		std::cout << "Xstream::tcp_input TCPS_CLOSED" << std::endl;
 		get_transport()->_tcpstat.tcps_rcvafterclose++;
 		goto dropwithreset;
 	}
@@ -619,11 +620,13 @@ XStream::tcp_input(WritablePacket *p)
 			tp->t_state = TCPS_CLOSED;
 			get_transport()->_tcpstat.tcps_drops++;
 			tcp_set_state(TCPS_CLOSED);
+			std::cout << "Xstream::tcp_input TCPS_CLOSED_2" << std::endl;
 			goto drop;
 		case TCPS_CLOSING:
 		case TCPS_LAST_ACK:
 		case TCPS_TIME_WAIT:
 			tcp_set_state(TCPS_CLOSED);
+			std::cout << "Xstream::tcp_input TCPS_CLOSED_3" << std::endl;
 			goto drop;
 		}
 	}
@@ -647,7 +650,9 @@ XStream::tcp_input(WritablePacket *p)
 		// server side 3-way handshake complete
 		listening_sock->pending_connection_buf.push(this);
 
-		source_xid = this->src_path.xid(this->src_path.destination_node());
+		//source_xid = this->src_path.xid(this->src_path.destination_node());
+		// Our SID will be the on which this ACK was delivered
+		source_xid = xiah.hdr()->node[xiah.last()].xid;
 		destination_xid = this->dst_path.xid(this->dst_path.destination_node());
 		xid_pair.set_src(source_xid);
 		xid_pair.set_dst(destination_xid);
@@ -875,6 +880,7 @@ XStream::tcp_input(WritablePacket *p)
 		case TCPS_LAST_ACK:
 			if (ourfinisacked){
 				tcp_set_state(TCPS_CLOSED);
+				std::cout << "Xstream::tcp_input TCPS_CLOSED_4" << std::endl;
 				goto drop;
 			}
 			break;
@@ -1602,6 +1608,7 @@ XStream::tcp_timers (int timer) {
 			tp->t_timer[TCPT_2MSL] = get_transport()->globals()->tcp_keepintvl;
 		  } else{
 			tcp_set_state(TCPS_CLOSED);
+			std::cout << "Xstream::tcp_timers TCPS_CLOSED" << std::endl;
 			// the socket is really closed
 		  }
 		  break;
@@ -1822,6 +1829,7 @@ XStream::tcp_drop(int err)
 		get_transport()->ProcessPollEvent(get_id(), POLLHUP);
 	}
 	tcp_set_state(TCPS_CLOSED);
+	std::cout << "XStream::tcp_drop TCPS_CLOSED" << std::endl;
 	if (TCPS_HAVERCVDSYN(tp->t_state)){
 		tcp_output();
 	}
@@ -1945,6 +1953,7 @@ XStream::usrclosed()
 		case TCPS_LISTEN:
 		case TCPS_SYN_SENT:
 			tcp_set_state(TCPS_CLOSED);
+			std::cout << "Xstream::usrclosed TCPS_CLOSED" << std::endl;
 			break;
 		case TCPS_SYN_RECEIVED:
 		case TCPS_ESTABLISHED:

@@ -775,6 +775,75 @@ Graph::add_edge(std::size_t from_id, std::size_t to_id)
 	vector_push_back_unique(in_edges_[to_id], from_id);
 }
 
+// @brief Remove an edge entry from the given vector
+// @return true if edge removed successfully
+// @return false if edge to be removed was not found in the vector
+bool
+Graph::remove_vector_edge(std::vector<std::size_t> &vec, std::size_t id)
+{
+	bool retval = false;
+	for(auto it=vec.begin(); it!=vec.end();) {
+		if(*it == id) {
+			it = vec.erase(it);
+			retval = true;
+		} else {
+			++it;
+		}
+	}
+	return retval;
+}
+
+// @brief Remove an edge
+// @returns true if edge removed from both internal vectors successfully
+// @returns false if an edge to be removed was not found.
+//
+bool
+Graph::remove_edge(std::size_t from_id, std::size_t to_id)
+{
+	if(from_id == to_id) {
+		return true;
+	}
+	// Walk out_edges_[from_id] list and remove the edge
+	if(remove_vector_edge(out_edges_[from_id], to_id) == false) {
+		return false;
+	}
+	if(remove_vector_edge(in_edges_[to_id], from_id) == false) {
+		return false;
+	}
+	return true;
+}
+
+/**
+ * brief Remove primary edge to first SID in a two SID graph
+ *
+ * For a graph like *-> AD -> HID --------> SID1
+ *                             '--> SID2 --'
+ * The edge between HID and SID1 is removed, so it becomes
+ *                  *-> AD -> HID -> SID2 -> SID1
+ * @returns true on success and false on failure
+ */
+bool
+Graph::flatten_double_sid()
+{
+	int sid_count = 0;
+	// First walk the list of nodes to make sure there are two SIDs
+	for (auto it=nodes_.cbegin(); it!=nodes_.cend(); it++) {
+		if((*it).type() == XID_TYPE_SID) {
+			sid_count++;
+		}
+	}
+	if(sid_count != 2) {
+		printf("Graph::flatten_double_sid expected 2 got %d\n", sid_count);
+		return false;
+	}
+	std::size_t intent_hid_index = intent_HID_index();
+	std::size_t intent_sid_index = intent_SID_index();
+	if(remove_edge(intent_hid_index, intent_sid_index) == false) {
+		return false;
+	}
+	return true;
+}
+
 bool
 Graph::is_source(std::size_t id) const
 {
@@ -1060,6 +1129,36 @@ Graph::compare_except_intent_AD(Graph other) const
 	//printf("this: %s\n", this->dag_string().c_str());
 	//printf("them: %s\n", them.dag_string().c_str());
 	return -1;
+}
+
+/**
+ * @brief add given SID as a fallback to the intent SID
+ *
+ * For a Graph like AD -> HID -> SID
+ * this function adds a fallback SID from HID.
+ *
+ * @return 0 on success, -1 on failure
+ */
+int
+Graph::add_sid_fallback(std::string sid)
+{
+	// TODO: check to make sure intent is an SID
+	int intent_index = final_intent_index();
+	if(intent_index == -1) {
+		printf("Graph::add_sid_fallback: ERROR finding intent node\n");
+		return -1;
+	}
+	size_t hid_index = intent_HID_index();
+	if (hid_index == INVALID_GRAPH_INDEX) {
+		printf("Graph::intent_HID_str: HID index not found\n");
+		return -1;
+	}
+	// Now add a node to this graph
+	int idx = add_node(sid, false);
+	add_edge(hid_index, idx);
+	add_edge(idx, final_intent_index());
+
+	return 0;
 }
 
 /**
@@ -2079,7 +2178,8 @@ Graph::flatten()
   *
   */
 bool
-Graph::depth_first_walk(int node, std::vector<Node> &paths) const
+Graph::depth_first_walk(int node, std::vector<Node> &stack,
+		std::vector<Node> &paths) const
 {
 	// Break out with error if we are headed to infinite recursion
 	if(paths.size() > Graph::MAX_XIDS_IN_ALL_PATHS) {
@@ -2088,17 +2188,24 @@ Graph::depth_first_walk(int node, std::vector<Node> &paths) const
 	}
 
 	// Add current node to 'paths'
-	paths.push_back(get_node(node));
+	stack.push_back(get_node(node));
 
 	// Follow all outgoing edges; sink will have none
 	std::vector<std::size_t> out_edges = get_out_edges(node);
 	std::vector<std::size_t>::const_iterator it;
 	for(it = out_edges.begin(); it != out_edges.end(); it++) {
 		// Recursively follow each outgoing edge
-		if(depth_first_walk(*it, paths) == false) {
+		if(depth_first_walk(*it, stack, paths) == false) {
 			return false;
 		}
 	}
+	// Found sink node. Stack contains path from source to sink. Save it.
+	if(out_edges.size() == 0) {
+		for(size_t i=0; i<stack.size(); i++) {
+			paths.push_back(stack[i]);
+		}
+	}
+	stack.pop_back();
 
 	// We reached the sink node or all outgoing edges have been handled
 	return true;
@@ -2123,8 +2230,10 @@ bool
 Graph::ordered_paths_to_sink(std::vector<Node> &paths_to_sink) const
 {
 	paths_to_sink.clear();
+	std::vector<Node> stack;
+	stack.clear();
 	// Walk starting at the dummy source node
-	return depth_first_walk(-1, paths_to_sink);
+	return depth_first_walk(-1, stack, paths_to_sink);
 }
 
 /**
@@ -2170,6 +2279,89 @@ Graph::operator==(const Graph &g) const
 		}
 	}
 	return true;
+}
+
+Graph
+Graph::last_ordered_path_dag() const
+{
+	std::vector<Node> g_paths;
+	int i;
+
+	if(ordered_paths_to_sink(g_paths) == false) {
+		printf("Graph::last_ordered_path_dag ERROR getting paths to sink\n");
+		return nullptr;
+	}
+	printf("Graph::last_ordered_path_dag All paths:\n");
+	for(i=0;i<(int)g_paths.size();i++) {
+		printf("%s ", g_paths[i].to_string().c_str());
+	}
+	printf("\n");
+	printf("Walking backwards in g_paths of size %d\n", (int)g_paths.size());
+	// Walk backwards until dummy source is found
+	i=g_paths.size()-1;
+	for(; i>=0; i--) {
+		printf("Checking %s for dummy\n", g_paths[i].to_string().c_str());
+		printf("Type is %d\n", g_paths[i].type());
+		if(g_paths[i].type() == XID_TYPE_DUMMY_SOURCE) {
+			printf("Graph::last_ordered_path_dag found dummy at %d\n",(int)i);
+			Node src;
+			Graph last_path_dag = src;
+			for(int j=i+1;j<(int)g_paths.size();j++) {
+				printf("Adding %s to graph\n", g_paths[j].to_string().c_str());
+				last_path_dag *= g_paths[j];
+			}
+			printf("Graph::last_ordered_path_dag: %s\n",
+					last_path_dag.dag_string().c_str());
+			return last_path_dag;
+		}
+	}
+	/*
+	// Identify the first node
+	// FIXME: Assumes no fallbacks from dummy source node
+	Node first_node = g_paths[0];
+	printf("Graph::last_ordered_path_dag first node %s\n",
+			first_node.to_string().c_str());
+	printf("Graph::last_ordered_path_dag - all ordered paths:\n");
+	for(int i=0; i<(int)g_paths.size(); i++) {
+		printf("%s ", g_paths[i].to_string().c_str());
+	}
+	printf("\n");
+	// Now search backwards in g_paths until we find first_node
+	for(int i=g_paths.size()-1; i!=0; i--) {
+		if(g_paths[i].equal_to(first_node)) {
+			// Build graph from here to end of g_paths and return it
+			Node dummy;
+			Graph last_path_dag(dummy);
+			for(int j=i; j<(int)g_paths.size(); j++) {
+				last_path_dag *= Graph(g_paths[j]);
+			}
+			printf("%s\n", last_path_dag.dag_string().c_str());
+			return last_path_dag;
+		}
+	}
+	*/
+	printf("Graph::last_ordered_path_dag ERROR building dag\n");
+	return Graph();
+}
+
+int
+Graph::merge_multi_host_fallback(Graph &fallback)
+{
+	// Merge the fallback into *this graph
+	std::size_t my_intent_HID = intent_HID_index();
+	std::size_t my_intent_SID = intent_SID_index();
+	// Now add the fallback nodes
+	std::size_t fallback_AD = add_node(fallback.intent_AD(), true);
+	std::size_t fallback_HID = add_node(fallback.intent_HID(), true);
+	std::size_t fallback_SID = add_node(fallback.intent_SID(), true);
+	// Make the fallback connections
+	add_edge(fallback_AD, fallback_HID);
+	add_edge(fallback_HID, fallback_SID);
+	// Connect fallback to the rest of this graph
+	add_edge(my_intent_HID, fallback_AD);
+	add_edge(fallback_SID, my_intent_SID);
+
+	return 0;
 }
 
 /**

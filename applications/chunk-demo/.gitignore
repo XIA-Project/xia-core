@@ -7,3 +7,5 @@ push-demo-client
 push-demo-proxy
 fetch-demo-client
 make-random-chunk
+multi-host-server
+multi-service-server
