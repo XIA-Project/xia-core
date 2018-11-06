@@ -650,14 +650,8 @@ XStream::tcp_input(WritablePacket *p)
 		// server side 3-way handshake complete
 		listening_sock->pending_connection_buf.push(this);
 
-		//source_xid = this->src_path.xid(this->src_path.destination_node());
-		// Our SID will be the on which this ACK was delivered
-		source_xid = xiah.hdr()->node[xiah.last()].xid;
-		destination_xid = this->dst_path.xid(this->dst_path.destination_node());
-		xid_pair.set_src(source_xid);
-		xid_pair.set_dst(destination_xid);
 		// Map the src & dst XID pair to source port
-		get_transport() -> XIDpairToSock.set(xid_pair, this);
+		get_transport() -> XIDpairToSock.set(key, this);
 		// push this socket into pending_connection_buf and let Xaccept handle that
 
 		// finish the connection handshake

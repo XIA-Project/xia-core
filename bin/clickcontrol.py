@@ -161,7 +161,7 @@ class ClickControl:
         iface_elem = ['x', 'xchal']
 
         # Xtransport and XCMP elements in RouteEngine and RoutingCore
-        dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x']
+        dag_elem = ['xrc/xtransport', 'xrc/n/x', 'xrc/x', 'xrc/n/proc/x', 'xrc/n/proc/rt_CID', 'xrc/n/proc/rt_NCID']
         return self.getElements(hostname, hosttype, 'dag', iface_elem, dag_elem)
 
     # Assign a Network dag to a given host

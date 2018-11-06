@@ -655,11 +655,11 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	CancelRetransmit(sk);
 
 	if (sk->src_path.destination_node() != static_cast<size_t>(-1)) {
-		src_xid = sk->src_path.xid(sk->src_path.destination_node());
+		src_xid = sk->get_key().src();
 		have_src = true;
 	}
 	if (sk->dst_path.destination_node() != static_cast<size_t>(-1)) {
-		dst_xid = sk->dst_path.xid(sk->dst_path.destination_node());
+		dst_xid = sk->get_key().dst();
 		have_dst = true;
 	}
 
@@ -667,12 +667,8 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 
 	if (sk->sock_type == SOCK_STREAM) {
 		if (have_src && have_dst) {
-			XIDpair xid_pair;
-			xid_pair.set_src(src_xid);
-			xid_pair.set_dst(dst_xid);
-
-			XIDpairToConnectPending.erase(xid_pair);
-			XIDpairToSock.erase(xid_pair);
+			XIDpairToConnectPending.erase(sk->get_key());
+			XIDpairToSock.erase(sk->get_key());
 		}
 	}
 
@@ -863,33 +859,29 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		return;
 	}
 
-	// NOTE: CID dags arrive here with the last ptr = the SID node,
-	//  so we can't use the last pointer as it's not pointing to the
-	// CID. I don't think this will break existing logic.
+	// The XID to which this packet is being delivered
+	// CID packets will have this pointing to local Xcache SID
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+
+	// The XID that this packet was intended for
 	XID _intent_xid = dst_path.xid(dst_path.destination_node());
+
+	// If delivering to an alternate intent for mobility
 	if (_intent_xid != _destination_xid) {
+		// Pick the fallback path that includes alternate intent
+		// For CIDs, there is only one flattened path, so it stays same
 		const Graph dst_graph = dst_path.get_graph();
-		printf("XTRANSPORT parsing as dst_path: %s\n",
-				dst_graph.last_ordered_path_dag().dag_string().c_str());
 		dst_path.parse(dst_graph.last_ordered_path_dag().dag_string().c_str());
 		click_chatter("XTRANSPORT::ProcessStreamPacket flattened path %s",
 				dst_path.unparse().c_str());
-		/*
-		if(dst_path.flatten_double_sid() == true) {
-			click_chatter("XTRANSPORT::ProcessStreamPacket flattened SIDs");
-			click_chatter("XTRANSPORT::ProcessStreamPacket dst_path: %s",
-					dst_path.unparse().c_str());
-		} else {
-			click_chatter("XTRANSPORT::ProcessStreamPacket using dst: %s",
-					dst_path.unparse().c_str());
-		}
-		*/
 	}
-	//XID _destination_xid = dst_path.xid(dst_path.destination_node());
 
+	// The sender of this packet
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
+	// The xid_pair will pair:
+	// Xcache SID and Client SID for CID requests
+	// Delivered SID and Client SID for multiple SID DAG
 	XIDpair xid_pair;
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
@@ -938,87 +930,52 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 				return;
 			}
 
-			// First, check if this request is already in the pending queue
-			HashTable<XIDpair , class sock*>::iterator it;
-			it = XIDpairToConnectPending.find(xid_pair);
+			// if this is new request, put it in the queue
+			// Check if this new request was modified by rendezvous service
+			bool rv_modified_dag = false;
 
-			if (it == XIDpairToConnectPending.end()) {
-				// if this is new request, put it in the queue
-				// Check if this new request was modified by rendezvous service
-				bool rv_modified_dag = false;
+			XIAPath bound_dag = sk->get_src_path();
+			XIAPath pkt_dag = dst_path; // Our address that client sent
+			if (usingRendezvousDAG(bound_dag, pkt_dag)) {
+				rv_modified_dag = true;
+			}
 
-				XIAPath bound_dag = sk->get_src_path();
+			uint8_t hop_count = -1;
+			// we have received a syn for CID,
+			int dest_type = ntohl(_intent_xid.type());
+			if (dest_type == CLICK_XIA_XID_TYPE_CID
+					|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
+				hop_count = HLIM_DEFAULT - xiah.hlim();
+				//set_full_dag = true;
+			}
 
-				// If we are bound to a path other than dst_path
-				// FIXME: We need to ensure that dst_path is acceptable
-				// Then use the bound path as the endpoint address
-				// because that's what the server user expects
-				//dst_path = bound_dag;
+			// INFO("Socket %d Handling new SYN\n", sk->port);
+			// Prepare new sock for this connection
+			uint32_t new_id = NewID();
+			XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
 
-				XIAPath pkt_dag = dst_path; // Our address that client sent
-				if (usingRendezvousDAG(bound_dag, pkt_dag)) {
-					rv_modified_dag = true;
-				}
+			new_sk->initialize(ErrorHandler::default_handler());
 
-				uint8_t hop_count = -1;
-				// we have received a syn for CID,
-				int dest_type = ntohl(_destination_xid.type());
-				if (dest_type == CLICK_XIA_XID_TYPE_CID
-						|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
-					hop_count = HLIM_DEFAULT - xiah.hlim();
-
-					// we've received a SYN for a CID DAG which usually contains a fallback
-					// we need to strip out the direct path to the content and only use the
-					// AD->HID->SID->CID path.
-					// Additionally, we may be a router which can service the request, so
-					// don't just flatten the DAG, but make sure it points to our cache daemon.
-					// FIXME: can we do this without having to convert to strings?
-					XIAPath new_addr = _local_addr;
-					new_addr.append_node(_xcache_sid);
-					new_addr.append_node(_destination_xid);
-					//set_full_dag = true;
-					/*
-					String str_local_addr = _local_addr.unparse_re();
-					str_local_addr += " ";
-					str_local_addr += _xcache_sid.unparse();
-					str_local_addr += " ";
-					str_local_addr += _destination_xid.unparse();
-
-					dst_path.parse_re(str_local_addr);
-					*/
-					dst_path = new_addr;
-				}
-
-				// INFO("Socket %d Handling new SYN\n", sk->port);
-				// Prepare new sock for this connection
-				uint32_t new_id = NewID();
-				XStream *new_sk = new XStream(this, 0, new_id); // just for now. This will be updated via Xaccept call
-
-				new_sk->initialize(ErrorHandler::default_handler());
-
-				new_sk->dst_path = src_path;
-				new_sk->src_path = dst_path;
-				new_sk->listening_sock = sk;
-				new_sk->rv_modified_dag = rv_modified_dag;
-				int iface;
-				if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
-					new_sk->outgoing_iface = iface;
-				}
+			new_sk->dst_path = src_path;
+			new_sk->src_path = dst_path;
+			new_sk->listening_sock = sk;
+			new_sk->rv_modified_dag = rv_modified_dag;
+			int iface;
+			if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
+				new_sk->outgoing_iface = iface;
+			}
+			//if (set_full_dag) {
 				// NITIN: accepting a connection and using dag from sender
 				// so it should be a full dag. Maybe add an assert here
 				// to check that there are more than one XIDs in the dag
-				//if (set_full_dag) {
-					new_sk->full_src_dag = true;
-				//}
-				new_sk->set_key(xid_pair);
-				new_sk->set_hop_count(hop_count);
-				XIDpairToConnectPending.set(xid_pair, new_sk);
-				new_sk->push(p_in);
-			}
+				new_sk->full_src_dag = true;
+			//}
+			new_sk->set_key(xid_pair);
+			new_sk->set_hop_count(hop_count);
+			XIDpairToConnectPending.set(xid_pair, new_sk);
+			new_sk->push(p_in);
 		}
 	}
-
-
 }
 
 
@@ -1676,6 +1633,9 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		xid_pair.set_src(source_xid);
 		xid_pair.set_dst(destination_xid);
 
+		// Assign src & dst XID pair as 'key' for this socket
+		sk->set_key(xid_pair);
+
 		// Map the src & dst XID pair to source port()
 		XIDpairToSock.set(xid_pair, tcp_conn);
 
@@ -2326,6 +2286,12 @@ void XTRANSPORT::Xupdatedag(unsigned short _sport, uint32_t id, xia::XSocketMsg 
 		// XCMP in PacketRoute
 		String packet_route_str = _hostname + "/xrc/n/proc/x.dag";
 		HandlerCall::call_write(packet_route_str.c_str(), new_dag.unparse().c_str(), this);
+		// rt_CID and rt_NCID being updated
+		String cid_table_str = _hostname + "/xrc/n/proc/rt_CID.dag";
+		String ncid_table_str = _hostname + "/xrc/n/proc/rt_NCID.dag";
+		HandlerCall::call_write(cid_table_str.c_str(), new_dag.unparse().c_str(), this);
+		HandlerCall::call_write(ncid_table_str.c_str(), new_dag.unparse().c_str(), this);
+
 		// Update the _local_addr in XTRANSPORT
 		_local_addr = new_dag;
 		click_chatter("XTRANSPORT:Xupdatedag system addr changed to %s", _local_addr.unparse().c_str());
@@ -2405,9 +2371,13 @@ void XTRANSPORT::XsetXcacheSid(unsigned short _sport, uint32_t id, xia::XSocketM
 	xia::X_SetXcacheSid_Msg *_msg = xia_socket_msg->mutable_x_setxcachesid();
 
 	_xcache_sid.parse(_msg->sid().c_str());
+	// Update CID and NCID forwarding tables with Xcache SID
+	String cid_table_str = _hostname + "/xrc/n/proc/rt_CID.xcache";
+	String ncid_table_str = _hostname + "/xrc/n/proc/rt_NCID.xcache";
+	HandlerCall::call_write(cid_table_str.c_str(), _msg->sid().c_str(), this);
+	HandlerCall::call_write(ncid_table_str.c_str(), _msg->sid().c_str(), this);
 	// FIXME: this isn't returing a status
 }
-
 
 
 void XTRANSPORT::Xgethostname(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
