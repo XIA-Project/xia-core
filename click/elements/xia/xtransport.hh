@@ -359,6 +359,7 @@ class sock : public Element {
 
 	XIAPath src_path;			// peer DAG
 	XIAPath dst_path;			// our DAG
+	XID our_xid;				// our endpoint XID. May not be src_path intent
 	uint8_t hlim;				// hlim/ttl
 	uint8_t hop_count;
 

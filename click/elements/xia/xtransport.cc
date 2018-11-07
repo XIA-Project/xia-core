@@ -676,6 +676,8 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 		// we only do this if the socket wasn't generateed due to an accept
 
 		if (have_src) {
+			std::cout << "XTRANSPORT::TeardownSocket route removal for "
+				<< src_xid.unparse().c_str() << std::endl;
 			//DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
 			delRoute(src_xid);
 			XIDtoSock.erase(src_xid);
@@ -835,7 +837,7 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 *************************************************************/
 void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 {
-	bool set_full_dag = false;
+	//bool set_full_dag = false;
 
 	// INFO("Inside ProcessStreamPacket");
 	XIAHeader xiah(p_in->xia_header());
@@ -857,11 +859,29 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 		return;
 	}
 
-	// NOTE: CID dags arrive here with the last ptr = the SID node,
+	// The XID to which this packet is being delivered
+	// CID packets will have this pointing to local Xcache SID
 	XID _destination_xid(xiah.hdr()->node[xiah.last()].xid);
+
+	// The XID that this packet was intended for
 	XID _intent_xid = dst_path.xid(dst_path.destination_node());
+
+	// If delivering to an alternate intent for mobility
+	if (_intent_xid != _destination_xid) {
+		// Pick the fallback path that includes alternate intent
+		// For CIDs, there is only one flattened path, so it stays same
+		const Graph dst_graph = dst_path.get_graph();
+		dst_path.parse(dst_graph.last_ordered_path_dag().dag_string().c_str());
+		click_chatter("XTRANSPORT::ProcessStreamPacket flattened path %s",
+				dst_path.unparse().c_str());
+	}
+
+	// The sender of this packet
 	XID	_source_xid = src_path.xid(src_path.destination_node());
 
+	// The xid_pair will pair:
+	// Xcache SID and Client SID for CID requests
+	// Delivered SID and Client SID for multiple SID DAG
 	XIDpair xid_pair;
 	xid_pair.set_src(_destination_xid);
 	xid_pair.set_dst(_source_xid);
@@ -926,7 +946,7 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if (dest_type == CLICK_XIA_XID_TYPE_CID
 					|| dest_type == CLICK_XIA_XID_TYPE_NCID) {
 				hop_count = HLIM_DEFAULT - xiah.hlim();
-				set_full_dag = true;
+				//set_full_dag = true;
 			}
 
 			// INFO("Socket %d Handling new SYN\n", sk->port);
@@ -944,9 +964,12 @@ void XTRANSPORT::ProcessStreamPacket(WritablePacket *p_in)
 			if((iface = IfaceFromSIDPath(new_sk->src_path)) != -1) {
 				new_sk->outgoing_iface = iface;
 			}
-			if (set_full_dag) {
+			//if (set_full_dag) {
+				// NITIN: accepting a connection and using dag from sender
+				// so it should be a full dag. Maybe add an assert here
+				// to check that there are more than one XIDs in the dag
 				new_sk->full_src_dag = true;
-			}
+			//}
 			new_sk->set_key(xid_pair);
 			new_sk->set_hop_count(hop_count);
 			XIDpairToConnectPending.set(xid_pair, new_sk);
@@ -1524,7 +1547,9 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
 				// FIXME: are these the right states to mask?
+				std::cout << "XTRANSPORT::Xclose stream sock eval" << std::endl;
 				if (sk->state > LISTEN && sk->state < CLOSED) {
+					std::cout << "XTRANSPORT::Xclose avoidtear" << std::endl;
 					teardown_now = false;
 					dynamic_cast<XStream *>(sk)->usrclosed();
 				}
@@ -1534,6 +1559,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 		}
 
 		if (teardown_now) {
+			std::cout << "XTRANSPORT::Xclose tearing down socket" << std::endl;
 			TeardownSocket(sk);
 		}
 
@@ -1606,6 +1632,9 @@ void XTRANSPORT::Xconnect(unsigned short _sport, uint32_t id, xia::XSocketMsg *x
 		XIDpair xid_pair;
 		xid_pair.set_src(source_xid);
 		xid_pair.set_dst(destination_xid);
+
+		// Assign src & dst XID pair as 'key' for this socket
+		sk->set_key(xid_pair);
 
 		// Map the src & dst XID pair to source port()
 		XIDpairToSock.set(xid_pair, tcp_conn);

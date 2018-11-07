@@ -2,10 +2,10 @@ include ../../xia.mk
 
 .PHONY: clean
 
-LDFLAGS+=$(LIBS) -lprotobuf 
+LDFLAGS+=$(LIBS) -lprotobuf -lpthread
 CFLAGS+=-I$(APIDIR)/xcache/
 
-TARGETS=chunk-demo-server chunk-demo-client ncid-demo-server ncid-demo-client push-demo-server push-demo-client push-demo-proxy fetch-demo-client make-random-chunk multi-service-client multi-host-client
+TARGETS=chunk-demo-server chunk-demo-client ncid-demo-server ncid-demo-client push-demo-server push-demo-client push-demo-proxy fetch-demo-client make-random-chunk multi-service-server multi-service-client multi-host-server multi-host-client
 
 all: $(TARGETS)
 
