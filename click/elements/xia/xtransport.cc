@@ -655,7 +655,11 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 	CancelRetransmit(sk);
 
 	if (sk->src_path.destination_node() != static_cast<size_t>(-1)) {
-		src_xid = sk->get_key().src();
+		if(sk->sock_type == SOCK_DGRAM) {
+			src_xid = sk->src_path.xid(sk->src_path.destination_node());
+		} else {
+			src_xid = sk->get_key().src();
+		}
 		have_src = true;
 	}
 	if (sk->dst_path.destination_node() != static_cast<size_t>(-1)) {
@@ -2725,6 +2729,7 @@ void XTRANSPORT::Xsendto(unsigned short _sport, uint32_t id, xia::XSocketMsg *xi
 			INFO("sk->port was %d setting to %d", sk->port, _sport);
 		}
 		sk->port = _sport;
+		sk->sock_type = SOCK_DGRAM;
 
 		// Create a random XID
 		char xid_string[50];
