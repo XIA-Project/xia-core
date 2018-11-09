@@ -646,38 +646,35 @@ void XTRANSPORT::ChangeState(sock *sk, SocketState state)
 bool XTRANSPORT::TeardownSocket(sock *sk)
 {
 	XID src_xid;
-	XID dst_xid;
-	bool have_src = 0;
-	bool have_dst = 0;
+	bool have_src = false;
+	bool have_dst = false;
 
 	//INFO("Tearing down %s socket %d\n", SocketTypeStr(sk->sock_type), sk->get_id());
 
 	CancelRetransmit(sk);
 
 	if (sk->src_path.destination_node() != static_cast<size_t>(-1)) {
-		if(sk->sock_type == SOCK_DGRAM) {
-			src_xid = sk->src_path.xid(sk->src_path.destination_node());
-		} else {
-			src_xid = sk->get_key().src();
-		}
+		src_xid = sk->src_path.xid(sk->src_path.destination_node());
 		have_src = true;
 	}
 	if (sk->dst_path.destination_node() != static_cast<size_t>(-1)) {
-		dst_xid = sk->get_key().dst();
 		have_dst = true;
 	}
 
 	xcmp_listeners.remove(sk->get_id());
 
+	// For stream sockets
 	if (sk->sock_type == SOCK_STREAM) {
+		// That have been connected
 		if (have_src && have_dst) {
+			// Remove book-keeping entries
 			XIDpairToConnectPending.erase(sk->get_key());
 			XIDpairToSock.erase(sk->get_key());
 		}
 	}
 
 	if (!sk->isAcceptedSocket) {
-		// we only do this if the socket wasn't generateed due to an accept
+		// we only do this if the socket wasn't generated due to an accept
 
 		if (have_src) {
 			std::cout << "XTRANSPORT::TeardownSocket route removal for "
