@@ -9,5 +9,6 @@ fetch-demo-client
 make-random-chunk
 multi-host-client
 multi-host-server
+multi-host-server1
 multi-service-client
 multi-service-server
