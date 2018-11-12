@@ -2291,27 +2291,29 @@ Graph::last_ordered_path_dag() const
 		printf("Graph::last_ordered_path_dag ERROR getting paths to sink\n");
 		return nullptr;
 	}
+	/*
 	printf("Graph::last_ordered_path_dag All paths:\n");
 	for(i=0;i<(int)g_paths.size();i++) {
 		printf("%s ", g_paths[i].to_string().c_str());
 	}
 	printf("\n");
 	printf("Walking backwards in g_paths of size %d\n", (int)g_paths.size());
+	*/
 	// Walk backwards until dummy source is found
 	i=g_paths.size()-1;
 	for(; i>=0; i--) {
-		printf("Checking %s for dummy\n", g_paths[i].to_string().c_str());
-		printf("Type is %d\n", g_paths[i].type());
+		//printf("Checking %s for dummy\n", g_paths[i].to_string().c_str());
+		//printf("Type is %d\n", g_paths[i].type());
 		if(g_paths[i].type() == XID_TYPE_DUMMY_SOURCE) {
-			printf("Graph::last_ordered_path_dag found dummy at %d\n",(int)i);
+			//printf("Graph::last_ordered_path_dag found dummy at %d\n",(int)i);
 			Node src;
 			Graph last_path_dag = src;
 			for(int j=i+1;j<(int)g_paths.size();j++) {
-				printf("Adding %s to graph\n", g_paths[j].to_string().c_str());
+				//printf("Adding %s to graph\n", g_paths[j].to_string().c_str());
 				last_path_dag *= g_paths[j];
 			}
-			printf("Graph::last_ordered_path_dag: %s\n",
-					last_path_dag.dag_string().c_str());
+			//printf("Graph::last_ordered_path_dag: %s\n",
+					//last_path_dag.dag_string().c_str());
 			return last_path_dag;
 		}
 	}
