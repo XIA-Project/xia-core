@@ -677,8 +677,6 @@ bool XTRANSPORT::TeardownSocket(sock *sk)
 		// we only do this if the socket wasn't generated due to an accept
 
 		if (have_src) {
-			std::cout << "XTRANSPORT::TeardownSocket route removal for "
-				<< src_xid.unparse().c_str() << std::endl;
 			//DBG("deleting route for %d %s\n", sk->port, src_xid.unparse().c_str());
 			delRoute(src_xid);
 			XIDtoSock.erase(src_xid);
@@ -1548,9 +1546,7 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 		switch (sk -> get_type()) {
 			case SOCK_STREAM:
 				// FIXME: are these the right states to mask?
-				std::cout << "XTRANSPORT::Xclose stream sock eval" << std::endl;
 				if (sk->state > LISTEN && sk->state < CLOSED) {
-					std::cout << "XTRANSPORT::Xclose avoidtear" << std::endl;
 					teardown_now = false;
 					dynamic_cast<XStream *>(sk)->usrclosed();
 				}
@@ -1560,7 +1556,6 @@ void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia
 		}
 
 		if (teardown_now) {
-			std::cout << "XTRANSPORT::Xclose tearing down socket" << std::endl;
 			TeardownSocket(sk);
 		}
 
