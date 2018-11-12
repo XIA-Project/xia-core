@@ -25,6 +25,7 @@
 #include "ncid_table.h"
 #include "xcache_sock.h"
 #include "cid.h"
+#include "icid/icid_monitor.h"
 
 #define IGNORE_PARAM(__param) ((void)__param)
 #define IO_BUF_SIZE (1024 * 1024)
@@ -438,6 +439,19 @@ int xcache_controller::xcache_fetch_content(xcache_cmd *resp, xcache_cmd *cmd,
 	return ret;
 }
 
+bool xcache_controller::is_CID_local(std::string cid)
+{
+	bool retval = false;
+	xcache_meta *meta = acquire_meta(cid);
+	if(meta && meta->state() == AVAILABLE) {
+		retval = true;
+	}
+	if(meta != NULL) {
+		release_meta(meta);
+	}
+	return retval;
+}
+
 int xcache_controller::xcache_is_content_local(xcache_cmd *resp,
 		xcache_cmd *cmd)
 {
@@ -446,14 +460,9 @@ int xcache_controller::xcache_is_content_local(xcache_cmd *resp,
 	resp->set_cmd(xcache_cmd::XCACHE_ERROR);
 
 	// Look for the cid requested by the caller
-	std::string cid(cmd->cid());
-	xcache_meta *meta = acquire_meta(cid);
-	if(meta && meta->state() == AVAILABLE) {
+	if(is_CID_local(cmd->cid()) == true) {
 		resp->set_status(xcache_cmd::XCACHE_OK);
 		resp->set_cmd(xcache_cmd::XCACHE_ISLOCAL);
-	}
-	if(meta != NULL) {
-		release_meta(meta);
 	}
 	return RET_SENDRESP;
 }
@@ -1038,51 +1047,60 @@ store_named_done:
 	return RET_SENDRESP;
 }
 
-int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
+/**
+ * Store given content into local storage
+ *
+ * @returns 0 on success
+ * @returns 1 if the chunk is already in xcache
+ * @returns -1 on error
+ */
+int xcache_controller::store(std::string &cid,
+		const std::string &data, time_t ttl)
 {
 	xcache_meta *meta;
-	int state = 0;
-	int retval = RET_FAILED;
-	std::string cid;
-	sockaddr_x addr;
 
-	// Build a CIDHeader so we can compute the CID
-	ContentHeader *chdr = new CIDHeader(cmd->data(), ttl);
+	auto chdr = std::make_unique<CIDHeader>(data, ttl);
 	if(chdr == NULL) {
 		syslog(LOG_ERR, "Failed allocating CIDHeader for a chunk");
-		goto store_done;
+		return -1;
 	}
-	state = 1;
-
 	cid = chdr->store_id();
 
 	// Check if the CID is already stored locally
 	meta = acquire_meta(cid.c_str());
-
-	if (meta != NULL) {
-		/*
-		 * Meta already exists
-		 */
+	if(meta != NULL) {
 		release_meta(meta);
-		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
+		return 1;
 	} else {
-		/*
-		 * Create new Meta object and use that to store chunk
-		 */
-		meta = new xcache_meta(chdr);
+		meta = new xcache_meta(chdr.release());
 		if(meta == NULL) {
-			syslog(LOG_ERR, "Failed allocating xcache_meta for a chunk");
-			goto store_done;
+			syslog(LOG_ERR, "Falied allocating xcache_meta for a chunk");
+			return -1;
 		}
-		state = 2;
 		meta->set_ttl(ttl);
 		meta->set_created();
-		meta->set_length(cmd->data().length());
+		meta->set_length(data.length());
 
-		if(__store(meta, cmd->data()) == RET_FAILED) {
+		if(__store(meta, data) == RET_FAILED) {
 			syslog(LOG_ERR, "Failed storing chunk");
-			goto store_done;
+			return -1;
 		}
+	}
+	return 0;
+}
+
+int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
+{
+	int retval = RET_FAILED;
+	std::string cid;
+	sockaddr_x addr;
+
+	int rc = store(cid, cmd->data(), ttl);
+	if(rc == 1) {
+		resp->set_status(xcache_cmd::XCACHE_ERR_EXISTS);
+	}
+	if(rc == -1) {
+		goto store_done;
 	}
 
 	// Prepare a response for caller
@@ -1103,17 +1121,6 @@ int xcache_controller::store(xcache_cmd *resp, xcache_cmd *cmd, time_t ttl)
 	syslog(LOG_INFO, "Store Finished\n");
 
 store_done:
-	// On error, delete allocated data structures
-	if(retval == RET_FAILED) {
-		switch(state) {
-			case 2:
-				delete meta;
-				[[gnu::fallthrough]];
-			case 1:
-				delete chdr;
-				[[gnu::fallthrough]];
-		};
-	}
 	return retval;
 }
 
@@ -1462,9 +1469,13 @@ void xcache_controller::run(void)
 	struct cache_args args;
 	xcache_req *req;
 	pthread_t gc_thread;
+	ICIDMonitor icid_monitor;
 
 	std::vector<int> active_conns;
 	std::vector<int>::iterator iter;
+
+	// ICID monitor to listen and respond to CID interest requests
+	std::thread icid_mon(&ICIDMonitor::monitor, &icid_monitor);
 
 	// Application interface
 	libsocket = xcache_create_lib_socket();
@@ -1510,8 +1521,8 @@ void xcache_controller::run(void)
 		max = MAX(libsocket, sendersocket);
 
 		// FIXME: do something better
-		for(iter = active_conns.begin(); iter != active_conns.end(); ++iter) {
-			max = MAX(max, *iter);
+		for(auto sockfd : active_conns) {
+			max = MAX(max, sockfd);
 		}
 
 		// Wait for read data on all active and library sockets
@@ -1550,6 +1561,10 @@ void xcache_controller::run(void)
 				if(FD_ISSET(new_connection, &allfds)) {
 					syslog(LOG_ERR, "Controller: sock already monitored %d\n",
 							new_connection);
+					if(std::find (active_conns.begin(), active_conns.end(),
+								new_connection) == active_conns.end()) {
+						active_conns.push_back(new_connection);
+					}
 				} else {
 					active_conns.push_back(new_connection);
 					FD_SET(new_connection, &allfds);

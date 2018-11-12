@@ -9,7 +9,7 @@ else
 	CFLAGS="-ggdb -DDEBUG"
 fi
 
-CFLAGS+=" -Wall -Wextra -std=c++11"
+CFLAGS+=" -Wall -Wextra -std=c++14"
 
 # compile for running inside a profiler
 [ ! -z $PROFILE ] && CFLAGS+=" -pg"
@@ -81,8 +81,8 @@ ETC=\$(XIADIR)/etc
 XLIB=\$(APIDIR)/lib
 XINC=\$(APIDIR)/include
 
-CC=g++
-LD=g++
+CC=g++-7
+LD=g++-7
 CFLAGS=$CFLAGS -I\$(XINC)
 CXXFLAGS=$CFLAGS
 LDFLAGS=-lpthread -Wl,-rpath,\$(APIDIR)/lib

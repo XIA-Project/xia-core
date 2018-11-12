@@ -117,7 +117,7 @@ public:
 	~XTRANSPORT();
 
 	const char *class_name() const { return "XTRANSPORT"; }
-	const char *port_count() const { return "2/2"; }
+	const char *port_count() const { return "2/3"; }
 	const char *processing() const { return PUSH; }
 
 	int configure(Vector<String> &, ErrorHandler *);
@@ -145,6 +145,7 @@ private:
 	int _num_ports;
 	XIAPath _nameserver_addr;
 	uint32_t _next_id;
+	int icidsock{-1};
 
 	Packet* UDPIPPrep(Packet *, int);
     bool migratable_sock(sock *, int);
@@ -247,8 +248,10 @@ private:
 	void XmanageFID(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xupdatedefiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 	void Xdefaultiface(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
+	void XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg);
 
 	// protocol handlers
+	void ProcessInterestPacket(WritablePacket *p_in);
 	void ProcessDatagramPacket(WritablePacket *p_in);
 	void ProcessStreamPacket(WritablePacket *p_in);
 	int HandleStreamRawPacket(WritablePacket *p_in);

@@ -181,6 +181,8 @@ extern int checkXid(const char *xid, const char *type);
 extern char *XrootDir(char *buf, unsigned len);
 extern void debug(int sock);
 
+extern int XinterestedInCID(int sockfd, sockaddr_x *addr);
+
 const char *xia_ntop(int af, const sockaddr_x *src, char *dst, socklen_t size);
 int xia_pton(int af, const char *src, sockaddr_x *dst);
 

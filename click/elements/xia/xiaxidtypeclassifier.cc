@@ -23,7 +23,7 @@ int
 XIAXIDTypeClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (conf.size() != noutputs())
-		return errh->error("need %d arguments, one per output port", noutputs());
+        return errh->error("need %d arguments, one per output port", noutputs());
 
     for (int i = 0; i < conf.size(); i++) {
         String str_copy = conf[i];
@@ -110,7 +110,7 @@ XIAXIDTypeClassifier::match(Packet *p)
 {
     const struct click_xia* hdr = p->xia_header();
 
-	// commented out for microbenchmarks
+    // commented out for microbenchmarks
     /*
     if (p==NULL) return -1;
     if (!hdr)
@@ -138,8 +138,8 @@ XIAXIDTypeClassifier::match(Packet *p)
         }
     }
 
-	// test all patterns
-	// TODO: group patterns to avoid the switch jump
+    // test all patterns
+    // TODO: group patterns to avoid the switch jump
     for (int i = 0; i < _patterns.size(); i++) {
         const struct pattern& pat = _patterns[i];
         switch (pat.type) {
@@ -160,8 +160,9 @@ XIAXIDTypeClassifier::match(Packet *p)
                     return i;
                 break;
             case pattern::NEXT:
-                if (next_xid_type == pat.next_xid_type)
+                if (next_xid_type == pat.next_xid_type) {
                     return i;
+                }
                 break;
             case pattern::ANY:
                 return i;

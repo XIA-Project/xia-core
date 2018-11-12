@@ -27,6 +27,7 @@
 // CMU principal types
 #define CLICK_XIA_XID_TYPE_FID      (0x30)
 #define CLICK_XIA_XID_TYPE_NCID     (0x31)
+#define CLICK_XIA_XID_TYPE_ICID     (0x32)
 
 #define CLICK_XIA_XID_TYPE_DUMMY    (0xff)
 

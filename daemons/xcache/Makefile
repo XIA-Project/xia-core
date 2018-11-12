@@ -2,7 +2,7 @@ include ../../xia.mk
 
 VPATH=../common
 
-SUBDIRS=fs
+SUBDIRS=fs icid
 XCACHE=$(BINDIR)/xcache
 CLEAN=$(addsuffix .build, $(SUBDIRS))
 
@@ -14,7 +14,7 @@ SOURCES=cid.cc xcache.cc cache.cc controller.cc meta.cc store_manager.cc \
 	policy_manager.cc XIARouter.cc csclient.cc ncid_table.cc
 OBJS=$(SOURCES:.cc=.o)
 
-LDFLAGS+=-lprotobuf -lcrypto -L$(XLIB) -lxcachehdr -lxcache -lXsocket -ldagaddr
+LDFLAGS+=-lprotobuf -lcrypto -L$(XLIB) -lxcachehdr -lxcache -lXsocket -ldagaddr -licid
 CFLAGS+=-I$(APIDIR)/xcache -I $(XIADIR)/daemons/common -I../../click/include -I$(APIDIR)/xsocket/minini
 
 %.pb.cc: %.proto

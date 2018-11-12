@@ -170,10 +170,10 @@
 #define SET_XIA_PAINT_ANNO(p, v)		((p)->set_anno_s16(XIA_PAINT_ANNO_OFFSET, (v)))
 
 // bytes 90-91
-#define XIA_TAIL_ANNO_OFFSET	90
-#define XIA_TAIL_ANNO_SIZE		2
-#define XIA_TAIL_ANNO(p)		((p)->anno_u16(XIA_TAIL_ANNO_OFFSET))
-#define SET_XIA_TAIL_ANNO(p, v)	((p)->set_anno_u16(XIA_TAIL_ANNO_OFFSET, (v)))
+#define XIA_FROMNET_ANNO_OFFSET	90
+#define XIA_FROMNET_ANNO_SIZE		2
+#define XIA_FROMNET_ANNO(p)		((p)->anno_u16(XIA_FROMNET_ANNO_OFFSET))
+#define SET_XIA_FROMNET_ANNO(p, v)	((p)->set_anno_u16(XIA_FROMNET_ANNO_OFFSET, (v)))
 #endif
 
 #endif

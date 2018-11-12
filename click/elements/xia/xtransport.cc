@@ -20,6 +20,8 @@
 
 #include "taskident.hh"
 
+#include <sys/socket.h>  // unix domain socket for ICIDs
+#include <sys/un.h>      // unix domain socket for ICIDs
 /*
 ** FIXME:
 ** - check for memory leaks (slow leak caused by open/close of stream sockets)
@@ -34,6 +36,7 @@
 #define FID_BAD_SEQ   1
 #define FID_SEQ_START 2
 #define uint32_max    0xffffffff
+#define ICID_SOCK_NAME "/tmp/xcache-icid.sock"
 
 CLICK_DECLS
 
@@ -239,6 +242,9 @@ XTRANSPORT::~XTRANSPORT()
 
 	xcmp_listeners.clear();
 	notify_listeners.clear();
+	if(icidsock != -1) {
+		close(icidsock);
+	}
 }
 
 
@@ -789,25 +795,29 @@ void XTRANSPORT::ProcessNetworkPacket(WritablePacket *p_in)
 	XIAHeader xiah(p_in->xia_header());
 	int next = xiah.nxt();
 
-	if (next == CLICK_XIA_NXT_XCMP) {
-		// pass the packet to all sockets that registered for XMCP packets
-		ProcessXcmpPacket(p_in);
-		return;
-
-	} else if (next == CLICK_XIA_NXT_FID) {
+	if (next == CLICK_XIA_NXT_FID) {
 		FIDHeader fh(p_in);
 		next = fh.nxt();
 	}
 
-	if (next == CLICK_XIA_NXT_XSTREAM) {
-		ProcessStreamPacket(p_in);
-
-	} else if (next == CLICK_XIA_NXT_XDGRAM){
-		ProcessDatagramPacket(p_in);
-
-	} else {
-			WARN("ProcessNetworkPacket: Unknown TransportType:%d\n", xiah.nxt());
-	}
+	switch(next) {
+		case CLICK_XIA_NXT_XCMP:
+			ProcessXcmpPacket(p_in);
+			break;
+		case CLICK_XIA_NXT_XSTREAM:
+			ProcessStreamPacket(p_in);
+			break;
+		case CLICK_XIA_NXT_XDGRAM:
+			ProcessDatagramPacket(p_in);
+			break;
+		case CLICK_XIA_NXT_DATA:
+			printf("Xtransport: Got an interest packet\n");
+			ProcessInterestPacket(p_in);
+			break;
+		default:
+			WARN("ProcessNetworkPacket: Unknown TransportType:%d\n",
+					xiah.nxt());
+	};
 }
 
 
@@ -830,6 +840,20 @@ void XTRANSPORT::ProcessDatagramPacket(WritablePacket *p_in)
 	dynamic_cast<XDatagram *>(sk)->push(p_in);
 }
 
+/*************************************************************
+** INTEREST PACKET HANDLER
+*************************************************************/
+void XTRANSPORT::ProcessInterestPacket(WritablePacket *p_in)
+{
+	WritablePacket *p = p_in->uniqueify();
+	XIAHeader xiah(p->xia_header());
+	XIAPath dst_path = xiah.dst_path();
+	printf("ProcessInterestPacket: request for: %s\n",
+			dst_path.unparse().c_str());
+	printf("ProcessInterestPacket: sending interest packet to Xcache\n");
+	checked_output_push(2, p);
+	printf("ProcessInterestPacket: done\n");
+}
 
 /*************************************************************
 ** STREAMING TRANSPORT PACKET HANDLERS
@@ -1224,6 +1248,9 @@ void XTRANSPORT::ProcessAPIPacket(WritablePacket *p_in)
 	case xia::XDEFIFACE:
 		Xdefaultiface(_sport, id, &xia_socket_msg);
 		break;
+	case xia::XCIDINTEREST:
+		XcidInterest(_sport, id, &xia_socket_msg);
+		break;
 	default:
 		ERROR("ERROR: Unknown API request\n");
 		break;
@@ -1511,6 +1538,72 @@ void XTRANSPORT::Xnotify(unsigned short _sport, uint32_t id, xia::XSocketMsg * /
 	// we just go away and wait for Xupdatedag to be called which will trigger a response on this client socket
 }
 
+
+void XTRANSPORT::XcidInterest(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
+{
+	xia::X_CIDInterest_Msg *xcm = xia_socket_msg->mutable_x_cidinterest();
+
+	sock *sk = idToSock.get(id);
+	if(!sk) {
+		ERROR("Invalid socket for id:%u\n", id);
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
+	// Make sure we have a valid address for the CID
+	if(xcm->cid_addr().size() != sizeof(sockaddr_x)) {
+		ERROR("Invalid address provided\n");
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
+	// Retrieve CID address from the message
+	sockaddr_x cid_addr;
+	memcpy(&cid_addr, xcm->cid_addr().c_str(), xcm->cid_addr().size());
+	Graph cid_dag(&cid_addr);
+
+	Graph src_dag(sk->get_src_path().get_graph());
+
+	// Verify that we are using a valid routable address
+	if(src_dag.num_nodes() < 2) {
+		ERROR("Source address should have at least two nodes\n");
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
+	// The intent of cid_dag is a CID, change it to ICID
+	if(cid_dag.replace_CID_with_ICID_intent() == false) {
+		ERROR("Unable to convert CID to ICID");
+		ReturnResult(_sport, xia_socket_msg, -1, EBADF);
+		return;
+	}
+
+	// Convert src and cid address to XIAPath used by Click
+	XIAPath src_path(src_dag);
+	XIAPath cid_path(cid_dag);
+
+	// Build ICID packet with our sk->src_path as source
+
+	// Empty packet
+	WritablePacket *p = WritablePacket::make((uint32_t) 1512 /*headroom*/,
+			NULL /*data*/, 0 /*length*/, 0 /*tailroom*/);
+
+	// Header with just addresses.
+	XIAHeaderEncap xiah;
+	//xiah.set_nxt(CLICK_XIA_NXT_DATA);
+	xiah.set_hlim(sk->hlim);
+	xiah.set_dst_path(cid_path);
+	xiah.set_src_path(src_path);
+
+	// Now add the header to the packet
+	p = xiah.encap(p, true);
+
+	// And, off it goes...
+	output(NETWORK_PORT).push(p);
+
+	// Tell API that all went well
+	ReturnResult(_sport, xia_socket_msg);
+}
 
 void XTRANSPORT::Xclose(unsigned short _sport, uint32_t id, xia::XSocketMsg *xia_socket_msg)
 {
