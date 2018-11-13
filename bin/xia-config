@@ -216,6 +216,10 @@ def create_nodeconf(args):
     node.set('hid', genkeys.create_new_HID())
     node.set('cache', str(args.cache))
 
+    if args.apimax != 0:
+        node.set('apimax', str(args.apimax))
+
+
     if args.nodetype == 'controller':
         node.set('ad', genkeys.create_new_AD())
         node.set('controller_sid', genkeys.create_new_SID())
