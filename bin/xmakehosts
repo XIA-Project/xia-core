@@ -37,7 +37,7 @@ HOSTSFILE=$XDIR/etc/hosts.xia
 
 # get the remote host's AD/HID
 rdag() {
-ssh $h <<ENDSSH
+ssh -o StrictHostKeyChecking=no $h <<ENDSSH
 	export XDIR="$XDIR"
 	cd \$XDIR
 	$XDIR/bin/xdag

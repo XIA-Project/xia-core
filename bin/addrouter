@@ -31,6 +31,8 @@ else:
 
 for host in args.host:
     cmdline = ['scp']
+    cmdline += ['-o']
+    cmdline += ['StrictHostKeyChecking=no']
     if args.port:
         cmdline += ['-p']
         cmdline += [args.port]

@@ -27,6 +27,8 @@ def send_file(fname, destname=None):
     dest = os.path.join(destpath, 'etc/%s' % destname)
 
     cmdline = ['scp']
+    cmdline += ['-o']
+    cmdline += ['StrictHostKeyChecking=no']
     if args.port:
         cmdline += ['-p']
         cmdline += [args.port]
