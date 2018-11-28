@@ -25,6 +25,12 @@ CIDHeader::CIDHeader(const std::string &data, time_t ttl)
 	_store_id = _id;
 }
 
+CIDHeader::CIDHeader(const std::string &buf)
+{
+	if(deserialize(buf) == false) {
+		throw std::runtime_error("Invalid data in provided buffer");
+	}
+
 std::string
 CIDHeader::serialize()
 {

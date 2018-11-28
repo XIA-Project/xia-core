@@ -10,7 +10,7 @@ class CIDHeader : public ContentHeader {
 		CIDHeader(const std::string &data, time_t ttl);
 
 		// NCIDHeader() calls CIDHeader(), so ignore deserialize failure
-		CIDHeader(const std::string &buf) { deserialize(buf); }
+		CIDHeader(const std::string &buf);
 
 		virtual ~CIDHeader() {}
 

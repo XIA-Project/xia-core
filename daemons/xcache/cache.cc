@@ -466,18 +466,23 @@ void xcache_cache::process_pkt(int cfsock,
 				std::string headerstr(download->chdr_data(),
 						download->chdr_len());
 
-				Node content_id(chunk_id);
-				switch(content_id.type()) {
-					case CLICK_XIA_XID_TYPE_NCID:
-						syslog(LOG_INFO, "Created NCIDHeader");
-						download->set_chdr(new NCIDHeader(headerstr));
-						break;
-					case CLICK_XIA_XID_TYPE_CID:
-						syslog(LOG_INFO, "Created CIDHeader");
-						download->set_chdr(new CIDHeader(headerstr));
-						break;
-					default:
-						assert(0);
+				try {
+					Node content_id(chunk_id);
+					switch(content_id.type()) {
+						case CLICK_XIA_XID_TYPE_NCID:
+							download->set_chdr(new NCIDHeader(headerstr));
+							syslog(LOG_INFO, "Created NCIDHeader");
+							break;
+						case CLICK_XIA_XID_TYPE_CID:
+							download->set_chdr(new CIDHeader(headerstr));
+							syslog(LOG_INFO, "Created CIDHeader");
+							break;
+						default:
+							assert(0);
+					}
+				} catch (const char *e) {
+					syslog(LOG_INFO, "Incomplete chunk: %s", e);
+					return;
 				}
 			}
 
