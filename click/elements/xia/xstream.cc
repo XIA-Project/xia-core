@@ -2804,7 +2804,7 @@ TCPFifo::TCPFifo(unsigned size)
 
 TCPFifo::~TCPFifo()
 {
-	assert(_used == 0);
+	//assert(_used == 0);
 	if (_buf) {
 		free(_buf);
 		_buf = NULL;
