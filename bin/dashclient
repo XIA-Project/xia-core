@@ -280,9 +280,8 @@ def get_video(name, id):
 
 def run_client(id):
 
-    if id > 0:
-        # pause briefly so that we don't (0-5 seconds)
-        time.sleep(random.random() * 10.0)
+    # stagger start times
+    time.sleep(random.random() * 5.0)
 
     try:
         loop = True
