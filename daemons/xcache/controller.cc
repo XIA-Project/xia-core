@@ -1204,6 +1204,10 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 
 	syslog(LOG_DEBUG, "Content Send Start\n");
 
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = 5000;
+
 	while (remaining > 0) {
 		sent = Xsend(req->to_sock, (char *)resp.data().c_str() + offset,
 			     remaining, 0);
@@ -1217,6 +1221,7 @@ void xcache_controller::send_content_remote(xcache_req* req, sockaddr_x *mypath)
 		remaining -= sent;
 		offset += sent;
 		syslog(LOG_DEBUG, "Content Send Remaining %lu\n", remaining);
+		nanosleep(&ts, NULL);
 	}
 	syslog(LOG_DEBUG, "Send Done\n");
 
