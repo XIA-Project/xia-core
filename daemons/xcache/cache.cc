@@ -480,8 +480,8 @@ void xcache_cache::process_pkt(int cfsock,
 						default:
 							assert(0);
 					}
-				} catch (const char *e) {
-					syslog(LOG_INFO, "Incomplete chunk: %s", e);
+				} catch (std::exception& e) {
+					syslog(LOG_INFO, "Incomplete chunk header");
 					return;
 				}
 			}
@@ -502,7 +502,7 @@ void xcache_cache::process_pkt(int cfsock,
 	}
 
 skip_data:
-	if ((ntohs(tcp->th_flags) & XTH_FIN)) {
+	if ((ntohs(tcp->th_flags) & XTH_FIN) && (download->chdr() != NULL)) {
 		// FIN Received, cache the chunk
 
 		meta = download->meta();
