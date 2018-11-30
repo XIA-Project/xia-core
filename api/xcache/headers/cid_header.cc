@@ -30,6 +30,7 @@ CIDHeader::CIDHeader(const std::string &buf)
 	if(deserialize(buf) == false) {
 		throw std::runtime_error("Invalid data in provided buffer");
 	}
+}
 
 std::string
 CIDHeader::serialize()
