@@ -1,4 +1,14 @@
 #!/bin/bash
+if [ -d cpr ]; then
+	echo Configuring C++ Requests for GNS support
+	if [ ! -d cpr/build ]; then
+		mkdir cpr/build
+		pushd cpr/build
+		cmake ..
+		popd
+	fi
+fi
+
 echo Creating xia.mk include file
 echo $tarch
 OUTPUT=xia.mk
