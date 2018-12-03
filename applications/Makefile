@@ -8,6 +8,7 @@ all:
 	make -C xregister
 #	make -C tinyhttpd
 	make -C example
+	make -C gns
 	make -C video-use-case/src
 #	make -C demo
 #	make -C irc
