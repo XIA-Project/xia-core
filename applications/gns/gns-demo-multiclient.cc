@@ -44,18 +44,14 @@ int main()
 		return -1;
 	}
 	for(nlohmann::json::iterator it=json.begin(); it!=json.end(); ++it) {
-		std::cout << "Instance: " << it.key()
-			<< " Addr: " << it.value() << std::endl;
+		std::string addr = it.value()[0].get<std::string>();
+		std::cout << "Instance: " << it.key() << " Addr: " << addr << std::endl;
+		if(connect_to(addr)) {
+			std::cout << "ERROR connecting to " << addr << std::endl;
+			return -1;
+		}
 	}
+	std::cout << "PASSED connecting to multiple servers" << std::endl;
 
-	return 0;
-	// Parse server address
-	std::string addr_json = response.text;
-	std::string addr = addr_json.substr(2, addr_json.size()-4);
-	std::cout << "Address received: " << addr << std::endl;
-	if(connect_to(addr)) {
-		std::cout << "ERROR connecting to " << addr << std::endl;
-		return -1;
-	}
 	return 0;
 }
