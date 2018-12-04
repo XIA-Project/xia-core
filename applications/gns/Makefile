@@ -8,12 +8,16 @@ CPRINCDIR=$(CPRDIR)/include
 
 CPRLDFLAGS=-L$(CPRLIBDIR) -lcpr -lcurl -Wl,-rpath,$(CPRLIBDIR)
 
-LDFLAGS+=$(LIBS) -lprotobuf -lpthread $(CPRLDFLAGS)
-CFLAGS+=-I$(APIDIR)/xcache/ -I$(CPRINCDIR)
+JSONINCDIR=$(XIADIR)/json/single_include/nlohmann
 
-TARGETS=gns-demo-server gns-demo-client
+LDFLAGS+=$(LIBS) -lprotobuf -lpthread $(CPRLDFLAGS)
+CFLAGS+=-I$(APIDIR)/xcache/ -I$(CPRINCDIR) -I$(JSONINCDIR)
+
+SOURCES=$(wildcard *.cc)
+TARGETS=$(SOURCES:.cc=)
 
 all: $(TARGETS)
+
 
 %: %.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
