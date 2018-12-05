@@ -21,7 +21,7 @@ void work(int sockfd, std::string their_addr)
 	Xclose(sockfd);
 }
 
-void got_signal(int)
+void sigint_handler(int)
 {
 	stop.store(true);
 }
@@ -35,10 +35,10 @@ int main()
 	int identifier = dist(mt);
 
 	struct sigaction sa;
-	memset( &sa, 0, sizeof(sa) );
-	sa.sa_handler = got_signal;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sigint_handler;
 	sigfillset(&sa.sa_mask);
-	sigaction(SIGINT,&sa,NULL);
+	sigaction(SIGINT, &sa, NULL);
 
 	std::cout << "Creating a socket" << std::endl;
 	auto sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
