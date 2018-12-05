@@ -1,3 +1,6 @@
+#ifndef _XKEYS_HH
+#define _XKEYS_HH
+
 #include <string>
 #include <exception>
 #include <stdexcept>
@@ -35,3 +38,5 @@ std::string SIDKey::to_string()
 {
 	return _sid;
 }
+
+#endif // _XKEYS_HH
