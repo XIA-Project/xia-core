@@ -5,7 +5,7 @@ include ../../xia.mk
 LDFLAGS += $(LIBS)
 CFLAGS += -Wno-unused-result
 
-TARGETS= echoclient echoclient-datagram echoclient-simple echoserver time_of_day_client time_of_day_server
+TARGETS= echoclient echoclient-datagram echoclient-simple echoserver time_of_day_client time_of_day_server sidtest
 
 all: $(TARGETS)
 	make -C dag_manipulation
@@ -13,6 +13,9 @@ all: $(TARGETS)
 	make -C speedtest
 
 %: %.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
+
+%: %.cc
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lpthread
 
 %: %.cpp
