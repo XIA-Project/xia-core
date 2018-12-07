@@ -9,16 +9,16 @@
 #include <cpr/cpr.h>
 
 #include "Xsocket.h"
-#include "Xkeys.hh"
 #include "dagaddr.hpp"
+#include "XIAStreamSocket.hh"
 
 std::atomic<bool> stop(false);
 
-void work(int sockfd, std::string their_addr)
+void work(std::unique_ptr<XIAStreamSocket> sock, std::string their_addr)
 {
 	std::cout << "New connection from: "
 		<< their_addr << std::endl;
-	Xclose(sockfd);
+	// sock goes out of scope and will be closed automatically
 }
 
 void sigint_handler(int)
@@ -28,7 +28,6 @@ void sigint_handler(int)
 
 int main()
 {
-	SIDKey sid;
 	std::random_device randev;
 	std::mt19937 mt(randev());
 	std::uniform_int_distribution<> dist(1, 100);
@@ -40,36 +39,13 @@ int main()
 	sigfillset(&sa.sa_mask);
 	sigaction(SIGINT, &sa, NULL);
 
-	std::cout << "Creating a socket" << std::endl;
-	auto sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
-	if(sockfd < 0) {
-		std::cout << "ERROR creating socket" << std::endl;
+	XIAStreamSocket sock;
+	sockaddr_x servaddr;
+	if(sock.bind_and_listen_on_temp_sid(5, servaddr)) {
+		std::cout << "ERROR creating server socket" << std::endl;
 		return -1;
 	}
-
-	std::cout << "Getting our address" << std::endl;
-	struct addrinfo hints, *ai;
-	bzero(&hints, sizeof(hints));
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_XIA;
-	if(Xgetaddrinfo(NULL, sid.to_string().c_str(), &hints, &ai) != 0) {
-		std::cout << "Failed getting address" << std::endl;
-		// TODO: remove temporary SID
-		return -1;
-	}
-
-	sockaddr_x addr;
-	memcpy(&addr, ai->ai_addr, sizeof(addr));
-	Xfreeaddrinfo(ai);
-	Graph our_addr(&addr);
-
-	std::cout << "Taking ownership of address" << std::endl;
-	if(Xbind(sockfd, (struct sockaddr *)&addr, sizeof(sockaddr_x)) < 0) {
-		std::cout << "ERROR binding to socket" << std::endl;
-		// TODO: remove SID
-		return -1;
-	}
-	Xlisten(sockfd, 5);
+	Graph our_addr(&servaddr);
 
 	std::cout << "Registering our address with GNS" << std::endl;
 	std::string gns_url("localhost:5678/GNS/");
@@ -84,14 +60,14 @@ int main()
 	std::cout << "Response status code: " << response.status_code << std::endl;
 	std::cout << response.text << std::endl;
 
+	struct pollfd ufd;
+	ufd.fd = sock.fd();	// TODO: fd() may not be available in future
+	ufd.events = POLLIN;
+	unsigned nfds = 1;
+	int timeout = 500;	// milliseconds
 	std::cout << "Waiting for connections" << std::endl;
 	while(true) {
 		// Wait for an incoming connection and handle SIGINT
-		struct pollfd ufd;
-		ufd.fd = sockfd;
-		ufd.events = POLLIN;
-		unsigned nfds = 1;
-		int timeout = 500;	// milliseconds
 		int rc = Xpoll(&ufd, nfds, timeout);
 		if(rc == 0) {
 			if(stop.load()) {
@@ -104,15 +80,10 @@ int main()
 			break;
 		}
 
-		int newsock;
 		sockaddr_x their_addr;
-		socklen_t sz = sizeof(their_addr);
-		if((newsock = Xaccept(sockfd, (sockaddr *)&their_addr, &sz)) < 0) {
-			std::cout << "ERROR accepting connection" << std::endl;
-			continue;
-		}
+		auto newsock = sock.accept(&their_addr);
 		Graph g(&their_addr);
-		auto t = std::thread(work, newsock, g.dag_string());
+		auto t = std::thread(work, std::move(newsock), g.dag_string());
 		t.detach();
 	}
 	std::cout << "Unregistering our address from GNS" << std::endl;
@@ -126,6 +97,6 @@ int main()
 	std::cout << "Response status code: " << response.status_code << std::endl;
 	std::cout << response.text << std::endl;
 
-	Xclose(sockfd);
+	// sock goes out of scope. It is closed and the temporary SID keys deleted.
 	return 0;
 }
