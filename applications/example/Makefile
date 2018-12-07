@@ -5,7 +5,7 @@ include ../../xia.mk
 LDFLAGS += $(LIBS)
 CFLAGS += -Wno-unused-result
 
-TARGETS= echoclient echoclient-datagram echoclient-simple echoserver time_of_day_client time_of_day_server sidtest
+TARGETS= echoclient echoclient-datagram echoclient-simple echoserver time_of_day_client time_of_day_server sidtest xiastreamsocket
 
 all: $(TARGETS)
 	make -C dag_manipulation
