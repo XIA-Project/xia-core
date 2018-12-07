@@ -2,21 +2,12 @@
 
 #include <cpr/cpr.h>
 
-#include "Xsocket.h"
+#include "XIAStreamSocket.hh"
 #include "dagaddr.hpp"
 
 int main()
 {
-	//auto response = cpr::Get(cpr::Url{"http://172.16.252.131:24703/GNS/read?guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B&field=clientaddr"});
-	//std::cout << response.text << std::endl;
-
-	std::cout << "Creating a socket" << std::endl;
-	auto sockfd = Xsocket(AF_XIA, SOCK_STREAM, 0);
-	if(sockfd < 0) {
-		std::cout << "ERROR creating socket" << std::endl;
-		return -1;
-	}
-
+	// Query GNS for the server address
 	std::cout << "Getting server address" << std::endl;
 	auto response = cpr::Get(cpr::Url{"172.16.252.131:24703/GNS/read?guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B&field=demoserveraddr"});
 	std::cout << "Request status: " << response.status_code << std::endl;
@@ -32,12 +23,15 @@ int main()
 	sockaddr_x sa;
 	g.fill_sockaddr(&sa);
 
-	// Then connect to that address
-	if(Xconnect(sockfd, (struct sockaddr *)&sa, sizeof(sockaddr_x)) < 0) {
+	// Now, create an XIA socket and connect to the server
+	XIAStreamSocket sock;
+	if(sock.connect(&sa)) {
 		std::cout << "ERROR connecting to server" << std::endl;
 		return -1;
 	}
+
 	std::cout << "PASSED gns query for server and connect to it" << std::endl;
-	Xclose(sockfd);
+
+	// sock goes out of scope and is closed automatically
 	return 0;
 }
