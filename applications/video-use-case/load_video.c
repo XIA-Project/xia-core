@@ -1,6 +1,5 @@
 #include <ftw.h>
 #include <stdio.h>
-#include <vector>
 #include <dirent.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -8,21 +7,21 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <sstream>
-#include <iostream>
 #include <assert.h>
 #include <dirent.h>
 #include "load_video.h"
 
-using namespace std;
-
 ServerVideoInfo videoInfo;
+int ramdomize = 100;
 
 void help(const char *name) {
     printf("\n%s (%s)\n", TITLE, VERSION);
-    printf("usage: %s video [video...]\n", name);
+    printf("usage: %s [-v] [-r <random>] video [video...]\n", name);
     printf("where:\n");
-    printf(" video is just the basname of the video\n\n");
+	printf("  -v:        : print version info\n");
+	printf("  -r <random>: percentage of segments to randomly load\n");
+    printf("video is just the basname of the video\n\n");
+	exit(1);
 }
 
 
@@ -42,10 +41,6 @@ void print_dash_info(ServerVideoInfo* videoInfo) {
 
 
 int create_xia_dash_manifest(ServerVideoInfo *videoInfo) {
-    int rc;
-
-    string manifestName ="xia_manifest_" + videoInfo->videoName + "." + MANIFEST_EXTENSION;
-
     string fullPath = RESOURCE_FOLDER;
     fullPath += videoInfo->videoName + "/";
 
@@ -57,9 +52,11 @@ int create_xia_dash_manifest(ServerVideoInfo *videoInfo) {
     remove(generated.c_str());
 
     DIR *dir;
-    struct dirent *ent;
     if ((dir = opendir (fullPath.c_str())) != NULL) {
+		struct dirent *ent;
+
         while ((ent = readdir (dir)) != NULL) {
+
             if(strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0
                     && strstr(ent->d_name, ".mpd") != NULL) {
                 char path[MAX_PATH_SIZE];
@@ -68,12 +65,12 @@ int create_xia_dash_manifest(ServerVideoInfo *videoInfo) {
 
                 string original = path;
 
-                if ((rc = parse_dash_manifest(fullPath.c_str(), original.c_str(), parsed.c_str())) < 0) {
+                if (parse_dash_manifest(fullPath.c_str(), original.c_str(), parsed.c_str()) < 0) {
                     warn("failed to create the video manifest file\n");
                     return -1;
                 }
 
-                if ((rc = generate_XIA_manifest(fullPath.c_str(), parsed.c_str(), generated.c_str(), videoInfo->dagUrls)) < 0) {
+                if (generate_XIA_manifest(fullPath.c_str(), parsed.c_str(), generated.c_str(), videoInfo->dagUrls) < 0) {
                     warn("failed to create the video manifest file\n");
                     return -1;
                 }
@@ -119,7 +116,7 @@ int publish_manifest(const char* name) {
         return -1;
     }
 
-    for(int i =0; i < count; i++) {
+    for(int i = 0; i < count; i++) {
         Graph g;
         g.from_sockaddr(&addrs[i]);
 
@@ -135,7 +132,14 @@ static int process_file(const char *fpath, const struct stat *, int tflag, struc
     int count;
     sockaddr_x *addrs = NULL;
 
-	printf("chunking: %s\n", fpath);
+	int r = random() % 100;
+
+	if (r > ramdomize) {
+		printf("skipping: %s\n", fpath);
+		return 0;
+	} else {
+		printf("chunking: %s\n", fpath);
+	}
 
 	if (tflag != FTW_F) {
 		// this shouldn't happen, but check just to be safe
@@ -199,14 +203,35 @@ int publish_content(ServerVideoInfo* videoInfo)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
-		help(basename(argv[0]));
-        return -1;
-    }
+	char c;
 
+	while ((c = getopt(argc, argv, "vr:")) != -1) {
+		switch (c) {
+			case 'v':
+				printf("\n%s (%s)\n", TITLE, VERSION);
+				return 0;
+				break;
+			case 'r':
+				ramdomize = MIN(100, MAX(1, atoi(optarg)));
+				break;
+			case '?':
+			default:
+				// Help Me!
+				help(basename(argv[0]));
+				exit(1);
+				break;
+		}
+	}
+
+	if (optind == argc) {
+		help(basename(argv[0]));
+		return 1;
+	}
+
+	srandom(time(NULL));
     XcacheHandleInit(&videoInfo.xcache);
 
-	for (int i = 1; i < argc; i++) {
+	for (int i = optind; i < argc; i++) {
         videoInfo.videoName = argv[i];
         publish_content(&videoInfo);
 	}

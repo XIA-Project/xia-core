@@ -1,8 +1,8 @@
 #ifndef __CONTENT_PUBLISHER_H__
 #define __CONTENT_PUBLISHER_H__
 
-#include <vector>
-#include <string>
+//#include <vector>
+//#include <string>
 #include "Xsocket.h"
 #include "Xkeys.h"
 #include "dagaddr.hpp"
@@ -21,7 +21,7 @@
 using namespace std;
 
 // The full url in manifest is:
-// 		www.origin.xia/DAG.0.-.CID$.....
+//		www.origin.xia/DAG.0.-.CID$.....
 
 // this is where the video file should be.
 static const char* RESOURCE_FOLDER = "resources/";
