@@ -4,9 +4,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <cpr/cpr.h>
-
 #include "Xsocket.h"
+#include "Xgns.h"
 #include "dagaddr.hpp"
 #include "XIAStreamSocket.hh"
 
@@ -27,6 +26,7 @@ void work(std::unique_ptr<XIAStreamSocket> sock, std::string their_addr)
 int main()
 {
 	SIDKey sid;
+	GNSServer gns("support@names.xia");
 
 	struct sigaction action;
 	memset(&action, 0, sizeof(action));
@@ -45,17 +45,10 @@ int main()
 	Graph our_addr(&servaddr);
 
 	// Register server address on GNS
-	std::cout << "Registering our address with GNS" << std::endl;
-	std::string gns_url("localhost:5678/GNS/");
-	std::string cmd = gns_url + "create?";
-	cmd += "guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B";
-	cmd += "&field=demoserveraddr";
-	cmd += "&value=" + our_addr.http_url_string();
-	std::cout << "Command: " << cmd << std::endl;
-	
-	auto response = cpr::Get(cpr::Url{cmd});
-	std::cout << "Response status code: " << response.status_code << std::endl;
-	std::cout << response.text << std::endl;
+	if(gns.makeTempEntry("demoserveraddr", our_addr.http_url_string())==false){
+		std::cout << "ERROR creating GNS entry for server" << std::endl;
+		return -1;
+	}
 
 	std::cout << "Waiting for connections" << std::endl;
 
@@ -86,16 +79,7 @@ int main()
 		t.detach();
 	}
 
-	std::cout << "Unregistering our address from GNS" << std::endl;
-	cmd = gns_url + "removefield?";
-	cmd += "guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B";
-	cmd += "&field=demoserveraddr";
-	std::cout << "Command: " << cmd << std::endl;
-
-	response = cpr::Get(cpr::Url(cmd));
-	std::cout << "Response status code: " << response.status_code << std::endl;
-	std::cout << response.text << std::endl;
-
+	// GRSServer goes out of scope, all temp entries will be removed
 	// sock goes out of scope. It will be closed and temporary SID keys deleted
 	return 0;
 }

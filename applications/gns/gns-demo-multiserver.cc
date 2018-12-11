@@ -6,9 +6,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <cpr/cpr.h>
-
 #include "Xsocket.h"
+#include "Xgns.h"
 #include "dagaddr.hpp"
 #include "XIAStreamSocket.hh"
 
@@ -28,6 +27,8 @@ void sigint_handler(int)
 
 int main()
 {
+	GNSServer gns("support@names.xia");
+
 	std::random_device randev;
 	std::mt19937 mt(randev());
 	std::uniform_int_distribution<> dist(1, 100);
@@ -47,18 +48,11 @@ int main()
 	}
 	Graph our_addr(&servaddr);
 
-	std::cout << "Registering our address with GNS" << std::endl;
-	std::string gns_url("localhost:5678/GNS/");
-	std::string cmd = gns_url + "create?";
-	cmd += "guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B";
-	cmd += "&field=demoserveraddr";
-	cmd += "." + std::to_string(identifier);
-	cmd += "&value=" + our_addr.http_url_string();
-	std::cout << "Command: " << cmd << std::endl;
-	
-	auto response = cpr::Get(cpr::Url{cmd});
-	std::cout << "Response status code: " << response.status_code << std::endl;
-	std::cout << response.text << std::endl;
+	std::string gns_entry = "demoserveraddr." + std::to_string(identifier);
+	if(gns.makeTempEntry(gns_entry, our_addr.http_url_string()) == false) {
+		std::cout << "ERROR creating GNS entry for server" << std::endl;
+		return -1;
+	}
 
 	struct pollfd ufd;
 	ufd.fd = sock.fd();	// TODO: fd() may not be available in future
@@ -86,17 +80,8 @@ int main()
 		auto t = std::thread(work, std::move(newsock), g.dag_string());
 		t.detach();
 	}
-	std::cout << "Unregistering our address from GNS" << std::endl;
-	cmd = gns_url + "removefield?";
-	cmd += "guid=70FD73C018FAEED5F041AACB9BA28BCB651A0F2B";
-	cmd += "&field=demoserveraddr";
-	cmd += "." + std::to_string(identifier);
-	std::cout << "Command: " << cmd << std::endl;
 
-	response = cpr::Get(cpr::Url{cmd});
-	std::cout << "Response status code: " << response.status_code << std::endl;
-	std::cout << response.text << std::endl;
-
+	// gns goes out of scope. Temporary entries in GNS will be removed.
 	// sock goes out of scope. It is closed and the temporary SID keys deleted.
 	return 0;
 }
