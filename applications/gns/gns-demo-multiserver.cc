@@ -1,3 +1,5 @@
+#include "gns-demo.hh"
+
 #include <iostream>
 #include <string>
 #include <random>
@@ -27,7 +29,7 @@ void sigint_handler(int)
 
 int main()
 {
-	GNSServer gns("support@names.xia");
+	GNSServer gns(PUBLISHER_NAME);
 
 	std::random_device randev;
 	std::mt19937 mt(randev());
@@ -48,7 +50,7 @@ int main()
 	}
 	Graph our_addr(&servaddr);
 
-	std::string gns_entry = "demoserveraddr." + std::to_string(identifier);
+	std::string gns_entry = SERVER_NAME + "." + std::to_string(identifier);
 	if(gns.makeTempEntry(gns_entry, our_addr.http_url_string()) == false) {
 		std::cout << "ERROR creating GNS entry for server" << std::endl;
 		return -1;

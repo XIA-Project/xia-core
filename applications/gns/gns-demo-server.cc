@@ -1,3 +1,5 @@
+#include "gns-demo.hh"
+
 #include <iostream>
 #include <atomic>
 
@@ -26,7 +28,7 @@ void work(std::unique_ptr<XIAStreamSocket> sock, std::string their_addr)
 int main()
 {
 	SIDKey sid;
-	GNSServer gns("support@names.xia");
+	GNSServer gns(PUBLISHER_NAME);
 
 	struct sigaction action;
 	memset(&action, 0, sizeof(action));
@@ -45,7 +47,8 @@ int main()
 	Graph our_addr(&servaddr);
 
 	// Register server address on GNS
-	if(gns.makeTempEntry("demoserveraddr", our_addr.http_url_string())==false){
+	std::string servname = SERVER_NAME + ".fixed";
+	if(gns.makeTempEntry(servname, our_addr.http_url_string())==false){
 		std::cout << "ERROR creating GNS entry for server" << std::endl;
 		return -1;
 	}
