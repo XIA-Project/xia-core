@@ -3,6 +3,8 @@
 
 #include <cpr/cpr.h>
 
+#define GNSHTTPPROXY_PORT 5678
+
 class GNSServer {
 	public:
 		GNSServer(std::string publisher_name);
@@ -18,7 +20,7 @@ class GNSServer {
 
 GNSServer::GNSServer(std::string publisher_name)
 {
-	_gns_url = "localhost:5678/GNS/";
+	_gns_url = "localhost:" + std::to_string(GNSHTTPPROXY_PORT) + "/GNS/";
 	// Try connecting to server and getting the GUID
 	std::string cmd = _gns_url + "lookupguid?";
 	cmd += "name=" + publisher_name;
@@ -27,7 +29,6 @@ GNSServer::GNSServer(std::string publisher_name)
 	if(response.status_code != 200) {
 		throw std::runtime_error("ERROR connecting to GNSHTTPProxy on 5678");
 	}
-	// TODO: If response code is not OK, throw exception
 	std::cout << response.text << std::endl;
 	_guid = response.text;
 }
