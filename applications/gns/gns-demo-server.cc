@@ -82,7 +82,7 @@ int main()
 		t.detach();
 	}
 
-	// GRSServer goes out of scope, all temp entries will be removed
+	// GNSServer goes out of scope, all temp entries will be removed
 	// sock goes out of scope. It will be closed and temporary SID keys deleted
 	return 0;
 }
