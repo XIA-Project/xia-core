@@ -1,0 +1,87 @@
+#! /usr/bin/env bash
+# create etc/hosts.xia by getting the host dag for our machine
+# plus the specified machines and appending it to the hosts file
+# then copy the file to the specified machines
+
+show_help() {
+	cat << EOH
+
+xthrotle -[hvacs]
+
+copy a file to the same location on another host
+
+options:
+  -a  --apply   set latency on all links
+  -c  --clear   clear latency
+  -s  --show    show current latency settings
+  -h, --help    display this help
+  -v, --version display the version number
+EOH
+	exit 0
+}
+
+# xia-cdn testbed links between routers & controllers
+links=(
+	# backbone
+	"g-r1 eth2 g-r2 eth1 10"
+	"g-r2 eth2 g-r3 eth1 10"
+
+	# AD0 internal
+	"g-r0 eth1 g-r1 eth1 5"
+
+	# AD1 internal
+	"g-r2 eth3 g-r6 eth1 5"
+	"g-r2 eth4 g-r8 eth1 5"
+	"g-r6 eth2 g-r7 eth1 5"
+	"g-r8 eth2 g-r9 eth1 5"
+
+	# AD2 internal
+	"g-r3 eth4 g-r4 eth3 5"
+	"g-r3 eth2 g-r5 eth2 5"
+	)
+
+set_latency() {
+	echo "setting $1:$2 -> $3:$4 with $5ms"
+	ssh $1 sudo xia-core/tools/shape $2 add -l$5
+	ssh $3 sudo xia-core/tools/shape $4 add -l$5
+}
+
+clear_latency() {
+	echo "clearing $1:$2 -> $3:$4"
+	ssh $1 sudo xia-core/tools/shape $2 clear
+	ssh $3 sudo xia-core/tools/shape $4 clear
+}
+
+show_latency() {
+	echo "status $1:$2 -> $3:$4"
+	ssh $1 sudo xia-core/tools/shape $2 show
+	ssh $3 sudo xia-core/tools/shape $4 show
+}
+
+[ "$1" == "-v" ] || [ "$1" == "--version" ] && echo "xthrottle 1.0" && exit 0
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ $# -ne 1 ]; then
+	show_help
+fi
+
+
+
+for link in "${links[@]}"
+do
+	case $1 in
+		'-a'|'--apply')
+			set_latency $link
+			;;
+		'-s'|'--show')
+			show_latency $link
+			;;
+		'-c'|'--clear')
+			clear_latency $link
+			;;
+		*)
+			help
+			;;
+
+	esac
+done
+
