@@ -2,12 +2,13 @@
 #define _XGNS_H
 
 #include <cpr/cpr.h>
+#include <json.hpp>
 
-#define GNSHTTPPROXY_PORT 5678
+#include <fstream>
 
 class GNSServer {
 	public:
-		GNSServer(std::string publisher_name);
+		GNSServer(std::string conf_file);
 		~GNSServer();
 		bool makeEntry(std::string name, std::string http_dag_string);
 		bool makeTempEntry(std::string name, std::string http_dag_string);
@@ -18,18 +19,21 @@ class GNSServer {
 		std::string _gns_url;
 };
 
-GNSServer::GNSServer(std::string publisher_name)
+GNSServer::GNSServer(std::string conf_file)
 {
-	_gns_url = "localhost:" + std::to_string(GNSHTTPPROXY_PORT) + "/GNS/";
+	// Read in a config file for GNS server information
+	std::ifstream i(conf_file);
+	nlohmann::json j;
+	i >> j;
+	_gns_url = j["proxyaddr"].get<std::string>() + "/GNS/";
+
 	// Try connecting to server and getting the GUID
 	std::string cmd = _gns_url + "lookupguid?";
-	cmd += "name=" + publisher_name;
+	cmd += "name=" + j["xiapublishername"].get<std::string>();
 	auto response = cpr::Get(cpr::Url{cmd});
-	std::cout << "Response status code: " << response.status_code << std::endl;
 	if(response.status_code != 200) {
 		throw std::runtime_error("ERROR connecting to GNSHTTPProxy on 5678");
 	}
-	std::cout << response.text << std::endl;
 	_guid = response.text;
 }
 

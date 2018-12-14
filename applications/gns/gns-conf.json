@@ -1,0 +1,5 @@
+{
+	"proxyaddr": "localhost:5678",
+	"gnsserveraddr": "172.16.252.131:24703",
+	"xiapublishername": "support@names.xia"
+}

@@ -28,7 +28,14 @@ void work(std::unique_ptr<XIAStreamSocket> sock, std::string their_addr)
 int main()
 {
 	SIDKey sid;
-	GNSServer gns(PUBLISHER_NAME);
+	char rootdir[2048];
+	if(XrootDir(rootdir, sizeof(rootdir)) == NULL) {
+		std::cout << "ERROR: finding XIA working directory" << std::endl;
+		return -1;
+	}
+	std::string conf_file(rootdir);
+	conf_file += "/" + GNS_DEMO_PATH + "/gns-conf.json";
+	GNSServer gns(conf_file);
 
 	struct sigaction action;
 	memset(&action, 0, sizeof(action));
