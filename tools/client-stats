@@ -1,11 +1,12 @@
+#!/usr/bin/awk -f
 # combines results from a dashclient log and the proxy log
 #
-# usage awk -f client-stats,awk dashclient-<n>.log proxy.log
+# usage client-stats dashclient-<n>.log proxy.log
 
- BEGIN {
-	 SUBSEP = "|"
-	 next_segment = 1
-	 start = 0
+BEGIN {
+	SUBSEP = "|"
+	next_segment = 1
+	start = 0
 }
 
 /starting/ {
@@ -73,7 +74,7 @@ $5 ~ /bytes/ {
 END {
 	print "time,video,cid,status,bitrate,client,cached,bytes,duration,speed"
 
-	# make output suitable for a .csv file
+	# make output suitable for a .csv file (space delimited)
 	for (segment = 1; segment < next_segment; segment++) {
 		cid = segments[segment]
 		status = stats[cid, "bytes"] == "" ? "0" : "1"

@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# parse dashclient and proxy logs
+# - create a csv file for each video session containing statistics for each chunk
+# - generate graphs for eaqch csv file generated
+
+for d in $(find . -mindepth 1 -type d); do
+	echo "processing $d"
+	for infile in "$d"/dashclient-*.log; do
+		fname=$(basename "$infile" .log)
+		csv="$d/$fname.csv"
+		./client-stats "$infile" "$d/proxy.log" > "$csv"
+
+		# make a file for each video
+		# FIXME: this doesn't help when a video is in the logs more than once
+		for video in dash1 dash5 bunny elephant; do
+			vfile="$d/$video-$fname.dat"
+			grep "$video" "$csv"  | tr "," " " >> "$vfile"
+		done
+	done
+	# delete empty csv files so we don't try to graph them
+	find "$d" -empty -exec rm {} \;
+
+	# now graph them (only doing client 0 even if more clients are in the directory)
+	find "$d" -name "*-dashclient-0.dat" -exec ./cdn-plot {} \;
+done
+

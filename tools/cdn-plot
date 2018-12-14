@@ -1,0 +1,112 @@
+#!/usr/local/bin/gnuplot -c
+
+csv = ARG1
+dir = sprintf('"`dirname %s`"', csv)
+testrun = sprintf('"`basename %s`"', @dir)
+
+bitrate_title = sprintf("%s - cache vs bitrate", @testrun)
+bitrate_file = sprintf("%s/bitrate-%s.pdf", @dir, @testrun)
+
+speed_title = sprintf("%s - transfer rate", @testrun)
+speed_file = sprintf("%s/speed-%s.pdf", @dir, @testrun)
+
+time_title = sprintf("%s - transfer time", @testrun)
+time_file = sprintf("%s/time-%s.pdf", @dir, @testrun)
+
+size_title = sprintf("%s - segment size", @testrun)
+size_file = sprintf("%s/size-%s.pdf", @dir, @testrun)
+
+set datafile separator ","
+
+
+# graph video bitrate and cached status
+reset
+set title bitrate_title
+set term pdf color
+
+set output bitrate_file
+set multiplot
+
+set grid
+unset key
+set style data dots
+set lmargin screen 0.25
+
+#set xdata time
+#set timefmt "%S"
+set xlabel "time (seconds)"
+set xtics 50
+
+#set ytics nomirror
+#set y2tics
+
+set ytics 1000000
+set yrange [0:*]
+set ylabel "video bitrate"
+plot csv using 1:5
+
+set ytics .5
+set ytics offset  -10, 0
+set yrange [-3:2]
+set ylabel "cached"
+plot csv using 1:7 linecolor 2
+
+unset multiplot
+
+
+
+# graph xfer speed
+reset
+set output speed_file
+set title speed_title
+set term pdf color
+set grid
+unset key
+set style data dots
+
+set xlabel "time (seconds)"
+set xtics 50
+
+#set ytics 1000000
+set yrange [0:*]
+set ylabel "xfer rate (mbps)"
+plot csv using 1:10
+
+
+
+# graph segment size
+reset
+set output size_file
+set title size_title
+set term pdf color
+set grid
+unset key
+set style data dots
+
+set xlabel "time (seconds)"
+set xtics 50
+
+#set ytics 1000000
+set yrange [0:*]
+set ylabel "segment size (bytes)"
+plot csv using 1:8
+
+
+
+# graph xfer time
+reset
+set output time_file
+set title time_title
+set term pdf color
+set grid
+unset key
+set style data dots
+
+set xlabel "time (seconds)"
+set xtics 50
+
+#set ytics 1000000
+set yrange [0:*]
+set ylabel "xfer time (seconds)"
+plot csv using 1:9
+
