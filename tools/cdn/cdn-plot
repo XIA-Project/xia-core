@@ -16,6 +16,9 @@ time_file = sprintf("%s/time-%s.pdf", @dir, @testrun)
 size_title = sprintf("%s - segment size", @testrun)
 size_file = sprintf("%s/size-%s.pdf", @dir, @testrun)
 
+cdn_title = sprintf("%s - cdn", @testrun)
+cdn_file = sprintf("%s/cdn-%s.pdf", @dir, @testrun)
+
 set datafile separator ","
 
 
@@ -48,6 +51,42 @@ plot csv using 1:5
 set ytics .5
 set ytics offset  -10, 0
 set yrange [-3:2]
+set ylabel "cached"
+plot csv using 1:7 linecolor 2
+
+unset multiplot
+
+
+
+# graph cdn and cached status
+reset
+set title cdn_title
+set term pdf color
+
+set output cdn_file
+set multiplot
+
+set grid
+unset key
+set style data dots
+set lmargin screen 0.25
+
+#set xdata time
+#set timefmt "%S"
+set xlabel "time (seconds)"
+set xtics 50
+
+#set ytics nomirror
+#set y2tics
+
+set ytics 1000000
+set yrange [0:6]
+set ylabel "cdn"
+plot csv using 1:12
+
+set ytics .5
+set ytics offset  -10, 0
+set yrange [-.5:6]
 set ylabel "cached"
 plot csv using 1:7 linecolor 2
 

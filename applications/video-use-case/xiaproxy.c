@@ -678,9 +678,11 @@ int forward_chunks_to_client(ProxyRequestCtx *ctx, sockaddr_x* chunkAddresses, i
 		syslog(LOG_NOTICE, "elapsed: %0.3f", elapsed);
 		syslog(LOG_NOTICE, "throughput: %0.3f mbps", len / elapsed * 8 / 1000000);
 
+
+
 		FILE *f = fopen("proxy.log", "a");
-		fprintf(f, "%s: cached %s %u bytes, %0.3f s, %0.3f mbps\n", g.intent_CID_str().c_str(),
-				cached ? "1" : "0", len, elapsed, len / elapsed * 8 / 1000000);
+		fprintf(f, "%d %s: cached %s %u bytes, %0.3f s, %0.3f mbps hid %s\n", id, g.intent_CID_str().c_str(),
+				cached ? "1" : "0", len, elapsed, len / elapsed * 8 / 1000000, g.intent_HID_str().c_str());
 		fclose(f);
 
 		if (ctx->bandwidth != 0) {

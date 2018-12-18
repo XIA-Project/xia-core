@@ -6,6 +6,7 @@
 BEGIN {
 	SUBSEP = "|"
 	next_segment = 1
+	next_cdn = 1
 	start = 0
 }
 
@@ -61,23 +62,41 @@ $5 ~ /bytes/ {
 	stats[cid, "speed"] = $8
 }
 
-/cached/ {
+$3 ~ /cached/ {
 	# this comes from proxy.log
 
-	# unfortunately this log is a bit spare, so we don't know which client was pulling the chunk
-	# assume that the cached status is the same for all clients until the log has more info
-	gsub(":$", "", $1)
-	stats[$1, "cached"] = $3
+	client = $1
+	cid = $2
+	cdn = $12
+
+	print NF
+	add_cdn(cdn)
+
+	if (client == stats["cid", "client"]) {
+		gsub(":$", "", cid)
+		stats[cid, "cached"] = $4
+
+		# save the originally requested CDN's HID
+		stats[cid, "cdn"] = cdn
+	}
 }
 
 
 END {
-	print "time,video,cid,status,bitrate,client,cached,bytes,duration,speed"
+	print "time,video,cid,status,bitrate,client,cached,bytes,duration,speed,cdn"
 
 	# make output suitable for a .csv file (space delimited)
 	for (segment = 1; segment < next_segment; segment++) {
 		cid = segments[segment]
 		status = stats[cid, "bytes"] == "" ? "0" : "1"
-		print stats[cid, "elapsed"] "," chunks[cid] "," cid "," status "," stats[cid, "bitrate"] "," stats[cid, "client"] "," stats[cid, "cached"] "," stats[cid, "bytes"] "," stats[cid, "duration"] "," stats[cid, "speed"]
+		print stats[cid, "elapsed"] "," chunks[cid] "," cid "," status "," stats[cid, "bitrate"] "," stats[cid, "client"] "," stats[cid, "cached"] "," stats[cid, "bytes"] "," stats[cid, "duration"] "," stats[cid, "speed"] "," stats[cid, "cdn"] "," cdns[stats[cid, "cdn"]]
 	}
 }
+
+
+function add_cdn(cdn) {
+	if (!(cdn in cdns)) {
+		cdns[cdn] = next_cdn++
+	}
+}
+

@@ -22,6 +22,6 @@ for d in $(find . -mindepth 1 -type d); do
 	find "$d" -empty -exec rm {} \;
 
 	# now graph them (only doing client 0 even if more clients are in the directory)
-	find "$d" -name "*-dashclient-0.dat" -exec ./cdn-plot {} \;
+	find "$d" -name "*-dashclient-*.dat" -exec ./cdn-plot {} \;
 done
 
