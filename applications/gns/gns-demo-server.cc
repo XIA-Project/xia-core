@@ -22,11 +22,24 @@ void work(std::unique_ptr<XIAStreamSocket> sock, std::string their_addr)
 {
 	std::cout << "New connection from: "
 		<< their_addr << std::endl;
+	char buf[1024];
+	int received = sock->recv(buf, sizeof(buf));
+	if(received < 0) {
+		std::cout << "ERROR receiving data from client" << std::endl;
+		return;
+	}
+	std::cout << "Client said: " << std::string(buf, received) << std::endl;
+	int sent = sock->send(buf, received);
+	if(sent != received) {
+		std::cout << "ERROR sending data to client" << std::endl;
+		return;
+	}
 	// sock goes out of scope and will be closed automatically
 }
 
 int main()
 {
+	std::vector<std::thread> threads;
 	SIDKey sid;
 	char rootdir[2048];
 	if(XrootDir(rootdir, sizeof(rootdir)) == NULL) {
@@ -86,7 +99,12 @@ int main()
 
 		// Hand off to a worker thread
 		auto t = std::thread(work, std::move(newsock), g.dag_string());
-		t.detach();
+		threads.emplace_back(std::move(t));
+	}
+	for (auto &thread : threads) {
+		if(thread.joinable()) {
+			thread.join();
+		}
 	}
 
 	// GNSServer goes out of scope, all temp entries will be removed

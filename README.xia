@@ -1,0 +1,44 @@
+For use with XIA, we set up the following.
+
+
+Run the server
+--------------
+./bin/gpServer.sh -DgigapaxosConfig=conf/gigapaxos.xiaserver.properties start all
+
+Run the HTTP proxy
+------------------
+./bin/gpClient.sh -DgigapaxosConfig=conf/gigapaxos.xiaserver.properties edu.umass.cs.gnsclient.client.http.GNSHTTPProxy
+
+Additional:
+----------
+There is a conf/gigapaxos.xiaclient.properties with just two entries
+but is probably not necessary:
+
+CLIENT_SSL_MODE=SERVER_AUTH
+reconfigurator.reconfigurator1=172.16.252.131:2178
+
+
+XIA GNS code:
+------------
+1. api/include/Xgns.h
+   - provides
+		GNSServer
+			makeTempEntry - entries removed automatically in destructor
+			makeEntry - entries that stay, unless removed explicitly
+			removeEntry - remove a named entry
+   - requires
+		conf_file - with 'proxyaddr' and 'xiapublishername' entries
+
+2. api/include/Xgnsclient.h
+   - provides
+		GNSClient
+			queryEntry - list of entries matching given query
+   - requires
+		conf_file - with 'gnsserveraddr' and 'xiapublishername' entries
+
+3. applications/gns
+   - gns-conf.json - 'proxyaddr', 'gnsserveraddr', 'xiapublishername' entries
+   - gns-demo-server - Start a server with a DAG entry in GNS
+   - gns-demo-client - Connect to a server by finding its DAG from GNS
+   - gns-demo-multiserver - Start any number of these - multiple GNS entries
+   - gns-demo-multiclient - Query all server DAGs and connect to them all
