@@ -4,21 +4,28 @@
 #include <cpr/cpr.h>
 #include <json.hpp>
 
+#include <fstream>
+
 class GNSClient {
 	public:
-		GNSClient(std::string publisher_name, std::string ipaddr_port);
+		GNSClient(std::string conf_file);
 		std::vector<std::string> queryEntry(std::string name);
 	private:
 		std::string _guid;
 		std::string _gns_url;
 };
 
-GNSClient::GNSClient(std::string publisher_name, std::string ipaddr_port)
+GNSClient::GNSClient(std::string conf_file)
 {
-	_gns_url = ipaddr_port + "/GNS/";
+	// Read in a config file for GNS server information
+	std::ifstream i(conf_file);
+	nlohmann::json j;
+	i >> j;
+
+	_gns_url = j["gnsserveraddr"].get<std::string>() + "/GNS/";
 	// Try connecting to server and getting the GUID
 	std::string cmd = _gns_url + "lookupguid?";
-	cmd += "name=" + publisher_name;
+	cmd += "name=" + j["xiapublishername"].get<std::string>();
 	auto response = cpr::Get(cpr::Url{cmd});
 	std::cout << "Response status code: " << response.status_code << std::endl;
 	if(response.status_code != 200) {
