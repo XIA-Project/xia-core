@@ -1,26 +1,25 @@
 #!/usr/local/bin/gnuplot -c
 
 csv = ARG1
+video = ARG2
+client = ARG3
+cached = ARG4
 dir = sprintf('"`dirname %s`"', csv)
-testrun = sprintf('"`basename %s`"', @dir)
 
-bitrate_title = sprintf("%s - cache vs bitrate", @testrun)
-bitrate_file = sprintf("%s/bitrate-%s.pdf", @dir, @testrun)
+bitrate_title = sprintf("client:%s video:%s cached:%s - cache vs bitrate", client, video, cached)
+bitrate_file = sprintf("%s/bitrate-%s-%s-%s.pdf", @dir, client, video, cached)
 
-speed_title = sprintf("%s - transfer rate", @testrun)
-speed_file = sprintf("%s/speed-%s.pdf", @dir, @testrun)
+speed_title = sprintf("client:%s video:%s cached:%s - transfer rate", client, video, cached)
+speed_file = sprintf("%s/speed-%s-%s-%s.pdf", @dir, client, video, cached)
 
-time_title = sprintf("%s - transfer time", @testrun)
-time_file = sprintf("%s/time-%s.pdf", @dir, @testrun)
+time_title = sprintf("client:%s video:%s cached%:s - transfer time", client, video, cached)
+time_file = sprintf("%s/time-%s-%s-%s.pdf", @dir, client, video, cached)
 
-size_title = sprintf("%s - segment size", @testrun)
-size_file = sprintf("%s/size-%s.pdf", @dir, @testrun)
+size_title = sprintf("client:%s video:%s cached%:s - segment size", client, video, cached)
+size_file = sprintf("%s/size-%s-%s-%s.pdf", @dir, client, video, cached)
 
-cdn_title = sprintf("%s - cdn", @testrun)
-cdn_file = sprintf("%s/cdn-%s.pdf", @dir, @testrun)
-
-set datafile separator ","
-
+cdn_title = sprintf("client:%s video:%s cached:%s - cdn", client, video, cached)
+cdn_file = sprintf("%s/cdn-%s-%s-%s.pdf", @dir, client, video, cached)
 
 # graph video bitrate and cached status
 reset
@@ -56,8 +55,6 @@ plot csv using 1:7 linecolor 2
 
 unset multiplot
 
-
-
 # graph cdn and cached status
 reset
 set title cdn_title
@@ -91,7 +88,6 @@ set ylabel "cached"
 plot csv using 1:7 linecolor 2
 
 unset multiplot
-
 
 
 # graph xfer speed

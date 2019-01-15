@@ -4,24 +4,35 @@
 # - create a csv file for each video session containing statistics for each chunk
 # - generate graphs for eaqch csv file generated
 
-for d in $(find . -mindepth 1 -type d); do
+# assume data files are 2 directories deep - day-mo-yr/cached-percentage/*.log
+for d in $(find . -mindepth 2 -type d); do
 	echo "processing $d"
+
+	# now walk through client capture files
 	for infile in "$d"/dashclient-*.log; do
 		fname=$(basename "$infile" .log)
 		csv="$d/$fname.csv"
+		client=$(echo "$csv" | sed -e 's/.*-//; s/\..*//')
+		cached=$(basename "$d")
+
 		./client-stats "$infile" "$d/proxy.log" > "$csv"
 
-		# make a file for each video
+		# make a data file for each video
 		# FIXME: this doesn't help when a video is in the logs more than once
 		for video in dash1 dash5 bunny elephant; do
-			vfile="$d/$video-$fname.dat"
-			grep "$video" "$csv"  | tr "," " " >> "$vfile"
+			vfile="$d/$video-$client.dat"
+
+			if [ -s "$vfile" ]; then
+				# and plot the file
+
+				# convert to make life easier in gnuplot
+				grep "$video" "$csv"  | tr "," " " >> "$vfile"
+
+				echo "  plotting client:$client video:$video cache amount:$cached %"
+				./cdn-plot "$vfile" "$video" "$client" "$cached"
+			fi
+			#rm "$vfile"
 		done
+		rm "$csv"
 	done
-	# delete empty csv files so we don't try to graph them
-	find "$d" -empty -exec rm {} \;
-
-	# now graph them (only doing client 0 even if more clients are in the directory)
-	find "$d" -name "*-dashclient-*.dat" -exec ./cdn-plot {} \;
 done
-
