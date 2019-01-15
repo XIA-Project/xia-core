@@ -69,7 +69,6 @@ $3 ~ /cached/ {
 	cid = $2
 	cdn = $12
 
-	print NF
 	add_cdn(cdn)
 
 	if (client == stats["cid", "client"]) {
