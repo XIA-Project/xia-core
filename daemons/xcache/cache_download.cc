@@ -81,14 +81,23 @@ void cache_download::destroy()
 {
 	if(_chdr_data) {
 		free(_chdr_data);
-	}
-	if(_chdr) {
-		delete _chdr;
+		_chdr_data = NULL;
 	}
 	if(_data) {
 		free(_data);
+		_data = NULL;
 	}
+
+	// _meta owns _chdr and deletes it
 	if(_meta) {
 		delete _meta;
+		_meta = NULL;
+		_chdr = NULL;
+	} else {
+		// _meta was null, so check if only _chdr was allocated
+		if(_chdr) {
+			delete _chdr;
+			_chdr = NULL;
+		}
 	}
 }
