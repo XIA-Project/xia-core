@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ $# != 1 ]; then
+	echo usage: cdn_logs percentage
+	echo where percentage is the random percentage of cached chunks on the routers
+	exit 0
+fi
+
+tar czvf $(hostname -s)-$1.$(date "+%Y-%m-%d").tar.gz *.log
+rm *.log
+
