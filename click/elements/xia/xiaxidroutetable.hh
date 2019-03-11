@@ -76,7 +76,6 @@ protected:
 
     static String list_routes_handler(Element *e, void *thunk);
 
-private:
 	HashTable<XID, XIARouteData*> _rts;
 	XIARouteData _rtdata;
     uint32_t _drops;

@@ -68,6 +68,9 @@ class XIAPath { public:
 	// Get the intent SID as a string
 	std::string intent_sid_str() const;
 
+	// Get the intent AID as a string
+	std::string intent_aid_str() const;
+
     // get XID of the node
     XID xid(handle_t node) const;
 

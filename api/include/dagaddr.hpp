@@ -37,6 +37,7 @@ public:
 	static const std::string XID_TYPE_CID_STRING;
 	static const std::string XID_TYPE_NCID_STRING;
 	static const std::string XID_TYPE_ICID_STRING;
+	static const std::string XID_TYPE_AID_STRING;
 	static const std::string XID_TYPE_SID_STRING;
 	static const std::string XID_TYPE_FID_STRING;
 	static const std::string XID_TYPE_IP_STRING;
@@ -138,11 +139,13 @@ public:
 	const Node& intent_AD() const;
 	const Node& intent_HID() const;
 	const Node& intent_SID() const;
+	const Node& intent_AID() const;
 	const Node& intent_CID() const;
 	const Node& intent_ICID() const;
 	std::string intent_AD_str() const;
 	std::string intent_HID_str() const;
 	std::string intent_SID_str() const;
+	std::string intent_AID_str() const;
 	std::string intent_CID_str() const;
 	std::string intent_ICID_str() const;
 	bool is_valid() const;
@@ -186,6 +189,7 @@ private:
 	std::size_t intent_AD_index() const;
 	std::size_t intent_HID_index() const;
 	std::size_t intent_SID_index() const;
+	std::size_t intent_AID_index() const;
 	std::size_t intent_CID_index() const;
 	std::size_t intent_ICID_index() const;
 

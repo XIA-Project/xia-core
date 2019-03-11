@@ -42,7 +42,7 @@ F_CONTROLLER   = 0x0008 # node is a controller
 F_IP_GATEWAY   = 0x0010 # router is a dual stack router
 F_STATIC_ROUTE = 0x0100 #route entry was added manually and should not expire
 
-KNOWN_XIDS = [ "AD", "HID", "FID", "SID", "CID", "IP", "NCID" ]
+KNOWN_XIDS = [ "AD", "HID", "FID", "SID", "CID", "IP", "NCID", "AID"]
 #
 # class for managing command line configuration options
 #

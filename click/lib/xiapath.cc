@@ -187,6 +187,12 @@ XIAPath::intent_sid_str() const
     return g.intent_SID_str();
 }
 
+std::string
+XIAPath::intent_aid_str() const
+{
+	return g.intent_AID_str();
+}
+
 bool
 XIAPath::append_node(const XID& xid)
 {

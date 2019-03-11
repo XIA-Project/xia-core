@@ -60,6 +60,7 @@ elementclass XIAPacketRoute {
 	$num_ports |
 
 	// input: a packet to process
+	// input[1]: QUIC XIA Registration Packet
 	// output[0]: forward (painted)
 	// output[1]: arrived at destination node
 	// output[2]: could not route at all (tried all paths)
@@ -76,7 +77,7 @@ elementclass XIAPacketRoute {
 	// print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// print_out :: XIAPrint("<<< $local_hid (Out Port $num)");
 
-	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, -);
+	c :: XIAXIDTypeClassifier(next AD, next HID, next SID, next CID, next IP, next FID, next NCID, next ICID, next AID, -);
 	//print_in :: XIAPrint(">>> $local_hid (In Port $num) ");
 	// pdesty :: XIAPrint(">>>  DEST YES");
 	// pdestn :: XIAPrint(">>>  DEST NO");
@@ -124,7 +125,9 @@ elementclass XIAPacketRoute {
 	rt_CID, rt_NCID :: XIACIDRouteTable();
 	rt_ICID :: XIAICIDRouteTable();
 	rt_FID :: FIDRouteEngine($num_ports);
-	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, rt_NCID, rt_ICID, [2]output;
+	rt_AID :: XIAAIDRouteTable();
+	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, rt_NCID, rt_ICID, rt_AID, [2]output;
+	input[1] -> [1]rt_AID; // QUIC XIA application registration request
 
 	// TO ADD A NEW USER DEFINED XID (step 3)
 	// add rt_XID_NAME before the arrow in the following 7 lines
@@ -147,6 +150,7 @@ elementclass RouteEngine {
 
 	// input[0]: a packet arrived at the node from outside (i.e. routing with caching)
 	// input[1]: a packet to send from a node (i.e. routing without caching)
+	// input[2]: QUIC XIA Registration Request
 	// output[0]: forward (painted)
 	// output[1]: arrived at destination node; go to RPC
 	// output[2]: arrived at destination node; go to cache
@@ -155,6 +159,7 @@ elementclass RouteEngine {
 
 	input[0] -> proc;
 	input[1] -> proc;
+	input[2] -> [1]proc;
 
 	proc[0] -> [0]output;
 	proc[1] -> [1]output;  // To RPC / Application
@@ -306,6 +311,7 @@ elementclass XIARoutingCore {
 	$hostname, $external_ip, $click_port, $num_ports, $is_dual_stack |
 
 	// input[0]: packet to route
+	// input[1]: QUIC XIA application registration request
 	// output[0]: packet to be forwarded out a given port based on paint value
 
 	n :: RouteEngine($num_ports);
@@ -343,6 +349,7 @@ elementclass XIARoutingCore {
 
 	n[0] -> output;
 	input -> [0]n;
+	input[1] -> [2]n;  // QUIC XIA application registration request
 
 	// Send ICID packets to Xcache
 	xtransport[2] -> XcacheICIDSock;
@@ -400,8 +407,18 @@ elementclass XIARouter4Port {
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
 
 	cf :: CacheFilter;
+	//quicxia :: Strip(43); // Remove Ethernet, IP and UDP headers
+	quicxiaclassifier :: Classifier(0/C0DA, -);
 
-	input => xlc0, xlc1, xlc2, xlc3 => output;
+	//input => xlc0, xlc1, xlc2, xlc3, quicxia;
+	input => xlc0, xlc1, xlc2, xlc3, quicxiaclassifier;
+	xlc0, xlc1, xlc2, xlc3 => output;
+	// Discarding registration packet for now
+	//quicxia -> quicxiaclassifier -> [1]xrc;
+	quicxiaclassifier[0] -> [1]xrc;
+	// Forward all other QUIC packet to the routing core
+	quicxiaclassifier[1] -> [0]xrc;
+
 	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
 	xianetjoin[0] -> XIAPaintSwitch[0,1,2,3] => [2]xlc0[2], [2]xlc1[2], [2]xlc2[2], [2]xlc3[2] -> [0]xianetjoin;
