@@ -417,7 +417,7 @@ elementclass XIARouter4Port {
 	//quicxia -> quicxiaclassifier -> [1]xrc;
 	quicxiaclassifier[0] -> [1]xrc;
 	// Forward all other QUIC packet to the routing core
-	quicxiaclassifier[1] -> [0]xrc;
+	quicxiaclassifier[1] -> CheckXIAHeader -> MarkXIAHeader -> [0]xrc;
 
 	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
