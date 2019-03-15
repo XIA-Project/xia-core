@@ -531,7 +531,7 @@ XIAAIDRouteTable::ProcessRegistration(WritablePacket* p_in)
 	routedata->flags = 0;
 	routedata->nexthop = (struct sockaddr_in*) calloc(
 			1, sizeof(struct sockaddr_in));
-	memcpy(&routedata->nexthop, &aid_addr, addrlen);
+	memcpy(routedata->nexthop, &aid_addr, addrlen);
 	_rts[xid] = routedata;
 	click_chatter("XIAAIDRouteTable: size: %zu\n", _rts.size());
 }
@@ -568,6 +568,9 @@ XIAAIDRouteTable::ProcessAIDPacket(WritablePacket* p_in)
 		click_chatter("XIAAIDRouteTable: Unable to send packet along");
 		return;
 	}
+	click_chatter("XIAAIDRouteTable: forwarded packet to %s:%d",
+			inet_ntoa(routedata->nexthop->sin_addr),
+			ntohs(routedata->nexthop->sin_port));
 }
 
 void
