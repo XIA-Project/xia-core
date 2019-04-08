@@ -58,12 +58,12 @@ class XIAAIDRouteTable : public XIAXIDRouteTable { public:
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
-    //void add_handlers();
+    virtual void add_handlers();
 
     void push(int in_ether_port, Packet *);
 
-	//int set_enabled(int e);
-	//int get_enabled();
+	int set_enabled(int e);
+	int get_enabled();
 
 protected:
     int lookup_route(Packet* p);
@@ -85,7 +85,7 @@ private:
 	void ProcessAIDPacket(WritablePacket* p_in);
 
 	HashTable<XID, XIAAIDRouteData*> _rts;
-	XIAAIDRouteData _rtdata;
+	XIAAIDRouteData _rtdata {-7, 0, NULL};
 	int _sockfd;
 	/*
 	HashTable<XID, XIARouteData*> _rts;

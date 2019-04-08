@@ -48,7 +48,6 @@ XIAAIDRouteTable::configure(Vector<String> & /*conf*/, ErrorHandler * /*errh*/)
 	return 0;
 }
 
-/*
 int
 XIAAIDRouteTable::set_enabled(int e)
 {
@@ -79,6 +78,7 @@ XIAAIDRouteTable::add_handlers()
 	add_write_handler("xcache", write_handler, (void *)XCACHE_SID);
 }
 
+/*
 String
 XIAAIDRouteTable::read_handler(Element *e, void *thunk)
 {
@@ -158,17 +158,14 @@ XIAAIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 		+ table->addr_str(xrd->nexthop) + "," + String(xrd->flags) + "\n";
 
 	// get the rest
-	auto it = table->_rts.begin();
-	while (it != table->_rts.end()) {
-		String xid = it.key().unparse();
-
-		xrd = (XIAAIDRouteData *)it.value();
+	for(const auto& it : table->_rts) {
+		String xid = it.first.unparse();
+		xrd = it.second;
 
 		tbl += xid + ",";
 		tbl += String(xrd->port) + ",";
 		tbl += table->addr_str(xrd->nexthop) + ",";
 		tbl += String(xrd->flags) + "\n";
-		it++;
 	}
 	return tbl;
 }
