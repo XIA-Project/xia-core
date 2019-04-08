@@ -196,7 +196,6 @@ class Socket : public Element { public:
 protected:
   Task _task;
 
-private:
   int _fd;	// socket descriptor
   int _active;	// connection descriptor
 
