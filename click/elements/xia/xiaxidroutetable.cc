@@ -107,7 +107,8 @@ XIAXIDRouteTable::add_entry_to_tbl_str(String& tbl, String xid,
 	if(xrd->nexthop != NULL) {
 		tbl += xrd->nexthop->unparse() + ",";
 	} else if(xrd->nexthop_in != nullptr) {
-		tbl += String(inet_ntoa(xrd->nexthop_in->sin_addr)) + ",";
+		tbl += String(inet_ntoa(xrd->nexthop_in->sin_addr)) + ":";
+		tbl += String(ntohs(xrd->nexthop_in->sin_port)) + ",";
 	} else {
 		tbl += String("") + ",";
 	}
@@ -187,6 +188,10 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 
 	if (args.size() >= 3 && args[2].length() > 0) {
 	    String nxthop = args[2];
+		// If nexthop is less than 40 chars, it is an IP:port
+		if(nxthop.length() < CLICK_XIA_XID_ID_LEN*2) {
+			return set_udpnext(conf, e, thunk, errh);
+		}
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -235,7 +240,7 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 	unsigned flags = XIA_UDP_NEXTHOP;
 	String xid_str;
 	cp_argvec(conf, args);
-	if(args.size() != 3) {
+	if(args.size() < 3) {
 		// We need xid, port, nexthop_in entries
 		return errh->error("Invalid route(need 3 entries): ", conf.c_str());
 	}
@@ -279,6 +284,9 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 		// Save this address as default route if XID was '-'
 		table->_rtdata.port = port;
 		table->_rtdata.flags = flags;
+		if(table->_rtdata.nexthop) {
+			delete table->_rtdata.nexthop;
+		}
 		table->_rtdata.nexthop = NULL;
 		table->_rtdata.nexthop_in = std::move(addr);
 	} else {
