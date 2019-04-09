@@ -96,7 +96,7 @@ XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
 }
 
 void
-XIAXIDRouteTable::add_entry_to_tbl_str(String& tbl, String& xid,
+XIAXIDRouteTable::add_entry_to_tbl_str(String& tbl, String xid,
 		XIARouteData* xrd)
 {
 	// XID
@@ -123,10 +123,10 @@ XIAXIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 
 	// get the default route
 	String tbl;
-	add_entry_to_tbl_str(tbl, '-', xrd);
+	add_entry_to_tbl_str(tbl, "-", xrd);
 
 	// get the rest
-	for(auto& it : table) {
+	for(auto& it : table->_rts) {
 		String xid = it.first.unparse();
 		xrd = it.second;
 		add_entry_to_tbl_str(tbl, xid, xrd);

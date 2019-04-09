@@ -80,7 +80,7 @@ protected:
 	static String read_handler(Element *e, void *thunk);
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
 
-	void add_entry_to_tbl_str(String& tbl, String& xid, XIARouteData* xrd);
+	static void add_entry_to_tbl_str(String& tbl, String xid, XIARouteData* xrd);
     static String list_routes_handler(Element *e, void *thunk);
 
 	HashTable<XID, XIARouteData*> _rts;
