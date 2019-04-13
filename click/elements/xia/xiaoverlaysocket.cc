@@ -19,15 +19,16 @@ XIAOverlaySocket::write_packet(Packet *p)
 {
     int len;
 
-    printf("XIAOverlaySocket::write_packet got an overlay packet\n");
+    //printf("XIAOverlaySocket::write_packet got an overlay packet\n");
 
     assert(_active >= 0);
 
     while (p->length()) {
         _remote.in.sin_addr = p->dst_ip_anno();
         _remote.in.sin_port = DST_PORT_ANNO(p);
+		// DISCARD packet, if the necessary annotations are not found
 		if(_remote.in.sin_addr == 0) {
-			printf("XIAOverlaySocket::write_packet no addr for pkt\n");
+			//printf("XIAOverlaySocket::write_packet no addr for pkt\n");
 			break;
 		}
         printf("XIAOverlaySocket: sending a packet to: %s:%d\n",

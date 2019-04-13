@@ -207,7 +207,10 @@ elementclass XIALineCard {
 	xrespFilter[1] -> Discard;
 
 	// On receiving a packet from the host
-	input[1] -> xarpq;
+	// If overlay packet, skip XARP for it
+	input[1] -> overlayFilter::XIAOverlayFilter -> toNet;
+	// Otherwise, regular XIA packet may need to XARP
+	overlayFilter[1] -> xarpq;
 
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
