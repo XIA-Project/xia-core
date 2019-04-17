@@ -9,26 +9,133 @@
 #include "xiaoverlaysocket.hh"
 
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 CLICK_DECLS
+
+void
+XIAOverlaySocket::selected(int fd, int)
+{
+  int len;
+  union { struct sockaddr_in in; struct sockaddr_un un; } from;
+  socklen_t from_len = sizeof(from);
+  bool allow;
+
+  if (noutputs()) {
+    // accept new connections
+    if (_socktype == SOCK_STREAM && !_client && _active < 0 && fd == _fd) {
+      _active = accept(_fd, (struct sockaddr *)&from, &from_len);
+
+      if (_active < 0) {
+	if (errno != EAGAIN)
+	  click_chatter("%s: accept: %s", declaration().c_str(), strerror(errno));
+	return;
+      }
+
+      if (_family == AF_INET) {
+	allow = allowed(IPAddress(from.in.sin_addr));
+
+	if (_verbose)
+	  click_chatter("%s: %s connection %d from %s:%d", declaration().c_str(),
+			allow ? "opened" : "denied",
+			_active, IPAddress(from.in.sin_addr).unparse().c_str(), ntohs(from.in.sin_port));
+
+	if (!allow) {
+	  close(_active);
+	  _active = -1;
+	  return;
+	}
+      } else {
+	if (_verbose)
+	  click_chatter("%s: opened connection %d from %s", declaration().c_str(), _active, from.un.sun_path);
+      }
+
+      fcntl(_active, F_SETFL, O_NONBLOCK);
+      fcntl(_active, F_SETFD, FD_CLOEXEC);
+
+      add_select(_active, SELECT_READ | SELECT_WRITE);
+    }
+
+    // read data from socket
+    if (!_rq)
+      _rq = Packet::make(_headroom, 0, _snaplen, 0);
+    if (_rq) {
+      if (_socktype == SOCK_STREAM)
+	len = read(_active, _rq->data(), _rq->length());
+      else if (_client)
+	len = recv(_active, _rq->data(), _rq->length(), MSG_TRUNC);
+      else {
+	// datagram server, find out who we are talking to
+	len = recvfrom(_active, _rq->data(), _rq->length(), MSG_TRUNC, (struct sockaddr *)&from, &from_len);
+	printf("XIAOverlaySocket::selected rcvd pkt of len %d\n", len);
+	printf("from: %s:%d\n", IPAddress(from.in.sin_addr).unparse().c_str(), ntohs(from.in.sin_port));
+
+	if (_family == AF_INET && !allowed(IPAddress(from.in.sin_addr))) {
+	  if (_verbose)
+	    click_chatter("%s: dropped datagram from %s:%d", declaration().c_str(),
+			  IPAddress(from.in.sin_addr).unparse().c_str(), ntohs(from.in.sin_port));
+	  len = -1;
+	  errno = EAGAIN;
+	} else if (len > 0) {
+	  memcpy(&_remote, &from, from_len);
+	  _remote_len = from_len;
+      _rq->set_src_ip_anno(_remote.in.sin_addr);
+	  SET_SRC_PORT_ANNO(_rq, _remote.in.sin_port);
+	  printf("XIAOverlaySocket::pkt src: %s\n",
+			  IPAddress(_rq->src_ip_anno()).unparse().c_str());
+	  printf("XIAOverlaySocket::pkt port: %d\n",
+			  ntohs(SRC_PORT_ANNO(_rq)));
+	}
+      }
+
+      // this segment OK
+      if (len > 0) {
+	if (len > _snaplen) {
+	  // truncate packet to max length (should never happen)
+	  assert(_rq->length() == (uint32_t)_snaplen);
+	  SET_EXTRA_LENGTH_ANNO(_rq, len - _snaplen);
+	} else {
+	  // trim packet to actual length
+	  _rq->take(_snaplen - len);
+	}
+
+	// set timestamp
+	if (_timestamp)
+	  _rq->timestamp_anno().assign_now();
+
+	// push packet
+	printf("XIAOverlaySocket::selected pushing packet to XIA router\n");
+	output(0).push(_rq);
+	_rq = 0;
+      }
+
+      // connection terminated or fatal error
+      else if (len == 0 || errno != EAGAIN) {
+	if (errno != EAGAIN && _verbose)
+	  click_chatter("%s: %s", declaration().c_str(), strerror(errno));
+	close_active();
+	return;
+      }
+    }
+  }
+
+  if (ninputs() && input_is_pull(0))
+    run_task(0);
+}
 
 int
 XIAOverlaySocket::write_packet(Packet *p)
 {
     int len;
 
-    //printf("XIAOverlaySocket::write_packet got an overlay packet\n");
 
     assert(_active >= 0);
 
     while (p->length()) {
         _remote.in.sin_addr = p->dst_ip_anno();
         _remote.in.sin_port = DST_PORT_ANNO(p);
-		// DISCARD packet, if the necessary annotations are not found
 		if(_remote.in.sin_addr == 0) {
-			//printf("XIAOverlaySocket::write_packet no addr for pkt\n");
 			break;
 		}
         printf("XIAOverlaySocket: sending a packet to: %s:%d\n",
@@ -63,6 +170,36 @@ XIAOverlaySocket::write_packet(Packet *p)
     }
     p->kill();
     return 0;
+}
+
+void
+XIAOverlaySocket::push(int, Packet *p)
+{
+  fd_set fds;
+  int err;
+
+  if (_active >= 0) {
+    // block
+    do {
+      FD_ZERO(&fds);
+      FD_SET(_active, &fds);
+      err = select(_active + 1, NULL, &fds, NULL, NULL);
+    } while (err < 0 && errno == EINTR);
+
+    if (err >= 0) {
+      // write
+      do {
+	err = write_packet(p);
+      } while (err < 0 && (errno == ENOBUFS || errno == EAGAIN));
+    }
+
+    if (err < 0) {
+      if (_verbose)
+	click_chatter("%s: %s, dropping packet", declaration().c_str(), strerror(err));
+      p->kill();
+    }
+  } else
+    p->kill();
 }
 
 bool

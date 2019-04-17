@@ -215,7 +215,8 @@ elementclass XIALineCard {
 	// On receiving a packet from interface
 	// also, save the source port so we can use it in xtransport
 	// XIA_FROMNET_ANNO is 1 on packets that arrived from network
-	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> XIAPaint(ANNO $XIA_FROMNET_ANNO, COLOR 1) -> c;
+	input[0] -> XIAPaint(ANNO $SRC_PORT_ANNO, COLOR $num) -> XIAPaint(ANNO $XIA_FROMNET_ANNO, COLOR 1) -> [1]overlayFilter[3] -> c;
+    overlayFilter[2] -> CheckXIAHeader -> MarkXIAHeader -> [0]xchal;
 
 	// Received a network joining packet
 	c[3] -> xnetj :: XNetJ($mac) -> toNet;

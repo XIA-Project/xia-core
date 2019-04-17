@@ -23,7 +23,7 @@ class XIAOverlayFilter : public Element { public:
     ~XIAOverlayFilter();
 
     const char *class_name() const		{ return "XIAOverlayFilter"; }
-    const char *port_count() const		{ return "1/-"; }
+    const char *port_count() const		{ return "2/4"; }
     const char *processing() const		{ return PUSH; }
 
     //int configure(Vector<String> &conf, ErrorHandler *errh);
