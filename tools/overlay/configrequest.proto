@@ -1,0 +1,34 @@
+syntax = "proto2";
+
+package configrequest;
+
+message Request {
+	enum RequestType {
+		IFACE_INFO = 0;
+		ROUTER_CONF = 1;
+		IP_ROUTES = 2;
+	}
+		
+	message InterfaceInfo {
+		required string name = 1;
+		optional string ipaddr = 2;
+		optional string macaddr = 3;
+	}
+
+	message GetInterfaceInfo {
+		repeated InterfaceInfo interfaces = 1;
+	}
+
+	message DeployRouterConf {
+		required string configfile = 1;
+	}
+
+	message SetIPRoutes {
+		repeated string routes = 1;
+	}
+
+	required RequestType type = 1;
+	optional GetInterfaceInfo ifrequest = 2;
+	optional DeployRouterConf routerconf = 3;
+	optional SetIPRoutes routes = 4;
+}
