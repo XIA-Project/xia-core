@@ -14,6 +14,7 @@ import sys
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, ClientFactory
 from twisted.protocols.basic import Int32StringReceiver
+from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 
 # Bring in xia and overlay tools into path
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
@@ -26,56 +27,18 @@ import xiaconfigdefs
 import configrequest_pb2
 
 from xiaconfigreader import XIAConfigReader
-
-HELPER_PORT = 9854
-
-class RouterClick:
-    def __init__(self, name):
-        self.name = name
-        self.interfaces = []
-
-    def add_interface(self, iface_name, ipaddr, macaddr):
-        self.interfaces.append((iface_name, ipaddr, macaddr))
-
-    def to_string(self):
-        rstr = """
-require(library ../../click/conf/xia_router_lib.click);
-require(library xia_address.click);
-
-log::XLog(VERBOSE 0, LEVEL 6);
-
-// router instantiation
-"""
-        rstr += "{} :: XIARouter4Port(1500, {}, 0.0.0.0".format(
-                self.name, self.name)
-        num_interfaces = len(self.interfaces)
-        for index in range(4):
-            if (index < num_interfaces):
-                (iface_name, ipaddr, macaddr) =  self.interfaces[index]
-                rstr += ", {}".format(macaddr)
-            else:
-                rstr += ", 00:00:00:00:00:00"
-        rstr += ");\n"
-
-        for index in range(4):
-            if (index < num_interfaces):
-                (iface_name, ipaddr, macaddr) = self.interfaces[index]
-                rstr += '\nosock{}::XIAOverlaySocket("UDP", {}, {}, SNAPLEN 65536) -> [{}]{}[{}] -> osock{};\n'.format(index, ipaddr, 8770+index, index, self.name, index, index)
-            else:
-                rstr += '\nIdle -> [{}]{}[{}] -> Discard;\n'.format(
-                        index, self.name, index)
-
-        (iface_name, ipaddr, macaddr) = self.interfaces[0]
-        rstr += '\nSocket("UDP", {}, 8769, SNAPLEN 65536) -> [4]{}\n'.format(
-                ipaddr, self.name)
-        rstr += '\nControlSocket(tcp, 7777);\n'
-        return rstr
+from routerclick import RouterClick
 
 class ConfigClient(Int32StringReceiver):
-    def __init__(self, router, addr):
+    def __init__(self, router, configurator):
         self.router = router
-        self.server_addr = addr
+        self.configurator = configurator
         self.initialized = False
+
+    def connectionLost(self, reason):
+        self.configurator.protocol_instances.remove(self)
+        if len(self.configurator.protocol_instances) == 0:
+            reactor.stop()
 
     def stringReceived(self, data):
         if not self.initialized:
@@ -88,6 +51,7 @@ class ConfigClient(Int32StringReceiver):
                 self.sendString(serialized_request)
             else:
                 print "ERROR: invalid greeting from server"
+                self.transport.loseConnection()
         else:
             # Got a response from server for one of our requests
             response = configrequest_pb2.Request()
@@ -98,12 +62,13 @@ class ConfigClient(Int32StringReceiver):
                 self.handleRouterConfResponse(response)
             else:
                 print "ERROR: invalid response from server"
+                self.transport.loseConnection()
 
     def handleInterfaceInfoResponse(self, response):
         print "Got interface info for:", self.router
-        print "which is at address:", self.server_addr
         if response.type != configrequest_pb2.Request.IFACE_INFO:
             print "ERROR: Invalid response to iface_info request"
+            self.transport.loseConnection()
             return
 
         print "Router:", self.router
@@ -118,8 +83,11 @@ class ConfigClient(Int32StringReceiver):
     def handleRouterConfResponse(self, response):
         if response.type != configrequest_pb2.Request.ROUTER_CONF:
             print "ERROR: Invalid router config response"
+            self.transport.loseConnection()
             return
         print "Got valid response to router config request"
+        # End the connection because the interaction is complete
+        self.transport.loseConnection()
 
 
 class ConfigClientFactory(ClientFactory):
@@ -136,19 +104,25 @@ class ConfigClientFactory(ClientFactory):
 class XIAConfigurator:
     def __init__(self, config):
         self.config = config
+        self.protocol_instances = []
         print 'Here are the routers we know of'
         for router in self.config.routers():
             print router
             print 'control_addr:', self.config.control_addr(router)
             print 'host_iface:', self.config.host_iface(router)
 
+    def gotProtocol(self, protocol):
+        self.protocol_instances.append(protocol)
+
     def configure(self):
         for router in self.config.routers():
-            if router != 'r1':
-                continue
-            reactor.connectTCP(self.config.control_addr(router),
-                    xiaconfigdefs.HELPER_PORT,
-                    ConfigClientFactory(router))
+            # Endpoint for client connection
+            endpoint = TCP4ClientEndpoint(reactor,
+                    self.config.control_addr(router),
+                    xiaconfigdefs.HELPER_PORT)
+            # Link ConfigClient protocol instance to endpoint
+            d = connectProtocol(endpoint, ConfigClient(router, self))
+            d.addCallback(self.gotProtocol)
         reactor.run()
 
 if __name__ == "__main__":
