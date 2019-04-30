@@ -5,6 +5,7 @@ class XIAConfigReader:
         self.control_addrs = {}
         self.host_ifaces = {}
         self.peer_info = {}
+        self.nameserver = ""
 
         # Read in the config file
         parser = RawConfigParser()
@@ -23,6 +24,16 @@ class XIAConfigReader:
 
             # AID host interface for each router
             self.host_ifaces[router] = parser.get(router, 'HostInterface')
+
+            # Check if this is a nameserver
+            try:
+                if parser.getboolean(router, "NameServer"):
+                    if len(self.nameserver) != 0:
+                        print "ERROR: Only one NameServer allowed in config"
+                        return
+                    self.nameserver = router
+            except:
+                pass
 
             # Peer info for each router
             self.peer_info[router] = []
@@ -46,3 +57,14 @@ class XIAConfigReader:
 
     def peer_list(self, router):
         return self.peer_info[router]
+
+    def is_nameserver(self, router):
+        if router == self.nameserver:
+            return True
+        return False
+
+if __name__ == "__main__":
+    config = XIAConfigReader("demo.conf")
+    for router in config.routers():
+        print "{}, {}, nameserver:{}".format(router,
+            config.control_addr(router), config.is_nameserver(router))
