@@ -1,0 +1,4 @@
+Install the following packages for the overlay scripts
+
+python-netifaces
+python-twisted
