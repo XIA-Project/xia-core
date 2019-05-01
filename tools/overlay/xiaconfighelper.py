@@ -102,6 +102,14 @@ class Helper(Int32StringReceiver):
             request.startxia.resolvconf = resolvconf.read()
         self.sendString(request.SerializeToString())
 
+    def handleGatherXIDsRequest(self, request):
+        xdag_cmd = os.path.join(xiapyutils.get_srcdir(), 'bin/xdag')
+        xdag_out = subprocess.check_output(xdag_cmd, shell=True)
+        router, re, ad, hid = xdag_out.split()
+        request.gatherxids.ad = ad
+        request.gatherxids.hid = hid
+        self.sendString(request.SerializeToString())
+
     def handleConfigRequest(self, request):
         if request.type == configrequest_pb2.Request.IFACE_INFO:
             self.handleInterfaceRequest(request)
@@ -111,6 +119,8 @@ class Helper(Int32StringReceiver):
             self.handleRoutesRequest(request)
         elif request.type == configrequest_pb2.Request.START_XIA:
             self.handleStartXIARequest(request)
+        elif request.type == configrequest_pb2.Request.GATHER_XIDS:
+            self.handleGatherXIDsRequest(request)
         else:
             print "ERROR: Unknown config request"
 

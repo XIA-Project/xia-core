@@ -130,6 +130,20 @@ class ConfigClient(Int32StringReceiver):
             # Save off resolv.conf for other connections to send
             self.configurator.resolvconf = response.startxia.resolvconf
 
+        # Now, ask the router to provide its AD, HID
+        request = configrequest_pb2.Request()
+        request.type = configrequest_pb2.Request.GATHER_XIDS
+        self.sendString(request.SerializeToString())
+
+    def handleGatherXIDsResponse(self, response):
+        if response.type != configrequest_pb2.Request.GATHER_XIDS:
+            print "ERROR: Invalid gather XIDs response"
+            self.transport.loseConnection()
+            return
+        (ad, hid) = response.gatherxids.ad, response.gatherxids.hid
+        print self.router, ad, hid
+        self.configurator.xids[router] = (ad, hid)
+
         # End the connection because the interaction is complete
         self.transport.loseConnection()
 
@@ -140,6 +154,7 @@ class XIAConfigurator:
         self.protocol_instances = []
         self.nameserver = self.config.nameserver
         self.resolvconf = ""
+        self.xids = {} # router: (ad, hid)
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
         for router in self.config.routers():
