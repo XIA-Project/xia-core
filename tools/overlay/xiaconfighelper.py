@@ -1,5 +1,7 @@
+# Python standard libraries
 import os
 import sys
+import subprocess
 
 # Install python-twisted package for this functionality
 from twisted.internet.protocol import Protocol, Factory
@@ -11,8 +13,10 @@ srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
 sys.path.append(os.path.join(srcdir, 'bin'))
 sys.path.append(os.path.join(srcdir, 'tools/overlay'))
 
+# XIA libraries
 import xiapyutils
 
+# XIA Overlay configuration libraries and definitions
 import configrequest_pb2
 import xiaconfigdefs
 from xiaconfigdefs import ROUTER_CLICK
@@ -57,6 +61,46 @@ class Helper(Int32StringReceiver):
 
     def handleRoutesRequest(self, request):
         print "Got IP routes to configure"
+        return
+
+    # If the request came without a resolv.conf, this router is a nameserver
+    # and a new resolv.conf file will be sent back in response
+    #
+    # Otherwise, this is a regular router that will be started with the
+    # given resolv.conf file. Response will not have a resolv.conf
+    def handleStartXIARequest(self, request):
+        resolvconfreceived = False
+        # If a resolv.conf was sent, write it to storage for router to use
+        if len(request.startxia.resolvconf) > 0:
+            resolvconffile = os.path.join(xiapyutils.xia_srcdir(),
+                    'etc/resolv.conf')
+            print 'Writing:', resolvconffile
+            with open(resolvconffile, 'w') as resolvconf:
+                resolvconf.write(request.startxia.resolvconf)
+                resolvconfreceived = True
+
+        print "Got request to restart XIA:", request.startxia.command
+        stopcmd = request.startxia.command.replace("restart", "stop")
+        startcmd = request.startxia.command.replace("restart", "start")
+
+        print "Stopping XIA:", stopcmd
+        subprocess.check_call(stopcmd, shell=True)
+
+        print "Starting XIA:", startcmd
+        subprocess.check_call(startcmd, shell=True)
+
+        # We're done starting a non-nameserver router
+        if resolvconfreceived:
+            response = configrequest_pb2.Request()
+            response.type = configrequest_pb2.Request.START_XIA
+            self.SendString(response.SerializeToString())
+            return
+
+        # Send resolv.conf from the nameserver back for other routers to use
+        conffile = os.path.join(xiapyutils.xia_srcdir(), 'etc/resolv.conf')
+        with open(conffile, 'r') as resolvconf:
+            request.startxia.resolvconf = resolvconf.read()
+        self.sendString(request.SerializeToString())
 
     def handleConfigRequest(self, request):
         if request.type == configrequest_pb2.Request.IFACE_INFO:
@@ -65,6 +109,8 @@ class Helper(Int32StringReceiver):
             self.handleRouterConfRequest(request)
         elif request.type == configrequest_pb2.Request.IP_ROUTES:
             self.handleRoutesRequest(request)
+        elif request.type == configrequest_pb2.Request.START_XIA:
+            self.handleStartXIARequest(request)
         else:
             print "ERROR: Unknown config request"
 

@@ -7,6 +7,7 @@ message Request {
 		IFACE_INFO = 0;
 		ROUTER_CONF = 1;
 		IP_ROUTES = 2;
+		START_XIA = 3;
 	}
 		
 	message InterfaceInfo {
@@ -27,8 +28,14 @@ message Request {
 		repeated string routes = 1;
 	}
 
+	message StartXIA {
+		required string command = 1;
+		optional string resolvconf = 2;
+	}
+
 	required RequestType type = 1;
 	optional GetInterfaceInfo ifrequest = 2;
 	optional DeployRouterConf routerconf = 3;
 	optional SetIPRoutes routes = 4;
+	optional StartXIA startxia = 5;
 }
