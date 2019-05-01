@@ -103,7 +103,7 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleGatherXIDsRequest(self, request):
-        xdag_cmd = os.path.join(xiapyutils.get_srcdir(), 'bin/xdag')
+        xdag_cmd = os.path.join(xiapyutils.xia_srcdir(), 'bin/xdag')
         xdag_out = subprocess.check_output(xdag_cmd, shell=True)
         router, re, ad, hid = xdag_out.split()
         request.gatherxids.ad = ad
