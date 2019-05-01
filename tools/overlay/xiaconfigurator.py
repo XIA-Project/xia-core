@@ -62,6 +62,8 @@ class ConfigClient(Int32StringReceiver):
                 self.handleRouterConfResponse(response)
             elif response.type == configrequest_pb2.Request.START_XIA:
                 self.handleStartXIAResponse(response)
+            elif response.type == configrequest_pb2.Request.GATHER_XIDS:
+                self.handleGatherXIDsResponse(response)
             else:
                 print "ERROR: invalid response from server"
                 self.transport.loseConnection()
@@ -142,7 +144,7 @@ class ConfigClient(Int32StringReceiver):
             return
         (ad, hid) = response.gatherxids.ad, response.gatherxids.hid
         print self.router, ad, hid
-        self.configurator.xids[router] = (ad, hid)
+        self.configurator.xids[self.router] = (ad, hid)
 
         # End the connection because the interaction is complete
         self.transport.loseConnection()
