@@ -93,7 +93,7 @@ class Helper(Int32StringReceiver):
         if resolvconfreceived:
             response = configrequest_pb2.Request()
             response.type = configrequest_pb2.Request.START_XIA
-            self.SendString(response.SerializeToString())
+            self.sendString(response.SerializeToString())
             return
 
         # Send resolv.conf from the nameserver back for other routers to use
