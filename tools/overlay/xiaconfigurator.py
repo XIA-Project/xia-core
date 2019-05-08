@@ -77,9 +77,12 @@ class ConfigClient(Int32StringReceiver):
             return
 
         # Build a router.click for the router
+        # and save IP addr in configurator.iface_addrs
         r_click = RouterClick(self.router)
         for iface in response.ifrequest.interfaces:
-            r_click.add_interface(iface.name, iface.ipaddr, iface.macaddr)
+            ifname, ipaddr, macaddr = iface.name, iface.ipaddr, iface.macaddr
+            r_click.add_interface(ifname, ipaddr, macaddr)
+            self.configurator.iface_addrs[(self.router, ifname)] = ipaddr
 
         # Send it over to be deployed on the router
         request = configrequest_pb2.Request()
@@ -137,6 +140,43 @@ class ConfigClient(Int32StringReceiver):
         request.type = configrequest_pb2.Request.GATHER_XIDS
         self.sendString(request.SerializeToString())
 
+    def sendIPRoutesRequest(self):
+        request = configrequest_pb2.Request()
+        request.type = configrequest_pb2.Request.IP_ROUTES
+
+        # Routes to set up from this router to others
+        routes = self.configurator.config.route_info[self.router]
+        for route in routes:
+            dest, our_iface, their_iface, their_name = route
+            # Convert dest router name to corresponding AD
+            dest_ad, dest_hid = self.configurator.xids[dest]
+            # Convert our_iface to corresponding outgoing port number
+            port = 0
+            # Their IP addr (from configurator.iface_addrs
+            ipaddr = self.configurator.iface_addrs[their_name, their_iface]
+            their_port = 8770 # Should be fixed or get from iface
+            # Add a new route request
+            #route = request.routes.route_cmds.add()
+            route = "./bin/xroute -a AD,{},{},{}:{}".format(
+                    dest_ad, port, ipaddr, their_port)
+            request.routes.route_cmds.append(route)
+        self.sendString(request.SerializeToString())
+        # Find its AD (from configurator.xids)
+        # Find outgoing iface number (from config.route_info)
+        # Find destination router and port (from config.route_info)
+        # Convert to IPaddr:port (from configurator.iface_addrs)
+
+        # End the connection because the interaction is complete
+        self.transport.loseConnection()
+
+    def waitForXIDCollection(self):
+        num_connections = len(self.configurator.protocol_instances)
+        if len(self.configurator.xids) < num_connections:
+            reactor.callLater(0.1, self.waitForXIDCollection)
+        else:
+            # Send route configurations
+            self.sendIPRoutesRequest()
+
     def handleGatherXIDsResponse(self, response):
         if response.type != configrequest_pb2.Request.GATHER_XIDS:
             print "ERROR: Invalid gather XIDs response"
@@ -146,8 +186,9 @@ class ConfigClient(Int32StringReceiver):
         print self.router, ad, hid
         self.configurator.xids[self.router] = (ad, hid)
 
-        # End the connection because the interaction is complete
-        self.transport.loseConnection()
+        num_connections = len(self.configurator.protocol_instances)
+        if len(self.configurator.xids) < num_connections:
+            self.waitForXIDCollection()
 
 
 class XIAConfigurator:
@@ -157,6 +198,7 @@ class XIAConfigurator:
         self.nameserver = self.config.nameserver
         self.resolvconf = ""
         self.xids = {} # router: (ad, hid)
+        self.iface_addrs = {} # (router, iface_name) : ipaddr
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
         for router in self.config.routers():

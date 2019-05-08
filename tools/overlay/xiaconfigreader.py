@@ -4,7 +4,7 @@ class XIAConfigReader:
     def __init__(self, config_filename):
         self.control_addrs = {}
         self.host_ifaces = {}
-        self.peer_info = {}
+        self.route_info = {}
         self.nameserver = ""
 
         # Read in the config file
@@ -35,16 +35,21 @@ class XIAConfigReader:
             except:
                 pass
 
-            # Peer info for each router
-            self.peer_info[router] = []
+            # Routes to other routers
+            self.route_info[router] = []
             for name, val in parser.items(router):
-                if not name.startswith('peer_'):
+                if not name.startswith('route_'):
                     continue
-                peername, iface = val.split(':')
-                self.peer_info[router].append((peername, iface))
+                dest = name.split('_')[1]
+                strippedval = val.replace(' ','')
+                our_iface, them = strippedval.split('->')
+                their_iface, their_name = them.split(':')
+                #routename, iface = val.split(':')
+                self.route_info[router].append(
+                        (dest, our_iface, their_iface, their_name))
         #print self.control_addrs
         #print self.host_ifaces
-        #print self.peer_info
+        #print self.route_info
 
     def routers(self):
         return self.control_addrs.keys()
@@ -55,8 +60,8 @@ class XIAConfigReader:
     def host_iface(self, router):
         return self.host_ifaces[router]
 
-    def peer_list(self, router):
-        return self.peer_info[router]
+    def route_list(self, router):
+        return self.route_info[router]
 
     def is_nameserver(self, router):
         if router == self.nameserver:
@@ -68,3 +73,4 @@ if __name__ == "__main__":
     for router in config.routers():
         print "{}, {}, nameserver:{}".format(router,
             config.control_addr(router), config.is_nameserver(router))
+        print config.route_info[router]

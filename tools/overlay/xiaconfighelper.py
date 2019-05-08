@@ -61,6 +61,8 @@ class Helper(Int32StringReceiver):
 
     def handleRoutesRequest(self, request):
         print "Got IP routes to configure"
+        for route_cmd in request.routes.route_cmds:
+            print route_cmd
         return
 
     # If the request came without a resolv.conf, this router is a nameserver
