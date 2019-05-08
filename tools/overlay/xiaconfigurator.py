@@ -12,6 +12,7 @@ import os
 import sys
 
 from twisted.internet import reactor
+from twisted.internet import defer
 from twisted.internet.protocol import Protocol, ClientFactory
 from twisted.protocols.basic import Int32StringReceiver
 from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
@@ -30,10 +31,11 @@ from xiaconfigreader import XIAConfigReader
 from routerclick import RouterClick
 
 class ConfigClient(Int32StringReceiver):
-    def __init__(self, router, configurator):
+    def __init__(self, router, configurator, xid_wait):
         self.router = router
         self.configurator = configurator
         self.initialized = False
+        self.xid_wait = xid_wait
 
     def connectionLost(self, reason):
         self.configurator.protocol_instances.remove(self)
@@ -147,35 +149,28 @@ class ConfigClient(Int32StringReceiver):
         # Routes to set up from this router to others
         routes = self.configurator.config.route_info[self.router]
         for route in routes:
-            dest, our_iface, their_iface, their_name = route
+
+            # Destination router, our interface, nexthop iface, nexthop name
+            dest, our_iface, next_iface, next_name = route
+
             # Convert dest router name to corresponding AD
             dest_ad, dest_hid = self.configurator.xids[dest]
+
             # Convert our_iface to corresponding outgoing port number
             port = 0
+
             # Their IP addr (from configurator.iface_addrs
-            ipaddr = self.configurator.iface_addrs[their_name, their_iface]
-            their_port = 8770 # Should be fixed or get from iface
+            ipaddr = self.configurator.iface_addrs[next_name, next_iface]
+            next_port = 8770 # Should be fixed or get from iface
+
             # Add a new route request
-            #route = request.routes.route_cmds.add()
             route = "./bin/xroute -a AD,{},{},{}:{}".format(
-                    dest_ad, port, ipaddr, their_port)
+                    dest_ad, port, ipaddr, next_port)
             request.routes.route_cmds.append(route)
         self.sendString(request.SerializeToString())
-        # Find its AD (from configurator.xids)
-        # Find outgoing iface number (from config.route_info)
-        # Find destination router and port (from config.route_info)
-        # Convert to IPaddr:port (from configurator.iface_addrs)
 
         # End the connection because the interaction is complete
         self.transport.loseConnection()
-
-    def waitForXIDCollection(self):
-        num_connections = len(self.configurator.protocol_instances)
-        if len(self.configurator.xids) < num_connections:
-            reactor.callLater(0.1, self.waitForXIDCollection)
-        else:
-            # Send route configurations
-            self.sendIPRoutesRequest()
 
     def handleGatherXIDsResponse(self, response):
         if response.type != configrequest_pb2.Request.GATHER_XIDS:
@@ -185,11 +180,7 @@ class ConfigClient(Int32StringReceiver):
         (ad, hid) = response.gatherxids.ad, response.gatherxids.hid
         print self.router, ad, hid
         self.configurator.xids[self.router] = (ad, hid)
-
-        num_connections = len(self.configurator.protocol_instances)
-        if len(self.configurator.xids) < num_connections:
-            self.waitForXIDCollection()
-
+        self.xid_wait.callback(self)
 
 class XIAConfigurator:
     def __init__(self, config):
@@ -199,6 +190,7 @@ class XIAConfigurator:
         self.resolvconf = ""
         self.xids = {} # router: (ad, hid)
         self.iface_addrs = {} # (router, iface_name) : ipaddr
+
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
         for router in self.config.routers():
@@ -206,18 +198,39 @@ class XIAConfigurator:
             print 'control_addr:', self.config.control_addr(router)
             print 'host_iface:', self.config.host_iface(router)
 
+    # All routers sent in their AD, HID. Send IP routes to all routers
+    def sendIPRoutes(self, result):
+        for (success, protocol) in result:
+            if success:
+                print "Sending IP routes to {}".format(protocol.router)
+                protocol.sendIPRoutesRequest()
+            else:
+                print "ERROR: failure sending IP routes for a protocol"
+
     def gotProtocol(self, protocol):
         self.protocol_instances.append(protocol)
 
     def configure(self):
+        xid_waiters = []
+
         for router in self.config.routers():
             # Endpoint for client connection
             endpoint = TCP4ClientEndpoint(reactor,
                     self.config.control_addr(router),
                     xiaconfigdefs.HELPER_PORT)
+
+            # Each connection will wait for all others to gather XIDs
+            xid_wait = defer.Deferred()
+            xid_waiters.append(xid_wait)
+
             # Link ConfigClient protocol instance to endpoint
-            d = connectProtocol(endpoint, ConfigClient(router, self))
+            d = connectProtocol(endpoint, ConfigClient(router, self, xid_wait))
             d.addCallback(self.gotProtocol)
+
+        # Callback called, when all routers have collected their XIDs
+        dl = defer.DeferredList(xid_waiters, consumeErrors=True)
+        dl.addCallback(self.sendIPRoutes)
+
         reactor.run()
 
 if __name__ == "__main__":
