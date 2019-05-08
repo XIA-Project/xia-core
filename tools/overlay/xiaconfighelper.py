@@ -63,6 +63,7 @@ class Helper(Int32StringReceiver):
         print "Got IP routes to configure"
         for route_cmd in request.routes.route_cmds:
             print route_cmd
+            subprocess.check_call(route_cmd, shell=True)
         return
 
     # If the request came without a resolv.conf, this router is a nameserver
