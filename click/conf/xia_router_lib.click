@@ -60,7 +60,6 @@ elementclass XIAPacketRoute {
 	$num_ports |
 
 	// input: a packet to process
-	// input[1]: QUIC XIA Registration Packet
 	// output[0]: forward (painted)
 	// output[1]: arrived at destination node
 	// output[2]: could not route at all (tried all paths)
@@ -121,24 +120,22 @@ elementclass XIAPacketRoute {
 	// rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO :: XIAXIDRouteTable($num_ports);
 	// c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FOO, [2]output;
 
-	rt_AD, rt_HID, rt_SID, rt_IP :: XIAXIDRouteTable();
+	rt_AD, rt_HID, rt_SID, rt_IP, rt_AID:: XIAXIDRouteTable();
 	rt_CID, rt_NCID :: XIACIDRouteTable();
 	rt_ICID :: XIAICIDRouteTable();
 	rt_FID :: FIDRouteEngine($num_ports);
-	rt_AID :: XIAAIDRouteTable();
 	c => rt_AD, rt_HID, rt_SID, rt_CID, rt_IP, rt_FID, rt_NCID, rt_ICID, rt_AID, [2]output;
-	input[1] -> [1]rt_AID; // QUIC XIA application registration request
 
 	// TO ADD A NEW USER DEFINED XID (step 3)
 	// add rt_XID_NAME before the arrow in the following 7 lines
 	// if the XID is used for routing like an AD or HID, add it to lines 1,2,4,5,7
 	// if the XID should be treated like a SID and will return data to the API, add it to lines 1,3,4,6,7
 
-	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_FID[0], rt_NCID[0], rt_ICID[0] -> GPRP;
+	rt_AD[0], rt_HID[0], rt_SID[0], rt_CID[0], rt_IP[0], rt_FID[0], rt_NCID[0], rt_ICID[0], rt_AID[0] -> GPRP;
 	rt_AD[1], rt_HID[1], 					   rt_IP[1], rt_FID[1]-> XIANextHop -> check_dest;
-						 rt_SID[1], rt_CID[1]					  , rt_NCID[1], rt_ICID[1] -> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
-	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_FID[2], rt_NCID[2], rt_ICID[2] -> consider_next_path;
-	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3], rt_FID[3], rt_NCID[3], rt_ICID[3] -> Discard;
+						 rt_SID[1], rt_CID[1]					  , rt_NCID[1], rt_ICID[1], rt_AID[1] -> XIANextHop -> XIAPaint($DESTINED_FOR_LOCALHOST) -> [1]output;
+	rt_AD[2], rt_HID[2], rt_SID[2], rt_CID[2], rt_IP[2], rt_FID[2], rt_NCID[2], rt_ICID[2], rt_AID[2] -> consider_next_path;
+	rt_AD[3], rt_HID[3],			rt_CID[3], rt_IP[3], rt_FID[3], rt_NCID[3], rt_ICID[3], rt_AID[3] -> Discard;
 						 rt_SID[3]								  -> [3]output;
 	//NITIN disable XCMP REDIRECT messages
 	//NITIN rt_AD[4], rt_HID[4], rt_SID[4], rt_CID[4], rt_IP[4] rt_FID[4]-> x; // xcmp redirect message
@@ -150,7 +147,6 @@ elementclass RouteEngine {
 
 	// input[0]: a packet arrived at the node from outside (i.e. routing with caching)
 	// input[1]: a packet to send from a node (i.e. routing without caching)
-	// input[2]: QUIC XIA Registration Request
 	// output[0]: forward (painted)
 	// output[1]: arrived at destination node; go to RPC
 	// output[2]: arrived at destination node; go to cache
@@ -159,7 +155,6 @@ elementclass RouteEngine {
 
 	input[0] -> proc;
 	input[1] -> proc;
-	input[2] -> [1]proc;
 
 	proc[0] -> [0]output;
 	proc[1] -> [1]output;  // To RPC / Application
@@ -315,7 +310,6 @@ elementclass XIARoutingCore {
 	$hostname, $external_ip, $click_port, $num_ports, $is_dual_stack |
 
 	// input[0]: packet to route
-	// input[1]: QUIC XIA application registration request
 	// output[0]: packet to be forwarded out a given port based on paint value
 
 	n :: RouteEngine($num_ports);
@@ -353,7 +347,6 @@ elementclass XIARoutingCore {
 
 	n[0] -> output;
 	input -> [0]n;
-	input[1] -> [2]n;  // QUIC XIA application registration request
 
 	// Send ICID packets to Xcache
 	xtransport[2] -> XcacheICIDSock;
@@ -411,17 +404,9 @@ elementclass XIARouter4Port {
 	xlc3 :: XIALineCard($mac3, 3, 0, 0);
 
 	cf :: CacheFilter;
-	//quicxia :: Strip(43); // Remove Ethernet, IP and UDP headers
-	quicxiaclassifier :: Classifier(0/C0DA, -);
 
-	//input => xlc0, xlc1, xlc2, xlc3, quicxia;
-	input => xlc0, xlc1, xlc2, xlc3, quicxiaclassifier;
+	input => xlc0, xlc1, xlc2, xlc3;
 	xlc0, xlc1, xlc2, xlc3 => output;
-	// Discarding registration packet for now
-	//quicxia -> quicxiaclassifier -> [1]xrc;
-	quicxiaclassifier[0] -> [1]xrc;
-	// Forward all other QUIC packet to the routing core
-	quicxiaclassifier[1] -> CheckXIAHeader -> MarkXIAHeader -> [0]xrc;
 
 	xrc -> cf -> XIAPaintSwitch[0,1,2,3] => [1]xlc0[1], [1]xlc1[1], [1]xlc2[1], [1]xlc3[1] -> [0]xrc;
 
