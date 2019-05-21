@@ -19,6 +19,10 @@ CLICK_DECLS
 #define DATA_PORT         0
 #define REGISTRATION_PORT 1
 
+
+#define CLICK_XIA_NXT_SECRET    0x05
+#define CLICK_XIA_NXT_QUIC      0x06
+
 XIAAIDRouteTable::XIAAIDRouteTable()//: _drops(0)
 {
 	_drops = 0;
@@ -542,7 +546,7 @@ XIAAIDRouteTable::ProcessAIDPacket(WritablePacket* p_in)
 	// Read the XIA Header
 	XIAHeader xiah(p_in->xia_header());
 	int next = xiah.nxt();
-	if (next != CLICK_XIA_NXT_DATA) {
+	if (next != CLICK_XIA_NXT_DATA && next != CLICK_XIA_NXT_QUIC && next != CLICK_XIA_NXT_SECRET) {
 		click_chatter("XIAAIDRouteTable: AID packet invalid");
 		return;
 	}
