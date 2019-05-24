@@ -6,6 +6,8 @@
 #include <click/xid.hh>
 #include <click/xiapath.hh>
 #include "xcmp.hh"
+
+#include <memory>
 CLICK_DECLS
 
 /* NOTE: This code is a copy of xiaxidroutetable.hh and should just be
@@ -65,12 +67,14 @@ protected:
 
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+	static int set_udpnext(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
 	static String read_handler(Element *e, void *thunk);
 	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
 
+	static void add_entry_to_tbl_str(String& tbl, String xid, XIARouteData* xrd);
     static String list_routes_handler(Element *e, void *thunk);
 
 private:

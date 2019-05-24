@@ -12,6 +12,9 @@
 #if CLICK_USERLEVEL
 #include <fstream>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #endif
 CLICK_DECLS
 
@@ -120,6 +123,27 @@ XIACIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Erro
 	return 0;
 }
 
+void
+XIACIDRouteTable::add_entry_to_tbl_str(String& tbl, String xid,
+		XIARouteData* xrd)
+{
+	// XID
+	tbl += xid + ",";
+	// port
+	tbl += String(xrd->port) + ",";
+	// nexthop
+	if(xrd->nexthop != NULL) {
+		tbl += xrd->nexthop->unparse() + ",";
+	} else if(xrd->nexthop_in != nullptr) {
+		tbl += String(inet_ntoa(xrd->nexthop_in->sin_addr)) + ":";
+		tbl += String(ntohs(xrd->nexthop_in->sin_port)) + ",";
+	} else {
+		tbl += String("") + ",";
+	}
+	// flags
+	tbl += String(xrd->flags) + "\n";
+}
+
 String
 XIACIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 {
@@ -127,22 +151,14 @@ XIACIDRouteTable::list_routes_handler(Element *e, void * /*thunk */)
 	XIARouteData *xrd = &table->_rtdata;
 
 	// get the default route
-	String tbl = "-," + String(xrd->port) + "," +
-		(xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + "," +
-		String(xrd->flags) + "\n";
+	String tbl;
+	add_entry_to_tbl_str(tbl, "-", xrd);
 
 	// get the rest
-	HashTable<XID, XIARouteData *>::iterator it = table->_rts.begin();
-	while (it != table->_rts.end()) {
-		String xid = it.key().unparse();
-
-		xrd = (XIARouteData *)it.value();
-
-		tbl += xid + ",";
-		tbl += String(xrd->port) + ",";
-		tbl += (xrd->nexthop != NULL ? xrd->nexthop->unparse() : "") + ",";
-		tbl += String(xrd->flags) + "\n";
-		it++;
+	for(auto& it : table->_rts) {
+		String xid = it.first.unparse();
+		xrd = it.second;
+		add_entry_to_tbl_str(tbl, xid, xrd);
 	}
 	return tbl;
 }
@@ -200,6 +216,10 @@ XIACIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 
 	if (args.size() >= 3 && args[2].length() > 0) {
 	    String nxthop = args[2];
+		// If nexthop is less than 40 chars, it is an IP:port
+		if(nxthop.length() < CLICK_XIA_XID_ID_LEN*2) {
+			return set_udpnext(conf, e, thunk, errh);
+		}
 		nexthop = new XID;
 		cp_xid(nxthop, nexthop, e);
 		//nexthop = new XID(args[2]);
@@ -231,9 +251,92 @@ XIACIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 		xrd->port = port;
 		xrd->flags = flags;
 		xrd->nexthop = nexthop;
+		xrd->nexthop_in = nullptr;
 		table->_rts[xid] = xrd;
 	}
 
+	return 0;
+}
+
+int
+XIACIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XIACIDRouteTable* table = static_cast<XIACIDRouteTable*>(e);
+	bool add_mode = !thunk;
+	Vector<String> args;
+	int port = 0;
+	unsigned flags = XIA_UDP_NEXTHOP;
+	String xid_str;
+	cp_argvec(conf, args);
+	if(args.size() < 3) {
+		// We need xid, port, nexthop_in entries
+		return errh->error("Invalid route(need 3 entries): ", conf.c_str());
+	}
+
+	// First argument is the XID
+	xid_str = args[0];
+
+	// Second argument is the interface that matching packet should go out on
+	if(!cp_integer(args[1], &port)) {
+		return errh->error("Invalid port: ", conf.c_str());
+	}
+
+	// Third argument should be IPaddr:port of next hop
+	if(args[2].length() == 0) {
+		return errh->error("Invalid ipaddr: ", conf.c_str());
+	}
+	String nxthop = args[2];
+	int separator_offset = nxthop.find_left(':', 0);
+	if(separator_offset == -1) {
+		return errh->error("Invalid nexthop(need ip:port): ", conf.c_str());
+	}
+	String ipaddrstr = nxthop.substring(0, separator_offset);
+	String portstr = nxthop.substring(separator_offset+1);
+	printf("XIACIDRouteTable: ip: %s, port: %s\n",
+			ipaddrstr.c_str(), portstr.c_str());
+	struct in_addr ipaddr;
+	if(inet_aton(ipaddrstr.c_str(), &ipaddr) == 0) {
+		return errh->error("Invalid ipaddr: ", ipaddrstr.c_str());
+	}
+	int ipport = atoi(portstr.c_str());
+	if(ipport < 0 || ipport > 65535) {
+		return errh->error("Invalid port: ", portstr.c_str());
+	}
+
+	// Convert address to a sockaddr_in and save into forwarding table
+	auto addr = std::make_unique<struct sockaddr_in>();
+	addr->sin_family = AF_INET;
+	addr->sin_port = htons(ipport);
+	addr->sin_addr.s_addr = ipaddr.s_addr;
+	if(xid_str == "-") {
+		// Save this address as default route if XID was '-'
+		table->_rtdata.port = port;
+		table->_rtdata.flags = flags;
+		if(table->_rtdata.nexthop) {
+			delete table->_rtdata.nexthop;
+		}
+		table->_rtdata.nexthop = NULL;
+		table->_rtdata.nexthop_in = std::move(addr);
+	} else {
+		// Otherwise, save it in forwarding table for given XID
+		XID xid;
+		if (!cp_xid(xid_str, &xid, e)) {
+			return errh->error("invalid XID: ", xid_str.c_str());
+		}
+		if (add_mode && table->_rts.find(xid) != table->_rts.end()) {
+			return errh->error("duplicate XID: ", xid_str.c_str());
+		}
+		// Now create a new sockaddr_in and fill it in
+		XIARouteData *xrd = new XIARouteData();
+		if(xrd == NULL) {
+			return errh->error("Memory allocation failed");
+		}
+		xrd->port = port;
+		xrd->flags = flags; // hardcoded to 4, representing ipv4 for now
+		xrd->nexthop = NULL; // Will fill nexthop_in with the address instead
+		xrd->nexthop_in = std::move(addr);
+		table->_rts[xid] = xrd;
+	}
 	return 0;
 }
 
@@ -255,6 +358,8 @@ XIACIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 			delete table->_rtdata.nexthop;
 			table->_rtdata.nexthop = NULL;
 		}
+		// Since nexthop_in is not going out of scope, it must be reset
+		table->_rtdata.nexthop_in.reset(nullptr);
 
 	} else {
 		XID xid;
@@ -559,9 +664,18 @@ XIACIDRouteTable::lookup_route(Packet *p)
 	{
 		XIARouteData *xrd = (*it).second;
 		// check if outgoing packet
-		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK && xrd->nexthop != NULL) {
-			p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
+		if(xrd->port != DESTINED_FOR_LOCALHOST && xrd->port != FALLBACK) {
+			// If nexthop is an XID, annotate the packet with it
+			if(xrd->nexthop != NULL) {
+				p->set_nexthop_neighbor_xid_anno(*(xrd->nexthop));
+			} else if(xrd->nexthop_in != nullptr) {
+				// If nexthop is an IP/port, annotate those instead
+				p->set_anno_u32(DST_IP_ANNO_OFFSET,
+						xrd->nexthop_in->sin_addr.s_addr);
+				SET_DST_PORT_ANNO(p, xrd->nexthop_in->sin_port);
+			}
 		}
+
 		return xrd->port;
 	}
 	else
