@@ -49,6 +49,10 @@ class ConfigClient(Int32StringReceiver):
                 self.initialized = True
                 request = configrequest_pb2.Request()
                 request.type = configrequest_pb2.Request.IFACE_INFO
+                config = self.configurator.config
+                for iface in config.router_ifaces[self.router]:
+                    if_info = request.ifrequest.interfaces.add()
+                    if_info.name = iface
                 serialized_request = request.SerializeToString()
                 self.sendString(serialized_request)
             else:

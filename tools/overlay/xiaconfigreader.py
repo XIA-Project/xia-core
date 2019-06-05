@@ -3,6 +3,7 @@ from ConfigParser import RawConfigParser
 class XIAConfigReader:
     def __init__(self, config_filename):
         self.control_addrs = {}
+        self.router_ifaces = {}
         self.host_ifaces = {}
         self.route_info = {}
         self.nameserver = ""
@@ -34,6 +35,10 @@ class XIAConfigReader:
                     self.nameserver = router
             except:
                 pass
+            # Interface names for each router (comma separated list)
+            interfaces = parser.get(router, 'Interfaces')
+            interfaces = interfaces.replace(' ', '')
+            self.router_ifaces[router] = interfaces.split(',')
 
             # Routes to other routers
             self.route_info[router] = []

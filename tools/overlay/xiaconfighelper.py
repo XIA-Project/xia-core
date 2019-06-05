@@ -39,11 +39,9 @@ class Helper(Int32StringReceiver):
         print "Got interface request"
 
         # Fill in interface information
-        for iface in interfaces.get_interfaces():
-            if_info = request.ifrequest.interfaces.add()
-            if_info.name = iface
-            if_info.ipaddr = interfaces.get_ip_addr(iface)
-            if_info.macaddr = interfaces.get_mac_addr(iface)
+        for if_info in request.ifrequest.interfaces:
+            if_info.ipaddr = interfaces.get_ip_addr(if_info.name)
+            if_info.macaddr = interfaces.get_mac_addr(if_info.name)
 
         # Send the if_request back to the requestor
         self.sendString(request.SerializeToString())
