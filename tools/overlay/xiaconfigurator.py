@@ -161,7 +161,8 @@ class ConfigClient(Int32StringReceiver):
             dest_ad, dest_hid = self.configurator.xids[dest]
 
             # Convert our_iface to corresponding outgoing port number
-            port = 0
+            our_ifaces = self.configurator.config.router_ifaces[self.router]
+            port = our_ifaces.index(our_iface)
 
             # Their IP addr (from configurator.iface_addrs
             ipaddr = self.configurator.iface_addrs[next_name, next_iface]

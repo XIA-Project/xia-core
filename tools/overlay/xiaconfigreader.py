@@ -2,10 +2,10 @@ from ConfigParser import RawConfigParser
 
 class XIAConfigReader:
     def __init__(self, config_filename):
-        self.control_addrs = {}
-        self.router_ifaces = {}
-        self.host_ifaces = {}
-        self.route_info = {}
+        self.control_addrs = {} # router: ctrl_addr
+        self.router_ifaces = {} # router: [iface1,...]
+        self.host_ifaces = {} # router: host_iface
+        self.route_info = {} # router: (dest,our_iface,their_iface,their_name)
         self.nameserver = ""
 
         # Read in the config file
