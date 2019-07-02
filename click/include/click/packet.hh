@@ -439,10 +439,10 @@ class Packet { public:
 	dst_ip_anno_offset = 0, dst_ip_anno_size = 4,
     dst_ip6_anno_offset = 0, dst_ip6_anno_size = 16,
 #if HAVE_XIA
-    src_ip_anno_offset = 52, src_ip_anno_size = 4,
+    src_ip_anno_offset = 48, src_ip_anno_size = 4,
 	nexthop_neighbor_xid_anno_offset = 64, nexthop_neighbor_xid_anno_size = 24
 #else
-	src_ip_anno_offset = 52, src_ip_anno_size = 4
+	src_ip_anno_offset = 48, src_ip_anno_size = 4
 #endif
     };
 
