@@ -80,7 +80,7 @@ XIAOverlaySocket::selected(int fd, int)
 	} else if (len > 0) {
 	  memcpy(&_remote, &from, from_len);
 	  _remote_len = from_len;
-      _rq->set_src_ip_anno(_remote.in.sin_addr);
+	  _rq->set_src_ip_anno(IPAddress(_remote.in.sin_addr));
 	  SET_SRC_PORT_ANNO(_rq, _remote.in.sin_port);
 	  printf("XIAOverlaySocket::pkt src: %s\n",
 			  IPAddress(_rq->src_ip_anno()).unparse().c_str());
@@ -133,13 +133,20 @@ XIAOverlaySocket::write_packet(Packet *p)
     assert(_active >= 0);
 
     while (p->length()) {
-        _remote.in.sin_addr = p->dst_ip_anno();
-        _remote.in.sin_port = DST_PORT_ANNO(p);
-		if(_remote.in.sin_addr == 0) {
+		struct sockaddr_in dest;
+		dest.sin_family = AF_INET;
+		dest.sin_port = DST_PORT_ANNO(p);
+		dest.sin_addr.s_addr = p->dst_ip_anno().addr();
+		if(dest.sin_addr.s_addr == 0) {
 			break;
 		}
-        printf("XIAOverlaySocket: sending a packet to: %s:%d\n",
-                inet_ntoa(_remote.in.sin_addr), ntohs(_remote.in.sin_port));
+		printf("XIAOverlaySocket: sending a packet to: %s:%d\n",
+				inet_ntoa(dest.sin_addr), ntohs(dest.sin_port));
+
+		const struct click_xia* hdr = p->xia_header();
+		if(p->data() != (uint8_t*) p->xia_header()) {
+			printf("XIAOverlaySocket: ERROR xia hdr != p->data\n");
+		}
 
         if (_socktype != SOCK_DGRAM) {
             click_chatter("XIAOverlaySocket: ERROR: not datagram socket");
@@ -147,7 +154,7 @@ XIAOverlaySocket::write_packet(Packet *p)
             return -1;
         }
         len = sendto(_active, p->data(), p->length(), 0,
-                (struct sockaddr *)&_remote, _remote_len);
+                (struct sockaddr *)&dest, sizeof(dest));
         // error
         if (len < 0) {
             // out of memory or would block
