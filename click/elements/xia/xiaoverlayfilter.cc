@@ -34,8 +34,9 @@ XIAOverlayFilter::configure(Vector<String> &conf, ErrorHandler *errh)
  *  output[3] = Incoming invalid overlay packet from network
  */
 void
-XIAOverlayFilter::push(int port, Packet *p)
+XIAOverlayFilter::push(int port, Packet *p_in)
 {
+	WritablePacket* p = p_in->uniqueify();
 	if(port == 0) {
 		// Does this packet come with an IP address and port annotated?
 		if(!(p->dst_ip_anno().empty()) && (DST_PORT_ANNO(p) != 0)) {
@@ -49,9 +50,9 @@ XIAOverlayFilter::push(int port, Packet *p)
 	} else if(port == 1) {
 		printf("XIAOverlayFilter: processing incoming pkt from network\n");
 		if(p->src_ip_anno().empty()) {
-			printf("XIAOverlayPacket: src IP annotation was empty\n");
+			printf("XIAOverlayFilter: src IP annotation was empty\n");
 		} else {
-			printf("XIAOverlayPacket: src IP annotation %s\n",
+			printf("XIAOverlayFilter: src IP annotation %s\n",
 					IPAddress(p->src_ip_anno()).unparse().c_str());
 		}
 		if( !(p->src_ip_anno().empty()) ) {
