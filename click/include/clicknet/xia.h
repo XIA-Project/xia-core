@@ -66,8 +66,8 @@ struct click_xia_xid_edge
 #define CLICK_XIA_XID_EDGE_UNUSED   127u
 
 struct click_xia_xid_node {
-    click_xia_xid xid;
-    click_xia_xid_edge edge[CLICK_XIA_XID_EDGE_NUM];
+    struct click_xia_xid xid;
+    struct click_xia_xid_edge edge[CLICK_XIA_XID_EDGE_NUM];
 };
 
 struct click_xia_common {
@@ -86,7 +86,7 @@ struct click_xia {
     //uint8_t dints;
     //uint8_t sints;
     int8_t last;			/* index of last visited node (note: integral) */
-    click_xia_xid_node node[0];         /* XID node list */
+    struct click_xia_xid_node node[0];         /* XID node list */
 };
 
 typedef struct click_xia_xid xid_t;
@@ -118,6 +118,9 @@ typedef struct {
 #define CLICK_XIA_NXT_XDGRAM	0x02
 #define CLICK_XIA_NXT_XSTREAM	0x03
 #define CLICK_XIA_NXT_FID       0x04
+#define CLICK_XIA_NXT_SECRET    0x05
+#define CLICK_XIA_NXT_QUIC      0x06
+
 
 // XIA extension header
 #pragma pack(push)
