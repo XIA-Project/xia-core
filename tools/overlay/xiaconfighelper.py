@@ -85,7 +85,7 @@ class Helper(Int32StringReceiver):
         startcmd = request.startxia.command.replace("restart", "start")
 
         print "Stopping XIA:", stopcmd
-        subprocess.check_call(stopcmd, shell=True)
+        subprocess.call(stopcmd, shell=True)
 
         print "Starting XIA:", startcmd
         subprocess.check_call(startcmd, shell=True)
