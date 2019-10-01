@@ -68,10 +68,10 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleStartXcacheRequest(self, request):
-        print "Got request to start Xcache"
+        print "Got request to start Xcache", request.startxcache.command
         cwd = os.getcwd()
         os.chdir(picoquic_directory)
-        subprocess.check_call(request.startxcache.command)
+        subprocess.check_call(request.startxcache.command, shell=True)
         os.chdir(cwd)
         request.startxcache.result = True
         self.sendString(request.SerializeToString())
