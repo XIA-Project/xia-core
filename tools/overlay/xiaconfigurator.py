@@ -70,6 +70,10 @@ class ConfigClient(Int32StringReceiver):
                 self.handleStartXIAResponse(response)
             elif response.type == configrequest_pb2.Request.GATHER_XIDS:
                 self.handleGatherXIDsResponse(response)
+            elif response.type == configrequest_pb2.Request.IP_ROUTES:
+                self.handleIPRoutesResponse(response)
+            elif response.type == configrequest_pb2.Request.START_XCACHE:
+                self.handleStartXcacheResponse(response)
             else:
                 print "ERROR: invalid response from server"
                 self.transport.loseConnection()
@@ -174,7 +178,35 @@ class ConfigClient(Int32StringReceiver):
             request.routes.route_cmds.append(route)
         self.sendString(request.SerializeToString())
 
-        # End the connection because the interaction is complete
+    def handleIPRoutesResponse(self, response):
+        if response.type != configrequest_pb2.Request.IP_ROUTES:
+            print "ERROR: Invalid IP route config response"
+            self.transport.loseConnection()
+            return
+        print "IP Routes configured on", self.router
+
+        # Now, request Xcache start if it was requested by user
+        if self.configurator.config.xcache[self.router] == True:
+            request = configrequest_pb2.Request()
+            request.type = configrequest_pb2.Request.START_XCACHE
+            cmd = "./build/xcache &"
+            request.startxcache.command = cmd;
+            self.sendString(request.SerializeToString())
+            # handleStartXcacheResponse will be called when xcache has started
+            return
+
+        # Otherwise end the connection because the interaction is complete
+        self.transport.loseConnection()
+
+    def handleStartXcacheResponse(self, response):
+        if response.type != configrequest_pb2.Request.START_XCACHE:
+            print "ERROR: Failed to start Xcache on", self.router
+            self.transport.loseConnection()
+            return
+        if response.startxcache.result != True:
+            print "ERROR: Failed to start Xcache on:", self.router
+        else:
+            print "Started Xcache on", self.router
         self.transport.loseConnection()
 
     def handleGatherXIDsResponse(self, response):

@@ -23,6 +23,8 @@ from xiaconfigdefs import ROUTER_CLICK
 
 import interfaces
 
+picoquic_directory = "../picoquic"
+
 class Helper(Int32StringReceiver):
     def __init__(self, common_data, addr):
         self.common_data = common_data
@@ -62,7 +64,17 @@ class Helper(Int32StringReceiver):
         for route_cmd in request.routes.route_cmds:
             print route_cmd
             subprocess.check_call(route_cmd, shell=True)
-        return
+        request.routes.result = True
+        self.sendString(request.SerializeToString())
+
+    def handleStartXcacheRequest(self, request):
+        print "Got request to start Xcache"
+        cwd = os.getcwd()
+        os.chdir(picoquic_directory)
+        subprocess.check_call(request.startxcache.command)
+        os.chdir(cwd)
+        request.startxcache.result = True
+        self.sendString(request.SerializeToString())
 
     # If the request came without a resolv.conf, this router is a nameserver
     # and a new resolv.conf file will be sent back in response
@@ -122,18 +134,20 @@ class Helper(Int32StringReceiver):
             self.handleStartXIARequest(request)
         elif request.type == configrequest_pb2.Request.GATHER_XIDS:
             self.handleGatherXIDsRequest(request)
+        elif request.type == configrequest_pb2.Request.START_XCACHE:
+            self.handleStartXcacheRequest(request)
         else:
             print "ERROR: Unknown config request"
 
     def stringReceived(self, request):
-        try:
+        #try:
             # Convert request into protobuf and handle the request
             conf_request = configrequest_pb2.Request()
             conf_request.ParseFromString(request)
             self.handleConfigRequest(conf_request);
-        except:
-            print "ERROR: invalid data instead of request"
-            self.transport.loseConnection();
+        #except:
+            #print "ERROR: invalid data instead of request"
+            #self.transport.loseConnection();
 
 class HelperFactory(Factory):
 

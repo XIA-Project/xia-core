@@ -9,6 +9,7 @@ message Request {
 		IP_ROUTES = 2;
 		START_XIA = 3;
 		GATHER_XIDS = 4;
+		START_XCACHE = 5;
 	}
 		
 	message InterfaceInfo {
@@ -27,6 +28,7 @@ message Request {
 
 	message SetIPRoutes {
 		repeated string route_cmds = 1;
+		optional bool result = 2;
 	}
 
 	message StartXIA {
@@ -39,10 +41,16 @@ message Request {
 		optional string hid = 2;
 	}
 
+	message StartXcache {
+		required string command = 1;
+		optional bool result = 2;
+	}
+
 	required RequestType type = 1;
 	optional GetInterfaceInfo ifrequest = 2;
 	optional DeployRouterConf routerconf = 3;
 	optional SetIPRoutes routes = 4;
 	optional StartXIA startxia = 5;
 	optional GatherXIDs gatherxids = 6;
+	optional StartXcache startxcache = 7;
 }

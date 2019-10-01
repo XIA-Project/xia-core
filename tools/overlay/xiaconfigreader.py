@@ -6,6 +6,7 @@ class XIAConfigReader:
         self.router_ifaces = {} # router: [iface1,...]
         self.host_ifaces = {} # router: host_iface
         self.route_info = {} # router: (dest,our_iface,their_iface,their_name)
+        self.xcache = {} # router: runs_xcache
         self.nameserver = ""
 
         # Read in the config file
@@ -35,6 +36,15 @@ class XIAConfigReader:
                     self.nameserver = router
             except:
                 pass
+
+            # Check if this router will have an Xcache
+            self.xcache[router] = False
+            try:
+                if parser.getboolean(router, "Xcache"):
+                    self.xcache[router] = True
+            except:
+                pass
+
             # Interface names for each router (comma separated list)
             interfaces = parser.get(router, 'Interfaces')
             interfaces = interfaces.replace(' ', '')
