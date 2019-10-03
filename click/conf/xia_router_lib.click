@@ -315,7 +315,9 @@ elementclass XIARoutingCore {
 	n :: RouteEngine($num_ports);
 
 	// Socket to send ICID packets to Xcache
-	XcacheICIDSock::Socket(UNIX_DGRAM, "/tmp/xcache-icid.sock", CLIENT true,
+	//XcacheICIDSock::Socket(UNIX_DGRAM, "/tmp/xcache-icid.sock", CLIENT true,
+		//SNAPLEN 65536);
+	XcacheICIDSock::Socket(UDP, 127.0.0.1, 7994, CLIENT true,
 		SNAPLEN 65536);
 
 	xtransport::XTRANSPORT($hostname, IP:$external_ip, $num_ports, IS_DUAL_STACK_ROUTER $is_dual_stack);
