@@ -43,6 +43,7 @@ message Request {
 
 	message StartXcache {
 		required string command = 1;
+        optional string hostname = 3;
 		optional bool result = 2;
 	}
 

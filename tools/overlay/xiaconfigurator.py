@@ -191,6 +191,7 @@ class ConfigClient(Int32StringReceiver):
             request.type = configrequest_pb2.Request.START_XCACHE
             cmd = "./build/xcache &"
             request.startxcache.command = cmd;
+            request.startxcache.hostname = self.router
             self.sendString(request.SerializeToString())
             # handleStartXcacheResponse will be called when xcache has started
             return

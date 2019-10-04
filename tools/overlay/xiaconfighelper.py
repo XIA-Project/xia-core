@@ -15,6 +15,7 @@ sys.path.append(os.path.join(srcdir, 'tools/overlay'))
 
 # XIA libraries
 import xiapyutils
+from clickcontrol import ClickControl
 
 # XIA Overlay configuration libraries and definitions
 import configrequest_pb2
@@ -67,13 +68,32 @@ class Helper(Int32StringReceiver):
         request.routes.result = True
         self.sendString(request.SerializeToString())
 
+    def getXcacheAID(self):
+        with open("xcache.local.conf", 'r') as localconf:
+            for line in localconf:
+                if not line.startswith('XCACHE_AID'):
+                    continue
+                param, aid = line.strip().split('=')
+                print "Xcache XID", aid
+                return aid
+        print "ERROR getting XcacheAID"
+        print "must call from picoquic dir and have xcache.local.conf"
+        return ''
+
+    def registerXcache(self, hostname, aid):
+        print "Confighelper: registering Xcache"
+        with ClickControl() as click:
+            return click.assignXcacheAID(hostname, aid)
+
     def handleStartXcacheRequest(self, request):
         print "Got request to start Xcache", request.startxcache.command
         cwd = os.getcwd()
         os.chdir(picoquic_directory)
         subprocess.check_call(request.startxcache.command, shell=True)
+        aid = self.getXcacheAID()
         os.chdir(cwd)
-        request.startxcache.result = True
+        hostname = request.startxcache.hostname
+        request.startxcache.result = self.registerXcache(hostname, aid)
         self.sendString(request.SerializeToString())
 
     # If the request came without a resolv.conf, this router is a nameserver

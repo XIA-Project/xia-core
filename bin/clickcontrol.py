@@ -193,6 +193,12 @@ class ClickControl:
             return False
         return True
 
+    def assignXcacheAID(self, hostname, aid):
+        cmd = '{}/xrc/n/proc/rt_ICID.xcache {}'.format(hostname, aid)
+        if not self.writeCommand(cmd):
+            return False
+        return True
+
     # Set an HID routing table entry
     def setHIDRoute(self, hostname, hid_str, port, flags):
         cmd = "{}/xrc/n/proc/rt_HID.set4 {},{},{},{}".format(
