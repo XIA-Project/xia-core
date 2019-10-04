@@ -442,18 +442,31 @@ XIAICIDRouteTable::generate_routes_handler(const String &conf, Element *e, void 
 void
 XIAICIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 {
+    /*
 	uint16_t fromnet = XIA_FROMNET_ANNO(p);
 	if (! (fromnet == 0 || fromnet == 1)) {
 		click_chatter("XIAICIDRouteTable: Invalid fromnet!");
 		output(3).push(p);
 		return;
 	}
+    */
 
 	if (!_principal_type_enabled) {
 		output(2).push(p);
 		return;
 	}
+    const struct click_xia* xiah = p->xia_header();
+    Graph src_dag;
+    src_dag.from_wire_format(xiah->snode, &xiah->node[xiah->dnode]);
+    XIAPath src_path(src_dag);
+    std::string xcache_sid(_xcache_sid.unparse().c_str());
+    if (src_path.intent_aid_str() == xcache_sid) {
+        output(2).push(p);
+    } else {
+        output(1).push(p);
+    }
 
+    /*
 	if (fromnet == 1) {
 		// Packet from network, send to API
 		output(1).push(p);
@@ -461,6 +474,7 @@ XIAICIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 		// Packet from API, ignore *-------> ICID link, try fallback.
 		output(2).push(p);
 	}
+    */
 }
 
 /*
