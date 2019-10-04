@@ -46,17 +46,17 @@ class XIAICIDRouteTable : public Element { public:
     XIAICIDRouteTable();
     ~XIAICIDRouteTable();
 
-    const char *class_name() const		{ return "XIAICIDRouteTable"; }
-    const char *port_count() const		{ return "-/-"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const      { return "XIAICIDRouteTable"; }
+    const char *port_count() const      { return "-/-"; }
+    const char *processing() const      { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *);
     void add_handlers();
 
     void push(int in_ether_port, Packet *);
 
-	int set_enabled(int e);
-	int get_enabled();
+    int set_enabled(int e);
+    int get_enabled();
 
 protected:
     int lookup_route(Packet *);
@@ -67,19 +67,19 @@ protected:
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
-	static String read_handler(Element *e, void *thunk);
-	static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
+    static String read_handler(Element *e, void *thunk);
+    static int write_handler(const String &str, Element *e, void *thunk, ErrorHandler *errh);
 
     static String list_routes_handler(Element *e, void *thunk);
 
 private:
-	HashTable<XID, XIARouteData*> _rts;
-	XIARouteData _rtdata;
+    HashTable<XID, XIARouteData*> _rts;
+    XIARouteData _rtdata;
     uint32_t _drops;
-	XIAPath _local_addr;
-	XID _xcache_sid;
+    XIAPath _local_addr;
+    XID _xcache_sid;
 
-	int _principal_type_enabled;
+    int _principal_type_enabled;
 };
 
 CLICK_ENDDECLS
