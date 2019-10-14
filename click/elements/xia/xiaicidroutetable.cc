@@ -29,7 +29,7 @@ XIAICIDRouteTable::configure(Vector<String> & /*conf*/, ErrorHandler * /*errh*/)
 {
     //click_chatter("XIAICIDRouteTable: configuring %s\n", this->name().c_str());
 
-    _principal_type_enabled = 1;
+    _principal_type_enabled = 0;
 
     _rtdata.port = -1;
     _rtdata.flags = 0;
@@ -112,6 +112,7 @@ XIAICIDRouteTable::write_handler(const String &str, Element *e, void *thunk, Err
             t->_xcache_sid = xcache_sid;
             click_chatter("XIAICIDRouteTable: Xcache is %s",
                     t->_xcache_sid.unparse().c_str());
+            t->_principal_type_enabled = 1;
             break;
         }
         default:
