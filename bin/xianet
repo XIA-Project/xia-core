@@ -342,20 +342,20 @@ router()
 	case $action in
 		"start")
 			cd $XIADIR/bin
-			./xrouted -h $host $LOG_FLAGS &
-			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
-			./xcache -h $host $LOG_FLAGS &
+#			./xrouted -h $host $LOG_FLAGS &
+#			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
+#			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
-			kill_service $host "xrouted"
-			kill_service $host "xnetjd"
-			kill_service $host "xcache"
+#			kill_service $host "xrouted"
+#			kill_service $host "xnetjd"
+#			kill_service $host "xcache"
 			;;
 		"check")
-			check_service $host "xrouted"
-			check_service $host "xnetjd"
-			check_service $host "xcache"
+#			check_service $host "xrouted"
+#			check_service $host "xnetjd"
+#			check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
@@ -374,17 +374,17 @@ host()
 	cd $XIADIR/bin
 	case $action in
 		"start")
-			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
-			./xcache -h $host $LOG_FLAGS &
+#			./xnetjd --client --hostname $host  -l $LOG_LEVEL $V_FLAG &
+#			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
 			;;
 		"stop")
-			kill_service $host "xnetjd"
-			kill_service $host "xcache"
+#			kill_service $host "xnetjd"
+#			kill_service $host "xcache"
 			;;
 		"check")
-			check_service $host "xnetjd"
-			check_service $host "xcache"
+#			check_service $host "xnetjd"
+#			check_service $host "xcache"
 			;;
 		*)
 			echo "unrecognized action: $action"
