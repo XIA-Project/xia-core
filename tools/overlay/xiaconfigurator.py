@@ -28,11 +28,12 @@ import xiaconfigdefs
 import configrequest_pb2
 
 from xiaconfigreader import XIAConfigReader
+from xiaclientconfigreader import XIAClientConfigReader
 from routerclick import RouterClick
 
 import inspect
 
-class ConfigClient(Int32StringReceiver):
+class ConfigRouter(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
         print inspect.stack()[0][3]
         self.router = router
@@ -278,8 +279,8 @@ class XIAConfigurator:
             xid_wait = defer.Deferred()
             xid_waiters.append(xid_wait)
 
-            # Link ConfigClient protocol instance to endpoint
-            d = connectProtocol(endpoint, ConfigClient(router, self, xid_wait))
+            # Link ConfigRouter protocol instance to endpoint
+            d = connectProtocol(endpoint, ConfigRouter(router, self, xid_wait))
             d.addCallback(self.gotProtocol)
 
         # Callback called, when all routers have collected their XIDs
@@ -293,10 +294,10 @@ if __name__ == "__main__":
     config = XIAConfigReader(conf_file)
     configurator = XIAConfigurator(config)
     configurator.configure()
-    clientConfig = XIAClientConfigReader(client.conf)
 
-
-    clientConfig = XIAClientConfigReader("client.conf")
+    print "==============================================================="
+    
+    clientConfig = XIAClientConfigReader('tools/overlay/client.conf')
     for client in clientConfig.clients():
         print client + ':'
         for router in clientConfig.routers[client]:
