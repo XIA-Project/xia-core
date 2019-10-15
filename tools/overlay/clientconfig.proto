@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package clientconfig;
+
+message Config {
+	message RouterInfo {
+		required string name = 1;
+		required string ipaddr = 2;
+		required string port = 3;
+		required string AD = 4;
+		required string HID = 5;
+	}
+}
+

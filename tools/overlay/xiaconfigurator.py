@@ -30,19 +30,24 @@ import configrequest_pb2
 from xiaconfigreader import XIAConfigReader
 from routerclick import RouterClick
 
+import inspect
+
 class ConfigClient(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
+        print inspect.stack()[0][3]
         self.router = router
         self.configurator = configurator
         self.initialized = False
         self.xid_wait = xid_wait
 
     def connectionLost(self, reason):
+        print inspect.stack()[0][3]
         self.configurator.protocol_instances.remove(self)
         if len(self.configurator.protocol_instances) == 0:
             reactor.stop()
 
     def stringReceived(self, data):
+        print inspect.stack()[0][3]
         if not self.initialized:
             # Get greeting from server and send a request for interfaces
             if data == "Helper Ready":
@@ -80,6 +85,7 @@ class ConfigClient(Int32StringReceiver):
 
     def handleInterfaceInfoResponse(self, response):
         # Got interface information
+        print inspect.stack()[0][3]
         print "Got interface info for:", self.router
         if response.type != configrequest_pb2.Request.IFACE_INFO:
             print "ERROR: Invalid response to iface_info request"
@@ -101,6 +107,7 @@ class ConfigClient(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def waitForResolvConf(self):
+        print inspect.stack()[0][3]
         if len(self.configurator.resolvconf) == 0:
             reactor.callLater(0.1, self.waitForResolvConf)
         else:
@@ -112,6 +119,7 @@ class ConfigClient(Int32StringReceiver):
             self.sendString(request.SerializeToString())
 
     def handleRouterConfResponse(self, response):
+        print inspect.stack()[0][3]
         # The router.click was successfully deployed
         if response.type != configrequest_pb2.Request.ROUTER_CONF:
             print "ERROR: Invalid router config response"
@@ -134,6 +142,7 @@ class ConfigClient(Int32StringReceiver):
     #    commands to start XIA on other routers with that file
     def handleStartXIAResponse(self, response):
         # Will have resolvconf field if nameserver started
+        print inspect.stack()[0][3]
         if response.type != configrequest_pb2.Request.START_XIA:
             print "ERROR: Invalid start XIA response"
             self.transport.loseConnection()
@@ -151,6 +160,7 @@ class ConfigClient(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def sendIPRoutesRequest(self):
+        print inspect.stack()[0][3]
         request = configrequest_pb2.Request()
         request.type = configrequest_pb2.Request.IP_ROUTES
 
@@ -179,6 +189,7 @@ class ConfigClient(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleIPRoutesResponse(self, response):
+        print inspect.stack()[0][3]
         if response.type != configrequest_pb2.Request.IP_ROUTES:
             print "ERROR: Invalid IP route config response"
             self.transport.loseConnection()
@@ -200,6 +211,7 @@ class ConfigClient(Int32StringReceiver):
         self.transport.loseConnection()
 
     def handleStartXcacheResponse(self, response):
+        print inspect.stack()[0][3]
         if response.type != configrequest_pb2.Request.START_XCACHE:
             print "ERROR: Failed to start Xcache on", self.router
             self.transport.loseConnection()
@@ -211,6 +223,7 @@ class ConfigClient(Int32StringReceiver):
         self.transport.loseConnection()
 
     def handleGatherXIDsResponse(self, response):
+        print inspect.stack()[0][3]
         if response.type != configrequest_pb2.Request.GATHER_XIDS:
             print "ERROR: Invalid gather XIDs response"
             self.transport.loseConnection()
@@ -222,6 +235,7 @@ class ConfigClient(Int32StringReceiver):
 
 class XIAConfigurator:
     def __init__(self, config):
+        print inspect.stack()[0][3]
         self.config = config
         self.protocol_instances = []
         self.nameserver = self.config.nameserver
@@ -238,6 +252,7 @@ class XIAConfigurator:
 
     # All routers sent in their AD, HID. Send IP routes to all routers
     def sendIPRoutes(self, result):
+        print inspect.stack()[0][3]
         for (success, protocol) in result:
             if success:
                 print "Sending IP routes to {}".format(protocol.router)
@@ -246,9 +261,11 @@ class XIAConfigurator:
                 print "ERROR: failure sending IP routes for a protocol"
 
     def gotProtocol(self, protocol):
+        print inspect.stack()[0][3]
         self.protocol_instances.append(protocol)
 
     def configure(self):
+        print inspect.stack()[0][3]
         xid_waiters = []
 
         for router in self.config.routers():
@@ -276,3 +293,11 @@ if __name__ == "__main__":
     config = XIAConfigReader(conf_file)
     configurator = XIAConfigurator(config)
     configurator.configure()
+    clientConfig = XIAClientConfigReader(client.conf)
+
+
+    clientConfig = XIAClientConfigReader("client.conf")
+    for client in clientConfig.clients():
+        print client + ':'
+        for router in clientConfig.routers[client]:
+            print configurator.xids[router]

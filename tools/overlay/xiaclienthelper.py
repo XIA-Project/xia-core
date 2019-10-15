@@ -2,7 +2,6 @@
 import os
 import sys
 import subprocess
-import inspect
 
 # Install python-twisted package for this functionality
 from twisted.internet.protocol import Protocol, Factory
@@ -29,21 +28,17 @@ picoquic_directory = "../picoquic"
 
 class Helper(Int32StringReceiver):
     def __init__(self, common_data, addr):
-        print inspect.stack()[0][3]
         self.common_data = common_data
         self.addr = addr
 
     def connectionMade(self):
-        print inspect.stack()[0][3]
         self.sendString(xiaconfigdefs.HELPER_GREETING);
 
     def connectionLost(self, reason):
-        print inspect.stack()[0][3]
         # Clean up any state created in common_data for this connection
         print "Connection to client lost"
 
     def handleInterfaceRequest(self, request):
-        print inspect.stack()[0][3]
         print "Got interface request"
 
         # Fill in interface information
@@ -55,7 +50,6 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleRouterConfRequest(self, request):
-        print inspect.stack()[0][3]
         conf_file = os.path.join(xiapyutils.xia_srcdir(), ROUTER_CLICK)
         with open(conf_file, 'w') as config:
             config.write(request.routerconf.configfile)
@@ -67,7 +61,6 @@ class Helper(Int32StringReceiver):
         self.sendString(response.SerializeToString())
 
     def handleRoutesRequest(self, request):
-        print inspect.stack()[0][3]
         print "Got IP routes to configure"
         for route_cmd in request.routes.route_cmds:
             print route_cmd
@@ -76,7 +69,6 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def getXcacheAID(self):
-        print inspect.stack()[0][3]
         with open("xcache.local.conf", 'r') as localconf:
             for line in localconf:
                 if not line.startswith('XCACHE_AID'):
@@ -89,13 +81,11 @@ class Helper(Int32StringReceiver):
         return ''
 
     def registerXcache(self, hostname, aid):
-        print inspect.stack()[0][3]
         print "Confighelper: registering Xcache"
         with ClickControl() as click:
             return click.assignXcacheAID(hostname, aid)
 
     def handleStartXcacheRequest(self, request):
-        print inspect.stack()[0][3]
         print "Got request to start Xcache", request.startxcache.command
         cwd = os.getcwd()
         os.chdir(picoquic_directory)
@@ -112,7 +102,6 @@ class Helper(Int32StringReceiver):
     # Otherwise, this is a regular router that will be started with the
     # given resolv.conf file. Response will not have a resolv.conf
     def handleStartXIARequest(self, request):
-        print inspect.stack()[0][3]
         resolvconfreceived = False
         # If a resolv.conf was sent, write it to storage for router to use
         if len(request.startxia.resolvconf) > 0:
@@ -147,7 +136,6 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleGatherXIDsRequest(self, request):
-        print inspect.stack()[0][3]
         xdag_cmd = os.path.join(xiapyutils.xia_srcdir(), 'bin/xdag')
         xdag_out = subprocess.check_output(xdag_cmd, shell=True)
         router, re, ad, hid = xdag_out.split()
@@ -156,7 +144,6 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleConfigRequest(self, request):
-        print inspect.stack()[0][3]
         if request.type == configrequest_pb2.Request.IFACE_INFO:
             self.handleInterfaceRequest(request)
         elif request.type == configrequest_pb2.Request.ROUTER_CONF:
@@ -173,7 +160,6 @@ class Helper(Int32StringReceiver):
             print "ERROR: Unknown config request"
 
     def stringReceived(self, request):
-            print inspect.stack()[0][3]
         #try:
             # Convert request into protobuf and handle the request
             conf_request = configrequest_pb2.Request()
