@@ -27,6 +27,7 @@ class XIAClientConfigReader:
        self.control_port = {}
        self.ad = {}
        self.hid = {}
+       self.router_addr = {}
 
        # Read in the config file
        parser = RawConfigParser()
@@ -65,49 +66,60 @@ class ConfigClient(Int32StringReceiver):
             reactor.stop()
 
     def connectionMade(self):
-        self.sendConfig()
+        # configure with default router
+        self.sendConfig(self.clientConfigurator.clientConfig.default_router[self.client])
 
-    def sendConfig(self):
+        if self.client == 'r2': #todo: make configurable
+          self.mobilityConfig()
+    
+    def sendConfig(self, router):
         response = clientconfig_pb2.Config()
         print "-----------------------------------"
         response.name = self.client
-        response.ipaddr = self.clientConfigurator.clientConfig.default_router[self.client]
+        response.ipaddr = self.clientConfigurator.clientConfig.router_addr[router]
         response.port = "8792"
-        response.AD = self.clientConfigurator.clientConfig.ad[self.client]
-        response.HID =self.clientConfigurator.clientConfig.hid[self.client]
+        response.AD = self.clientConfigurator.clientConfig.ad[router]
+        response.HID =self.clientConfigurator.clientConfig.hid[router]
 
-        print "Sending"
+        print "Sending config to " + self.client
         print response
         print "-----------------------------------"
 
         self.sendString(response.SerializeToString())
 
+    def mobilityConfig(self):
+        t = 60*2
+        for router in self.clientConfigurator.routers[client]:
+            reactor.callLater(t, self.sendConfig, router)
+            t = t + 60*2
+
 
 class XIAClientConfigurator():
-	def __init__(self, configurator):
-		self.connected_clients = 0
+    def __init__(self, configurator):
+	self.connected_clients = 0
+        
+	clientConfig = XIAClientConfigReader('tools/overlay/client.conf')
+        for client in clientConfig.clients():
+            print client + ':'
+            for router in clientConfig.routers[client]:
+                clientConfig.ad[router] = configurator.xids[router][0]
+                clientConfig.hid[router] = configurator.xids[router][1]
+                clientConfig.router_addr[router] = configurator.config.host_ipaddrs[router]
+                print configurator.xids[router]
 
-		clientConfig = XIAClientConfigReader('tools/overlay/client.conf')
-     	        for client in clientConfig.clients():
-        	    print client + ':'
-        	    for router in clientConfig.routers[client]:
-            	        clientConfig.ad[client] = configurator.xids[router][0]
-            	        clientConfig.hid[client] = configurator.xids[router][1]
-            	        print configurator.xids[router]
+        self.clientConfig = clientConfig
 
-                self.clientConfig = clientConfig
+    def configureClient(self):
+        for client in self.clientConfig.clients():
+            endpoint = TCP4ClientEndpoint(reactor, 
+                                          self.clientConfig.control_addr[client],
+                                          int(self.clientConfig.control_port[client]))
 
-	def configureClient(self):
-            for client in self.clientConfig.clients():
+            d = connectProtocol(endpoint, ConfigClient(client, self))
+            d.addCallback(self.addClient)
 
-                endpoint = TCP4ClientEndpoint(reactor, 
-                        self.clientConfig.control_addr[client],
-                        int(self.clientConfig.control_port[client]))
+            #reactor.run()
 
-                d = connectProtocol(endpoint, ConfigClient(client, self))
-                d.addCallback(self.addClient)
+    def addClient(self):
+        self.connected_clients += 1
 
-        #reactor.run()
-
-        def addClient(self):
-            self.connected_clients += 1

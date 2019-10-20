@@ -47,9 +47,10 @@ class ConfigRouter(Int32StringReceiver):
         self.configurator.protocol_instances.remove(self)
         if len(self.configurator.protocol_instances) == 0:
             print "==============================================================="
+            print self.configurator.config
             clientConfigurator = XIAClientConfigurator(self.configurator)
             clientConfigurator.configureClient()
-        #     reactor.stop()
+            #reactor.stop()
         
     def stringReceived(self, data):
         print inspect.stack()[0][3]

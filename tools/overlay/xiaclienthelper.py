@@ -36,21 +36,18 @@ class Helper(Int32StringReceiver):
         print "Connection to client lost"
 
     def stringReceived(self, recvd_conf):
-        print "----------------------------------------------"
         print inspect.stack()[0][3]
-        print recvd_conf
         conf = clientconfig_pb2.Config()
         conf.ParseFromString(recvd_conf)
 
-        print "Received"
-        print conf
-        print "----------------------------------------------"
         self.handleConfig(conf)
 
     def handleConfig(self, config):
-    	print "handle config"
+        print "----------------------------------------------"
+    	print "Received"
     	print config
-        reactor.stop()
+        print "----------------------------------------------"
+        #reactor.stop()
         
 
 class HelperFactory(Factory):

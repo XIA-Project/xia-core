@@ -5,6 +5,7 @@ class XIAConfigReader:
         self.control_addrs = {} # router: ctrl_addr
         self.router_ifaces = {} # router: [iface1,...]
         self.host_ifaces = {} # router: host_iface
+        self.host_ipaddrs = {} # router: host ipaddr  # todo fill this
         self.route_info = {} # router: (dest,our_iface,their_iface,their_name)
         self.xcache = {} # router: runs_xcache
         self.nameserver = ""
@@ -26,6 +27,9 @@ class XIAConfigReader:
 
             # AID host interface for each router
             self.host_ifaces[router] = parser.get(router, 'HostInterface')
+
+            # IP Address of host iface
+            self.host_ipaddrs[router] = parser.get(router, 'HostAddr')
 
             # Check if this is a nameserver
             try:
