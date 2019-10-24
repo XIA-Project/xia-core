@@ -10,7 +10,7 @@ class XIAClientConfigReader:
        self.control_addr = {}
        self.control_port = {}
        #router metadata
-       self.ifaces = {}
+       self.router_iface = {}
        self.router_addr = {}
        self.ad = {}
        self.hid = {}
@@ -34,11 +34,11 @@ class XIAClientConfigReader:
 
            ifaces = parser.get(client, 'Interfaces')
            ifaces = ifaces.replace(' '. '')
-           self.ifaces[client] = []
+           self.router_iface[client] = []
            r_iface = []
            for i, iface in ifaces:
               r_iface[routers[i]] = iface
-           self.ifaces[client] = r_iface
+           self.router_iface[client] = r_iface
 
            self.default_router[client] = parser.get(client, 'Default')
            self.control_addr[client] = parser.get(client, 'ControlAddress')

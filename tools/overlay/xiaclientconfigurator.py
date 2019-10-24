@@ -28,6 +28,7 @@ class XIAClientConfigReader:
        self.ad = {}
        self.hid = {}
        self.router_addr = {}
+       self.router_iface = {}
 
        # Read in the config file
        parser = RawConfigParser()
@@ -36,7 +37,7 @@ class XIAClientConfigReader:
        # Router names are the section names in the config file
        clients = parser.sections()
        if len(clients) == 0:
-       		print "ERROR: No sections found in config file"
+          print "ERROR: No sections found in config file"
 
        # Read in info into our internal data structures
        for client in clients:
@@ -45,6 +46,15 @@ class XIAClientConfigReader:
            routers = parser.get(client, 'Routers')
            routers = routers.replace(' ', '')
            self.routers[client] = routers.split(',')
+
+           iface = parser.get(client, 'Interfaces')
+           iface = iface.replace(' ', '')
+           ifaces = iface.split(',')
+           self.router_iface[client] = []
+           r_iface = []
+           for i, iface in ifaces:
+              r_iface[routers[i]] = iface
+           self.router_iface[client] = r_iface
 
            self.default_router[client] = parser.get(client, 'Default')
            self.control_addr[client] = parser.get(client, 'ControlAddress')
@@ -69,7 +79,7 @@ class ConfigClient(Int32StringReceiver):
         # configure with default router
         self.sendConfig(self.clientConfigurator.clientConfig.default_router[self.client])
 
-        if self.client == 'r2': #todo: make configurable
+        if self.client == 'c1': #todo: make configurable
           self.mobilityConfig()
     
     def sendConfig(self, router):
@@ -77,6 +87,7 @@ class ConfigClient(Int32StringReceiver):
         print "-----------------------------------"
         response.name = self.client
         response.ipaddr = self.clientConfigurator.clientConfig.router_addr[router]
+        response.iface = self.clientConfigurator.clientConfig.router_iface[self.client][router]
         response.port = "8792"
         response.AD = self.clientConfigurator.clientConfig.ad[router]
         response.HID =self.clientConfigurator.clientConfig.hid[router]
@@ -88,10 +99,11 @@ class ConfigClient(Int32StringReceiver):
         self.sendString(response.SerializeToString())
 
     def mobilityConfig(self):
-        t = 60*2
-        for router in self.clientConfigurator.routers[client]:
+        t = 10
+        for router in self.clientConfigurator.clientConfig.routers[self.client]:
+            print "Adding a call for " + router
             reactor.callLater(t, self.sendConfig, router)
-            t = t + 60*2
+            t = t + 10*2
 
 
 class XIAClientConfigurator():
