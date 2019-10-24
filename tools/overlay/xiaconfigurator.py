@@ -48,6 +48,8 @@ class ConfigRouter(Int32StringReceiver):
         if len(self.configurator.protocol_instances) == 0:
             print "==============================================================="
             print self.configurator.config
+
+            # configure client after last router is configured
             clientConfigurator = XIAClientConfigurator(self.configurator)
             clientConfigurator.configureClient()
             #reactor.stop()

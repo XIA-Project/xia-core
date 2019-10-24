@@ -45,15 +45,16 @@ class XIAClientConfigReader:
            # Interface names for each router (comma separated list)
            routers = parser.get(client, 'Routers')
            routers = routers.replace(' ', '')
-           self.routers[client] = routers.split(',')
+           router_list = routers.split(',')
+           self.routers[client] = router_list
 
            iface = parser.get(client, 'Interfaces')
            iface = iface.replace(' ', '')
            ifaces = iface.split(',')
-           self.router_iface[client] = []
-           r_iface = []
-           for i, iface in ifaces:
-              r_iface[routers[i]] = iface
+           self.router_iface[client] = {}
+           r_iface = {}
+           for i in range(len(ifaces)):
+              r_iface[router_list[i]] = ifaces[i]
            self.router_iface[client] = r_iface
 
            self.default_router[client] = parser.get(client, 'Default')
@@ -93,7 +94,9 @@ class ConfigClient(Int32StringReceiver):
         response.HID =self.clientConfigurator.clientConfig.hid[router]
 
         print "Sending config to " + self.client
-        print response
+       print response.SerializeToString()
+       print "Length "
+       print len(response.SerializeToString())
         print "-----------------------------------"
 
         self.sendString(response.SerializeToString())
@@ -134,4 +137,3 @@ class XIAClientConfigurator():
 
     def addClient(self):
         self.connected_clients += 1
-
