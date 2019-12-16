@@ -81,6 +81,7 @@ int sendHello()
 
 
 //	printf("sending %s\n", msg.DebugString().c_str());
+	// printf("**** sending lsa with and num_neighbors %d \n", route_state.num_neighbors);
 
 	msg.SerializeToString(&message);
 	buflen = message.length();
@@ -136,8 +137,6 @@ int sendLSA()
 		hid->set_type(p_hid.type());
 		hid->set_id(p_hid.id(), XID_SIZE);
 	}
-
-//	printf("sending %s\n", msg.DebugString().c_str());
 
 	msg.SerializeToString(&message);
 	buflen = message.length();
@@ -264,8 +263,6 @@ int processLSA(const Xroute::XrouteMsg& msg)
 	string neighborAD, neighborHID, myAD;
 	string destAD, destHID;
 
-//	printf("processLSA: %s\n", lsa.DebugString().c_str());
-
 	// fix me once we don't need to rebroadcast the lsa
 	const Xroute::LSAMsg& lsa = msg.lsa();
 
@@ -287,8 +284,6 @@ int processLSA(const Xroute::XrouteMsg& msg)
 		// skip if from me
 		return 1;
 	}
-
-
 
 	map<std::string, NodeStateEntry>::iterator it = route_state.networkTable.find(destAD);
 	if(it != route_state.networkTable.end()) {

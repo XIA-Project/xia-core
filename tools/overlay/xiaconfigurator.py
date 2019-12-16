@@ -19,6 +19,7 @@ from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 
 # Bring in xia and overlay tools into path
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+
 sys.path.append(os.path.join(srcdir, 'bin'))
 sys.path.append(os.path.join(srcdir, 'tools/overlay'))
 
@@ -169,6 +170,8 @@ class ConfigRouter(Int32StringReceiver):
 
             # Destination router, our interface, nexthop iface, nexthop name
             dest, our_iface, next_iface, next_name = route
+            print("Adding route : ")
+            print(route)
 
             # Convert dest router name to corresponding AD
             dest_ad, dest_hid = self.configurator.xids[dest]
@@ -185,6 +188,11 @@ class ConfigRouter(Int32StringReceiver):
             route = "./bin/xroute -a AD,{},{},{}:{}".format(
                     dest_ad, port, ipaddr, next_port)
             request.routes.route_cmds.append(route)
+            dest_sid = self.configurator.config.sid[dest]
+            sid_route = "./bin/xroute -a SID,{},{},{}:{},{}".format(
+                    dest_sid, port, ipaddr, 8772, 7)
+            print("Sending %s" %sid_route)
+            request.routes.route_cmds.append(sid_route)
         self.sendString(request.SerializeToString())
 
     def handleIPRoutesResponse(self, response):
@@ -240,6 +248,7 @@ class XIAConfigurator:
         self.xids = {} # router: (ad, hid)
         self.iface_addrs = {} # (router, iface_name) : ipaddr
         self.connected_clients = []
+
 
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
