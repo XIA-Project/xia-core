@@ -99,7 +99,7 @@ XIAOverlayRouted::XIAOverlayRouted()
   
   FILE *f = fopen("etc/address.conf", "r"); 
   if (!f) {
-    printf("Failed to open resolv.conf \n");
+    printf("Failed to open address.conf \n");
     return;
   }
   char *hostname = (char *)malloc(32);
