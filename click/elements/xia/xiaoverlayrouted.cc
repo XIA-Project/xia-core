@@ -317,10 +317,12 @@ XIAOverlayRouted::calcShortestPath() {
   route_state.networkTable[myAD].cost = 0;
   table.erase(myAD);
 
-  vector<std::string>::iterator it2;
-  for ( it2=route_state.networkTable[myAD].neighbor_list.begin() ; it2 < route_state.networkTable[myAD].neighbor_list.end(); it2++ ) {
 
-    tempAD = (*it2).c_str();
+  std::map<std::string, NeighborEntry*>::iterator it2;
+  // for ( it2=route_state.neig[myAD].neighbor_list.begin() ; it2 < route_state.networkTable[myAD].neighbor_list.end(); it2++ ) {
+
+  for( it2 = route_state.neighborTable.begin(); it2 != route_state.neighborTable.end(); it2++) {
+    tempAD = it2->first.c_str();
     route_state.networkTable[tempAD].cost = 1;
     route_state.networkTable[tempAD].prevNode = myAD;
   }
@@ -343,25 +345,33 @@ XIAOverlayRouted::calcShortestPath() {
     table.erase(selectedAD);
     route_state.networkTable[selectedAD].checked = true;
 
-    for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
-      tempAD = (*it2).c_str();
+    vector<std::string>::iterator it3;
+    for ( it3=route_state.networkTable[selectedAD].neighbor_list.begin() ; it3 < route_state.networkTable[selectedAD].neighbor_list.end(); it3++ ) {
+      tempAD = (*it3).c_str();    
       if (route_state.networkTable[tempAD].checked != true) {
-        if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
+        if (route_state.networkTable[tempAD].cost ==0 || route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
+
+          if(route_state.networkTable[tempAD].cost == 0) {
+            route_state.networkTable[tempAD].dest = tempAD;
+            route_state.networkTable[tempAD].num_neighbors = 0;
+          }
+
           route_state.networkTable[tempAD].cost = route_state.networkTable[selectedAD].cost + 1;
           route_state.networkTable[tempAD].prevNode = selectedAD;
+
         }
       }
     }
   }
 
-  string tempAD1, tempAD2;
+  std::string tempAD1, tempAD2;
   int hop_count;
   // set up the nexthop
   for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
-
     tempAD1 = it1->second.dest;
     if ( myAD.compare(tempAD1) != 0 ) {
       tempAD2 = tempAD1;
+      // tempAD2 = route_state.networkTable[tempAD2].prevNode;
       hop_count = 0;
       while (route_state.networkTable[tempAD2].prevNode.compare(myAD)!=0 && hop_count < MAX_HOP_COUNT) {
         tempAD2 = route_state.networkTable[tempAD2].prevNode;
@@ -370,11 +380,18 @@ XIAOverlayRouted::calcShortestPath() {
       if(hop_count < MAX_HOP_COUNT) {
         route_state.ADrouteTable[tempAD1].dest = tempAD1;
         // route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2].HID;
-        route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->AD;
+        if(tempAD1.compare(tempAD2) != 0) {
+          route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->AD;
+        }
+        // add ipaddr as nexthop for neighbor
+        else {
+          route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->addr + ":8770";
+        }
         route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2]->port;
       }
     }
   }
+  printf("\n\n");
   printRoutingTable();
 }
 
