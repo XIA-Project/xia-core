@@ -362,6 +362,27 @@ elementclass XIARoutingCore {
 	// For get and put cid
 }
 
+elementclass XIAOverlayRouter {
+	of0::XIAOverlayFilter();
+	of1::XIAOverlayFilter();
+	of2::XIAOverlayFilter();
+	of3::XIAOverlayFilter();
+
+	rd::XIAOverlayRouted();
+
+	input -> rd;
+	rd[0] -> of0 -> [0]output;
+	rd[1] -> of1 -> [1]output;
+	rd[2] -> of2 -> [2]output;
+	rd[3] -> of3 -> [3]output;
+
+	// discard remaining of ports
+	of0[1]->[1]of0; 	of0[2]->Discard; 	of0[3]->Discard;
+	of1[1]->[1]of1; 	of1[2]->Discard;	of1[3]->Discard;
+	of2[1]->[1]of2;	of2[2]->Discard;	of2[3]->Discard;
+	of3[1]->[1]of3;	of3[2]->Discard;	of3[3]->Discard;
+}
+
 // 2-port router
 elementclass XIARouter2Port {
 	$click_port, $hostname, $external_ip, $mac0, $mac1, |
@@ -384,6 +405,7 @@ elementclass XIARouter2Port {
 };
 
 // 4-port router node
+
 elementclass XIARouter4Port {
 	$click_port, $hostname, $external_ip,
 	$mac0, $mac1, $mac2, $mac3 |

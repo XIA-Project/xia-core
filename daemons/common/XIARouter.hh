@@ -90,6 +90,7 @@ public:
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int delRoute(const std::string &xid);
 
+
 	const char *cserror();
 private:
 	bool _connected;

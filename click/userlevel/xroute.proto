@@ -1,0 +1,91 @@
+syntax = "proto2";
+/*
+** xrouted message definitions
+*/
+
+package Xroute;
+//syntax = "proto2";
+
+enum constants {
+	XROUTE_PROTO_VERSION = 1;
+}
+
+message XID {
+	required uint32 type = 1; // should use the XID type values from xia.h
+	required bytes  id   = 2; // must be 20 bytes long
+}
+
+message Node {
+	required XID    ad    = 1;
+	optional XID    hid   = 2;
+	optional XID    sid   = 3;
+	optional uint32 flags = 4;
+}
+
+message TableEntry {
+	required Node   node      = 1;
+	required uint32 interface = 2;
+	optional uint32 flags     = 3;
+}
+
+message HelloMsg {
+	required Node   node  = 1;
+	optional uint32 flags = 2;
+}
+
+message LSAMsg {
+	required Node   node  = 1;
+	optional uint32 flags = 2;
+	repeated Node   peers = 3;
+}
+
+message HostJoinMsg {
+	required string hid       = 1;
+	required uint32 interface = 2;
+	optional uint32 flags     = 3;
+}
+
+// FIXME: make this use the XID type at some point
+message HostLeaveMsg {
+	required string hid = 1;
+}
+
+message TableUpdateMsg {
+	required Node       from  = 1;
+	required Node       to    = 2;
+	repeated TableEntry route = 3;
+}
+
+message GlobalLSAMsg {
+	required Node from = 1;
+}
+
+message ConfigMsg {
+	required string ad             = 1;
+	required string controller_dag = 2;
+}
+
+enum msg_type {
+	HELLO_MSG        = 1; // local router hello msg. still needed?
+	LSA_MSG          = 2; // router announcement -> controller
+	HOST_JOIN_MSG    = 3; // add host route from xnetjd
+	HOST_LEAVE_MSG   = 4; // host leaving network
+	TABLE_UPDATE_MSG = 5; // new tables from controller -> router
+	GLOBAL_LSA_MSG   = 6; // lsa between controllers in different ADs
+	CONFIG_MSG       = 7; // router configuration info from xnetjd
+}
+
+message XrouteMsg {
+	required uint32   version = 1;
+	required msg_type type    = 2;
+
+	oneof payload {
+		HelloMsg       hello        = 3;
+		LSAMsg         lsa          = 4;
+		TableUpdateMsg table_update = 5;
+		GlobalLSAMsg   global_lsa   = 6;
+		HostJoinMsg    host_join    = 7;
+		HostLeaveMsg   host_leave   = 8;
+		ConfigMsg      config       = 9;
+	}
+}

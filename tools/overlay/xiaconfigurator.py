@@ -19,6 +19,7 @@ from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 
 # Bring in xia and overlay tools into path
 srcdir = os.getcwd()[:os.getcwd().rindex('xia-core')+len('xia-core')]
+
 sys.path.append(os.path.join(srcdir, 'bin'))
 sys.path.append(os.path.join(srcdir, 'tools/overlay'))
 
@@ -26,12 +27,17 @@ import xiapyutils
 
 import xiaconfigdefs
 import configrequest_pb2
+import clientconfig_pb2
 
 from xiaconfigreader import XIAConfigReader
+from xiaclientconfigurator import XIAClientConfigurator
 from routerclick import RouterClick
 
-class ConfigClient(Int32StringReceiver):
+import inspect
+
+class ConfigRouter(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
+
         self.router = router
         self.configurator = configurator
         self.initialized = False
@@ -40,8 +46,12 @@ class ConfigClient(Int32StringReceiver):
     def connectionLost(self, reason):
         self.configurator.protocol_instances.remove(self)
         if len(self.configurator.protocol_instances) == 0:
-            reactor.stop()
-
+            print "Going to configure clients now"
+            # configure client after last router is configured
+            clientConfigurator = XIAClientConfigurator(self.configurator)
+            clientConfigurator.configureClient()
+            #reactor.stop()
+        
     def stringReceived(self, data):
         if not self.initialized:
             # Get greeting from server and send a request for interfaces
@@ -160,6 +170,8 @@ class ConfigClient(Int32StringReceiver):
 
             # Destination router, our interface, nexthop iface, nexthop name
             dest, our_iface, next_iface, next_name = route
+            print("Adding route : ")
+            print(route)
 
             # Convert dest router name to corresponding AD
             dest_ad, dest_hid = self.configurator.xids[dest]
@@ -176,6 +188,11 @@ class ConfigClient(Int32StringReceiver):
             route = "./bin/xroute -a AD,{},{},{}:{}".format(
                     dest_ad, port, ipaddr, next_port)
             request.routes.route_cmds.append(route)
+            dest_sid = self.configurator.config.sid[dest]
+            sid_route = "./bin/xroute -a SID,{},{},{}:{},{}".format(
+                    dest_sid, port, ipaddr, 8772, 7)
+            print("Sending %s" %sid_route)
+            request.routes.route_cmds.append(sid_route)
         self.sendString(request.SerializeToString())
 
     def handleIPRoutesResponse(self, response):
@@ -211,6 +228,7 @@ class ConfigClient(Int32StringReceiver):
         self.transport.loseConnection()
 
     def handleGatherXIDsResponse(self, response):
+
         if response.type != configrequest_pb2.Request.GATHER_XIDS:
             print "ERROR: Invalid gather XIDs response"
             self.transport.loseConnection()
@@ -220,6 +238,7 @@ class ConfigClient(Int32StringReceiver):
         self.configurator.xids[self.router] = (ad, hid)
         self.xid_wait.callback(self)
 
+
 class XIAConfigurator:
     def __init__(self, config):
         self.config = config
@@ -228,6 +247,8 @@ class XIAConfigurator:
         self.resolvconf = ""
         self.xids = {} # router: (ad, hid)
         self.iface_addrs = {} # (router, iface_name) : ipaddr
+        self.connected_clients = []
+
 
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
@@ -238,6 +259,7 @@ class XIAConfigurator:
 
     # All routers sent in their AD, HID. Send IP routes to all routers
     def sendIPRoutes(self, result):
+
         for (success, protocol) in result:
             if success:
                 print "Sending IP routes to {}".format(protocol.router)
@@ -246,13 +268,16 @@ class XIAConfigurator:
                 print "ERROR: failure sending IP routes for a protocol"
 
     def gotProtocol(self, protocol):
+
         self.protocol_instances.append(protocol)
 
     def configure(self):
+
         xid_waiters = []
 
         for router in self.config.routers():
             # Endpoint for client connection
+
             endpoint = TCP4ClientEndpoint(reactor,
                     self.config.control_addr(router),
                     xiaconfigdefs.HELPER_PORT)
@@ -261,8 +286,8 @@ class XIAConfigurator:
             xid_wait = defer.Deferred()
             xid_waiters.append(xid_wait)
 
-            # Link ConfigClient protocol instance to endpoint
-            d = connectProtocol(endpoint, ConfigClient(router, self, xid_wait))
+            # Link ConfigRouter protocol instance to endpoint
+            d = connectProtocol(endpoint, ConfigRouter(router, self, xid_wait))
             d.addCallback(self.gotProtocol)
 
         # Callback called, when all routers have collected their XIDs
@@ -270,6 +295,7 @@ class XIAConfigurator:
         dl.addCallback(self.sendIPRoutes)
 
         reactor.run()
+
 
 if __name__ == "__main__":
     conf_file = os.path.join(xiapyutils.xia_srcdir(), 'tools/overlay/demo.conf')

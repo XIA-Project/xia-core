@@ -1,14 +1,17 @@
 from ConfigParser import RawConfigParser
+import genkeys
 
 class XIAConfigReader:
     def __init__(self, config_filename):
         self.control_addrs = {} # router: ctrl_addr
         self.router_ifaces = {} # router: [iface1,...]
         self.host_ifaces = {} # router: host_iface
+        self.host_ipaddrs = {} # router: host ipaddr  # todo fill this
         self.route_info = {} # router: (dest,our_iface,their_iface,their_name)
         self.xcache = {} # router: runs_xcache
         self.nameserver = ""
-
+        self.sid = {} # router : routing sid
+ 
         # Read in the config file
         parser = RawConfigParser()
         parser.read(config_filename)
@@ -26,6 +29,12 @@ class XIAConfigReader:
 
             # AID host interface for each router
             self.host_ifaces[router] = parser.get(router, 'HostInterface')
+
+            # IP Address of host iface
+            self.host_ipaddrs[router] = parser.get(router, 'HostAddr')
+
+            # Routing SID
+            self.sid[router] = genkeys.create_new_SID()
 
             # Check if this is a nameserver
             try:

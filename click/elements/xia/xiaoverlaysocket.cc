@@ -68,8 +68,6 @@ XIAOverlaySocket::selected(int fd, int)
       else {
 	// datagram server, find out who we are talking to
 	len = recvfrom(_active, _rq->data(), _rq->length(), MSG_TRUNC, (struct sockaddr *)&from, &from_len);
-	printf("XIAOverlaySocket::selected rcvd pkt of len %d\n", len);
-	printf("from: %s:%d\n", IPAddress(from.in.sin_addr).unparse().c_str(), ntohs(from.in.sin_port));
 
 	if (_family == AF_INET && !allowed(IPAddress(from.in.sin_addr))) {
 	  if (_verbose)
@@ -127,12 +125,10 @@ XIAOverlaySocket::selected(int fd, int)
 int
 XIAOverlaySocket::write_packet(Packet *p)
 {
-    int len;
+  int len;
+  assert(_active >= 0);
 
-
-    assert(_active >= 0);
-
-    while (p->length()) {
+  while (p->length()) {
 		struct sockaddr_in dest;
 		dest.sin_family = AF_INET;
 		dest.sin_port = DST_PORT_ANNO(p);
@@ -148,35 +144,36 @@ XIAOverlaySocket::write_packet(Packet *p)
 			printf("XIAOverlaySocket: ERROR xia hdr != p->data\n");
 		}
 
-        if (_socktype != SOCK_DGRAM) {
-            click_chatter("XIAOverlaySocket: ERROR: not datagram socket");
-			p->kill();
-            return -1;
-        }
-        len = sendto(_active, p->data(), p->length(), 0,
-                (struct sockaddr *)&dest, sizeof(dest));
-        // error
-        if (len < 0) {
-            // out of memory or would block
-            if (errno == ENOBUFS || errno == EAGAIN) {
-                return -1;
-            } else if (errno == EINTR) {
-                continue;
-            } else {
-                if(_verbose) {
-                    click_chatter("%s: %s", declaration().c_str(),
-                            strerror(errno));
-                }
-                close_active();
-                break;
-            }
-        } else {
-            // this segment OK
-            p->pull(len);
-        }
+    if (_socktype != SOCK_DGRAM) {
+      click_chatter("XIAOverlaySocket: ERROR: not datagram socket");
+		  p->kill();
+      return -1;
     }
-    p->kill();
-    return 0;
+    printf("Sending len %d\n", p->length());
+    len = sendto(_active, p->data(), p->length(), 0,
+              (struct sockaddr *)&dest, sizeof(dest));
+    // error
+    if (len < 0) {
+      // out of memory or would block
+      if (errno == ENOBUFS || errno == EAGAIN) {
+        return -1;
+      } else if (errno == EINTR) {
+          continue;
+      } else {
+          if(_verbose) {
+            click_chatter("%s: %s", declaration().c_str(),
+              strerror(errno));
+          }
+          close_active();
+          break;
+      }
+    } else {
+      // this segment OK
+      p->pull(len);
+    }
+  }
+  p->kill();
+  return 0;
 }
 
 void
