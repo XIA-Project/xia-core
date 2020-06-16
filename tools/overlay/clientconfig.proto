@@ -4,10 +4,12 @@ package clientconfig;
 
 message Config {
 	required string name = 1;
-	required string ipaddr = 2;
-	required string iface = 3;
-	required string port = 4;
-	required string AD = 5;
-	required string HID = 6;
+	required string AID = 2;
+	required string ipaddr = 3;
+	required string iface = 4;
+	required string port = 5;
+	required string AD = 6;
+	required string HID = 7;
+	required string serverdag = 8;
 }
 

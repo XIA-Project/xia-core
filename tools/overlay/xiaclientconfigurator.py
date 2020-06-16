@@ -25,10 +25,12 @@ class XIAClientConfigReader:
        self.default_router = {}
        self.control_addr = {}
        self.control_port = {}
+       self.aid = {}
        self.ad = {}
        self.hid = {}
        self.router_addr = {}
        self.router_iface = {}
+       self.serverdag = {}
 
        # Read in the config file
        parser = RawConfigParser()
@@ -60,6 +62,8 @@ class XIAClientConfigReader:
            self.default_router[client] = parser.get(client, 'Default')
            self.control_addr[client] = parser.get(client, 'ControlAddress')
            self.control_port[client] = parser.get(client, 'ControlPort')
+           self.serverdag[client] = parser.get(client, 'ServerDag')
+           self.aid[client] = parser.get(client, 'AID')
 
     def clients(self):
         return self.routers.keys()
@@ -80,22 +84,30 @@ class ConfigClient(Int32StringReceiver):
         # configure with default router
         self.sendConfig(self.clientConfigurator.clientConfig.default_router[self.client])
 
-        # if self.client == 'c1': #todo: make configurable
-        #   self.mobilityConfig()
+        if self.client == 'c1': #todo: make configurable
+          self.mobilityConfig()
     
     def sendConfig(self, router):
         response = clientconfig_pb2.Config()
         response.name = self.client
         response.ipaddr = self.clientConfigurator.clientConfig.router_addr[router]
         response.iface = self.clientConfigurator.clientConfig.router_iface[self.client][router]
-        response.port = "8792"
+        response.port = "8770"
+        response.AID = self.clientConfigurator.clientConfig.aid[self.client]
         response.AD = self.clientConfigurator.clientConfig.ad[router]
         response.HID =self.clientConfigurator.clientConfig.hid[router]
+        response.serverdag = self.clientConfigurator.clientConfig.serverdag[self.client]
 
+        print "Sending config to " + self.client
         self.sendString(response.SerializeToString())
+        print response.SerializeToString()
+        print "Length "
+        print len(response.SerializeToString())
+        print "-----------------------------------"
+
 
     def mobilityConfig(self):
-        t = 10
+        t = 5
         for router in self.clientConfigurator.clientConfig.routers[self.client]:
             print "Adding a call for " + router
             reactor.callLater(t, self.sendConfig, router)
