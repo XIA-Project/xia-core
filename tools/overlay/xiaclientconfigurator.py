@@ -17,7 +17,7 @@ import clientconfig_pb2
 
 from ConfigParser import RawConfigParser
 
-import inspect
+mobility_time = 5
 
 class XIAClientConfigReader:
     def __init__(self, config_filename):
@@ -31,6 +31,7 @@ class XIAClientConfigReader:
        self.router_addr = {}
        self.router_iface = {}
        self.serverdag = {}
+       self.mobile = {}
 
        # Read in the config file
        parser = RawConfigParser()
@@ -64,31 +65,50 @@ class XIAClientConfigReader:
            self.control_port[client] = parser.get(client, 'ControlPort')
            self.serverdag[client] = parser.get(client, 'ServerDag')
            self.aid[client] = parser.get(client, 'AID')
+           self.mobile[client] = False
+           try:
+               if parser.getboolean(client, "Mobile"):
+                   self.mobile[client] = True
+           except:
+               pass
 
     def clients(self):
         return self.routers.keys()
 
 class ConfigClient(Int32StringReceiver):
     def __init__(self, client, clientConfigurator):
-        print inspect.stack()[0][3]
         self.client = client
         self.clientConfigurator = clientConfigurator
+        self.connected_clients = 0
 
     def connectionLost(self, reason):
         #self.connected_clients.remove(self)
-        self.clientConfigurator.connected_clients -= 1
+        print "Lost connection with " + self.client
+        self.connected_clients -= 1
         if self.clientConfigurator.connected_clients == 0:
-            reactor.stop()
+            print "!!!!!!!!!!! Stopping the configurator  !!!!!!!!!!!!!"
+            #reactor.stop()
 
     def connectionMade(self):
         # configure with default router
+        self.connected_clients += 1
         self.sendConfig(self.clientConfigurator.clientConfig.default_router[self.client])
 
-        if self.client == 'c1': #todo: make configurable
-          self.mobilityConfig()
+        if self.clientConfigurator.clientConfig.mobile[self.client] == True:
+          print "Making " + self.client + "mobile"
+          # We don't want to recursively do this, disable mobility
+          self.clientConfigurator.clientConfig.mobile[self.client] = False
+          for router in self.clientConfigurator.clientConfig.routers[self.client]:
+            print "\n Checking out router " + router + "\n" 
+            if router != self.clientConfigurator.clientConfig.default_router[self.client]:
+              print "Adding a call for " + router
+              reactor.callLater(mobility_time, self.mobilityConfig, self.client, router)
     
     def sendConfig(self, router):
         response = clientconfig_pb2.Config()
+        print "-----------------------------------"
+        print "Sending config to " + self.client
+        print "-----------------------------------"
         response.name = self.client
         response.ipaddr = self.clientConfigurator.clientConfig.router_addr[router]
         response.iface = self.clientConfigurator.clientConfig.router_iface[self.client][router]
@@ -98,20 +118,18 @@ class ConfigClient(Int32StringReceiver):
         response.HID =self.clientConfigurator.clientConfig.hid[router]
         response.serverdag = self.clientConfigurator.clientConfig.serverdag[self.client]
 
-        print "Sending config to " + self.client
         self.sendString(response.SerializeToString())
         print response.SerializeToString()
-        print "Length "
-        print len(response.SerializeToString())
         print "-----------------------------------"
 
 
-    def mobilityConfig(self):
-        t = 5
-        for router in self.clientConfigurator.clientConfig.routers[self.client]:
-            print "Adding a call for " + router
-            reactor.callLater(t, self.sendConfig, router)
-            t = t + 10*2
+    def mobilityConfig(self, client, router):
+        # new default router
+        self.clientConfigurator.clientConfig.default_router[client] = router
+        endpoint = TCP4ClientEndpoint(reactor, self.clientConfigurator.clientConfig.control_addr[client],
+                                          int(self.clientConfigurator.clientConfig.control_port[client]))
+
+        d = connectProtocol(endpoint, ConfigClient(client, self.clientConfigurator))
 
 
 class XIAClientConfigurator():
@@ -136,7 +154,7 @@ class XIAClientConfigurator():
                                           int(self.clientConfig.control_port[client]))
 
             d = connectProtocol(endpoint, ConfigClient(client, self))
-            d.addCallback(self.addClient)
+            #d.addCallback(self.addClient)
 
             #reactor.run()
 
