@@ -293,8 +293,6 @@ XIAXIDRouteTable::add_ip_handler(const String &conf, Element *e, void *thunk, Er
 	HashTable<String, XIAXIDAddr *>::iterator it = table->_nts.find(ipstr);
 	XIAXIDAddr *n;
 	if(it == table->_nts.end()) {
-		printf("XIAXIDNeighbor: %s does not exist in HT %d \n", 
-			ipstr.c_str(), table->_nts.size());
 		n = new XIAXIDAddr();
 		table->_nts[ipstr] = n;
 	}
@@ -326,7 +324,7 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 {
 
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
-	printf("******called %s table : %lld\n", __FUNCTION__, (unsigned long)table);
+	// printf("******called %s table : %lld\n", __FUNCTION__, (unsigned long)table);
 	bool add_mode = !thunk;
 	Vector<String> args;
 	int port = 0;
@@ -361,7 +359,7 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 	String ename = table->_hostname +  String("/xrc/n/proc/rt_IP");
 	Element *ne = e->router()->find(ename);
 	if(ne) {
-		printf("XIAXIDRoutetable: Calling write\n");
+		printf("XIAXIDRoutetable: Calling write \n");
 		int ret = HandlerCall::call_write(ne, "addIP", ipaddrstr + "," + xid_str);
 		if (ret) 
 			return errh->error("Failed to call write\n");
@@ -381,10 +379,10 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 		printf("XIAXIDRouteTable: Going into the neighbor block \n");
 		if(flags == NEIGHBOR)
 		{
-			Vector <Element *> ve = e->router()->elements();
-			for(int i=0; i<ve.size(); i++) {
-				printf("Element: %s\n", ve[i]->name().c_str());
-			}
+			// Vector <Element *> ve = e->router()->elements();
+			// for(int i=0; i<ve.size(); i++) {
+			// 	printf("Element: %s\n", ve[i]->name().c_str());
+			// }
 			
 			String ename = table->_hostname +  String("/xrc/n/proc/rt_IP");
 			Element *ne = e->router()->find(ename);
@@ -425,29 +423,10 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 					}
 				}
 
-
 			}
 			else {
 				printf("Element %s not found \n", ename.c_str());
-			}
-			// XIAXIDNeighbor *neighbor = (XIAXIDNeighbor *)malloc(sizeof(XIAXIDNeighbor));
-			// if(!neighbor) {
-			// 	printf("XIAXIDRouteTable: allocation failed\n");
-			// }
-			// String *s = new String(ipaddrstr + ":" + portstr);
-			// neighbor->addr = s;
-			// neighbor->iface = port;
-			// printf("XIAXIDRouteTable: Adding neighbor %s at port %d\n", (*(neighbor->addr)).c_str(), 
-			// 	neighbor->iface);
-			// table->_ntable.push_back(neighbor);
-			// printf("XIAXIDRoutable: Pushed %s\n", (*(table->_ntable[0]->addr)).c_str());
-			// // table->_ntable.count += 1;
-			// printf("XIAXIDRouteTable: neighbor count %ld \n", table->_ntable.size());
-			// 
-			// 
-			// printf("neighbor entry found %s %s %s %s\n", ipaddrstr.c_str(), 
-			// 	table->_nts[ipaddrstr]->AD->c_str(), table->_nts[ipaddrstr]->HID->c_str(), table->_nts[ipaddrstr]->SID->c_str());
-			
+			}			
 		}
 	}
 

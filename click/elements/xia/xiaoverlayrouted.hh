@@ -69,44 +69,6 @@ typedef struct {
 	unsigned long  flags;
 } XIARouteEntry;
 
-// class XIARouter {
-// public:
-// 	XIARouter(const char *_rtr = "router0") { _connected = false;
-// 		_cserr = ControlSocketClient::no_err; _router = _rtr; };
-// 	~XIARouter() { if (connected()) close(); };
-
-// 	// connect to click
-// 	int connect(std::string clickHost = "localhost", unsigned short controlPort = 7777);
-// 	int connected() { return _connected; };
-// 	void close();
-
-// 	// returns the click version in <ver>
-// 	int version(std::string &ver);
-
-// 	// return a vector of router devices click knows about (host0, router1, ....)
-// 	int listRouters(std::vector<std::string> &rlist);
-
-// 	// specify which router to operate on, must be called before adding/removing routes
-// 	// defaults to router0
-// 	void setRouter(std::string r) { _router = r; };
-// 	std::string getRouter() { return _router; };
-
-// 	// get the current set of route entries, return value is number of entries returned or < 0 on err
-// 	int getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt);
-
-// 	// returns 0 success, < 0 on error
-// 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
-// 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
-// 	int delRoute(const std::string &xid);
-// 	int getNeighbors(std::string xidtype, std::vector<std::string> &neighbors);
-
-// private:
-// 	bool _connected;
-// 	std::string _router;
-// 	int updateRoute(std::string cmd, const std::string &xid, int port, const std::string &next, unsigned long flags);
-// 	string itoa(signed);
-// };
-
 typedef struct {
 	std::string dest;	// destination AD or HID
 	std::string nextHop;	// nexthop HID
@@ -123,7 +85,6 @@ typedef struct {
 	int32_t port;		// interface (outgoing port)
 } NeighborEntry;
 
-
 typedef struct {
 	std::string dest;	// destination AD or HID
 	int32_t num_neighbors;	// number of neighbors of dest AD
@@ -134,6 +95,7 @@ typedef struct {
 	std::string prevNode; // previous node along the shortest path from myAD to destAD
 
 } NodeStateEntry; // extracted from incoming LSA
+
 
 typedef struct RouteState {
 	int32_t sock; // socket for routing process
@@ -160,32 +122,41 @@ typedef struct RouteState {
 
 class XIAOverlayRouted : public Element {
 
-void add_handlers();
-
-protected:
-  static int add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
-
-  RouteState route_state;
-  // XIARouter xr;
-  String _hostname;
-  int c;
-  
-public:
-
-	XIAOverlayRouted();
-	~XIAOverlayRouted();
-
-	const char *class_name() const { return "XIAOverlayRouted"; }
-	const char *port_count() const { return "1/4"; }
-	const char *processing() const { return PUSH; }
-
-	void push(int, Packet *);
+  void add_handlers();
+  String itoa(signed i);
   std::string sendHello();
   std::string sendLSA();
   int processLSA(const Xroute::XrouteMsg &msg);
+  void updateClickRoutingTable();
+  int updateRoute(string cmd, const std::string &xid, int port,
+    const std::string &next, unsigned long flags);
+  void calcShortestPath();
+  void neighbor_broadcast(std::string msg);
+  void _push_msg(std::string msg, String dst, int port);
+  void printRoutingTable();
+
+  protected:
+    static int add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+
+    RouteState route_state;
+    // XIARouter xr;
+    String _hostname;
+    int c;
+    
+  public:
+
+  	XIAOverlayRouted();
+  	~XIAOverlayRouted();
+
+  	const char *class_name() const { return "XIAOverlayRouted"; }
+  	const char *port_count() const { return "1/4"; }
+  	const char *processing() const { return PUSH; }
+
+  	void push(int, Packet *);
 
 
-  // int getNeighbors(std::vector<std::string> &neighbors);
+
+    // int getNeighbors(std::vector<std::string> &neighbors);
 };
 
 CLICK_ENDDECLS

@@ -83,6 +83,7 @@ class XIAXIDRouteTable : public Element { public:
 
     int set_enabled(int e);
     int get_enabled();
+    void printRoutingTable();
 
 protected:
     int lookup_route(Packet *);
