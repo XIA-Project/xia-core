@@ -72,7 +72,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
 	archive.o userutils.o driver.o \
-	xid.o xidpair.o xidtuple.o xiapath.o xiaheader.o xiautil.o xia.pb.o \
+	xid.o xidpair.o xidtuple.o xiapath.o xiaheader.o xiautil.o xia.pb.o xroute.pb.o\
 	xiasecurity.o \
 	xiamigrate.o \
 	xiarendezvous.o \
@@ -141,6 +141,9 @@ all: $(INSTALLPROGS) $(INSTALLLIBS)
 xia.pb.cc: xia.proto
 	protoc --cpp_out=. xia.proto
 
+xroute.pb.cc: xroute.proto
+	protoc --cpp_out=. xroute.proto
+
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
@@ -167,6 +170,8 @@ $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
 	@rm -f $(ELEMENTSCONF).d
 	echo '#include "xia.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
+	echo '#include "xroute.pb.h"' | cat - $(ELEMENTSCONF).cc  > temp && mv temp $(ELEMENTSCONF).cc
+
 
 DEPFILES := $(wildcard *.d)
 ifneq ($(DEPFILES),)
@@ -189,7 +194,7 @@ uninstall:
 
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
-	rm -f xia.pb.h xia.pb.cc
+	rm -f xia.pb.h xia.pb.cc xroute.pb.cc
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a

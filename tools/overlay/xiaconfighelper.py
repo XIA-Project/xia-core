@@ -2,6 +2,7 @@
 import os
 import sys
 import subprocess
+import inspect
 
 # Install python-twisted package for this functionality
 from twisted.internet.protocol import Protocol, Factory
@@ -34,13 +35,11 @@ class Helper(Int32StringReceiver):
     def connectionMade(self):
         self.sendString(xiaconfigdefs.HELPER_GREETING);
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason):    
         # Clean up any state created in common_data for this connection
         print "Connection to client lost"
 
     def handleInterfaceRequest(self, request):
-        print "Got interface request"
-
         # Fill in interface information
         for if_info in request.ifrequest.interfaces:
             if_info.ipaddr = interfaces.get_ip_addr(if_info.name)
@@ -170,7 +169,6 @@ class Helper(Int32StringReceiver):
             #self.transport.loseConnection();
 
 class HelperFactory(Factory):
-
     def __init__(self):
         self.common_data = {}
 
