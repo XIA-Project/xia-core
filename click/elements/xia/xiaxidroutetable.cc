@@ -31,8 +31,15 @@ XIAXIDRouteTable::XIAXIDRouteTable(): _drops(0)
 {
 	char *hostname = (char *)malloc(32);
 	assert(hostname);
-	gethostname(hostname, 32);
-	_hostname = String(hostname, strlen(hostname));
+	FILE *f = fopen("etc/address.conf", "r"); 
+	if (!f) {
+		printf("Failed to open address.conf \n");
+		return;
+	}
+  fscanf(f,"%s", hostname);
+  fclose(f);
+
+  _hostname = String(hostname, strlen(hostname));
 }
 
 XIAXIDRouteTable::~XIAXIDRouteTable()
@@ -43,8 +50,6 @@ XIAXIDRouteTable::~XIAXIDRouteTable()
 int
 XIAXIDRouteTable::configure(Vector<String> & /*conf*/, ErrorHandler * /*errh*/)
 {
-    //printf("XIAXIDRouteTable: configuring %s\n", this->name().c_str());
-
 	_principal_type_enabled = 1;
 
     _rtdata.port = -1;
@@ -87,7 +92,6 @@ XIAXIDRouteTable::add_handlers()
 String
 XIAXIDRouteTable::read_handler(Element *e, void *thunk)
 {
-	// printf("******called %s \n", __FUNCTION__);
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
@@ -101,7 +105,6 @@ XIAXIDRouteTable::read_handler(Element *e, void *thunk)
 int
 XIAXIDRouteTable::write_handler(const String &str, Element *e, void *thunk, ErrorHandler * /*errh*/)
 {
-	// printf("******called %s \n", __FUNCTION__);
 	XIAXIDRouteTable *t = (XIAXIDRouteTable *) e;
     switch ((intptr_t)thunk) {
 		case PRINCIPAL_TYPE_ENABLED:
@@ -115,7 +118,6 @@ void
 XIAXIDRouteTable::add_entry_to_tbl_str(Element *e, String& tbl, String xid,
 		XIARouteData* xrd)
 {
-	// printf("******called %s \n", __FUNCTION__);
 	// XID
 	tbl += xid + ",";
 	// port
@@ -136,7 +138,6 @@ XIAXIDRouteTable::add_entry_to_tbl_str(Element *e, String& tbl, String xid,
 String
 XIAXIDRouteTable::list_routes_handler(Element *e, void *thunk)
 {
-	// printf("******called %s \n", __FUNCTION__);
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 	XIARouteData *xrd = &table->_rtdata;
 
@@ -172,7 +173,6 @@ int
 XIAXIDRouteTable::set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
 	// handle older style route entries
-	// printf("******called %s \n", __FUNCTION__);
 	String str_copy = conf;
 	String xid_str = cp_shift_spacevec(str_copy);
 
@@ -223,7 +223,6 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 	    String nxthop = args[2];
 		// If nexthop is less than 40 chars, it is an IP:port
 		if(nxthop.length() < CLICK_XIA_XID_ID_LEN*2) {
-			printf("XIAXIDRouteTable: Calling udpnext nts %lld\n", (unsigned long)&table->_nts);
 			return set_udpnext(conf, e, thunk, errh);
 		}
 		nexthop = new XID;
@@ -267,7 +266,6 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 int 
 XIAXIDRouteTable::add_ip_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-	printf("In add ip handler\n");
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
 	Vector<String> args;
@@ -304,16 +302,16 @@ XIAXIDRouteTable::add_ip_handler(const String &conf, Element *e, void *thunk, Er
 
 	if(xid_str.starts_with("AD")) {
 		n->AD = s;
-		printf("Added AD for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->AD->c_str());
+		printf("XIAXIDRouteTable: Added AD for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->AD->c_str());
 	}
 	else if(xid_str.starts_with("HID"))
 	{
 		n->HID = s;		
-		printf("Added HID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->HID->c_str());
+		printf("XIAXIDRouteTable: Added HID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->HID->c_str());
 	}
 	else if(xid_str.starts_with("SID")) {
 		n->SID = s;
-		printf("Added SID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->SID->c_str());
+		printf("XIAXIDRouteTable: Added SID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->SID->c_str());
 	}
 
 	return 0;
@@ -324,7 +322,6 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 {
 
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
-	// printf("******called %s table : %lld\n", __FUNCTION__, (unsigned long)table);
 	bool add_mode = !thunk;
 	Vector<String> args;
 	int port = 0;
@@ -391,17 +388,14 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 				std::string rstr(result.c_str (), result.length());
 
 				std::string::size_type beg = 0;
-				printf("Returned %s\n", rstr.c_str());
 				String ad, sid;
 				for (auto end = 0; (end = rstr.find(';', end)) != std::string::npos; end++)
 				{
 					std::string n(rstr.substr(beg, end - beg));
-					printf("N : %s\n", n.c_str());
 					Vector<String>args;
 					String c(n.c_str());
 					cp_argvec(c, args);
 					if(args.size() != 3) {
-						printf("List IP did not return all args %d\n", args.size());
 						return errh->error("Not all args");
 					}
 					if(args[0].equals(ipaddrstr)) {
@@ -416,16 +410,13 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 				if(re) {
 					String nentry(ipaddrstr + "," + ad + "," + sid + "," + std::to_string(port).c_str());
 					if(HandlerCall::call_write(re, "neighbor", nentry)) {
-						printf("Failed to write to xrouted\n");
+						return errh->error("Failed to write to xrouted");
 					}	
-					else {
-						printf("Written %s\n", nentry.c_str());
-					}
 				}
 
 			}
 			else {
-				printf("Element %s not found \n", ename.c_str());
+				return errh->error("Element not found : ", ename.c_str());
 			}			
 		}
 	}
@@ -481,7 +472,6 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 int
 XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, ErrorHandler *errh)
 {
-	// printf("******called %s \n", __FUNCTION__);
 	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
 
 	if (xid_str.length() == 0)
@@ -522,7 +512,6 @@ XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 int
 XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
-	// printf("******called %s \n", __FUNCTION__);
 #if CLICK_USERLEVEL
 	std::ifstream in_f(conf.c_str());
 	if (!in_f.is_open())
@@ -590,7 +579,6 @@ XIAXIDRouteTable::load_routes_handler(const String &conf, Element *e, void *, Er
 int
 XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh)
 {
-	// printf("******called %s \n", __FUNCTION__);
 #if CLICK_USERLEVEL
 	XIAXIDRouteTable* table = dynamic_cast<XIAXIDRouteTable*>(e);
 #else
@@ -688,7 +676,6 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 void
 XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 {
-	// printf("******called %s \n", __FUNCTION__);
     int port;
 
 	//in_ether_port = XIA_PAINT_ANNO(p);
@@ -763,7 +750,6 @@ XIAXIDRouteTable::push(int /*in_ether_port*/, Packet *p)
 int
 XIAXIDRouteTable::lookup_route(Packet *p)
 {
-   // printf("******called %s \n", __FUNCTION__);
    const struct click_xia* hdr = p->xia_header();
    int last = hdr->last;
    if (last == LAST_NODE_DEFAULT)

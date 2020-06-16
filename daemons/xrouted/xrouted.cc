@@ -80,9 +80,6 @@ int sendHello()
 	sid->set_id(n_sid.id(), XID_SIZE);
 
 
-//	printf("sending %s\n", msg.DebugString().c_str());
-	// printf("**** sending lsa with and num_neighbors %d \n", route_state.num_neighbors);
-
 	msg.SerializeToString(&message);
 	buflen = message.length();
 

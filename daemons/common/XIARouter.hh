@@ -89,7 +89,6 @@ public:
 	int addRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int setRoute(const std::string &xid, int port, const std::string &next, unsigned long flags);
 	int delRoute(const std::string &xid);
-	int getNeighbors(std::string xidtype, std::vector<std::string> &neighbors);
 
 
 	const char *cserror();

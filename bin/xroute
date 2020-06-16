@@ -567,7 +567,7 @@ class XrouteApp:
 			self.errorExit("port not specified")
 
 		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (self.device, table, xid, port, nexthop, flags)
-		print("Writing %s" %cmd)
+		print cmd
 
 		self.writeData(cmd)
 		print "added route for %s:%s" % (table, self.config.getAlias(xid))

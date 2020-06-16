@@ -69,29 +69,6 @@ int XIARouter::listRouters(std::vector<std::string> &rlist)
 	return 0;
 }
 
-int XIARouter::getNeighbors(std::string xidtype, std::vector<std::string> &neighbors)
-{
-	if (!connected())
-		return XR_NOT_CONNECTED;
-	
-	std::string table = _router + "/xrc/n/proc/rt_" + xidtype;
-
-	std::string neighborStr;
-	if ((_cserr = _cs.read(table, "neighbor", neighborStr)) != 0)
-		return XR_CLICK_ERROR;
-
-	std::string::size_type beg = 0;
-	for (auto end = 0; (end = neighborStr.find(',', end)) != std::string::npos; ++end)
-	{
-		neighbors.push_back(neighborStr.substr(beg, end - beg));
-		beg = end + 1;
-	}
-
-	printf("Retuning neighbors\n");
-	return 0;
-}
-
-
 // get the current set of route entries, return value is number of entries returned or < 0 on err
 int XIARouter::getRoutes(std::string xidtype, std::vector<XIARouteEntry> &xrt)
 {

@@ -103,6 +103,7 @@ XIAOverlayRouted::XIAOverlayRouted()
     return;
   }
   char *hostname = (char *)malloc(32);
+  assert(hostname);
   char ad[100], hid[100], re[100];
   fscanf(f,"%s %s %s %s", hostname, re, ad, hid);
   fclose(f);
@@ -116,7 +117,6 @@ XIAOverlayRouted::XIAOverlayRouted()
   route_state.flags = F_EDGE_ROUTER;
 
   route_state.dual_router_AD = "NULL";
-  assert(hostname);
   _hostname = String(hostname, strlen(hostname));
     printf("\n----XIAOverlayRouted: Started with ad: %s hid: %s hostname: %s----\n", route_state.myAD,
     route_state.myHID, _hostname.c_str());
