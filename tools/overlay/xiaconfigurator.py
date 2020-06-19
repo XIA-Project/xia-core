@@ -33,7 +33,7 @@ from xiaconfigreader import XIAConfigReader
 from xiaclientconfigurator import XIAClientConfigurator
 from routerclick import RouterClick
 
-import inspect
+import time
 
 class ConfigRouter(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
@@ -46,6 +46,7 @@ class ConfigRouter(Int32StringReceiver):
     def connectionLost(self, reason):
         self.configurator.protocol_instances.remove(self)
         if len(self.configurator.protocol_instances) == 0:
+            time.sleep(50)
             print "Going to configure clients now"
             # configure client after last router is configured
             clientConfigurator = XIAClientConfigurator(self.configurator)

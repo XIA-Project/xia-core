@@ -136,6 +136,7 @@ class XIAOverlayRouted : public Element {
   void printRoutingTable();
 
   protected:
+    Task _task;
     static int add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 
     RouteState route_state;
@@ -147,6 +148,8 @@ class XIAOverlayRouted : public Element {
 
   	XIAOverlayRouted();
   	~XIAOverlayRouted();
+    virtual int initialize(ErrorHandler *) CLICK_COLD;
+    bool run_task(Task *);
 
   	const char *class_name() const { return "XIAOverlayRouted"; }
   	const char *port_count() const { return "1/4"; }
