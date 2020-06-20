@@ -45,18 +45,47 @@ CLICK_DECLS
 void
 XIAOverlayRouted::add_handlers()
 {
-  add_write_handler("neighbor", add_neighbor, 0);
+  add_write_handler("addNeighbor", add_neighbor, 0);
+  add_write_handler("removeNeighbor", remove_neighbor, 0);
+
 }
 
-// int
-// XIAOverlayRouted::remove_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
-// {
-// }
+int
+XIAOverlayRouted::remove_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+  XIAOverlayRouted *r = static_cast<XIAOverlayRouted *>(e);
+
+  Vector<String> args;
+  cp_argvec(conf, args);
+
+  if (args.size() != 1)
+    return errh->error("Invalid args: ", conf.c_str());
+
+  String ad;
+
+  if (!cp_string(args[0], &ad)) {
+    return errh->error("Invalid AD");
+  }
+
+  std::map<std::string, NeighborEntry*>::iterator it;
+  std::string ad_str(ad.c_str());
+  it = r->route_state.neighborTable.find(ad_str);
+  if(it != r->route_state.neighborTable.end()) {
+    NeighborEntry *n = it->second;
+    r->route_state.neighborTable.erase(it);
+    delete(n);
+    printf("XIAOverlayRouted: removed neighborAD %s\n", ad.c_str());
+  }
+  else {
+    return errh->error("AD not found ", ad.c_str());
+  }
+
+  return 0;
+}
 
 int
 XIAOverlayRouted::add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-  printf("Called add neighbor\n");
   XIAOverlayRouted *r = static_cast<XIAOverlayRouted *>(e);
 
   Vector<String> args;
@@ -644,7 +673,7 @@ XIAOverlayRouted::run_timer(Timer *timer) {
   // printf("\n**********************\n getting neighbors c :%d\n", c);
   neighbor_broadcast(msg);
   // printf("\n**********************\n");
-  _ticks->reschedule_after_msec(CALC_DIJKSTRA_INTERVAL);
+  _ticks->reschedule_after_sec(CALC_DIJKSTRA_INTERVAL);
 }
 
 

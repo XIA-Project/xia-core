@@ -149,7 +149,6 @@ XIAOverlaySocket::write_packet(Packet *p)
 		  p->kill();
       return -1;
     }
-    printf("Sending len %d\n", p->length());
     len = sendto(_active, p->data(), p->length(), 0,
               (struct sockaddr *)&dest, sizeof(dest));
     // error

@@ -39,7 +39,7 @@ CLICK_DECLS
 #define RECV_ITERS 2
 #define HELLO_ITERS 2
 #define LSA_ITERS 8
-#define CALC_DIJKSTRA_INTERVAL 400
+#define CALC_DIJKSTRA_INTERVAL 40
 #define MAX_HOP_COUNT 50
 #define MAX_XID_SIZE 64
 #define MAX_DAG_SIZE 512
@@ -144,6 +144,7 @@ class XIAOverlayRouted : public Element {
     Timer _timer;
     Timer *_ticks;
     static int add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+    static int remove_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 
     RouteState route_state;
     // XIARouter xr;
@@ -162,8 +163,6 @@ class XIAOverlayRouted : public Element {
   	const char *processing() const { return PUSH; }
 
   	void push(int, Packet *);
-
-
 
     // int getNeighbors(std::vector<std::string> &neighbors);
 };

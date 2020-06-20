@@ -86,6 +86,7 @@ XIAXIDRouteTable::add_handlers()
 	add_write_handler("enabled", write_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 	add_read_handler("enabled", read_handler, (void *)PRINCIPAL_TYPE_ENABLED);
 	add_write_handler("addIP", add_ip_handler, 0);
+	add_write_handler("removeIP", remove_ip_handler, 0);
 	add_read_handler("listIP", list_ip_handler, 0);
 }
 
@@ -258,6 +259,7 @@ XIAXIDRouteTable::set_handler4(const String &conf, Element *e, void *thunk, Erro
 		xrd->nexthop = nexthop;
 		xrd->nexthop_in = nullptr;
 		table->_rts[xid] = xrd;
+		xrd->neighbor = false;
 	}
 
 	return 0;
@@ -274,17 +276,14 @@ XIAXIDRouteTable::add_ip_handler(const String &conf, Element *e, void *thunk, Er
 	cp_argvec(conf, args);
 
 	if (args.size() != 2) {
-		printf("1 %ld\n", args.size());
-		return errh->error("Invalid route(need 2 entries): ", conf.c_str());
+		return errh->error("Invalid args(need 2 entries): ", conf.c_str());
 	}
 
 	if (!cp_string(args[0], &ipstr)) {
-		printf("3\n");
 		return errh->error("Invalid ipaddr arg");
 	}
 
 	if (!cp_string(args[1], &xid_str)) {
-		printf("2\n");
 		return errh->error("Invalid xid arg");
 	}
 
@@ -302,17 +301,45 @@ XIAXIDRouteTable::add_ip_handler(const String &conf, Element *e, void *thunk, Er
 
 	if(xid_str.starts_with("AD")) {
 		n->AD = s;
-		printf("XIAXIDRouteTable: Added AD for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->AD->c_str());
+		// printf("XIAXIDRouteTable: Added AD for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->AD->c_str());
 	}
 	else if(xid_str.starts_with("HID"))
 	{
 		n->HID = s;		
-		printf("XIAXIDRouteTable: Added HID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->HID->c_str());
+		// printf("XIAXIDRouteTable: Added HID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->HID->c_str());
 	}
 	else if(xid_str.starts_with("SID")) {
 		n->SID = s;
-		printf("XIAXIDRouteTable: Added SID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->SID->c_str());
+		// printf("XIAXIDRouteTable: Added SID for %s :  %s\n", ipstr.c_str(), table->_nts[ipstr]->SID->c_str());
 	}
+
+	return 0;
+}
+
+int 
+XIAXIDRouteTable::remove_ip_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+	XIAXIDRouteTable* table = static_cast<XIAXIDRouteTable*>(e);
+
+	Vector<String> args;
+	String ipstr;
+
+	cp_argvec(conf, args);
+
+	if (args.size() != 1) {
+		return errh->error("Invalid args(need 1 entries): ", conf.c_str());
+	}
+
+	if (!cp_string(args[0], &ipstr)) {
+		return errh->error("Invalid ipaddr arg");
+	}
+
+	HashTable<String, XIAXIDAddr *>::iterator it = table->_nts.find(ipstr);
+	if(it == table->_nts.end()) {
+		return errh->error("Invalid ipaddr ", ipstr.c_str());
+	}
+	table->_nts.erase(it);
+	printf("XIAXIDRouteTable: Removed ip entry for %s\n", ipstr.c_str());
 
 	return 0;
 }
@@ -356,26 +383,24 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 	String ename = table->_hostname +  String("/xrc/n/proc/rt_IP");
 	Element *ne = e->router()->find(ename);
 	if(ne) {
-		printf("XIAXIDRoutetable: Calling write \n");
 		int ret = HandlerCall::call_write(ne, "addIP", ipaddrstr + "," + xid_str);
 		if (ret) 
-			return errh->error("Failed to call write\n");
+			return errh->error("Failed to write addIP\n");
 	}
 	else {
-		printf("Element %s not found \n", ename.c_str());
 		return errh->error("Failed to find element : \n", ename.c_str());
 	}
 
-
+	bool neighbor = false;
 	if(args.size() > 3) {
 		int flags;
 		// XIARouteData *xrd = &table->_rtdata;
 		if (!cp_integer(args[3], &flags))
 			return errh->error("invalid flags: ", conf.c_str());
 
-		printf("XIAXIDRouteTable: Going into the neighbor block \n");
 		if(flags == NEIGHBOR)
 		{
+			neighbor = true;
 			// Vector <Element *> ve = e->router()->elements();
 			// for(int i=0; i<ve.size(); i++) {
 			// 	printf("Element: %s\n", ve[i]->name().c_str());
@@ -409,7 +434,7 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 				Element *re = e->router()->find(rname);
 				if(re) {
 					String nentry(ipaddrstr + "," + ad + "," + sid + "," + std::to_string(port).c_str());
-					if(HandlerCall::call_write(re, "neighbor", nentry)) {
+					if(HandlerCall::call_write(re, "addNeighbor", nentry)) {
 						return errh->error("Failed to write to xrouted");
 					}	
 				}
@@ -462,6 +487,8 @@ XIAXIDRouteTable::set_udpnext(const String &conf, Element *e, void *thunk, Error
 		xrd->flags = flags; // hardcoded to 4, representing ipv4 for now
 		xrd->nexthop = NULL; // Will fill nexthop_in with the address instead
 		xrd->nexthop_in = std::move(addr);
+		xrd->neighbor = neighbor;
+
 		table->_rts[xid] = xrd;
 	}
 
@@ -499,6 +526,69 @@ XIAXIDRouteTable::remove_handler(const String &xid_str, Element *e, void *, Erro
 			return errh->error("nonexistent XID: ", xid_str.c_str());
 
 		XIARouteData *xrd = (XIARouteData*)it.value();
+		if(xrd->neighbor) {
+			String ipaddrstr, ad;
+			// remove associated ip, ad
+			String ename = table->_hostname +  String("/xrc/n/proc/rt_IP");
+			Element *ne = e->router()->find(ename);
+			if(ne) {
+				String result = HandlerCall::call_read(ne, "listIP");
+				std::string rstr(result.c_str (), result.length());
+
+				std::string::size_type beg = 0;
+				String ad, sid;
+				for (auto end = 0; (end = rstr.find(';', end)) != std::string::npos; end++)
+				{
+					std::string n(rstr.substr(beg, end - beg));
+					Vector<String>args;
+					String c(n.c_str());
+					cp_argvec(c, args);
+					if(args.size() != 3) {
+						return errh->error("Not all args");
+					}
+					if(args[2].equals(xid_str)) {
+						cp_string(args[1], &ad);
+						cp_string(args[0], &ipaddrstr);
+						break;
+					}
+					beg = end + 1;
+				}
+
+				// remove neighbor entry
+				String rname = "rd/rd";
+				Element *re = e->router()->find(rname);
+				if(re) {
+					if(HandlerCall::call_write(re, "removeNeighbor", ad)) {
+						return errh->error("Failed to removeNeighbor from xiaoverlayxrouted");
+					}
+				}
+				else {
+					return errh->error("Cannot find element", rname.c_str());
+				}
+				
+				// remove ip
+				if(HandlerCall::call_write(ne, "removeIP", ipaddrstr)) {
+					return errh->error("Failed to removeIP");
+				}
+
+				// remove ad
+				rname = table->_hostname +  String("/xrc/n/proc/rt_AD");
+				ne = e->router()->find(rname);
+				if(ne) {
+					if(HandlerCall::call_write(ne, "remove", ad)) {
+						return errh->error("Failed to remove AD", ad.c_str());
+					}
+				}
+				else {
+					return errh->error("Failed to find element", rname.c_str());
+				}
+
+			}
+			else {
+				return errh->error("Element not found : ", ename.c_str());
+			}			
+
+		}
 		if (xrd->nexthop) {
 			delete xrd->nexthop;
 		}
@@ -651,6 +741,7 @@ XIAXIDRouteTable::generate_routes_handler(const String &conf, Element *e, void *
 		XIARouteData *xrd = new XIARouteData();
 		xrd->flags = 0;
 		xrd->nexthop = NULL;
+		xrd->neighbor = false;
 
 		if (port<0) {
 #if CLICK_LINUXMODULE
