@@ -2,7 +2,7 @@ from ConfigParser import RawConfigParser
 import genkeys
 
 class XIAConfigReader:
-    def __init__(self, config_filename):
+    def __init__(self, config_filename, events_filename):
         self.control_addrs = {} # router: ctrl_addr
         self.router_ifaces = {} # router: [iface1,...]
         self.host_ifaces = {} # router: host_iface
@@ -11,6 +11,8 @@ class XIAConfigReader:
         self.xcache = {} # router: runs_xcache
         self.nameserver = ""
         self.sid = {} # router : routing sid
+        self.links = {}
+        self.link_info = {}
  
         # Read in the config file
         parser = RawConfigParser()
@@ -61,6 +63,8 @@ class XIAConfigReader:
 
             # Routes to other routers
             self.route_info[router] = []
+            self.link_info[router] = {}
+            self.links[router] = []
             for name, val in parser.items(router):
                 if not name.startswith('route_'):
                     continue
@@ -71,9 +75,49 @@ class XIAConfigReader:
                 #routename, iface = val.split(':')
                 self.route_info[router].append(
                         (dest, our_iface, their_iface, their_name))
+                self.links[router].append(dest)
+                self.link_info[router][dest] = [our_iface, their_iface]
+
         #print self.control_addrs
         #print self.host_ifaces
         #print self.route_info
+        #
+        self.events = self.parse_events(events_filename)
+        print self.events
+
+    def parse_events(self, events_filename):
+
+        parser = RawConfigParser()
+        parser.read(events_filename)
+
+        events = parser.sections()
+        if len(events) == 0:
+            print "ERROR: No sections found in events file"
+
+        revents = {}
+        for event in events:
+            revents[event] = {}
+            revents[event]['add_links'] = {}
+            revents[event]['remove_links'] = {}
+            revents[event]['delay'] = parser.get(event, 'delay')
+            revents[event]['link_count'] = 0
+
+            for name, val in parser.items(event):
+                if name.startswith('add_'):
+                    r = name.split('_')[1]
+                    strippedval = val.replace(' ', '')
+                    revents[event]['add_links'][r] = strippedval.split(',')
+                    revents[event]['link_count'] += 1
+                elif name.startswith('remove_'):
+                    r = name.split('_')[1]
+                    strippedval = val.replace(' ', '')
+                    revents[event]['remove_links'][r] = strippedval.split(',')
+                    revents[event]['link_count'] += 1
+
+                else:
+                    continue
+
+        return revents
 
     def routers(self):
         return self.control_addrs.keys()
