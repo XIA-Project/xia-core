@@ -18,6 +18,8 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <click/task.hh>
+
 
 #include "../../userlevel/xroute.pb.h"
 
@@ -37,7 +39,7 @@ CLICK_DECLS
 #define RECV_ITERS 2
 #define HELLO_ITERS 2
 #define LSA_ITERS 8
-#define CALC_DIJKSTRA_INTERVAL 4
+#define CALC_DIJKSTRA_INTERVAL 40
 #define MAX_HOP_COUNT 50
 #define MAX_XID_SIZE 64
 #define MAX_DAG_SIZE 512
@@ -134,9 +136,15 @@ class XIAOverlayRouted : public Element {
   void neighbor_broadcast(std::string msg);
   void _push_msg(std::string msg, String dst, int port);
   void printRoutingTable();
+  void updateRTable();
+
+  int _n_updates;
 
   protected:
+    Timer _timer;
+    Timer *_ticks;
     static int add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+    static int remove_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
 
     RouteState route_state;
     // XIARouter xr;
@@ -147,14 +155,14 @@ class XIAOverlayRouted : public Element {
 
   	XIAOverlayRouted();
   	~XIAOverlayRouted();
+    virtual int initialize(ErrorHandler *) CLICK_COLD;
+    void run_timer(Timer *);
 
   	const char *class_name() const { return "XIAOverlayRouted"; }
   	const char *port_count() const { return "1/4"; }
   	const char *processing() const { return PUSH; }
 
   	void push(int, Packet *);
-
-
 
     // int getNeighbors(std::vector<std::string> &neighbors);
 };

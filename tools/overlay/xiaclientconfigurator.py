@@ -85,8 +85,8 @@ class ConfigClient(Int32StringReceiver):
         #self.connected_clients.remove(self)
         print "Lost connection with " + self.client
         self.connected_clients -= 1
-        if self.clientConfigurator.connected_clients == 0:
-            print "!!!!!!!!!!! Stopping the configurator  !!!!!!!!!!!!!"
+        # if self.clientConfigurator.connected_clients == 0:
+        #     print "!!!!!!!!!!! Stopping the configurator  !!!!!!!!!!!!!"
             #reactor.stop()
 
     def connectionMade(self):

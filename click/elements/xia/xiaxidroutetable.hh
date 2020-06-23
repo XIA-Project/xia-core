@@ -52,6 +52,7 @@ typedef struct {
     unsigned flags;
     XID *nexthop;
     std::unique_ptr<struct sockaddr_in> nexthop_in;
+    bool neighbor;
 } XIARouteData;
 
 
@@ -92,6 +93,7 @@ protected:
     static int set_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_handler4(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int add_ip_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
+    static int remove_ip_handler(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int set_udpnext(const String &conf, Element *e, void *thunk, ErrorHandler *errh);
     static int remove_handler(const String &conf, Element *e, void *, ErrorHandler *errh);
     static int load_routes_handler(const String &conf, Element *e, void *, ErrorHandler *errh);

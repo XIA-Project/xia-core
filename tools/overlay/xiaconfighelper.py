@@ -37,7 +37,7 @@ class Helper(Int32StringReceiver):
 
     def connectionLost(self, reason):    
         # Clean up any state created in common_data for this connection
-        print "Connection to client lost"
+        print "Connection to controller lost"
 
     def handleInterfaceRequest(self, request):
         # Fill in interface information

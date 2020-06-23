@@ -11,6 +11,7 @@
 #include <click/router.hh>
 #include <click/element.hh>
 #include <click/hashtable.hh>
+#include <click/standard/scheduleinfo.hh>
 #include <click/handlercall.hh>
 
 
@@ -44,13 +45,47 @@ CLICK_DECLS
 void
 XIAOverlayRouted::add_handlers()
 {
-  add_write_handler("neighbor", add_neighbor, 0);
+  add_write_handler("addNeighbor", add_neighbor, 0);
+  add_write_handler("removeNeighbor", remove_neighbor, 0);
+
+}
+
+int
+XIAOverlayRouted::remove_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
+{
+  XIAOverlayRouted *r = static_cast<XIAOverlayRouted *>(e);
+
+  Vector<String> args;
+  cp_argvec(conf, args);
+
+  if (args.size() != 1)
+    return errh->error("Invalid args: ", conf.c_str());
+
+  String ad;
+
+  if (!cp_string(args[0], &ad)) {
+    return errh->error("Invalid AD");
+  }
+
+  std::map<std::string, NeighborEntry*>::iterator it;
+  std::string ad_str(ad.c_str());
+  it = r->route_state.neighborTable.find(ad_str);
+  if(it != r->route_state.neighborTable.end()) {
+    NeighborEntry *n = it->second;
+    r->route_state.neighborTable.erase(it);
+    delete(n);
+    printf("XIAOverlayRouted: removed neighborAD %s\n", ad.c_str());
+  }
+  else {
+    return errh->error("AD not found ", ad.c_str());
+  }
+
+  return 0;
 }
 
 int
 XIAOverlayRouted::add_neighbor(const String &conf, Element *e, void *thunk, ErrorHandler *errh)
 {
-  printf("Called add neighbor\n");
   XIAOverlayRouted *r = static_cast<XIAOverlayRouted *>(e);
 
   Vector<String> args;
@@ -90,6 +125,8 @@ XIAOverlayRouted::add_neighbor(const String &conf, Element *e, void *thunk, Erro
   //todo: check if the entry already exits
   r->route_state.neighborTable[entry->AD] = entry;
 
+  r->_n_updates = 1;
+
   return 0;
 }
 
@@ -121,6 +158,7 @@ XIAOverlayRouted::XIAOverlayRouted()
     printf("\n----XIAOverlayRouted: Started with ad: %s hid: %s hostname: %s----\n", route_state.myAD,
     route_state.myHID, _hostname.c_str());
   c = 0;
+  _n_updates = 0;
 }
 
 XIAOverlayRouted::~XIAOverlayRouted()
@@ -132,7 +170,7 @@ XIAOverlayRouted::sendLSA() {
   string message;
 
   Node n_ad(route_state.myAD);
-  printf("XIAOverlayRouted: sending lsa with ad %s\n", n_ad.to_string().c_str());
+  // printf("XIAOverlayRouted: sending lsa with ad %s\n", n_ad.to_string().c_str());
   // Node n_hid(route_state.myHID);
 
   Xroute::XrouteMsg msg;
@@ -214,7 +252,7 @@ XIAOverlayRouted::processLSA(const Xroute::XrouteMsg &msg) {
   Node  ad(a.type(), a.id().c_str(), 0);
 
   destAD  = ad.to_string();
-  printf("\n\nIn processLSA with destAD %s\n", destAD.c_str());
+  // printf("\n\nIn processLSA with destAD %s\n", destAD.c_str());
   // FIXME: this only allows for a single dual stack router in the network
   if (lsa.flags() & F_IP_GATEWAY) {
     route_state.dual_router_AD = destAD;
@@ -225,7 +263,7 @@ XIAOverlayRouted::processLSA(const Xroute::XrouteMsg &msg) {
     return 1;
   }
 
-  printf("In processLSA\n");
+  // printf("In processLSA\n");
 
   map<std::string, NodeStateEntry>::iterator it = route_state.networkTable.find(destAD);
   if(it != route_state.networkTable.end()) {
@@ -255,30 +293,43 @@ XIAOverlayRouted::processLSA(const Xroute::XrouteMsg &msg) {
 
     // fill the neighbors into the corresponding networkTable entry
     entry.neighbor_list.push_back(neighborAD);
-    printf("Adding neighbor entry %s\n", neighborAD.c_str());
+    // printf("Adding neighbor entry %s\n", neighborAD.c_str());
   }
 
   route_state.networkTable[destAD] = entry;
 
 
-  printf("LSA received src=%s, num_neighbors=%d \n",
-   (route_state.networkTable[destAD].dest).c_str(),
-   route_state.networkTable[destAD].num_neighbors );
+  // printf("LSA received src=%s, num_neighbors=%d \n",
+   // (route_state.networkTable[destAD].dest).c_str(),
+   // route_state.networkTable[destAD].num_neighbors );
 
 
   // route_state.calc_dijstra_ticks++;
 
   // if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
-  //   // Calculate Shortest Path algorithm
-    printf("Calcuating shortest paths\n");
+    // Calculate Shortest Path algorithm
+    // printf("Calcuating shortest paths\n");
+    // calcShortestPath();
+    // route_state.calc_dijstra_ticks = 0;
+
+    // // update Routing table (click routing table as well)
+    // updateClickRoutingTable();
+    updateRTable();
+  // }
+
+  return 1;
+}
+
+void
+XIAOverlayRouted::updateRTable() {
+    // printf("Calcuating shortest paths\n");
     calcShortestPath();
     route_state.calc_dijstra_ticks = 0;
 
     // update Routing table (click routing table as well)
     updateClickRoutingTable();
-  // }
 
-  return 1;
+    _n_updates = 0;
 }
 
 void 
@@ -317,10 +368,12 @@ XIAOverlayRouted::calcShortestPath() {
   route_state.networkTable[myAD].cost = 0;
   table.erase(myAD);
 
-  vector<std::string>::iterator it2;
-  for ( it2=route_state.networkTable[myAD].neighbor_list.begin() ; it2 < route_state.networkTable[myAD].neighbor_list.end(); it2++ ) {
 
-    tempAD = (*it2).c_str();
+  std::map<std::string, NeighborEntry*>::iterator it2;
+  // for ( it2=route_state.neig[myAD].neighbor_list.begin() ; it2 < route_state.networkTable[myAD].neighbor_list.end(); it2++ ) {
+
+  for( it2 = route_state.neighborTable.begin(); it2 != route_state.neighborTable.end(); it2++) {
+    tempAD = it2->first.c_str();
     route_state.networkTable[tempAD].cost = 1;
     route_state.networkTable[tempAD].prevNode = myAD;
   }
@@ -343,25 +396,33 @@ XIAOverlayRouted::calcShortestPath() {
     table.erase(selectedAD);
     route_state.networkTable[selectedAD].checked = true;
 
-    for ( it2=route_state.networkTable[selectedAD].neighbor_list.begin() ; it2 < route_state.networkTable[selectedAD].neighbor_list.end(); it2++ ) {
-      tempAD = (*it2).c_str();
+    vector<std::string>::iterator it3;
+    for ( it3=route_state.networkTable[selectedAD].neighbor_list.begin() ; it3 < route_state.networkTable[selectedAD].neighbor_list.end(); it3++ ) {
+      tempAD = (*it3).c_str();    
       if (route_state.networkTable[tempAD].checked != true) {
-        if (route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
+        if (route_state.networkTable[tempAD].cost ==0 || route_state.networkTable[tempAD].cost > route_state.networkTable[selectedAD].cost + 1) {
+
+          if(route_state.networkTable[tempAD].cost == 0) {
+            route_state.networkTable[tempAD].dest = tempAD;
+            route_state.networkTable[tempAD].num_neighbors = 0;
+          }
+
           route_state.networkTable[tempAD].cost = route_state.networkTable[selectedAD].cost + 1;
           route_state.networkTable[tempAD].prevNode = selectedAD;
+
         }
       }
     }
   }
 
-  string tempAD1, tempAD2;
+  std::string tempAD1, tempAD2;
   int hop_count;
   // set up the nexthop
   for ( it1=route_state.networkTable.begin() ; it1 != route_state.networkTable.end(); it1++ ) {
-
     tempAD1 = it1->second.dest;
     if ( myAD.compare(tempAD1) != 0 ) {
       tempAD2 = tempAD1;
+      // tempAD2 = route_state.networkTable[tempAD2].prevNode;
       hop_count = 0;
       while (route_state.networkTable[tempAD2].prevNode.compare(myAD)!=0 && hop_count < MAX_HOP_COUNT) {
         tempAD2 = route_state.networkTable[tempAD2].prevNode;
@@ -370,12 +431,19 @@ XIAOverlayRouted::calcShortestPath() {
       if(hop_count < MAX_HOP_COUNT) {
         route_state.ADrouteTable[tempAD1].dest = tempAD1;
         // route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2].HID;
-        route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->AD;
+        if(tempAD1.compare(tempAD2) != 0) {
+          route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->AD;
+        }
+        // add ipaddr as nexthop for neighbor
+        else {
+          route_state.ADrouteTable[tempAD1].nextHop = route_state.neighborTable[tempAD2]->addr + ":8770";
+        }
         route_state.ADrouteTable[tempAD1].port = route_state.neighborTable[tempAD2]->port;
       }
     }
   }
-  printRoutingTable();
+  // printf("\n\n");
+  // printRoutingTable();
 }
 
 void
@@ -465,7 +533,7 @@ XIAOverlayRouted::updateRoute(string cmd, const std::string &xid, int port,
     entry = String(mutableXID.c_str()) + sep + itoa(port) + sep + String(next.c_str()) + sep + itoa(flags);
   }
 
-  printf("\nXIAOverlayRouted: updateRoute for %s \n",entry.c_str());
+  // printf("\nXIAOverlayRouted: updateRoute for %s \n",entry.c_str());
 
   Element *re = this->router()->find(String(table.c_str()));
   if(re) {
@@ -553,7 +621,7 @@ XIAOverlayRouted::push(int port, Packet *p_in)
   struct click_udp *udp;
   
   size_t a = sizeof(*ip) + sizeof(*udp);
-  printf("XIAOverlayRouted: received packet of %d\n", p_in->length());
+  // printf("XIAOverlayRouted: received packet of %d\n", p_in->length());
   Xroute::XrouteMsg xmsg;
   if(p_in->length() > a) {
 
@@ -569,7 +637,7 @@ XIAOverlayRouted::push(int port, Packet *p_in)
         printf("Received hello message from %s\n",inet_ntoa(ip->ip_src));
       }
       else if(xmsg.type() == Xroute::LSA_MSG) {
-        printf("Received LSA_MSG from %s\n", inet_ntoa(ip->ip_src));
+        // printf("Received LSA_MSG from %s\n", inet_ntoa(ip->ip_src));
         processLSA(xmsg);
           // 5. rebroadcast this LSA
       }
@@ -578,23 +646,34 @@ XIAOverlayRouted::push(int port, Packet *p_in)
       }
     }
   }
+  p_in->kill();
+}
 
-  // std::string msg =  sendHello();
+int
+XIAOverlayRouted::initialize(ErrorHandler *errh) {
+  _timer.initialize(this);
+  _ticks = new Timer(this);
+  _ticks->initialize(this);
+  _ticks->schedule_after_msec(CALC_DIJKSTRA_INTERVAL);
+
+  return 0;
+}
+
+void
+XIAOverlayRouted::run_timer(Timer *timer) {
+
+  // printf("XIAOverlayRouted: run_task\n");
+  // route_state.calc_dijstra_ticks++;
+  // if (route_state.calc_dijstra_ticks == CALC_DIJKSTRA_INTERVAL) {
+  if(_n_updates)
+    updateRTable();
+  // }
+
   std::string msg = sendLSA();
-  c++; 
-
-  if(c>1) {
-    WritablePacket *q = Packet::make(1);
-    output(port).push(q);
-    return;    
-  }
-
-  printf("\n**********************\n getting neighbors c :%d\n", c);
-    
+  // printf("\n**********************\n getting neighbors c :%d\n", c);
   neighbor_broadcast(msg);
-
-  printf("\n**********************\n");  
-
+  // printf("\n**********************\n");
+  _ticks->reschedule_after_sec(CALC_DIJKSTRA_INTERVAL);
 }
 
 

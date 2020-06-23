@@ -33,7 +33,7 @@ from xiaconfigreader import XIAConfigReader
 from xiaclientconfigurator import XIAClientConfigurator
 from routerclick import RouterClick
 
-import inspect
+import time
 
 class ConfigRouter(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
@@ -44,12 +44,14 @@ class ConfigRouter(Int32StringReceiver):
         self.xid_wait = xid_wait
 
     def connectionLost(self, reason):
-        self.configurator.protocol_instances.remove(self)
-        if len(self.configurator.protocol_instances) == 0:
-            print "Going to configure clients now"
+        print "connection lost with client"
+        # self.configurator.protocol_instances.remove(self)
+        # if len(self.configurator.protocol_instances) == 0:
+        #     time.sleep(50)
+            # print "Going to configure clients now"
             # configure client after last router is configured
-            clientConfigurator = XIAClientConfigurator(self.configurator)
-            clientConfigurator.configureClient()
+            # clientConfigurator = XIAClientConfigurator(self.configurator)
+            # clientConfigurator.configureClient()
             #reactor.stop()
         
     def stringReceived(self, data):
@@ -195,6 +197,63 @@ class ConfigRouter(Int32StringReceiver):
             request.routes.route_cmds.append(sid_route)
         self.sendString(request.SerializeToString())
 
+
+    def sendRoutesRequest(self, event):
+        request = configrequest_pb2.Request()
+        request.type = configrequest_pb2.Request.IP_ROUTES
+
+        add_links = []
+        remove_links = []
+
+        try:
+            add_links = self.configurator.events[event]['add_links'][self.router]
+            print("Add links")
+            print add_links
+            link_info = self.configurator.config.link_info[self.router]
+            for other_router in add_links:
+                dest_ad, dest_hid = self.configurator.xids[other_router]
+                my_iface, other_iface = link_info[other_router]
+
+                # Convert our_iface to corresponding outgoing port number
+                my_ifaces = self.configurator.config.router_ifaces[self.router]
+                port = my_ifaces.index(my_iface)
+
+                # Their IP addr (from configurator.iface_addrs
+                ipaddr = self.configurator.iface_addrs[other_router, other_iface]
+                next_port = 8770 # Should be fixed or get from iface
+
+                # Add a new route request
+                route = "./bin/xroute -a AD,{},{},{}:{}".format(
+                        dest_ad, port, ipaddr, next_port)
+                request.routes.route_cmds.append(route)
+                print("Sending %s" %route)
+                dest_sid = self.configurator.config.sid[other_router]
+                sid_route = "./bin/xroute -a SID,{},{},{}:{},{}".format(
+                        dest_sid, port, ipaddr, 8772, 7)
+                print("Sending %s" %sid_route)
+                request.routes.route_cmds.append(sid_route)
+
+        except KeyError:
+            pass
+
+        try:
+            remove_links = self.configurator.events[event]['remove_links'][self.router]
+            print("remove links")
+            print remove_links
+
+            link_info = self.configurator.config.link_info[self.router]
+            for other_router in remove_links:
+                dest_sid = self.configurator.config.sid[other_router]
+                sid_route = "./bin/xroute -r SID,{}".format(dest_sid)
+                print("Sending %s" %sid_route)
+                request.routes.route_cmds.append(sid_route)
+
+        except KeyError:
+            pass       
+
+        if len(add_links) > 0 or len(remove_links) > 0:
+            self.sendString(request.SerializeToString())
+
     def handleIPRoutesResponse(self, response):
         if response.type != configrequest_pb2.Request.IP_ROUTES:
             print "ERROR: Invalid IP route config response"
@@ -211,10 +270,22 @@ class ConfigRouter(Int32StringReceiver):
             request.startxcache.hostname = self.router
             self.sendString(request.SerializeToString())
             # handleStartXcacheResponse will be called when xcache has started
-            return
+            # return
 
-        # Otherwise end the connection because the interaction is complete
-        self.transport.loseConnection()
+            # print "Back after configureClient"
+
+
+        # # Otherwise end the connection because the interaction is complete
+        # self.transport.loseConnection()
+
+        if not self.configurator.routers_setup:
+            self.configurator.first_route_req_count -= 1
+            # first event done, setup clients
+            if self.configurator.first_route_req_count == 0:
+                self.configurator.routers_setup = True
+                time.sleep(40)
+                self.configurator.configureClients()
+
 
     def handleStartXcacheResponse(self, response):
         if response.type != configrequest_pb2.Request.START_XCACHE:
@@ -247,8 +318,9 @@ class XIAConfigurator:
         self.resolvconf = ""
         self.xids = {} # router: (ad, hid)
         self.iface_addrs = {} # (router, iface_name) : ipaddr
-        self.connected_clients = []
-
+        self.first_route_req_count = 0
+        self.events = self.config.events
+        self.routers_setup = False
 
         print self.nameserver, 'is the nameserver'
         print 'Here are the routers we know of'
@@ -267,8 +339,31 @@ class XIAConfigurator:
             else:
                 print "ERROR: failure sending IP routes for a protocol"
 
-    def gotProtocol(self, protocol):
+    # All routers sent in their AD, HID. Send IP routes to all routers
+    def sendRoutes(self, event, result):
+        for (success, protocol) in result:
+            if success:
+                print "Sending IP routes to {}".format(protocol.router)
+                protocol.sendRoutesRequest(event)
+            else:
+                print "ERROR: failure sending IP routes for a protocol"
 
+
+    def runEvents(self, result):
+        print "Starting events"
+        for i, (event, val) in enumerate(self.events.items()):
+            print("Scheduling event %s" % event)
+            delay = int(val['delay'])
+            if i == 0:
+                self.first_route_req_count = val['link_count']
+            reactor.callLater(delay, self.sendRoutes, event, result)
+        
+    def configureClients(self):
+        print "Going to configure client"
+        clientConfigurator = XIAClientConfigurator(self)
+        clientConfigurator.configureClient()
+
+    def gotProtocol(self, protocol):
         self.protocol_instances.append(protocol)
 
     def configure(self):
@@ -289,16 +384,19 @@ class XIAConfigurator:
             # Link ConfigRouter protocol instance to endpoint
             d = connectProtocol(endpoint, ConfigRouter(router, self, xid_wait))
             d.addCallback(self.gotProtocol)
+    
 
         # Callback called, when all routers have collected their XIDs
         dl = defer.DeferredList(xid_waiters, consumeErrors=True)
-        dl.addCallback(self.sendIPRoutes)
+        # dl.addCallback(self.sendIPRoutes)
+        dl.addCallback(self.runEvents)
 
         reactor.run()
 
 
 if __name__ == "__main__":
     conf_file = os.path.join(xiapyutils.xia_srcdir(), 'tools/overlay/demo.conf')
-    config = XIAConfigReader(conf_file)
+    events_file = os.path.join(xiapyutils.xia_srcdir(), 'tools/overlay/events.conf')
+    config = XIAConfigReader(conf_file, events_file)
     configurator = XIAConfigurator(config)
     configurator.configure()
