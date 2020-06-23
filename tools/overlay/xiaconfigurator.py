@@ -226,6 +226,7 @@ class ConfigRouter(Int32StringReceiver):
                 route = "./bin/xroute -a AD,{},{},{}:{}".format(
                         dest_ad, port, ipaddr, next_port)
                 request.routes.route_cmds.append(route)
+                print("Sending %s" %route)
                 dest_sid = self.configurator.config.sid[other_router]
                 sid_route = "./bin/xroute -a SID,{},{},{}:{},{}".format(
                         dest_sid, port, ipaddr, 8772, 7)
@@ -282,6 +283,7 @@ class ConfigRouter(Int32StringReceiver):
             # first event done, setup clients
             if self.configurator.first_route_req_count == 0:
                 self.configurator.routers_setup = True
+                time.sleep(40)
                 self.configurator.configureClients()
 
 
