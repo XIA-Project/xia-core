@@ -39,8 +39,9 @@ click/Makefile: click/Makefile.in xia.mk
 
 
 # treat click special since we want multi-proc compiles
+# Choosing 4 processes as a placeholder that works for 8GB RAM
 click: click/Makefile
-	make -j$(NPROCS) -C $@
+	make -j4 -C $@
 
 # rules for all of the other directories
 $(filter-out click, $(MAKEDIRS)):
