@@ -550,17 +550,21 @@ start_click()
 		exit 1
 	fi
 
-	# create nodes.conf from the click config file
+	# nameserver pass in via cmd line, add it to nodes.conf before generating address.conf
+	if [ -f $NODECONF -a $NAMESERVER -eq 1 ]; then
+			printf "$HOSTNAME\tnameserver\n" >> $NODECONF
+	fi
+	# Check from xianet Reading topology and generating $NODECONF
 	echo "Reading topology and generating $NODECONF"
-	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT $NODECONF
+	$XIADIR/bin/read_topology $CONFPATH/$SCRIPT 
 
 	# nameserver was configured on cmd line, add it to the nodes file so we control
 	#  it properly
 	if [ "$NSHOST" != "" ]; then
 		printf "$NSHOST\tnameserver\n" >> $NODECONF
 	#elif [ $NAMESERVER -eq 1 -a "$NODETYPE" == "host" ]; then
-	elif [ $NAMESERVER -eq 1 ]; then
-		printf "$HOSTNAME\tnameserver\n" >> $NODECONF
+	#elif [ $NAMESERVER -eq 1 ]; then
+	#	printf "$HOSTNAME\tnameserver\n" >> $NODECONF
 	fi
 
 	if [ $RENDEZVOUS -eq 1 ]; then

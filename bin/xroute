@@ -571,7 +571,7 @@ class XrouteApp:
 
 		self.writeData(cmd)
 		print "added route for %s:%s" % (table, self.config.getAlias(xid))
-
+                print(self.getRouteTable())
 
 	#
 	# read a command file and add / delete routes as specified

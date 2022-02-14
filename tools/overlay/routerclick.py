@@ -56,6 +56,8 @@ log::XLog(VERBOSE 0, LEVEL 6);
         for index in range(4):
             if (index < num_interfaces):
                 rstr += 'rd[{}] -> rsock{};\n'.format(index, index)
+            else:
+                rstr += 'rd[{}] -> Discard;\n'.format(index)
 
 
         # rstr += '\n'

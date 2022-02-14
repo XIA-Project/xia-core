@@ -55,6 +55,12 @@ class Helper(Int32StringReceiver):
         #print "Got router.click file:\n-----------------------"
         #print request.routerconf.configfile
         #print "---------------------------"
+        print "Use the click config to create nodes from helper"
+        node_conf_file = os.path.join(srcdir,'etc/nodes.conf')
+        if not os.path.exists(node_conf_file):
+            print "create nodes.conf from topology if not existing\n"
+            subprocess.check_call([os.path.join(srcdir,'bin','read_topology'), conf_file])
+
         response = configrequest_pb2.Request()
         response.type = configrequest_pb2.Request.ROUTER_CONF
         self.sendString(response.SerializeToString())
@@ -68,7 +74,7 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def getXcacheAID(self):
-        with open("xcache.local.conf", 'r') as localconf:
+        with open("local.conf", 'r') as localconf:
             for line in localconf:
                 if not line.startswith('XCACHE_AID'):
                     continue
@@ -112,6 +118,7 @@ class Helper(Int32StringReceiver):
                 resolvconfreceived = True
 
         print "Got request to restart XIA:", request.startxia.command
+
         stopcmd = request.startxia.command.replace("restart", "stop")
         startcmd = request.startxia.command.replace("restart", "start")
 

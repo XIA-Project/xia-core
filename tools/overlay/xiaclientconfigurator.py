@@ -92,6 +92,7 @@ class ConfigClient(Int32StringReceiver):
     def connectionMade(self):
         # configure with default router
         self.connected_clients += 1
+        print "Step3. Check connect to client"
         self.sendConfig(self.clientConfigurator.clientConfig.default_router[self.client])
 
         if self.clientConfigurator.clientConfig.mobile[self.client] == True:
@@ -107,7 +108,7 @@ class ConfigClient(Int32StringReceiver):
     def sendConfig(self, router):
         response = clientconfig_pb2.Config()
         print "-----------------------------------"
-        print "Sending config to " + self.client
+        print "Step4. Sending config to " + self.client
         print "-----------------------------------"
         response.name = self.client
         response.ipaddr = self.clientConfigurator.clientConfig.router_addr[router]
@@ -117,7 +118,8 @@ class ConfigClient(Int32StringReceiver):
         response.AD = self.clientConfigurator.clientConfig.ad[router]
         response.HID =self.clientConfigurator.clientConfig.hid[router]
         response.serverdag = self.clientConfigurator.clientConfig.serverdag[self.client]
-
+        
+        print "serverdag updated with server's default route AD and HID", response.serverdag, "\n"
         self.sendString(response.SerializeToString())
         print response.SerializeToString()
         print "-----------------------------------"
@@ -137,13 +139,32 @@ class XIAClientConfigurator():
 	self.connected_clients = 0
         
 	clientConfig = XIAClientConfigReader('tools/overlay/client.conf')
+        updated_DAG =""
         for client in clientConfig.clients():
+            print "Step2. Check from clientconfig init"
             print client + ':'
             for router in clientConfig.routers[client]:
                 clientConfig.ad[router] = configurator.xids[router][0]
                 clientConfig.hid[router] = configurator.xids[router][1]
                 clientConfig.router_addr[router] = configurator.config.host_ipaddrs[router]
+                
+                #locate DAG from the server endpoint
+                if clientConfig.serverdag[client].find(clientConfig.aid[client]) != -1:
+                    updated_DAG = "RE " + clientConfig.ad[router] + " " + clientConfig.hid[router]+ " " + clientConfig.aid[client]
                 print configurator.xids[router]
+
+        #update Serverdag in client.conf to the DAG from default router connected to server endpoint
+        config_clientfile = RawConfigParser()
+        config_clientfile.read('tools/overlay/client.conf')
+        for section in config_clientfile.sections():
+            config_clientfile.set(section, "ServerDag", updated_DAG)
+        with open('tools/overlay/client.conf', 'w+') as cf:
+            config_clientfile.write(cf)
+
+        #upload newDAG to clientConfig for all endpoints
+        ClientConfig_u = XIAClientConfigReader('tools/overlay/client.conf')
+        for client in clientConfig.clients():
+            clientConfig.serverdag[client] = updated_DAG
 
         self.clientConfig = clientConfig
 

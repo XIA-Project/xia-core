@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+########################################
+#Generate nodes.conf on routers based on the click cofiguration file
+#Argument to pass:  click_configuration file
+#Output:  etc/nodes.conf
+########################################
+
 import sys
 import os
 import re
 import genkeys
-
-DEFAULT_PORT=1500
-DEFAULT_CACHE_IN_PORT=1501
-DEFAULT_CACHE_OUT_PORT=1502
 
 def help():
 	print '\nUsage: %s click_conf_file dest_nodeconf' % sys.argv[0]
@@ -36,54 +38,76 @@ def create_output_file(name):
 		print 'ERROR: unable to open %s for writing\n' % name
 		help()
 
-# start here
 
-# We take exactly 2 arguments
-if len(sys.argv) != 3:
+# TakeIn click_configuration file and create etc/nodes.conf
+if len(sys.argv) != 2:
 	help()
 topology_conf_file = sys.argv[1]
-nodes_conf_file	   = sys.argv[2]
+nodepath = os.path.dirname(os.path.dirname(os.path.abspath(topology_conf_file)))
+nodes_file_name = "nodes.conf"
 
-# Create the nodes.conf file
-nodeconf = create_output_file(nodes_conf_file)
-
-# pattern for comment containing nameserver host name
-ns_pattern = re.compile('//\s*(\w+)\s*::\s*nameserver')
+nodes_conf_file = os.path.join(nodepath, nodes_file_name)
+addr_conf_file = os.path.join(nodepath, 'address.conf')
 
 # pattern for a Click element instantiation
 # hostname :: element_type (argument1, argument2, ...)
 element_pattern = re.compile('^(\w+)\s*::\s*(XIA\w+)\s*\((.+)\);')
 
+# e.g. "host0    XIAEndHost"
+nodeconfpattern = re.compile('^(\w+)\s+(\w+)')
+
 # Nameserver hostname
 nshost = None
-
 # Read the bootstrapping click config file that defines the topology
 try:
-	with open(topology_conf_file) as conf_file:
-		for line in conf_file:
-			# Read nameserver from comment: '// host :: nameserver'
-			match = ns_pattern.match(line)
-			if match:
-				nshost = match.group(1)
-				continue
+        if not os.path.isfile(nodes_conf_file):
+	    with open(topology_conf_file) as conf_file:
+                with open(nodes_conf_file, 'w') as nodeconf:
+                    for line in conf_file:
+		        # Look for Click host/router definitions
+		        match = element_pattern.match(line)
+		        if not match:
+			    continue
 
-			# Look for Click host/router definitions
-			match = element_pattern.match(line)
-			if not match:
-				continue
+		        # We found a Click host/router instance
+		        hostname  = match.group(1)
+		        elemtype  = match.group(2)
+		        arguments = match.group(3).replace(' ','').split(',')
 
-			# We found a Click host/router instance
-			hostname  = match.group(1)
-			elemtype  = match.group(2)
-			arguments = match.group(3).replace(' ','').split(',')
+		        # Create a nodes.conf entry for this hostname
+		        nodeconf.write("%s\t%s\n" % (hostname, elemtype))
+        else:
+            print "using the existing nodes.conf"
+        
+        # Now use the nodes.conf to create address.conf on router:
 
-			# Create a nodes.conf entry for this hostname
-			nodeconf.write("%s\t%s\n" % (hostname, elemtype))
+        print 'Creating the address first without nameserver paramete'
+        with open(nodes_conf_file, 'r') as f_in:
+            #print(f_in.read())
+            with open(addr_conf_file, 'w') as f_out:
+                for line in f_in:
+                    match = nodeconfpattern.match(line)
+                    #print "Check match hostname ", match.group(1), "   " , match.group(2)
+                    if match:
+                        # if nameserver writeline as nodes.conf: host namesever
+                        if match.group(2) == 'nameserver':
+                            f_out.write('%s %s\n' % (match.group(1), match.group(2)))
+                        else:
+                            #print "Check Router type"
+                            # other routers/host type, put generated AD/HID in parentheses
+                            f_out.write('%s %s (' % (match.group(1), match.group(2)))
+
+                            # Assign an AD for every router
+                            if 'Router' in match.group(2):
+                                f_out.write('%s ' % genkeys.create_new_AD())
+
+                            # Assign the same HID for every interface this host has
+                            hid = genkeys.create_new_HID()
+                            print "HID on R1 ", hid , '\n'
+                            f_out.write(hid +')\n')
+            print "Complete the address.conf below"
+        with open(addr_conf_file, 'r') as readf:
+            print(readf.read())
 except:
 	help()
 
-# Add nameserver (if found) at the end of nodes.conf
-if nshost != None:
-	nodeconf.write("%s\t%s\n" % (nshost, 'nameserver'))
-
-nodeconf.close

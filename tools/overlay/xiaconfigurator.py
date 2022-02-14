@@ -187,9 +187,12 @@ class ConfigRouter(Int32StringReceiver):
             next_port = 8770 # Should be fixed or get from iface
 
             # Add a new route request
+            print("xiaconfigurator : set up route to destAD router");
             route = "./bin/xroute -a AD,{},{},{}:{}".format(
                     dest_ad, port, ipaddr, next_port)
             request.routes.route_cmds.append(route)
+
+            print("xiaconfigurator : set up route to destSID");
             dest_sid = self.configurator.config.sid[dest]
             sid_route = "./bin/xroute -a SID,{},{},{}:{},{}".format(
                     dest_sid, port, ipaddr, 8772, 7)
@@ -263,6 +266,7 @@ class ConfigRouter(Int32StringReceiver):
 
         # Now, request Xcache start if it was requested by user
         if self.configurator.config.xcache[self.router] == True:
+            print "Check xCache enabled on from Configurator ", self.router
             request = configrequest_pb2.Request()
             request.type = configrequest_pb2.Request.START_XCACHE
             cmd = "./build/xcache &"
@@ -283,7 +287,7 @@ class ConfigRouter(Int32StringReceiver):
             # first event done, setup clients
             if self.configurator.first_route_req_count == 0:
                 self.configurator.routers_setup = True
-                time.sleep(40)
+                time.sleep(100)
                 self.configurator.configureClients()
 
 
