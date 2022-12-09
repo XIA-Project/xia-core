@@ -1,4 +1,4 @@
-TARGETS=pubkeymgr xcache nameserver xrouted rendezvous xnetjd
+TARGETS=pubkeymgr xcache nameserver xrouted xnetjd
 CLEAN=$(addsuffix .build, $(TARGETS))
 
 .PHONY: all clean $(TARGETS)

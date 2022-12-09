@@ -4,15 +4,15 @@ endif
 
 
 # list of top level directories that need to be built
-MAKEDIRS=api click daemons applications arada tools
+MAKEDIRS=api click daemons tools/overlay
 
 # make sure we run clean in anything we built in
-CLEANDIRS=$(addsuffix .build, $(MAKEDIRS) doc)
+CLEANDIRS=$(addsuffix .build, $(MAKEDIRS))
 
 # list of directories with automated tests that should be run
 TESTDIRS=$(addsuffix .test, api)
 
-.PHONY: all config clean test deps fresh tags doc $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
+.PHONY: all config clean test deps fresh tags $(MAKEDIRS) $(CLEANDIRS) $(TESTDIRS)
 
 
 #### BUILD RULES
@@ -76,12 +76,12 @@ $(CLEANDIRS):
 	-make -C $(basename $@) clean
 
 # documents
-doc:
-	-make -C doc doc
+#doc:
+#	-make -C doc doc
 
 # get required packages
-deps:
-	@tools/getdeps
+#deps:
+#	@tools/getdeps
 
 # build project-wide ctags file
 tags:

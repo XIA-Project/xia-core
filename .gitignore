@@ -41,9 +41,7 @@ publishers
 
 # ignore session layer files on this branch only
 api/session
-applications/example/session
 daemons/session
-applications/example/videos/
 daemons/xroute/xrouted
 daemons/xcidrouted/bin/*
 daemons/xcidrouted/log
@@ -52,8 +50,6 @@ daemons/xcidrouted/log
 !daemons/xcidrouted/bin/getworkload.sh
 !daemons/xcidrouted/bin/startrouted.sh
 daemons/xcidrouted/stats/
-arada/waveserver/waveserver
-arada/waveserverip/waveserverip
 
 # output from scripts
 etc/click/host*.click
@@ -61,20 +57,7 @@ etc/click/router*.click
 etc/click/dual_stack_host*.click
 etc/click/dual_stack_router*.click
 
-# planetlab
-experiments/planetlab/logs/*.txt
-experiments/planetlab/logs/tunneling
-experiments/planetlab/logs/fourid
-
 key/*
-
-applications/video-use-case/src/manifest_server
-applications/video-use-case/src/proxy
-applications/video-use-case/src/video_publisher
-applications/video-use-case/src/xia_manifest_urls_dash2.txt
-arada/pdrtestip/pdrtestipclient
-arada/pdrtestip/pdrtestipserver
-arada/waveserveripudp/waveserveripudp
 
 # ignore git temp files
 *_BACKUP_*
@@ -85,10 +68,3 @@ arada/waveserveripudp/waveserveripudp
 # but don't ignore the .orig files that are in the click/driver tree. But why are they there???
 !click/drivers/*.orig
 
-applications/video-use-case/src/manifest_server
-applications/video-use-case/src/proxy
-applications/video-use-case/src/video_publisher
-applications/video-use-case/src/xia_manifest_urls_dash2.txt
-arada/pdrtestip/pdrtestipclient
-arada/pdrtestip/pdrtestipserver
-arada/waveserveripudp/waveserveripudp
