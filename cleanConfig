@@ -1,0 +1,17 @@
+#!/bin/bash
+
+XIADIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ -z "$XIADIR" ];then
+        echo "ERROR: XIADIR not set "
+        exit 1
+else
+        echo $XIADIR
+fi
+echo "Deleting router nodes.conf address.conf and resolv.conf files"
+rm -f $XIADIR/etc/nodes.conf
+rm -f $XIADIR/etc/address.conf
+rm -f $XIADIR/etc/resolv.conf
+echo "Deleting publiser's key files"
+rm -rf $XIADIR/key/
+rm -rf $XIADIR/ca/
+rm -rf $XIADIR/publishers/
