@@ -11,7 +11,7 @@ import xiapyutils
 import xiaconfigdefs
 import configrequest_pb2
 
-class RouterClick:
+class RouterFilegen:
     def __init__(self, name):
         self.name = name
         self.interfaces = []
