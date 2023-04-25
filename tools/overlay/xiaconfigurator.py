@@ -31,9 +31,10 @@ import clientconfig_pb2
 
 from xiaconfigreader import XIAConfigReader
 from xiaclientconfigurator import XIAClientConfigurator
-from routerclick import RouterClick
+from routerfilegen import RouterFilegen
 
 import time
+print("Changed Xiaconfigurator.py")
 
 class ConfigRouter(Int32StringReceiver):
     def __init__(self, router, configurator, xid_wait):
@@ -100,7 +101,7 @@ class ConfigRouter(Int32StringReceiver):
 
         # Build a router.click for the router
         # and save IP addr in configurator.iface_addrs
-        r_click = RouterClick(self.router)
+        r_click = RouterFilegen(self.router)
         for iface in response.ifrequest.interfaces:
             ifname, ipaddr, macaddr = iface.name, iface.ipaddr, iface.macaddr
             r_click.add_interface(ifname, ipaddr, macaddr)

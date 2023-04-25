@@ -21,11 +21,13 @@ from clickcontrol import ClickControl
 # XIA Overlay configuration libraries and definitions
 import configrequest_pb2
 import xiaconfigdefs
-from xiaconfigdefs import ROUTER_CLICK
+from xiaconfigdefs import ROUTER_FILE
 
 import interfaces
 
 picoquic_directory = "../picoquic"
+
+print("Changed xiaconfighelper.py")
 
 class Helper(Int32StringReceiver):
     def __init__(self, common_data, addr):
@@ -49,13 +51,13 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def handleRouterConfRequest(self, request):
-        conf_file = os.path.join(xiapyutils.xia_srcdir(), ROUTER_CLICK)
+        conf_file = os.path.join(xiapyutils.xia_srcdir(), ROUTER_FILE)
         with open(conf_file, 'w') as config:
             config.write(request.routerconf.configfile)
         #print "Got router.click file:\n-----------------------"
         #print request.routerconf.configfile
         #print "---------------------------"
-        print "Use the click config to create nodes from helper"
+        print "Use the router_file config to create nodes from helper"
         node_conf_file = os.path.join(srcdir,'etc/nodes.conf')
         if not os.path.exists(node_conf_file):
             print "create nodes.conf from topology if not existing\n"
