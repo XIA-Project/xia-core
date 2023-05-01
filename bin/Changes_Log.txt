@@ -1,0 +1,40 @@
+Changes in xiaconfigurator.py
+
+
+Make changes in routerclick.py, rename the file and change the class name to RouterFilegen
+
+1. Line 34 - routerclick changed to routerfilegen (only name change, no click functionality is being used)
+2. Line 34 - RouterClick changed to RouterFilegen (name of class changed in routerfilegen.py as well)
+3. Line 104 - Class name change to RouterFilegen
+
+Note:
+
+routerclick.py file had a class called RouterClick. Both filename as well as class name has been changed as mentioned above.
+This file seems to generate a file by concatinating many fields to the routers for config (Line 113 and 114).
+No click functionality is being used here so only file name has been changed to remove confusion for the clickless system.
+
+No other changes in xiaconfigurator.py file. Rest of the code has no click. Major changes in xroute file.
+
+
+Changes in xiaconfighelper.py
+
+1. Line 24 - ROUTER_CLICK changed to ROUTER_FILE - need to change in xiaconfigdefs.py
+2. Line 53 - same change
+
+Note:
+
+router.click file is being used to generate nodes.conf file which is sent back to the overlay controller.
+nodes.conf is needed while bootup. The router.click file contents seem to be the same as generated 
+in routerclick.py (now routerfilegen.py) file. Since no click is used here and it is only naming convention, 
+it is retained as is. Can change router.click filename to something else? Need to make same changes in xiaconfigdefs.py
+Line 58 - print statement still says click
+
+Changes in xroute.py
+
+addRoute and deleteRoute has been updated in order to call the forwarding table object file to add/remove
+routes from the forwarding table. Comments in the file describe the changes and implementation
+
+forwarding_tale.cpp
+
+This file has the hash table implementation to add/remove routes from the forwarding table. The forwading table is written into a file
+and manipulated when add or remove functions are called. Comments describe implementation in detail. The executable of this program is called in xroute 
