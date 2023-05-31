@@ -74,7 +74,8 @@ class Helper(Int32StringReceiver):
         self.sendString(request.SerializeToString())
 
     def getXcacheAID(self):
-        with open("local.conf", 'r') as localconf:
+        xcache_conf_file = os.path.join(os.getcwd(),'conf/local.conf')
+        with open(xcache_conf_file, 'r') as localconf:
             for line in localconf:
                 if not line.startswith('XCACHE_AID'):
                     continue
