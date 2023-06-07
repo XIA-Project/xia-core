@@ -592,10 +592,11 @@ class XrouteApp:
 		
 		cmd_ft = "%s,%s,%s,%s" % (table, xid, port, nexthop)
 		print("adding to forwarding_table")
+		print(cmd_ft)
 		# The input string to be passed as a command line argument to the C++ program
 		add = '-a'
 		# Call the C++ program as a subprocess and pass the input string as a command line argument
-		process = subprocess.Popen(["./home/vhuvinah/xia-core/bin/forwarding_table",add,cmd_ft], stdout=subprocess.PIPE, shell=True)
+		process = subprocess.Popen(["./home/vhuvinah/xia-core/bin/forwarding_table", add, cmd_ft], stdout=subprocess.PIPE, shell=True)
 
 		# Read the output of the subprocess and print it to the console
 		output, errors = process.communicate()
