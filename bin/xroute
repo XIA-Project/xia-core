@@ -537,12 +537,12 @@ class XrouteApp:
 		cmd_ft = "%s,%s" % (table, xid)
 		print("deleting from forwarding_table")
 
-        # The input string to be passed as a command line argument to the C++ program
+        	# The input string to be passed as a command line argument to the C++ program
 		remove = '-r'
-        # Call the C++ program as a subprocess and pass the input string as a command line argument
+        	# Call the C++ program as a subprocess and pass the input string as a command line argument
 		process = subprocess.Popen(["./forwarding_table",remove,cmd_ft], stdout=subprocess.PIPE)
 
-        # Read the output of the subprocess and print it to the console
+		# Read the output of the subprocess and print it to the console
 		output, errors = process.communicate()
 		if errors:
 		print("Errors occurred:", errors.decode())
