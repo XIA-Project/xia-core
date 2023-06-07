@@ -545,7 +545,7 @@ class XrouteApp:
 		# Read the output of the subprocess and print it to the console
 		output, errors = process.communicate()
 		if errors:
-		print("Errors occurred:", errors.decode())
+		  print("Errors occurred:", errors.decode())
 		print(output.decode())
 
 
@@ -600,7 +600,7 @@ class XrouteApp:
 		# Read the output of the subprocess and print it to the console
 		output, errors = process.communicate()
 		if errors:
-		print("Errors occurred:", errors.decode())
+		  print("Errors occurred:", errors.decode())
 		print(output.decode())
 
 	#
