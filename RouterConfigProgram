@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# The file is used to execute on each Router. It cleans caches generated through previous configuration run
+# and starts execute configuration helper from the router's xia-core directory
+
+XIADIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ -z "$XIADIR" ];then
+        echo "ERROR: XIADIR not set "
+        exit 1
+else
+        echo $XIADIR
+fi
+echo "Deleting system generated cached file nodes.conf address.conf and resolv.conf files"
+rm -f $XIADIR/etc/nodes.conf
+rm -f $XIADIR/etc/address.conf
+rm -f $XIADIR/etc/resolv.conf
+# clear the previous running services before starting new programs
+#pgrep -l -x '^(xnameservice|pubkeymgr)$'
+pkill -x '^(xnameservice|pubkeymgr|xcache)$'
+
+clear
+
+echo "Starting router configuration helper program......"
+python $XIADIR/tools/overlay/xiaconfighelper.py 

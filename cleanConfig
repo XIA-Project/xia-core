@@ -15,3 +15,6 @@ echo "Deleting publiser's key files"
 rm -rf $XIADIR/key/
 rm -rf $XIADIR/ca/
 rm -rf $XIADIR/publishers/
+
+pkill -x '^(xnameservice|pubkeymgr|xcache)$'
+clear

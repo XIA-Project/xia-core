@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# The file is executed on Controller when the configuration files are desired to passed from cmd
+# -e for events.conf; -c for demo.conf having xcache enabled; -d for defaul demo.conf
+# default demo.conf events.conf are defined inoverlay directory
+
+XIADIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ -z "$XIADIR" ];then
+        echo "ERROR: XIADIR not set "
+        exit 1
+else
+        echo $XIADIR
+fi
+while getopts e:cd opts; do
+	case ${opts} in
+		e) 
+		  EVENTCASE=${OPTARG}
+		  # echo "$EVENTCASE"
+		  cp $XIADIR/tools/overlay/conf/$EVENTCASE $XIADIR/tools/overlay/events.conf
+		  ;;
+		c)
+		 cp $XIADIR/tools/overlay/conf/xcache.conf $XIADIR/tools/overlay/demo.conf
+		 ;;
+		d)
+		  cp $XIADIR/tools/overlay/conf/demo.conf $XIADIR/tools/overlay/demo.conf
+		  ;;
+			
+	esac
+done
+clear
+
+echo "Starting configuration controller program......"
+python $XIADIR/tools/overlay/xiaconfigurator.py
