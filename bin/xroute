@@ -22,6 +22,7 @@ import datetime
 import telnetlib
 import socket
 import xiapyutils
+from subprocess import Popen, PIPE, CalledProcessError
 
 APP="xroute"
 APP_VERSION="1.5"
@@ -106,6 +107,7 @@ class Options:
 				self._host = a
 			elif o in ("--port"):
 				self._port = a
+                                print self._port
 			elif o in ("--type"):
 				self._types.append(a)
 			elif o in ("--version"):
@@ -257,6 +259,7 @@ class RouterConfig:
 class XrouteApp:
 	connected = False
 	csock = None
+        overlay_socket_created = True
 	device = xiapyutils.getxiaclickhostname()
 	types = []
 
@@ -266,6 +269,7 @@ class XrouteApp:
 	def run(self):
 		# load user defined XIDs
 		self.loadXids()
+                #self.loadsockconf()
 
 		# get the command line options
 		self.options = Options()
@@ -274,7 +278,6 @@ class XrouteApp:
 		# connect to click and parse the click configuration into our config object
 		self.connectToClick()
 		self.config = RouterConfig(self.readData("flatconfig"))
-
 
 		# if specified by the user, only get info for the specified XID types (AD, HID,...)
 		if (len(self.options.types())):
@@ -386,6 +389,33 @@ class XrouteApp:
 			self.errorExit(tn, "error retreiving data length")
 		return int(length)
 
+        #####################################################
+        #TEST RoutingSocket#
+        #a.open socket
+        #b.open input and outstream to Socket
+        #c.read and write routingcommand to socket to trigger routingtable update 
+        #d.cleanup
+
+        def loadsockconf(self):
+                print "Run loadsock!!"
+                f_path = os.path.dirname(os.path.realpath(__file__))
+                tail = f_path.rfind("/")
+                f_path = f_path[:tail] + "/etc/overlay_socket.csv"
+                fcmd = "%s/bin/xiaforwardingtable" % (f_path[:tail])
+
+                # pass socket configfile and router to create socket
+                ps = Popen([fcmd, '-s', f_path, self.device], stdout=PIPE)
+
+                ps_resp= ps.communicate()
+                if ps.returncode !=0:
+                    raise CalledProcessError(ps.returncode, ps.args)
+                overlay_socket_created = False
+                print ps_resp[0].decode("utf-8")             
+
+
+
+        #####################################################
+
 	#
 	# connect to the click control socket
 	#
@@ -484,12 +514,9 @@ class XrouteApp:
 
 				if self.options.verbose() == False:
 					nexthop = self.config.getAlias(nexthop)
-
 				text += "%-5s %-45s %2s%-11s %08x %s\n" % (table, xid,
 						port, self.portType(port), flags, nexthop)
 
-
-#		print "text = %s" % (text)
 
 		return text
 
@@ -531,6 +558,25 @@ class XrouteApp:
 		self.writeData(cmd)
 		print "deleted route for %s:%s" % (table, self.config.getAlias(xid))
 
+                ###Use new forwardingtable####
+                print "deleting route from forwardingtable:XID \n"
+                cmd_ft = "%s,%s" % (table, xid)
+                curr_path = os.path.dirname(os.path.realpath(__file__))
+                base_fp = curr_path.rfind("/")
+                ffile = curr_path[:base_fp] + "/routingeng/forwardingtables/"
+
+                fcmd = "%s/bin/xiaforwardingtable" % (curr_path[:base_fp])
+
+                # The input string to be passed as a command line argument to the C++ program
+                rm = '-r'
+                # Call the C++ program as a subprocess and pass the input string as a command line argument
+                ps = Popen([fcmd, rm, ffile,  cmd_ft], stdout=PIPE)
+
+                ps_resp= ps.communicate()
+                if ps.returncode !=0:
+                    raise CalledProcessError(ps.returncode, ps.args)
+                print ps_resp[0].decode("utf-8")
+
 
 	#
 	# send an individual add route command to click
@@ -567,12 +613,28 @@ class XrouteApp:
 			self.errorExit("port not specified")
 
 		cmd = "%s/xrc/n/proc/rt_%s.set4 %s,%s,%s,%s" % (self.device, table, xid, port, nexthop, flags)
-		print cmd
 
 		self.writeData(cmd)
 		print "added route for %s:%s" % (table, self.config.getAlias(xid))
-                print(self.getRouteTable())
 
+                ###Use new forwardingtable####
+                print "adding route into forwarding: TYPE, XID-Type, PORT, NEXTHOP,FLG \n"
+                cmd_ft = "%s,%s,%s,%s,%s" % (table, xid, port, nexthop,flags)
+                curr_path = os.path.dirname(os.path.realpath(__file__))
+                base_fp = curr_path.rfind("/")
+                ffile = curr_path[:base_fp] + "/routingeng/forwardingtables/"
+
+                fcmd = "%s/bin/xiaforwardingtable" % (curr_path[:base_fp])
+
+                # The input string to be passed as a command line argument to the C++ program
+                add = '-a'
+                # Call the C++ program as a subprocess and pass the input string as a command line argument
+                ps = Popen([fcmd, add, ffile,  cmd_ft], stdout=PIPE)
+ 
+                ps_resp= ps.communicate()
+                if ps.returncode !=0:
+                    raise CalledProcessError(ps.returncode, ps.args)
+                print ps_resp[0].decode("utf-8")
 	#
 	# read a command file and add / delete routes as specified
 	#

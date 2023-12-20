@@ -11,10 +11,14 @@ echo "Deleting router nodes.conf address.conf and resolv.conf files"
 rm -f $XIADIR/etc/nodes.conf
 rm -f $XIADIR/etc/address.conf
 rm -f $XIADIR/etc/resolv.conf
-echo "Deleting publiser's key files"
-rm -rf $XIADIR/key/
-rm -rf $XIADIR/ca/
-rm -rf $XIADIR/publishers/
+rm -f $XIADIR/etc/overlay_socket.csv   $XIADIR/routingeng/forwardingtables/xiaforwardingdata.csv
 
+# clear the previous running services before starting new programs
+pgrep -l -x '^(xnameservice|pubkeymgr|xcache)$'
 pkill -x '^(xnameservice|pubkeymgr|xcache)$'
 clear
+
+# echo "Deleting publiser's key files"
+# rm -rf $XIADIR/key/
+# rm -rf $XIADIR/ca/
+# rm -rf $XIADIR/publishers/

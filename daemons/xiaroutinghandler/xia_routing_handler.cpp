@@ -15,7 +15,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-//#include "fd_manager.h"             // FdManager
 #include "dagaddr.hpp"
 #include <memory>
 #include <map>
@@ -43,7 +42,7 @@ void print_address(struct sockaddr* address, char* label)
                 ((struct sockaddr_in*)address)->sin_port :
                 ((struct sockaddr_in6*)address)->sin6_port;
         port = ntohs(port);
-        printf("Checklabel %s %s, port %d\n", label, x, port);
+	printf("Checklabel %s %s, port %d\n", label, x, port);
 }
 
  /* The function is to lookup xiaforwarding data using the key xid 
@@ -87,7 +86,6 @@ return s_dest;
  */
 map<int, std::string> iface_socket_init(){
 	map<int, string> overlay_sock;
-	int retval=0;
 	string ssocket;
 	//open the iface file
 	std::ifstream iface_f("./etc/overlay_socket.csv");
@@ -127,7 +125,7 @@ map<int, std::string> iface_socket_init(){
 
 map<std::string, int> create_sds_iface(std::map<int, string> map_iface) {
         struct addrinfo hints,*server;
-        int r, sockfd, ret;
+        int r, sockfd;
         map<std::string, int> if_sock;
         std::map<int, string>::iterator it = map_iface.begin();
         char socket_if_lable[] = "IF socket";
@@ -198,12 +196,11 @@ map<std::string, int> create_sds_iface(std::map<int, string> map_iface) {
  */
 int processing_forward_packet(int sockfd, std::string nexthop_str, struct msghdr msg){
 	//now open udp sockets with this iface to connect nexthop IP:Port to send packet
-	int rv, sd, r;
+	int rv, sd;
 	int numbytes =0;
         struct addrinfo servaddr, *servinfo;
         struct sockaddr_in local_outip;
         char EndNodelabel[]= "R2 label:";
-        char destipstr[100];
 
 	//nexthop as transmit destination address	
 	std::string nexthop_ip, nexthop_port;
@@ -259,7 +256,7 @@ return numbytes;
  */
 
 int check_processing_recv(int sockfd){
-        int bytes_count, bytes_sent;
+        int bytes_count;
         socklen_t fromlen;
         struct sockaddr fromaddr;
         char ipstr[1024], ipservice[20];
@@ -291,14 +288,12 @@ int check_processing_recv(int sockfd){
         }
 
 int processing_recv_packet(int sockfd){
-        int out_fd,retval=0, numbytes=0;
+	int retval=0, numbytes=0;
         std::string destTocheck("");
-        socklen_t client_size;
         //load xiaforwardingtable file to lookup
         std::string testpath ="./routingeng/forwardingtables/xiaforwardingdata.csv";
 
         //step4. obtain client input from recv function; &client is referred as clientAddr used for later nameinfo call
-        client_size = sizeof(struct sockaddr);
         ///r = recvfrom(sockfd,c_msg, maxBytes,0,&client,&client_size);
 
         //step5. process data to get the client name and sent response  --GOOD
@@ -345,21 +340,21 @@ int processing_recv_packet(int sockfd){
 	int payload_offset = sizeof(node_t) * (xiah.dnode + xiah.snode);
     	memcpy(c_buffer, &(addrspluspayload[payload_offset]), payload_length);
 	std::string s( reinterpret_cast< char const* >(c_buffer) ) ;
-    	std::cout<<"Check Msg sent: "<<s.c_str() << std::endl;
+    	//std::cout<<"check Msg sent: "<<s.c_str() << std::endl;
         printf("payload_length %d\n" , payload_length);
     }
 
     //step6. Now process the receiving packet:lookup routing table to find dest DAG from receiving
 	Graph our_addr, their_addr;
         std::string  destTocheck_ip("");
-        int payload_length = ntohs(xiah.plen);
+        //int payload_length = ntohs(xiah.plen);
         const node_t* dst_wire_addr = (const node_t*)addrspluspayload;
         const node_t* src_wire_addr = dst_wire_addr + xiah.dnode;
         our_addr.from_wire_format(xiah.dnode, dst_wire_addr); //retrieve packet destAddr from dnode
         their_addr.from_wire_format(xiah.snode, src_wire_addr);//retrieve srcaddr that packet send from
 
-	cout<<"Reading from XIA header dest dag: "<< our_addr.dag_string().c_str()<<endl;
-        cout<<"Receiving from sourceAddr: "<<their_addr.dag_string().c_str()<<endl;
+	//cout<<"Check: reading from XIA header dest dag: "<< our_addr.dag_string().c_str()<<endl;
+        //cout<<"Check: receiving from sourceAddr: "<<their_addr.dag_string().c_str()<<endl;
 
         Node my_aid = our_addr.intent_AID();
         std::string aid_str =my_aid.to_string();
@@ -373,10 +368,9 @@ int processing_recv_packet(int sockfd){
         }
         destTocheck = get_dest_addr_str(testpath, aid_str);
         if(!destTocheck.empty()){ //final step
-                printf("Check AID nexthop: %s\n", destTocheck.c_str());
+                //printf("Check: AID nexthop: %s\n", destTocheck.c_str());
                 //send nexthop
-		 numbytes = processing_forward_packet (sockfd, destTocheck, msg);
-		//int retval = sendmsg(out_fd, &msg, 0);
+		 numbytes = processing_forward_packet(sockfd, destTocheck, msg);
 		//printf("send packet to dest %d \n\n", retval);
 
         }else {
@@ -391,30 +385,24 @@ int processing_recv_packet(int sockfd){
                         //wait for next cycle when AID routing is up on forwardingtable
                 } else {
                 	destTocheck_ip= destTocheck.substr(0,destTocheck.find(":")); //only IP
-                	printf("Check AD nexthop IPAddr: %s\n", destTocheck_ip.c_str());
+                	//printf("Check: AD nexthop IPAddr: %s\n", destTocheck_ip.c_str());
 
     			//step8. seperate process forwarding packet out to nexthop
                 	//socket binded with specific output interface IP
                 	numbytes= processing_forward_packet(sockfd, destTocheck, msg);
 		}
         }
+	std::cout<<"Check: number of bytes processed: " <<numbytes<<std::endl;
         //step6. clean-up and close
         //freeaddrinfo(server);
 	//close(sockfd);
-        return retval;
+        return numbytes;
 }
 
 int main()
 {
-
-        struct addrinfo hints,*server;
-        struct sockaddr client;
-        socklen_t client_size;
         int numByteRecv=0;
         //const int size = 1024;
-	const size_t maxBytes = MSGBUFSIZE - 1;
-        char input[MSGBUFSIZE],output[MSGBUFSIZE];
-	std::string test_dest("");
 	std::vector<int> sockIF_lst;
 	int ret_val, max_sd=0;
 

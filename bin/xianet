@@ -24,7 +24,7 @@ VERSION=2.0
 
 # click parameters
 CLICKPATH=$XIADIR/click
-CONFPATH=$XIADIR/etc/click/
+CONFPATH=$XIADIR/etc/click
 CLICK=$CLICKPATH/userlevel/click
 SCRIPT=""
 
@@ -32,7 +32,7 @@ NODECONF=$XIADIR/etc/nodes.conf
 ADDRCONF=$XIADIR/etc/address.conf
 RESOLVCONF=$XIADIR/etc/resolv.conf
 
-ALL_PROCESSES="click xrouted xnetjd xcache xnameservice xstats xstatserver pubkeymgr"
+ALL_PROCESSES="click xrouted xnetjd xcache xstats xstatserver pubkeymgr"
 
 NAME=`basename $0`
 VERBOSE=0
@@ -342,7 +342,7 @@ router()
 	case $action in
 		"start")
 			cd $XIADIR/bin
-#			./xrouted -h $host $LOG_FLAGS &
+#			./xrouted -h $host &
 #			./xnetjd --accesspoint --layer2 $L2_TYPE --hostname $host -l $LOG_LEVEL $V_FLAG &
 #			./xcache -h $host $LOG_FLAGS &
 			sleep 0.5
@@ -354,7 +354,7 @@ router()
 			;;
 		"check")
 #			check_service $host "xrouted"
-#			check_service $host "xnetjd"
+#  			check_service $host "xnetjd"
 #			check_service $host "xcache"
 			;;
 		*)
@@ -401,20 +401,20 @@ nameserver()
 	local action=$2
 
 	cd $XIADIR/bin
-	case $action in
-		"start")
-			./xnameservice -h $host $LOG_FLAGS &
-			;;
-		"stop")
-			kill_service $host "xnameservice"
-			;;
-		"check")
-			check_service $host "xnameservice"
-			;;
-		*)
-			echo "unrecognized action: $action"
-			;;
-	esac
+#	case $action in
+#		"start")
+#			./xnameservice -h $host $LOG_FLAGS &
+#			;;
+#		"stop")
+#			kill_service $host "xnameservice"
+#			;;
+#		"check")
+#			check_service $host "xnameservice"
+#			;;
+#		*)
+#			echo "unrecognized action: $action"
+#			;;
+#	esac
 }
 
 #
@@ -542,7 +542,7 @@ start_click()
 
 	# create a click conf file from a template if necessary
 	create_click_config
-	printf "\nXIA using script: $SCRIPT\n"
+	#printf "\nXIA using script: $SCRIPT\n"
 
 	if [ ! -f $CONFPATH/$SCRIPT ]; then
 		SNAME=`basename $SCRIPT .click`
@@ -692,7 +692,7 @@ create_click_config()
 		echo "Building configuration from template"
 		python $XIADIR/bin/xconfig.py $CONFFLAGS
 	else
-		echo -n "NOTE: Config file $CONFPATH/$SCRIPT exists. "
+		#echo -n "NOTE: Config file $CONFPATH/$SCRIPT exists. "
 		echo "Skipped building from template."
 	fi
 }
@@ -719,11 +719,11 @@ case $1 in
 			echo "Copy resolv.conf from the nameserver host and start again"
 			exit -1
 		fi
-		[ $NO_CLICK != 1 ] && start_click
+ 		[ $NO_CLICK != 1 ] && start_click
 		publisher_keymgr "start"
 		process_nodes "start"
 		visualizer "start"
-		check_service "click"
+		#check_service "click"
 		process_nodes "check"
 		publisher_keymgr "check"
 		visualizer "check"
@@ -748,7 +748,7 @@ case $1 in
 		process_nodes "start"
 		visualizer "start"
 		publisher_keymgr "start"
-		check_service "click"
+		#check_service "click"
 		process_nodes "check"
 		publisher_keymgr "check"
 		visualizer "check"
@@ -757,7 +757,7 @@ case $1 in
 		clean_conf_and_keys
 		;;
 	check)
-		check_service "click"
+		#check_service "click"
 		process_nodes "check"
 		publisher_keymgr "check"
 		visualizer "check"

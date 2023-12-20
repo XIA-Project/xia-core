@@ -57,26 +57,11 @@ typedef struct {
         std::string  flags;
 } RouterEntry;
 
-class XIAforwardingtable {
-	public:
-	XIAforwardingtable();
-	static void add_to_table(unordered_map<string, RouterEntry>& router_table, RouterEntry entry);
-	static void delete_from_table(unordered_map<string, RouterEntry>& router_table, string xid);
-	static void display_table(const unordered_map<string, RouterEntry> &router_table);
-        	int lookup_Route(unordered_map<string, RouterEntry>& _rt, string xid );
-	static void write_table_to_file(string fpath, unordered_map<string, RouterEntry>& router_table);
-	static void read_table_from_file(string fpath, unordered_map<string, RouterEntry>& router_table);
-	static void incomingPacket();
-	int init_socket (string ip, string rname);
-
-	unordered_map<string, RouterEntry> route_table;
-//	int create_overlay_socket(string fpath, string rname);
-	int get_socketfd();
-	int get_tableflg();
-    	private:
-        int _sockfd;
-	int _hastable;
-};
-
+void add_to_table(unordered_map<string, RouterEntry>& router_table, RouterEntry entry);
+void delete_from_table(unordered_map<string, RouterEntry>& router_table, string xid);
+void display_table(const unordered_map<string, RouterEntry> &router_table);
+int lookup_Route(unordered_map<string, RouterEntry>& _rt, string xid );
+void write_table_to_file(string fpath, unordered_map<string, RouterEntry>& router_table);
+void read_table_from_file(string fpath, unordered_map<string, RouterEntry>& router_table);
 
 #endif /* XIAFORWARDINGTABLE_H */

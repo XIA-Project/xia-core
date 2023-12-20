@@ -1,8 +1,10 @@
 # Python standard libraries
-import os
+import os, csv
 import sys
 import subprocess
 import inspect
+import socket
+import random
 
 # Install python-twisted package for this functionality
 from twisted.internet.protocol import Protocol, Factory
@@ -22,6 +24,7 @@ from clickcontrol import ClickControl
 import configrequest_pb2
 import xiaconfigdefs
 from xiaconfigdefs import ROUTER_CLICK
+from xiaconfigdefs import SOCKET_CONF
 
 import interfaces
 
@@ -41,9 +44,19 @@ class Helper(Int32StringReceiver):
 
     def handleInterfaceRequest(self, request):
         # Fill in interface information
+        socket_conf_file = os.path.join(xiapyutils.xia_srcdir(), SOCKET_CONF)
+        iface_lsts=[]
         for if_info in request.ifrequest.interfaces:
             if_info.ipaddr = interfaces.get_ip_addr(if_info.name)
             if_info.macaddr = interfaces.get_mac_addr(if_info.name)
+            #print "IFace ipaddr: " ,if_info.ipaddr
+            #print "IFace macaddr: ", if_info.macaddr
+            iface_lsts.append([if_info.name, if_info.ipaddr, if_info.macaddr])
+        with open(socket_conf_file, "w") as socket_conf:
+            writer = csv.writer(socket_conf)
+            writer.writerow(['name','ipaddr','macaddr'])
+	    writer.writerows(iface_lsts)
+        socket_conf.close()
 
         # Send the if_request back to the requestor
         self.sendString(request.SerializeToString())
@@ -52,10 +65,7 @@ class Helper(Int32StringReceiver):
         conf_file = os.path.join(xiapyutils.xia_srcdir(), ROUTER_CLICK)
         with open(conf_file, 'w') as config:
             config.write(request.routerconf.configfile)
-        #print "Got router.click file:\n-----------------------"
         #print request.routerconf.configfile
-        #print "---------------------------"
-        print "Use the click config to create nodes from helper"
         node_conf_file = os.path.join(srcdir,'etc/nodes.conf')
         if not os.path.exists(node_conf_file):
             print "create nodes.conf from topology if not existing\n"
@@ -146,6 +156,7 @@ class Helper(Int32StringReceiver):
         xdag_cmd = os.path.join(xiapyutils.xia_srcdir(), 'bin/xdag')
         xdag_out = subprocess.check_output(xdag_cmd, shell=True)
         router, re, ad, hid = xdag_out.split()
+        print "Gather xid info: " , xdag_out.split()
         request.gatherxids.ad = ad
         request.gatherxids.hid = hid
         self.sendString(request.SerializeToString())
@@ -159,6 +170,12 @@ class Helper(Int32StringReceiver):
             self.handleRoutesRequest(request)
         elif request.type == configrequest_pb2.Request.START_XIA:
             self.handleStartXIARequest(request)
+            fp = srcdir + "/etc/overlay_socket.csv"
+            #subprocess.Popen([os.path.join(srcdir,'bin','xiaroutinghandler')])
+            #p_resp= p.communicate()
+            #if p.returncode !=0:
+             #   raise subprocess.CalledProcessError(p.returncode, p.args)
+            #print p_resp[0].decode("utf-8")
         elif request.type == configrequest_pb2.Request.GATHER_XIDS:
             self.handleGatherXIDsRequest(request)
         elif request.type == configrequest_pb2.Request.START_XCACHE:

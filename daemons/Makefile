@@ -1,4 +1,4 @@
-TARGETS=pubkeymgr xcache nameserver xrouted xiaforwardingtable xnetjd
+TARGETS=pubkeymgr xcache nameserver xrouted xiaforwardingtable xiaroutinghandler xnetjd
 CLEAN=$(addsuffix .build, $(TARGETS))
 
 .PHONY: all clean $(TARGETS)
